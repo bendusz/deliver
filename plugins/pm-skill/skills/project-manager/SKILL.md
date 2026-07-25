@@ -76,9 +76,10 @@ Run reviewers as a **risk-selected panel** (see `references/review-gates.md`), n
 When the OpenAI Codex CLI is installed, `/pm-skill:codex-review` can add an optional independent
 second-model review alongside the panel (never as a replacement for it), and `/pm-skill:codex-help`
 offers a one-off second opinion on a consequential decision — use sparingly.
-**Model tiering:** every agent ships pinned to an explicit model and effort level —
-`expert-builder` on the top-tier model, `security-auditor` and `debugger` at high effort, the rest
-one tier down at medium effort. See `references/model-tiering.md` for the mapping and overrides.
+**Model tiering:** every agent ships pinned to an explicit model and effort level — the
+judgement-heavy core on `opus` (`expert-builder` at `xhigh` effort, `security-auditor` and
+`debugger` at `high`, the rest at `medium`), with `codebase-analyst` and `technical-writer` on
+`sonnet`. See `references/model-tiering.md` for the mapping and overrides.
 
 ## Bundled templates
 Project-file templates live in this plugin's `templates/` directory
