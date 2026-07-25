@@ -2,7 +2,7 @@
 name: technical-writer
 description: Use at sprint or project boundaries, once work has shipped, to update user-facing docs — README sections, usage docs, CHANGELOG entries, and the completion report — from the plan, pm/log.md, and story files. Writes documentation only, never source, tests, or config. <example>Sprint 1's stories are merged, so the PM dispatches technical-writer with the plan and pm/log.md to refresh the README and draft the completion report.</example>
 tools: Read, Write, Edit
-model: opus
+model: sonnet
 effort: medium
 color: yellow
 ---

@@ -2,8 +2,8 @@
 name: expert-builder
 description: Use when a build-ready story file is handed over for implementation — it writes the code and tests for exactly that one story, follows the project's CLAUDE.md, runs the story's verification command and the tests before reporting, and returns a structured summary. Not for multi-story work or unscoped changes. <example>The PM has docs/stories/S1-2-auth.md build-ready and dispatches expert-builder with that story path to implement it.</example>
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: fable
-effort: medium
+model: opus
+effort: xhigh
 color: blue
 ---
 

@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here.
 
+## 0.11.0 — 2026-07-25
+
+Model consolidation for the Claude 5 family — Opus 5 closed the gap that justified Fable for
+code-writing, so the shipped defaults get cheaper with quality concentrated where it counts.
+
+- **`expert-builder` re-tiered** from `fable`/`medium` to `opus`/`xhigh` — one model for the whole
+  judgement-heavy core, with effort (not model tier) as the quality lever; the builder is now the
+  deepest-thinking agent in the fleet.
+- **Light roles to `sonnet`**: `codebase-analyst` and `technical-writer` drop from `opus` — the two
+  roles least sensitive to model tier. All gate-bearing roles (reviews, verification, tests) stay
+  on `opus`; `security-auditor` and `debugger` keep `high` effort.
+- **Aliases, not IDs**: pins stay on `opus`/`sonnet`, resolving to Opus 5 / Sonnet 5 today and
+  auto-tracking future releases. Re-pin `fable` per agent frontmatter to restore the old builder.
+- **Docs updated** — `references/model-tiering.md` rewritten around the v0.11 mapping; the
+  SKILL.md tiering summary matches.
+
 ## 0.10.1 — 2026-07-16
 
 Hook hardening — fixes the six findings from a whole-codebase codex review (gpt-5.6-sol). New

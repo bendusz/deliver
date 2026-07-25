@@ -2,7 +2,7 @@
 name: codebase-analyst
 description: Use PROACTIVELY before planning any work in an existing or unfamiliar codebase — it maps architecture, conventions, the real test/lint/build commands, and where new code should go into a concise context pack for plans and self-contained stories. Read-only. <example>The user wants a feature added to a brownfield repo, so before writing the plan the PM dispatches codebase-analyst to learn the architecture and conventions.</example>
 tools: Read, Grep, Glob
-model: opus
+model: sonnet
 effort: medium
 color: cyan
 ---
