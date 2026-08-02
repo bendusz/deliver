@@ -89,3 +89,12 @@ Scope keywords: `recent` = last commit (`--commit HEAD`), `worktree` = `--uncomm
 - Exit codes: `0` success · `1` runtime/auth failure · `2` CLI usage error.
 - Streams: progress + session header (model/sandbox/effort/session id) → **stderr**; final
   message → **stdout** (or the `-o` file).
+
+## Web search (`--search`) — noted 2026-08-02, codex-cli 0.145.0
+
+`codex exec --help` does NOT accept `--search` as of codex-cli 0.145.0 (verified: `codex exec
+--help | grep -i -- '--search'` returns no match, and the full `--help` output has no
+search-related flag). `codex exec review --help` likewise has no `--search`. The `codex-researcher`
+agent probes `codex exec --help` for this flag at its own runtime and adds it when present, so on
+installations where it is supported it should still get live sources; on installations like this
+one it falls back to model knowledge + repo reading.
