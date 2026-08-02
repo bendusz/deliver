@@ -5,7 +5,7 @@ Control cost/quality by giving heavier work a stronger model and routine work a 
 ## Shipped defaults (v0.12)
 Every agent ships pinned to an explicit model **and** reasoning-effort level, so the workflow's
 behaviour is reproducible regardless of which model the session happens to run. The judgement-heavy
-core runs on one model — `opus` — differentiated by effort; the two breadth/documentation roles run
+core runs on one model — `opus` — differentiated by effort; the breadth/documentation roles run
 on `sonnet`. Aliases resolve to the Claude 5 family (`opus` → Opus 5, `sonnet` → Sonnet 5) and
 auto-track future releases within each tier:
 
