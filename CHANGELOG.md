@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## 0.12.0 — 2026-08-02
+
+Research agents — the fleet gains an external-research role and an optional second-model
+counterpart; findings persist under `docs/research/` instead of dying with the session.
+
+- **New `researcher` agent** (`sonnet`/`medium`) — web-capable (WebSearch/WebFetch); answers one
+  tightly-scoped external question per dispatch (library choice, SDK facts, prior art) with
+  sourced findings and an explicit recommendation; writes `docs/research/YYYY-MM-DD-<slug>.md`
+  and returns a ≤20-line digest. Write access is prompt-constrained to `docs/research/` only.
+- **New `codex-researcher` agent** (`sonnet`/`medium`) — drives `codex exec --sandbox read-only
+  --ephemeral` (default `gpt-5.6-terra` @ `high`, `--search` when the CLI supports it) for an
+  independent second-model research opinion; risk-selected alongside `researcher` for
+  consequential or contested questions, mirroring codex-review vs the review panel; returns
+  UNAVAILABLE cleanly when the codex CLI is missing; attributed report at
+  `docs/research/YYYY-MM-DD-<slug>-codex.md`.
+- **Dispatch guidance rerouted** — SKILL.md and the discovery/specification/planning references
+  now send research to `researcher` instead of the built-in `general-purpose`/`Explore` agents.
+- **Docs** — model-tiering table extended (both new agents on `sonnet`/`medium`); README roster
+  updated; codex `--search` non-support (codex-cli 0.145.0) recorded in `docs/codex-cli-reference.md`.
+
 ## 0.11.0 — 2026-07-25
 
 Model consolidation for the Claude 5 family — Opus 5 closed the gap that justified Fable for
