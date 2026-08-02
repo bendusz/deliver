@@ -7,7 +7,7 @@ contradictions; it **never** fixes them. Driven by `/pm-skill:analyze`.
 ## Read-only contract
 Read the artifacts; produce a report. **Never** edit, create, scaffold, or fix anything — not even
 logs or state. Offer remediation as *suggestions* only. If the artifact set is large, delegate the
-reading to a read-only `general-purpose`/`Explore` subagent and take back only the findings.
+reading to a read-only subagent (e.g. `codebase-analyst`) and take back only the findings.
 
 ## Inputs (whichever exist)
 `docs/constitution.md`, `docs/spec.md`, `docs/plan.md`, `docs/stories/*.md`, `pm/pm-state.json`,
