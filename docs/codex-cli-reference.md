@@ -2,8 +2,8 @@
 
 Everything here was verified on 2026-07-16 against **codex-cli 0.145.0-alpha.4** (latest stable
 `rust-v0.144.5`), the hosted docs (`learn.chatgpt.com/docs/*` — all `developers.openai.com/codex/*`
-URLs 308-redirect there), and live runs. It backs `/pm-skill:codex-review` and
-`/pm-skill:codex-help`. Re-verify against `codex exec --help` / `codex exec review --help` when the
+URLs 308-redirect there), and live runs. It backs `/pm-skill:codex-review`, `/pm-skill:codex-help`, and the `codex-researcher` agent.
+Re-verify against `codex exec --help` / `codex exec review --help` when the
 CLI major-bumps — third-party blogs are unreliable (several claim a `--effort` flag that does not
 exist).
 

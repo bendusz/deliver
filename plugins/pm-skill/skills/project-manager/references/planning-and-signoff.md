@@ -6,9 +6,10 @@ Turn the agreed direction into a written plan, get explicit human sign-off, then
 If you're working in an existing codebase, dispatch `codebase-analyst` first. Fold its context pack
 into the plan's Architecture and Commands sections, and keep it to embed into story files later.
 Skip this for a greenfield project.
-If the plan hinges on an external unknown (a library choice, an unfamiliar SDK), dispatch
-`researcher` — and `codex-researcher` alongside it for a consequential or contested call when
-the codex CLI is installed — then cite the `docs/research/` reports in the plan's decisions.
+**Greenfield or brownfield:** if the plan hinges on an external unknown (a library choice, an
+unfamiliar SDK), dispatch `researcher` — and `codex-researcher` alongside it for a consequential
+or contested call when the codex CLI is installed — then cite the `docs/research/` reports in the
+plan's decisions.
 
 ## 1. Write `docs/plan.md`
 If `docs/spec.md` exists, the plan **derives from it** — turn its requirements into delivery work and
