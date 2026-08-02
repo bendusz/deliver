@@ -2,10 +2,10 @@
 
 Control cost/quality by giving heavier work a stronger model and routine work a cheaper one.
 
-## Shipped defaults (v0.11)
+## Shipped defaults (v0.12)
 Every agent ships pinned to an explicit model **and** reasoning-effort level, so the workflow's
 behaviour is reproducible regardless of which model the session happens to run. The judgement-heavy
-core runs on one model — `opus` — differentiated by effort; the two breadth/documentation roles run
+core runs on one model — `opus` — differentiated by effort; the breadth/documentation roles run
 on `sonnet`. Aliases resolve to the Claude 5 family (`opus` → Opus 5, `sonnet` → Sonnet 5) and
 auto-track future releases within each tier:
 
@@ -20,6 +20,8 @@ auto-track future releases within each tier:
 | `test-engineer` | `opus` | `medium` | derives tests from written criteria |
 | `codebase-analyst` | `sonnet` | `medium` | reads and summarises; breadth over depth |
 | `technical-writer` | `sonnet` | `medium` | documents already-shipped facts |
+| `researcher` | `sonnet` | `medium` | web research; breadth and sourcing over depth |
+| `codex-researcher` | `sonnet` | `medium` | thin wrapper — the thinking happens inside Codex |
 
 Effort — not model tier — is the quality lever within the core: the builder thinks hardest
 (`xhigh`), the two rare, hard-problem analysts (`security-auditor`, `debugger`) keep targeted

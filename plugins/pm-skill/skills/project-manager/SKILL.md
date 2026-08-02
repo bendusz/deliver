@@ -70,16 +70,18 @@ On a bare install everything below still works.
 - `pm-verifier` — read-only final story verifier; invoked after the gates and the review/fix loop and **before ship/merge** to independently confirm the story is shippable (`PASS` required). See `references/verification.md`.
 - `technical-writer` — writes docs only (README, usage, CHANGELOG, completion report), at a sprint/project boundary.
 - `codebase-analyst` — read-only; maps an existing codebase into a context pack for planning/stories.
-- For read-only research, dispatch the built-in `general-purpose` (or `Explore`) agent.
+- `researcher` — web-capable external research (libraries, SDKs, prior art); one scoped question per dispatch, sourced report under `docs/research/`, short digest back.
+- `codex-researcher` — optional second-model research opinion via the OpenAI Codex CLI; risk-selected alongside `researcher` for consequential or contested questions; returns UNAVAILABLE cleanly when `codex` is absent.
 
 Run reviewers as a **risk-selected panel** (see `references/review-gates.md`), not always all of them.
 When the OpenAI Codex CLI is installed, `/pm-skill:codex-review` can add an optional independent
 second-model review alongside the panel (never as a replacement for it), and `/pm-skill:codex-help`
 offers a one-off second opinion on a consequential decision — use sparingly.
+The `codex-researcher` agent plays the same independent-second-model role for research questions.
 **Model tiering:** every agent ships pinned to an explicit model and effort level — the
 judgement-heavy core on `opus` (`expert-builder` at `xhigh` effort, `security-auditor` and
-`debugger` at `high`, the rest at `medium`), with `codebase-analyst` and `technical-writer` on
-`sonnet`. See `references/model-tiering.md` for the mapping and overrides.
+`debugger` at `high`, the rest at `medium`), with the breadth roles — `codebase-analyst`, `technical-writer`, `researcher`,
+`codex-researcher` — on `sonnet`. See `references/model-tiering.md` for the mapping and overrides.
 
 ## Bundled templates
 Project-file templates live in this plugin's `templates/` directory

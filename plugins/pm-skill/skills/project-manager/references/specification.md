@@ -34,9 +34,9 @@ non-event criteria. Sharper criteria make `test-engineer` and `pm-verifier` more
   options, a recommendation, and why it matters. Each answer updates the spec and clears its marker.
 
 ## Protect your context
-For heavy reading (prior art, an existing codebase, external docs), dispatch a read-only
-`general-purpose`/`Explore` subagent with a tight question and take back a short summary — don't read
-large sources into your own context.
+For heavy reading, dispatch a read-only subagent with a tight question and take back a short
+summary — `researcher` for prior art and external docs (findings land under `docs/research/`),
+`codebase-analyst` for an existing codebase. Don't read large sources into your own context.
 
 ## Exit gate
 The spec has **no blocking `[NEEDS CLARIFICATION]`** before planning begins. A non-blocking unknown may

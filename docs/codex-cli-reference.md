@@ -2,8 +2,8 @@
 
 Everything here was verified on 2026-07-16 against **codex-cli 0.145.0-alpha.4** (latest stable
 `rust-v0.144.5`), the hosted docs (`learn.chatgpt.com/docs/*` — all `developers.openai.com/codex/*`
-URLs 308-redirect there), and live runs. It backs `/pm-skill:codex-review` and
-`/pm-skill:codex-help`. Re-verify against `codex exec --help` / `codex exec review --help` when the
+URLs 308-redirect there), and live runs. It backs `/pm-skill:codex-review`, `/pm-skill:codex-help`, and the `codex-researcher` agent.
+Re-verify against `codex exec --help` / `codex exec review --help` when the
 CLI major-bumps — third-party blogs are unreliable (several claim a `--effort` flag that does not
 exist).
 
@@ -89,3 +89,12 @@ Scope keywords: `recent` = last commit (`--commit HEAD`), `worktree` = `--uncomm
 - Exit codes: `0` success · `1` runtime/auth failure · `2` CLI usage error.
 - Streams: progress + session header (model/sandbox/effort/session id) → **stderr**; final
   message → **stdout** (or the `-o` file).
+
+## Web search (`--search`) — noted 2026-08-02, codex-cli 0.145.0
+
+`codex exec --help` does NOT accept `--search` as of codex-cli 0.145.0 (verified: `codex exec
+--help | grep -i -- '--search'` returns no match, and the full `--help` output has no
+search-related flag). `codex exec review --help` likewise has no `--search`. The `codex-researcher`
+agent probes `codex exec --help` for this flag at its own runtime and adds it when present, so on
+installations where it is supported it should still get live sources; on installations like this
+one it falls back to model knowledge + repo reading.

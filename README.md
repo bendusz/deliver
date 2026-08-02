@@ -64,9 +64,11 @@ building anything.
 Bundled specialist agents do the work — a builder (**`expert-builder`**), a risk-selected read-only
 **review panel** (**`code-integrity-reviewer`**, **`architecture-reviewer`**, **`security-auditor`**),
 a **`test-engineer`** (tests only), a **`debugger`** (read-only root-cause → fix plan), a read-only
-final **`pm-verifier`** (independent PASS/FAIL before ship), a **`technical-writer`** (docs only), and
-a **`codebase-analyst`** for brownfield work. The PM stays an orchestrator and protects its own
-context by handing each agent only what it needs.
+final **`pm-verifier`** (independent PASS/FAIL before ship), a **`technical-writer`** (docs only), a
+**`codebase-analyst`** for brownfield work, and two research roles — a web-capable
+**`researcher`** and an optional Codex-CLI-backed **`codex-researcher`** (independent
+second-model opinion) — whose sourced reports land under `docs/research/`. The PM stays an
+orchestrator and protects its own context by handing each agent only what it needs.
 
 Default check-in is **sprint-level** (you review at each sprint boundary); configurable to
 story-level or fully autonomous. Pick a **scale** (`tiny`→`regulated`) to right-size the workflow —

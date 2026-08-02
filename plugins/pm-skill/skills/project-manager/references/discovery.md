@@ -20,9 +20,10 @@ Reach a shared, explicit understanding with the user (the customer-facing manage
 
 ## Protect your context
 - You are the PM. Keep the conversation and the decisions in this thread.
-- For anything that needs heavy reading (existing code, docs, prior art), dispatch the built-in
-  `general-purpose` (or `Explore`) subagent with a tight question and have it return a short
-  summary. Don't read large sources into your own context.
+- For anything that needs heavy reading, dispatch a read-only subagent with a tight question and
+  take back a short summary — `researcher` for external questions (libraries, prior art, best
+  practices; it writes its findings under `docs/research/`), `codebase-analyst` for the existing
+  code. Don't read large sources into your own context.
 
 ## Exit gate
 Move on once you and the user share the problem and the solution direction. You needn't resolve every
