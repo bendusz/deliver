@@ -33,7 +33,8 @@ Read the referenced files before answering, and cite sources for external claims
 ## 3. Run
 Defaults — model `gpt-5.6-terra`, effort `high`; use values from the dispatch prompt when
 given. Create `SCRATCH=$(mktemp -d)` so Codex output stays outside the repo. If
-`codex exec --help` lists `--search`, include that flag (live web sources). From the repo root:
+`codex exec --help` lists `--search`, include that flag (live web sources). From the repo root (if `git rev-parse --show-toplevel` fails — greenfield research can precede
+`git init` — add `--skip-git-repo-check` to the command):
 
     codex exec --sandbox read-only --ephemeral --color never \
       -m "$MODEL" -c model_reasoning_effort="$EFFORT" \

@@ -32,7 +32,8 @@ mark every claim you could not verify as **unverified**, and say the web was una
 Never invent sources.
 
 ## Report — `docs/research/YYYY-MM-DD-<slug>.md`
-Today's date, short kebab-case slug of the question. Sections:
+Today's date, short kebab-case slug of the question. Write the file directly — the Write tool
+creates `docs/research/` if it doesn't exist yet. Sections:
 - **Question** — and the decision it feeds.
 - **Context** — repo facts that constrain the answer (versions, patterns), with file paths.
 - **Findings** — every claim cites its source (URL or file path). No uncited claims.
