@@ -61,7 +61,8 @@ building anything.
 | Review & verification | A separate read-only reviewer + the project's real test/lint/build gates + a final read-only `pm-verifier` PASS; bounded fix loops. |
 | Logging | A shared author-prefixed `pm/log.md` + per-actor state under `pm/actors/` so concurrent PM sessions never overwrite each other and any lost session can resume. |
 
-Bundled specialist agents do the work — a builder (**`expert-builder`**), a risk-selected read-only
+Bundled specialist agents do the work. They include a broad-context Opus builder (**`expert-builder`**) and an
+optional Codex-CLI-backed precision builder (**`codex-builder`**), a risk-selected read-only
 **review panel** (**`code-integrity-reviewer`**, **`architecture-reviewer`**, **`security-auditor`**),
 a **`test-engineer`** (tests only), a **`debugger`** (read-only root-cause → fix plan), a read-only
 final **`pm-verifier`** (independent PASS/FAIL before ship), a **`technical-writer`** (docs only), a
@@ -69,6 +70,12 @@ final **`pm-verifier`** (independent PASS/FAIL before ship), a **`technical-writ
 **`researcher`** and an optional Codex-CLI-backed **`codex-researcher`** (independent
 second-model opinion) — whose sourced reports land under `docs/research/`. The PM stays an
 orchestrator and protects its own context by handing each agent only what it needs.
+
+Each story declares `Builder: expert-builder | codex-builder | auto` and carries matching one-line
+`pm-meta` JSON with its machine-readable touch paths. Opus remains the default for broad features,
+architecture, and changes spread across the codebase. Codex is selected for bounded implementation,
+failing tests, and localized fixes with concrete evidence. Both feed the same deterministic gates,
+independent review panel, and final verifier.
 
 Default check-in is **sprint-level** (you review at each sprint boundary); configurable to
 story-level or fully autonomous. Pick a **scale** (`tiny`→`regulated`) to right-size the workflow —
@@ -85,6 +92,7 @@ tiny work stays lightweight; regulated work makes every gate mandatory.
 | `/pm-skill:analyze` | Read-only consistency & quality report across all artifacts (never edits). |
 | `/pm-skill:checklist` | Generate/evaluate a spec/plan/story/verification quality checklist under `docs/checklists/`. |
 | `/pm-skill:doctor` | Check environment readiness (toolchain, deps, gates run) and PM-state health before building. |
+| `/pm-skill:benchmark-builders` | Run Opus and Codex on the same story in isolated worktrees, score the measured results, and merge neither. |
 | `/pm-skill:correct-course` | Handle a mid-flight scope change — re-plan at the right altitude, re-sign-off if material. |
 | `/pm-skill:handoff` | End a session cleanly — write a token-efficient `pm/actors/<id>.HANDOFF.md` briefing for the next agent. |
 | `/pm-skill:resume` | Read saved state, handoff, and logbook — then continue where you left off. |
@@ -114,12 +122,29 @@ Committed under `pm/` (tracked session state — the project's resume point; sol
 Scratch under `tmp/` (gitignored, disposable — never load-bearing for resume):
 
 - `tmp/environment-check.md` — `/pm-skill:doctor`'s readiness report.
+- `tmp/codex-builder/*.md`. Focused fix briefs passed to `codex-builder`; never authoritative and
+  safe to discard after the story.
+- `tmp/codex-runtime/*`. Per-run tool temp directories; ignored and removed on every runner exit.
+- `tmp/builder-benchmark/*`. Opt-in two-builder evaluations; never part of delivery or resume state.
 - `untracked/` or `codex/` (gitignored) — `/pm-skill:codex-review` reports: `<stamp>-codex-review-<scope>[-<objective>].md` (+ an index file for multi-objective runs).
 - Worktrees, prompts, raw agent output, and other ephemera.
 
 ## Safety
 
 - **No implementation before your sign-off** — behavioural rule plus a bundled fail-open hook.
+- **Guarded Codex writes:** the `codex-builder` runner fails closed unless tracked PM state exists
+  and is signed off, requires the exact git worktree root, mechanically enforces the story's
+  `pm-meta.touches`, and uses `workspace-write` with host temporary paths, network, web search, MCP
+  servers, lifecycle hooks, subagents, login shells, user config, and execution rules disabled. Tool
+  shells get a reduced secret-filtered environment and an ignored, worktree-local `TMPDIR` that is
+  deleted after every exit. Before/after content snapshots catch unreported,
+  protected, and out-of-scope repository edits; git checks cover HEAD, every ref, staged contents,
+  local config, and worktree registrations. Runs time out after 10 minutes by default and retain
+  partial changes plus diagnostics on failure. `--preflight` checks readiness and story scope
+  without model inference or task quota. Codex may edit working files but never owns Git.
+- Repository `AGENTS.md`/`CLAUDE.md` and non-safety project configuration remain trusted project
+  inputs; command-line overrides win for every safety-sensitive setting above. This is an OS
+  sandbox, not a VM boundary.
 - **No secrets in tracked state:** a bundled hook blocks secret-shaped content (key tokens, PEM
   blocks, credential assignments) from being written into the git-tracked `pm/` directory.
 - **Actor isolation:** a bundled hook blocks writes to another person's `pm/actors/` state files.
@@ -137,6 +162,13 @@ prefer them where useful — but nothing here is a dependency:
 - A dedicated planning / TDD skill suite for richer discovery and planning.
 - An external code-review tool (for example an OpenAI Codex–based reviewer, or another model's CLI)
   for the optional independent review step.
+- The OpenAI Codex CLI for `codex-builder`, `codex-researcher`, and the Codex commands. An
+  `auto` story or opportunistic fix falls back to `expert-builder` when Codex is unavailable; a
+  story that explicitly requires `codex-builder` waits for `codex login` rather than switching
+  workers silently.
+- To exercise the real write path after an install or Codex upgrade, run
+  `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh`. It uses one low-effort Codex task in a
+  disposable signed-off repository and is intentionally excluded from default validation.
 - `gh` plus a GitHub remote for real pull requests (otherwise the PM uses local merges).
 
 The spec / clarify / analyze / constitution steps add spec-driven rigor (inspired by spec-driven

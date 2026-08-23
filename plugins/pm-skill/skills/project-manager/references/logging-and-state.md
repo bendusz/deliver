@@ -69,14 +69,16 @@ Fields: `project`, `spec`, `constitution`, `scale`, `phase`, `signed_off` (bool)
 ## `pm/actors/<you>.json` (yours alone)
 
 Fields: `actor`, `current_story`, `current_story_status`, `current_story_verification_status`,
-`current_story_rounds`, `current_story_retries`, `branch`, `parallel_batch`, `next`,
+`current_story_rounds`, `current_story_retries`, `branch`, `resolved_builder`, `parallel_batch`, `next`,
 `handoff_written`, `updated`. Create from `${CLAUDE_PLUGIN_ROOT}/templates/actor-state.json.template`.
 
 - **Bound counters:** `current_story_rounds` (fix/re-review rounds) and `current_story_retries`
   (builder retries) persist the loop bounds across sessions — reset to `0` at story start,
   increment as spent; the ≤3-round / ≤2-retry caps count what previous sessions already used.
-- **`parallel_batch`** (parallel path): your batch entries `{story, branch, worktree, commit,
-  status, rounds, retries}` — per-actor, since worktrees and batches are yours.
+- **`resolved_builder`** persists the sequential story's `expert-builder` or `codex-builder`
+  routing decision until ship, so resume never re-resolves `auto` from memory.
+- **`parallel_batch`** (parallel path): your batch entries `{story, branch, worktree, builder,
+  commit, status, rounds, retries}` — per-actor, since worktrees and batches are yours.
 - `handoff_written` vs `updated` is the handoff staleness check (see below).
 
 ## `pm/log.md` (shared, append-only)
@@ -107,7 +109,8 @@ stale — trust state + log instead.
 - **Pull/rebase before claiming** a story and **before shipping** one.
 - **Claim** = one commit on the up-to-date **integration branch** that sets
   `assignments[story] = you` in the shared state **and** records your position in
-  `pm/actors/<you>.json` (story, status, planned branch name, counters reset) — a claim committed
+  `pm/actors/<you>.json` (story, status, planned branch name, resolved builder, counters reset) and
+  appends the route decision to `pm/log.md` — a claim committed
   only to a story branch is invisible to teammates' pull-and-check flow, and an assignment
   without the matching actor position reads as a stale claim — then create the story branch.
   Push the claim only under the user's standing push permission (the
@@ -135,11 +138,20 @@ HANDOFF (the `/pm-skill:resume` command does exactly this; the bundled `session-
 also injects a short pointer — yours plus teammate one-liners — into every new or freshly-compacted
 session). Then continue from your recorded `next`.
 
+### Migrating actor state created before 0.13
+
+If an in-flight actor file lacks `resolved_builder`, recover an already logged route choice first.
+If none exists and the story names an explicit builder, persist that value. If the story still says
+`auto`, resolve it once with the current routing rules and append the reason. Commit the actor state
+and log together before another builder dispatch. Apply the same rule to any active
+`parallel_batch` entry that lacks `builder`. Idle actor files may simply add
+`resolved_builder: null` when they are next updated.
+
 ### Migrating a flat 0.8 project (personal fields in `pm-state.json`, no `pm/actors/`)
 
 On any state read:
 1. Derive your actor id; create `pm/actors/<you>.json` from the personal fields
-   (`current_story*`, `branch`, `parallel_batch`, `next`, `handoff_written`) and remove them from
+   (`current_story*`, `branch`, `resolved_builder`, `parallel_batch`, `next`, `handoff_written`) and remove them from
    the shared file; add `assignments` (seed from `current_story` if one is in flight).
 2. Move `pm/HANDOFF.md` → `pm/actors/<you>.HANDOFF.md` if present.
 3. Strip the log's Current State block (its live content now lives in the state files); keep all

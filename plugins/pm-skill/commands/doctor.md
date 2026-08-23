@@ -16,6 +16,14 @@ Inspect (whichever apply):
 - **Config:** a missing `.env.example` or required env vars; CI config.
 - **Containers:** a `Dockerfile` / devcontainer that defines the expected environment.
 - **Setup steps:** any documented bootstrap (README/CONTRIBUTING) needed before the gates pass.
+- **Codex builder readiness:** if any build-ready story selects `codex-builder`, or the active
+  story's `Builder: auto` may resolve to it, call the bundled runner with
+  `--preflight --worktree <absolute-root> --story <story>` (omit `--story` for environment-only
+  readiness). Treat `runner_status: ready` as authoritative. It checks exact-root Git state,
+  sign-off, ignored runtime temp, Codex auth/capabilities, schemas, and machine story scope, then
+  reports the fixed sandbox/environment policy. It never starts model inference and reports
+  `quota_consumed: false`. A missing or logged-out Codex is a blocker only for an explicit
+  `codex-builder` story; `auto` may resolve to `expert-builder` and should record that fallback.
 - **PM state health** (when `pm/` exists — report `OK` / `DRIFT` per check):
   - `pm/pm-state.json` parses as JSON (`jq empty` or equivalent).
   - `git check-ignore pm/pm-state.json pm/log.md pm/actors/<you>.json` **fails** — check the state
@@ -29,7 +37,8 @@ Inspect (whichever apply):
     actor is actually on that story with a matching story branch (flag stale or half-made claims —
     an assignment whose actor's file is idle or on a different story, or whose actor has no branch
     or recent activity); every `pm/actors/*.json` parses and matches a recent git author (flag
-    orphans from a changed git identity); your own actor id is derivable (git `user.email` /
+    orphans from a changed git identity); every in-flight sequential story has a valid
+    `resolved_builder` and every active parallel entry has a valid `builder`; your own actor id is derivable (git `user.email` /
     `user.name` set).
   - `docs/plan.md`'s Sign-off line agrees with `signed_off` in `pm/pm-state.json` (the v0.9 log is
     append-only and has no Current State block to cross-check).

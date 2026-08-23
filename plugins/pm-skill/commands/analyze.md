@@ -16,7 +16,13 @@ absent. Team checks: a **claim conflict** — an actor file whose `current_story
 the actor files; compare them against the map); a **stale or half-made claim** — an assignment
 whose actor's own file is *not* on that story (`current_story` null or different); an assignment
 pointing at a nonexistent story or actor file; in-flight stories of **different actors** whose
-`Touches` overlap (serialize or re-scope them).
+`Touches` overlap (serialize or re-scope them); an in-flight sequential story without
+`resolved_builder`, or an active parallel entry without `builder`.
+
+For every story, parse the one-line `pm-meta` JSON comment in its first 12 lines. Flag a missing or
+malformed object, keys other than `builder` and `touches`, an invalid builder, empty/duplicate/unsafe
+touch paths, or disagreement with the visible Builder and Touches fields. Use `pm-meta.touches`, not
+comma-splitting prose, for overlap checks.
 
 **Strictly read-only.** Do **not** edit, create, fix, or scaffold anything — not even logs or state.
 You may *suggest* remediation; you must not apply it.

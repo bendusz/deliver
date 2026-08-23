@@ -9,5 +9,10 @@
 - [ ] A concrete Verification command is given.
 - [ ] `depends-on` IDs are valid and (before build) already merged.
 - [ ] `[P]` and `Touches` are present; `[P]` stories have non-overlapping Touches.
+- [ ] A first-12-lines `pm-meta` JSON comment has exactly `builder` and `touches`; it matches the
+      visible fields and contains unique repo-relative file/directory roots with no globs,
+      placeholders, whole-repo grants, or traversal.
+- [ ] `Builder` is `expert-builder`, `codex-builder`, or `auto`; a Codex choice has one exact
+      verification command and bounded `pm-meta.touches` covering code and tests.
 - [ ] `Risk` is set and `Review lenses` are listed (`code-integrity-reviewer` plus any warranted).
 - [ ] `Security-sensitive` / `Architecture-sensitive` flags match the story's actual scope.

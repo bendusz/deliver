@@ -13,8 +13,9 @@ command is run **from the main checkout**.
 A batch = stories in the sprint that are all of:
 - **build-ready** (see `decomposition.md`) and marked **`[P]`**, and
 - their `depends-on` are **already merged**, and
-- they **don't share a file domain** — compare each story's **Touches** (the files/modules it will
-  change). If two would write the same files, **serialize them** (one this batch, the other after).
+- they **don't share a file domain** — compare each story's authoritative **`pm-meta.touches`**
+  (the visible Touches is its human-readable copy; flag any mismatch). If two would write the same
+  files, **serialize them** (one this batch, the other after).
   A story whose **Touches is blank/unknown (`—`) is treated as overlapping everything** — it is
   **not eligible** for the batch; run it sequentially.
 
@@ -29,14 +30,23 @@ worktree + story branch from the integration branch:
 (ensure `tmp/` — so `tmp/worktrees/` — is gitignored first). **A story's worktree is where all of its
 work happens: every builder/debugger dispatch for that story is given its worktree path and works
 there.**
+- Before dispatch, resolve every `Builder: auto` with the same rules as `implementation-loop.md`.
+  In the clean integration checkout, claim the batch and persist each resolved choice in the
+  corresponding `parallel_batch` entry, append the choices and reasons to `pm/log.md`, and commit
+  the assignments, actor state, and log together. Never leave route decisions only in prose.
+- Run `codex-builder-run.sh --preflight` against every Codex worktree/story pair before concurrent
+  dispatch. A failed preflight removes that story from the batch without consuming task quota.
 - Dispatch the batch's builders **together** (concurrent subagent calls in one step), giving each
-  **only its story file path + its worktree path**. Tell each to **implement and self-check only —
-  not run the full or exclusive test suite** (you run the authoritative gates serially next; this
+  its resolved builder inputs: both builders get the story file path and absolute worktree root;
+  `codex-builder` also gets `Mode: build`. `expert-builder` must confirm the exact git root and use
+  worktree-rooted paths for all edits and commands. Tell each to **implement and self-check only**.
+  Do not run the full or exclusive test suite (you run the authoritative gates serially next; this
   avoids parallel builders colliding on shared ports/DBs). Take back only structured summaries.
 - **Commit each story's edits to its story branch the moment that builder returns done** — before you
   process the next builder's result — so no work sits uncommitted in a worktree (story-path-scoped;
-  **never `git add -A`**). Record the commit in `parallel_batch` and set the story's status to
-  `built`.
+  **never `git add -A`**). For Codex, use the runner's authoritative
+  `actual_files_changed`, not its model-reported list. Record the commit in `parallel_batch` and set
+  the story's status to `built`.
 - If a builder returns **blocked** or fails, retry it up to **2** times with clarification; if still
   failing, mark its `parallel_batch` entry `blocked` (nothing to commit) and carry on with the rest.
 
@@ -53,8 +63,10 @@ Take one story at a time and land it before starting the next. **Work in that st
    that each passed alone but break together). If the worktree lacks runtime deps (`node_modules`,
    `.env`), bootstrap them first (install only — **don't commit** those artifacts); if that isn't
    feasible, fall back to the sequential loop for this story.
-3. **Review + fix** exactly as in the sequential loop, **in the worktree**: story-scoped diff →
-   risk-selected panel → triage → fix via the builder, **≤3 rounds** (dispatch `debugger` first when
+3. **Review + fix** exactly as in the sequential loop, **in the worktree**: cumulative
+   story-scoped diff from authoritative changed paths →
+   risk-selected panel → triage → prefer `codex-builder` with a contained evidence brief for a
+   localized fix, otherwise use `expert-builder`, **≤3 rounds** (dispatch `debugger` first when
    a gate fails or a round stalls), re-gating each round. Commit accepted fixes to the story branch.
 4. **Verify.** Dispatch `pm-verifier` (read-only) **in the worktree** on the combined result — the
    story file, `docs/spec.md`/`docs/plan.md`, the story-scoped diff, the reviewer verdicts, and the
@@ -83,7 +95,7 @@ from the user. A partial batch still checkpoints at the sprint boundary.
 
 ## State & resume
 Track the batch in **your** `pm/actors/<you>.json` `parallel_batch` — each entry
-`{story, branch, worktree, commit, status, rounds, retries}` with status
+`{story, branch, worktree, builder, commit, status, rounds, retries}` with status
 `building|built|in-review|merged|blocked`; `rounds`/`retries` play the same role as
 `current_story_rounds`/`current_story_retries` on the sequential path, and the ≤3-round / ≤2-retry
 caps count what a previous session already spent. The batch is per-actor: claim every batch story
@@ -92,6 +104,7 @@ as it merges. Cross-actor coordination happens through `assignments`, never thro
 actor's batch.
 
 On resume, **from the main checkout**:
+- Continue each story with its persisted `builder`; do not resolve `auto` again after a session loss.
 - Reconcile `parallel_batch` against `git worktree list`. If a `built`/`in-review` story's worktree
   directory is **missing** (deleted externally), **log the anomaly** (its branch should already hold
   the committed work — verify before continuing) rather than silently moving on.

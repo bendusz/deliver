@@ -1,6 +1,8 @@
 # S<sprint>-<n> — <title>
-Sprint: <n> · Priority: <high|med|low> · Covers: <FR-…, AC-…> · Depends on: <ids|none> · Parallel-safe: <yes|no> · Touches: <files/modules, or —>
+<!-- pm-meta: {"builder":"<expert-builder|codex-builder|auto>","touches":["<repo-relative file or directory root>"]} -->
+Sprint: <n> · Priority: <high|med|low> · Covers: <FR-…, AC-…> · Depends on: <ids|none> · Parallel-safe: <yes|no> · Touches: <comma-separated repo-relative files or directory roots; no globs; or —>
 Risk: <low|med|high> · Review lenses: <code-integrity-reviewer[, architecture-reviewer][, security-auditor]> · Security-sensitive: <yes|no> · Architecture-sensitive: <yes|no>
+Builder: <expert-builder|codex-builder|auto>
 
 ## Goal
 <one paragraph>
