@@ -11,7 +11,12 @@ command -v jq >/dev/null 2>&1 || { echo "validate.sh: jq is required" >&2; exit 
 # 1) JSON validity
 for f in .claude-plugin/marketplace.json \
          plugins/pm-skill/.claude-plugin/plugin.json \
-         plugins/pm-skill/hooks/hooks.json; do
+         plugins/pm-skill/hooks/hooks.json \
+         plugins/pm-skill/schemas/codex-builder-result.schema.json \
+         plugins/pm-skill/schemas/story-metadata.schema.json \
+         plugins/pm-skill/schemas/builder-benchmark-result.schema.json \
+         plugins/pm-skill/schemas/builder-routing-cases.schema.json \
+         plugins/pm-skill/benchmarks/codex-builder-routing-cases.json; do
   if [ -f "$f" ]; then jq empty "$f" 2>/dev/null || err "invalid JSON: $f"; else err "missing: $f"; fi
 done
 
@@ -35,6 +40,10 @@ done
 for h in plugins/pm-skill/hooks/*.sh; do
   [ -x "$h" ] || err "hook not executable: $h"
 done
+[ -x plugins/pm-skill/scripts/codex-builder-run.sh ] || err "Codex builder runner is not executable"
+[ -x plugins/pm-skill/scripts/score-builder-benchmark.sh ] || err "builder benchmark scorer is not executable"
+[ -x plugins/pm-skill/scripts/smoke-codex-builder-live.sh ] || err "bundled live Codex builder smoke test is not executable"
+[ -x scripts/smoke-codex-builder-live.sh ] || err "live Codex builder smoke test is not executable"
 
 # 6) the installed plugin must stay generic (no third-party *plugin* names).
 # The OpenAI Codex CLI is an intentional, documented external dependency of the
@@ -103,10 +112,18 @@ for md in plugins/pm-skill/agents/*.md plugins/pm-skill/skills/project-manager/S
   fi
 done
 
-# 12) behavioral hook tests (allow/block fixtures — needs jq + git, both required above)
+# 14) behavioral tests (quota-free; needs jq + git, both required above)
 if ! bash "$(dirname "$0")/test-hooks.sh" >/dev/null 2>&1; then
   bash "$(dirname "$0")/test-hooks.sh" || true
   err "hook behavioral tests failed (scripts/test-hooks.sh)"
+fi
+if ! bash "$(dirname "$0")/test-codex-builder.sh" >/dev/null 2>&1; then
+  bash "$(dirname "$0")/test-codex-builder.sh" || true
+  err "Codex builder behavioral tests failed (scripts/test-codex-builder.sh)"
+fi
+if ! bash "$(dirname "$0")/test-builder-benchmark.sh" >/dev/null 2>&1; then
+  bash "$(dirname "$0")/test-builder-benchmark.sh" || true
+  err "builder benchmark tests failed (scripts/test-builder-benchmark.sh)"
 fi
 
 if [ "$fail" -eq 0 ]; then echo "validate.sh: OK"; else echo "validate.sh: FAILED" >&2; exit 1; fi

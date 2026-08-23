@@ -10,7 +10,8 @@ slug + digest, e.g. `v-bende-gmail-com-0719f22c3305` — derive it with
 `bash -c '. "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"; pm_actor_id .'`, never by hand) — your story,
 branch, loop counters
 (`current_story_rounds`/`current_story_retries`; the fix/retry caps count what earlier sessions
-already spent), and `next`. On a v0.9 layout with no `pm/actors/<you>.json` yet (you are a new
+already spent), persisted `resolved_builder`, and `next`. For a parallel batch, use each entry's
+persisted `builder`; never re-resolve `auto` after a session loss. On a v0.9 layout with no `pm/actors/<you>.json` yet (you are a new
 actor on this project), create it from `${CLAUDE_PLUGIN_ROOT}/templates/actor-state.json.template`
 and commit it before continuing. If `pm/actors/<you>.HANDOFF.md` exists and is current (your `updated`
 is not newer than `handoff_written`), use it as the primary briefing — it carries the in-flight

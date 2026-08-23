@@ -1,6 +1,6 @@
 ---
 name: debugger
-description: Use PROACTIVELY the moment a deterministic gate fails or the fix loop stalls (a second identical failure) — always before another blind builder retry. Read-only root-cause analysis — give it the failing output and the diff; it returns the root cause, evidence, and a minimal fix plan for the builder to apply. <example>S1-3's tests fail again after a fix round, so the PM hands debugger the pytest output and the story diff; it pins the root cause and returns a file:line fix plan for expert-builder.</example>
+description: Use PROACTIVELY the moment a deterministic gate fails or the fix loop stalls (a second identical failure), always before another blind builder retry. Give this read-only root-cause analyst the failing output and diff; it returns the root cause, evidence, and a minimal fix plan for the resolved builder. <example>S1-3's tests fail again after a fix round, so the PM hands debugger the pytest output and story diff; it returns a file:line plan for codex-builder if localized or expert-builder if broad.</example>
 tools: Read, Grep, Glob
 model: opus
 effort: high

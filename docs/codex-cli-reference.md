@@ -1,8 +1,9 @@
 # Codex CLI reference (for pm-skill's codex commands)
 
-Everything here was verified on 2026-07-16 against **codex-cli 0.145.0-alpha.4** (latest stable
-`rust-v0.144.5`), the hosted docs (`learn.chatgpt.com/docs/*` — all `developers.openai.com/codex/*`
-URLs 308-redirect there), and live runs. It backs `/pm-skill:codex-review`, `/pm-skill:codex-help`, and the `codex-researcher` agent.
+Everything here was re-verified on 2026-08-23 against **codex-cli 0.149.0**, the
+[official command reference](https://learn.chatgpt.com/docs/developer-commands), and local help
+output. It backs `/pm-skill:codex-review`, `/pm-skill:codex-help`, `codex-researcher`, and the
+write-capable `codex-builder` agent.
 Re-verify against `codex exec --help` / `codex exec review --help` when the
 CLI major-bumps — third-party blogs are unreliable (several claim a `--effort` flag that does not
 exist).
@@ -26,6 +27,8 @@ exist).
 | `--json` | ✓ | ✓ | JSONL event stream on stdout |
 | `--output-schema <file>` | ✓ | ✓ | JSON Schema for the final response |
 | `--ephemeral` | ✓ | ✓ | no session files persisted |
+| `--ignore-user-config` | ✓ | ✓ | ignores `$CODEX_HOME/config.toml`; auth still uses `CODEX_HOME` |
+| `--strict-config` | ✓ | ✓ | rejects unrecognized config keys instead of ignoring them |
 | `--skip-git-repo-check` | ✓ | ✓ | |
 | `-s, --sandbox <mode>` | ✓ | ✗ **exit 2** | exec default is `read-only`; review is read-only by design |
 | `-C, --cd <dir>` | ✓ | ✗ **exit 2** | for review, `cd` to the repo root first |
@@ -59,13 +62,13 @@ review is not native at all: use `codex exec --sandbox read-only` with an audit 
 
 | Model | Position | API price /1M in/out |
 |---|---|---|
-| `gpt-5.6-sol` | flagship; strongest coding judgment; default for paid ChatGPT plans | $5 / $30 |
+| `gpt-5.6-sol` | flagship; strongest coding judgment; default for paid ChatGPT plans | $4 / $20 promotional pricing |
 | `gpt-5.6-terra` | balanced everyday workhorse | $2.50 / $15 |
 | `gpt-5.6-luna` | fast/cheap, high volume | $1 / $6 |
 | `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex` | previous generations, still selectable (`5.4-mini` ≈ 30% of 5.4 quota cost) | — |
 
-- Reasoning effort: `minimal | low | medium | high | xhigh` (xhigh model-dependent), plus
-  `max`/`ultra` on the 5.6 generation (`ultra` spawns internal subagents, Plus tier+).
+- The [official GPT-5.6 Sol model page](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
+  lists `none | low | medium | high | xhigh | max` reasoning effort. The builder uses `high`.
 - **No dedicated review model exists**; `review_model` in `~/.codex/config.toml` overrides the
   session model for `/review` — pm-skill never touches that file, passing `-m`/`-c` per call.
 - ChatGPT sign-in is quota-based (Free/Go: Terra only); API-key auth is per-token.
@@ -76,6 +79,7 @@ review is not native at all: use `codex exec --sandbox read-only` with an audit 
 |---|---|---|---|
 | `/pm-skill:codex-review` | `gpt-5.6-terra` | `high` | balanced cost for possibly-parallel review agents; Sol@xhigh available via `model=`/`effort=` for high-stakes reviews |
 | `/pm-skill:codex-help` | `gpt-5.6-sol` | `medium` | judgment work gets the top tier; used sparingly by design |
+| `codex-builder` | `gpt-5.6-sol` | `high` | precise implementation and fix work; strongest coding judgement with a bounded brief |
 
 Scope keywords: `recent` = last commit (`--commit HEAD`), `worktree` = `--uncommitted` (default),
 `codebase` = read-only `codex exec` audit.
@@ -89,6 +93,75 @@ Scope keywords: `recent` = last commit (`--commit HEAD`), `worktree` = `--uncomm
 - Exit codes: `0` success · `1` runtime/auth failure · `2` CLI usage error.
 - Streams: progress + session header (model/sandbox/effort/session id) → **stderr**; final
   message → **stdout** (or the `-o` file).
+
+## Write-capable builder invocation, added 2026-08-22 with codex-cli 0.149.0
+
+The builder does not assemble this command in agent prose. It calls the bundled
+`scripts/codex-builder-run.sh`, which validates the worktree, story, fix evidence, PM sign-off,
+auth, and required CLI flags before launching:
+
+```sh
+codex exec \
+  --ignore-user-config \
+  --ignore-rules \
+  --strict-config \
+  -C "$WORKTREE" \
+  --sandbox workspace-write \
+  --ephemeral \
+  --color never \
+  -m gpt-5.6-sol \
+  -c model_reasoning_effort=high \
+  -c 'sandbox_workspace_write.network_access=false' \
+  -c 'sandbox_workspace_write.exclude_slash_tmp=true' \
+  -c 'sandbox_workspace_write.exclude_tmpdir_env_var=true' \
+  -c 'shell_environment_policy.inherit="core"' \
+  -c 'shell_environment_policy.ignore_default_excludes=false' \
+  -c 'shell_environment_policy.experimental_use_profile=false' \
+  -c 'shell_environment_policy.set.TMPDIR="<worktree>/tmp/codex-runtime/<run>"' \
+  -c 'allow_login_shell=false' \
+  -c 'agents.enabled=false' \
+  -c 'web_search="disabled"' \
+  -c 'mcp_servers={}' \
+  -c 'features.hooks=false' \
+  --output-schema "$RESULT_SCHEMA" \
+  -o "$SCRATCH/result.json" \
+  - < "$SCRATCH/prompt.md"
+```
+
+The runner never accepts free-form Codex arguments and never passes `--add-dir`, `--full-auto`, or a
+sandbox-bypass flag. `--ignore-user-config` retains authentication while skipping user defaults;
+`--ignore-rules` skips user/project execpolicy rules. Session overrides outrank project config, so
+network, web search, inherited MCP servers, and lifecycle hooks stay disabled even when
+`.codex/config.toml` requests them. Repository instructions and other non-safety project settings
+remain trusted inputs.
+
+The shell policy inherits Codex's reduced `core` environment and activates its default filtering of
+variable names containing `KEY`, `SECRET`, or `TOKEN`. Login-shell profile loading and Codex
+subagents are disabled. Both `/tmp` and the launcher's `$TMPDIR` are removed from writable sandbox
+roots. Tool commands instead receive a fresh `TMPDIR` under the ignored worktree
+`tmp/codex-runtime/`; the runner removes that exact directory on every exit.
+
+Codex receives an explicit ban on git-mutating commands. The runner independently snapshots tracked
+and non-ignored untracked content, derives `actual_files_changed`, compares it with Codex's claim,
+and rejects changes to PM artifacts or outside machine-readable `pm-meta.touches`. It also fingerprints
+HEAD, every ref, staged contents, local Git config, and worktree registrations. Any mismatch becomes
+a safety violation for the PM to inspect. The PM accumulates runner-derived paths across fix rounds,
+regenerates the diff, and re-runs deterministic gates; Codex's structured test report is not
+accepted as independent proof.
+
+The default timeout is 600 seconds (bounded override: 1–7200). `INT`, `TERM`, `HUP`, and timeout
+terminate the Codex process tree on a best-effort macOS/Linux basis, preserve partial repository
+changes, and retain the scratch diagnostics. Completed runs embed their structured result and delete
+their scratch directory; failed, interrupted, timed-out, or safety-violating runs retain it.
+
+Run `codex-builder-run.sh --preflight --worktree <root> [--story <story>]` to validate sign-off,
+authentication, required flags, ignored temp setup, bundled schema, and optional story metadata. It
+returns JSON with `quota_consumed: false` and does not invoke model inference. The opt-in
+`PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh` then exercises environment filtering, local
+TMPDIR, host-temp denial, bounded writes, structured output, and cleanup in a disposable repository.
+
+This remains an OS sandbox rather than a VM-level security boundary. Use the builder only with
+trusted repositories and stories.
 
 ## Web search (`--search`) — noted 2026-08-02, codex-cli 0.145.0
 

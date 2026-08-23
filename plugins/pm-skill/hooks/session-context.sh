@@ -50,7 +50,7 @@ jq -r '"project: phase=\(.phase // "?") sprint=\(.current_sprint // "-")/\(.tota
 
 if [ ! -d "$cwd/pm/actors" ]; then
   # Legacy flat 0.8 layout — one summary line, then the migration hint.
-  jq -r '"you: story=\(.current_story // "-") status=\(.current_story_status // "-") next=\(.next // "?")"' "$state" 2>/dev/null
+  jq -r '"you: story=\(.current_story // "-") status=\(.current_story_status // "-") builder=\(.resolved_builder // "-") next=\(.next // "?")"' "$state" 2>/dev/null
   echo "Layout is flat single-actor (pre-0.9) — /pm-skill:resume migrates it to pm/actors/."
   echo "To continue: run /pm-skill:resume (or read the pm/ files directly). Before ending a long session, offer /pm-skill:handoff."
   exit 0
@@ -68,7 +68,7 @@ fi
 
 if [ -n "$me" ] && [ -f "$cwd/pm/actors/$me.json" ] && jq empty "$cwd/pm/actors/$me.json" 2>/dev/null; then
   my="$cwd/pm/actors/$me.json"
-  jq -r '"you (\(.actor // "?")): story=\(.current_story // "-") status=\(.current_story_status // "-") branch=\(.branch // "-") next=\(.next // "?")"' "$my" 2>/dev/null
+  jq -r '"you (\(.actor // "?")): story=\(.current_story // "-") status=\(.current_story_status // "-") builder=\(.resolved_builder // "-") branch=\(.branch // "-") next=\(.next // "?")"' "$my" 2>/dev/null
   # Handoff freshness: timestamps are "YYYY-MM-DD HH:MM", so string comparison is safe.
   hw="$(jq -r '.handoff_written // empty' "$my" 2>/dev/null)"
   up="$(jq -r '.updated // empty' "$my" 2>/dev/null)"

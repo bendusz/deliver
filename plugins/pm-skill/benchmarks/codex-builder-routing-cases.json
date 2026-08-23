@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {"id":"R01","title":"One parser regression with a failing unit test","signals":["one module","exact reproducer","known test"],"expected_builder":"codex-builder","reason":"The fault and proof are both tightly bounded."},
+    {"id":"R02","title":"Rename one API field across three known files","signals":["fixed file list","mechanical change","stable contract"],"expected_builder":"codex-builder","reason":"The change is precise and its full scope is known."},
+    {"id":"R03","title":"Repair an off-by-one pagination bug","signals":["localized function","regression test supplied"],"expected_builder":"codex-builder","reason":"A small logic correction with concrete evidence suits Codex."},
+    {"id":"R04","title":"Add validation to one CLI flag","signals":["single command","specified error text","exact tests"],"expected_builder":"codex-builder","reason":"The behavior and touch paths are explicit."},
+    {"id":"R05","title":"Fix a review finding in one serializer","signals":["accepted finding","implicated paths","verification command"],"expected_builder":"codex-builder","reason":"Evidence-rich fix mode is designed for this case."},
+    {"id":"R06","title":"Update a focused database query","signals":["one repository method","known performance assertion"],"expected_builder":"codex-builder","reason":"The requested outcome is local and measurable."},
+    {"id":"R07","title":"Design a new authentication architecture","signals":["security-sensitive","open design choices","many layers"],"expected_builder":"expert-builder","reason":"Architecture and security judgement need broad context."},
+    {"id":"R08","title":"Split a monolith into services","signals":["cross-cutting","migration strategy","uncertain scope"],"expected_builder":"expert-builder","reason":"This is broad structural work with unresolved boundaries."},
+    {"id":"R09","title":"Build a feature spanning UI API and storage","signals":["multiple subsystems","product tradeoffs","wide context"],"expected_builder":"expert-builder","reason":"The implementation depends on system-wide coordination."},
+    {"id":"R10","title":"Replace the persistence framework","signals":["framework migration","schema evolution","operational risk"],"expected_builder":"expert-builder","reason":"A wide migration needs long-context planning and judgement."},
+    {"id":"R11","title":"Investigate an intermittent production race","signals":["root cause unknown","concurrency","blast radius unknown"],"expected_builder":"expert-builder","reason":"The scope is not bounded enough for a precision worker yet."},
+    {"id":"R12","title":"Redesign shared domain boundaries","signals":["architecture-sensitive","many consumers","open interfaces"],"expected_builder":"expert-builder","reason":"The work is primarily architectural and cross-cutting."}
+  ]
+}

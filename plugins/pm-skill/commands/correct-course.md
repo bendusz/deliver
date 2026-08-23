@@ -31,8 +31,9 @@ Do this, in order:
    explicit request** — hard rule), and if you cannot push, tell the user teammates won't see
    the halt until it reaches the remote.
 4. **Reset the affected story.** If the in-flight story's scope changed, restart it from step 0 of
-   the implementation loop against the revised story file, resetting `current_story_rounds` and
-   `current_story_retries` to `0`. Unaffected stories keep their state.
+   the implementation loop against the revised story file, resetting `current_story_rounds`,
+   `current_story_retries`, and `resolved_builder` so the materially revised story is routed again.
+   Unaffected stories keep their state.
 5. **Log and commit.** Record the correct-course outcome (what changed, at which altitude,
    re-sign-off or not) in `pm/log.md`, update `pm/pm-state.json`, and commit the `docs/` + `pm/`
    changes together.

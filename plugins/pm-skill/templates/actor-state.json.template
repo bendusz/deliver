@@ -6,6 +6,7 @@
   "current_story_rounds": null,
   "current_story_retries": null,
   "branch": null,
+  "resolved_builder": null,
   "parallel_batch": [],
   "next": "<continuation point>",
   "handoff_written": null,

@@ -22,7 +22,10 @@ reading to a read-only subagent (e.g. `codebase-analyst`) and take back only the
 - **Sign-off:** missing or inconsistent sign-off across `docs/plan.md`, `pm/log.md`, and
   `pm/pm-state.json`.
 - **Constitution alignment:** plan/stories that conflict with a rule in `docs/constitution.md`.
-- **Parallel safety:** `[P]` stories with **overlapping** `Touches`; `[P]` stories with blank `Touches`.
+- **Story metadata:** missing, malformed, duplicated, or extra-key `pm-meta`; a machine `builder` or
+  `touches` value that disagrees with its visible story field; unsafe paths in `pm-meta.touches`.
+- **Parallel safety:** `[P]` stories with overlapping `pm-meta.touches`; `[P]` stories with blank or
+  unbounded scope.
 - **Dependencies:** `depends-on` pointing at a missing/invalid story ID; dependency cycles.
 - **Gate references:** stories naming a gate not listed in `docs/plan.md`'s Commands.
 - **Risk lenses (declared vs actual):** a story whose content looks security-sensitive (auth, secrets,
@@ -39,7 +42,8 @@ reading to a read-only subagent (e.g. `codebase-analyst`) and take back only the
   in the actor files; compare them against the map); a **stale or half-made claim** — an
   assignment whose actor's own file is *not* on that story (`current_story` null or different);
   an assignment pointing at a nonexistent story or actor file; in-flight stories of **different
-  actors** whose `Touches` overlap (serialize or re-scope them).
+  actors** whose `Touches` overlap (serialize or re-scope them); an in-flight sequential story
+  without `resolved_builder`, or an active parallel entry without `builder`.
 
 ## Severities
 - **CRITICAL** — blocks safe delivery, or violates the constitution or the sign-off rule.

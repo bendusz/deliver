@@ -2,6 +2,41 @@
 
 All notable changes to this project are documented here.
 
+## 0.13.0 - 2026-08-22
+
+Codex precision builder. Opus remains the broad-context implementation worker; bounded stories and
+localized fix rounds can now use a write-capable Codex worker without weakening the PM gates.
+
+- **New `codex-builder` agent** (`sonnet` / `medium` liaison, inner Codex default
+  `gpt-5.6-sol` / `high`) for precise implementation and evidence-rich fixes. It is deliberately
+  thin and never solves or edits outside the bundled runner.
+- **Hardened runner** fails closed on missing, malformed, unsigned, or symlinked PM state; enforces
+  strict `pm-meta` JSON scope; and derives authoritative changes from before/after content snapshots.
+  Fixed CLI overrides disable host temp roots, network, web search, inherited MCP servers, lifecycle
+  hooks, subagents, login shells, user config, and execpolicy rules; tool shells receive a reduced,
+  secret-filtered environment plus a disposable worktree-local `TMPDIR`. Strict config rejects unknown keys. It rejects
+  protected/out-of-scope/unreported edits and fingerprints
+  HEAD, all refs, staged contents, local config, and worktree registrations.
+  Duplicate changed paths are checked after response generation because the API's strict structured
+  output subset does not accept JSON Schema `uniqueItems`.
+- **Bounded execution** adds a 10-minute default timeout, signal/process-tree cleanup, partial-diff
+  preservation, failure-only diagnostics retention, and automatic scratch cleanup after success.
+- **Explicit routing** adds `Builder: expert-builder | codex-builder | auto` to stories. Broad,
+  cross-cutting, or architecture-heavy work stays with Opus; precise stories and localized
+  review/gate fixes prefer Codex. Switching workers never resets the existing retry or fix bounds.
+- **Resumable routing and worktrees** persist `resolved_builder` in sequential actor state and a
+  `builder` per parallel-batch entry. Parallel `expert-builder` dispatches now receive and verify
+  the absolute worktree root.
+- **Quota-free behavioral tests** cover missing CLI, failed auth, missing/symlinked/unsigned state,
+  nonzero exits, done/blocked results, hostile project config, protected/out-of-scope/unreported
+  edits, dirty baselines, timeouts and descendant cleanup, path containment, fix evidence, and broad
+  git metadata tampering. `/pm-skill:doctor` now probes Codex only when routing may need it.
+- **Operational checks** add `--preflight` for no-inference readiness, an opt-in real Codex smoke
+  test, and `/pm-skill:benchmark-builders` with a transparent scorer, result schema, and stable
+  routing-case corpus. Benchmark work is isolated and never merged.
+- **Docs and references** update the agent roster, model tiers, decomposition, sequential and
+  parallel loops, safety guidance, and the local Codex CLI reference for codex-cli 0.149.0.
+
 ## 0.12.0 — 2026-08-02
 
 Research agents — the fleet gains an external-research role and an optional second-model

@@ -13,7 +13,7 @@ produce plans and coordinate agents; you do **not** write implementation code yo
 ## Hard rules (non-negotiable)
 1. **PM, not coder.** Never write implementation code. Orchestrate via subagents.
 2. **Protect your context.** Give each subagent only the minimal context it needs (in the
-   build loop, just the story file). Take back only a structured summary — never raw
+   build loop, the story file plus the absolute root when worktree isolation requires it). Take back only a structured summary — never raw
    transcripts. Delegate heavy reading/research to read-only subagents.
 3. **No implementation before explicit human sign-off** on the plan.
 4. **Always log.** Append an author-prefixed entry to `pm/log.md` after every meaningful step. `pm/` is git-tracked —
@@ -62,6 +62,8 @@ On a bare install everything below still works.
 
 ## Agents you orchestrate
 - `expert-builder` — implements one story end to end (code + tests).
+- `codex-builder`. Optional Codex-CLI-backed implementation worker for precise, bounded stories
+  and evidence-rich localized fixes; a thin Sonnet liaison calls the bundled safe runner.
 - `code-integrity-reviewer` — read-only review of a story's diff for correctness and security.
 - `architecture-reviewer` — read-only, higher-altitude review (boundaries, abstractions, tech debt).
 - `security-auditor` — read-only deep security lens; risk-selected for stories touching auth/authz, crypto, secrets, untrusted input, I/O, deserialization, or dependencies.
@@ -78,10 +80,14 @@ When the OpenAI Codex CLI is installed, `/pm-skill:codex-review` can add an opti
 second-model review alongside the panel (never as a replacement for it), and `/pm-skill:codex-help`
 offers a one-off second opinion on a consequential decision — use sparingly.
 The `codex-researcher` agent plays the same independent-second-model role for research questions.
+`codex-builder` is different: it is write-capable inside one fixed worktree and may replace
+`expert-builder` only when the story or fix brief is narrow enough. The normal gates, separate
+review panel, and `pm-verifier` still judge its work.
 **Model tiering:** every agent ships pinned to an explicit model and effort level — the
 judgement-heavy core on `opus` (`expert-builder` at `xhigh` effort, `security-auditor` and
 `debugger` at `high`, the rest at `medium`), with the breadth roles — `codebase-analyst`, `technical-writer`, `researcher`,
-`codex-researcher` — on `sonnet`. See `references/model-tiering.md` for the mapping and overrides.
+`codex-researcher`, plus the thin `codex-builder` liaison on `sonnet`. Its inner Codex run defaults
+to `gpt-5.6-sol` / `high`. See `references/model-tiering.md` for the mapping and overrides.
 
 ## Bundled templates
 Project-file templates live in this plugin's `templates/` directory
