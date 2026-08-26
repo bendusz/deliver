@@ -64,8 +64,9 @@ return PASS unless ALL of these hold:
 - Every acceptance criterion has concrete evidence — a command you ran or code you read — never a
   summary's say-so. For a criterion the story proves by driving the app (its verification is a
   `verify-<app>` skill or otherwise needs a running service), an opened PM-captured artifact that
-  shows the claimed state is **mandatory**: code inspection alone does not pass it, and a missing
-  or unopenable artifact makes that criterion UNKNOWN.
+  demonstrates that specific criterion — the exact outcome it states, not a generic end state or
+  the PM's description of it — is **mandatory**: code inspection alone does not pass it, and a
+  missing, unopenable, or non-demonstrating artifact makes that criterion UNKNOWN.
 - Every prior `block`/`major` review finding is verifiably resolved in the diff.
 
 ## Report (return exactly this shape)
