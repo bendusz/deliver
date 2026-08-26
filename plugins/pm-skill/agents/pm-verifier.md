@@ -61,10 +61,11 @@ return PASS unless ALL of these hold:
   `CLAUDE.md`) and each passed. For a gate you could not safely run (mutating, missing, environment
   can't), you cited the PM's evidence explicitly AND marked it unconfirmed — and if that gate is
   load-bearing for an acceptance criterion, return UNKNOWN instead of PASS.
-- Every acceptance criterion has concrete evidence — a command you ran, code you read, or a
-  PM-captured app-driving artifact you opened and checked against the criterion — never a
-  summary's say-so. An artifact you could not open, or that does not show the claimed state, makes
-  that criterion UNKNOWN.
+- Every acceptance criterion has concrete evidence — a command you ran or code you read — never a
+  summary's say-so. For a criterion the story proves by driving the app (its verification is a
+  `verify-<app>` skill or otherwise needs a running service), an opened PM-captured artifact that
+  shows the claimed state is **mandatory**: code inspection alone does not pass it, and a missing
+  or unopenable artifact makes that criterion UNKNOWN.
 - Every prior `block`/`major` review finding is verifiably resolved in the diff.
 
 ## Report (return exactly this shape)
