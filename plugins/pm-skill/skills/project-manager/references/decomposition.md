@@ -32,8 +32,10 @@ needs without reading the rest of the repo**:
   `security-auditor` for security-sensitive surfaces. Declaring these (with `Security-sensitive` /
   `Architecture-sensitive`) lets `/pm-skill:analyze` check declared-vs-actual instead of guessing.
   For an `Architecture-sensitive` story, when a design-exploration skill is installed (for example
-  `poteto:architect`), you may run it before marking the story build-ready and put its synthesized
-  type/module sketch into the story's Context, so the builder implements against a settled shape.
+  `poteto:architect`), you may run it before marking the story build-ready — with a checkpoint
+  (`/poteto:architect with checkpoint`), stopping at the synthesized sketch; never its
+  implementation phases — and put the type/module sketch into the story's Context, so the builder
+  implements against a settled shape.
 - **Verification:** the exact command(s) that prove the story is done.
 
 (Use `${CLAUDE_PLUGIN_ROOT}/templates/story.md.template` as the shape.)

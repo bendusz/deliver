@@ -34,11 +34,11 @@ differs. Keep it current.
 | Skill | Files | Classes | Notes |
 |---|---|---|---|
 | `how` | `SKILL.md` | 1, 2 | Explorer, explainer, and critic params; critic list is `opus`, `fable`, `sonnet` plus an optional Codex CLI run. |
-| `why` | `SKILL.md` | 1, 2 | MCP discovery rewritten for `mcp__<server>__<tool>` names and `ToolSearch`; investigators and synthesizer stay on `general-purpose` because they need MCP tools. |
+| `why` | `SKILL.md` | 1, 2, prose | "cursor location" (the text caret) became "the IDE selection when one is attached"; MCP discovery rewritten for `mcp__<server>__<tool>` names and `ToolSearch`; investigators and synthesizer stay on `general-purpose` because they need MCP tools. |
 | `architect` | `SKILL.md` | 1, 6 | Runner list; `/poteto:architect` in description and Phase C. |
 | `arena` | `SKILL.md` | 1, 3, 6 | Runner and cross-judge lists; `/poteto:arena` in description. |
-| `create-verification-skill` | `SKILL.md` | 4, 6 | Output path `.claude/skills/verify-<app>/`; `/poteto:create-verification-skill` in description. |
-| `maintain-verification-skill` | `SKILL.md` | 4, 6 | Target path `.claude/skills/verify-*/`; description. |
+| `create-verification-skill` | `SKILL.md` | 4, 6 | Output path `.claude/skills/verify-<app>/`; `/poteto:create-verification-skill` in description; `/poteto:maintain-verification-skill` in step 5. |
+| `maintain-verification-skill` | `SKILL.md` | 4, 6 | Target path `.claude/skills/verify-*/`; `/poteto:maintain-verification-skill` in description; `/poteto:create-verification-skill` in the intro and step 0. |
 | `interrogate` | `SKILL.md` | 1, 2, 3 | Reviewer table `fable` / `opus` / `sonnet` / Codex CLI; params; the slug-fallback paragraph shortened to one sentence. |
 | `reflect` | `SKILL.md`, `references/synthesizer.md`, `references/judgment-reviewer.md`, `references/tooling-reviewer.md`, `references/divergent-reviewer.md` | 1, 2, 4, 5, 6 | Transcript lookup; reviewer and synthesizer params and models; `create-skill` routing; skill paths in the three reviewer prompts; `/poteto:reflect`. |
 | `technical-writing` | `SKILL.md` | 6 | Description only. |

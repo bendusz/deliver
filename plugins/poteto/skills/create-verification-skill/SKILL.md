@@ -41,4 +41,4 @@ Run its own instructions end to end once: launch, doctor, drive ONE mapped featu
 
 ## 5. Offer the maintenance loop
 
-Point the user at `/maintain-verification-skill` for keeping the map honest as the app changes. Suggest a cadence only if they ask.
+Point the user at `/poteto:maintain-verification-skill` for keeping the map honest as the app changes. Suggest a cadence only if they ask.
