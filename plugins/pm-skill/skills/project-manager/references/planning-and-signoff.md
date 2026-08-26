@@ -10,6 +10,11 @@ Skip this for a greenfield project.
 unfamiliar SDK), dispatch `researcher` — and `codex-researcher` alongside it for a consequential
 or contested call when the codex CLI is installed — then cite the `docs/research/` reports in the
 plan's decisions.
+**Design exploration (optional):** if a design-exploration skill is installed (for example
+`poteto:architect`, which sketches types, signatures, and module boundaries across several
+competing candidates before any code), run it for the plan's Architecture section on greenfield
+work and for any decision with more than one viable shape. Fold the synthesized sketch and its
+rationale into Architecture and list the rejected alternatives under Risks.
 
 ## 1. Write `docs/plan.md`
 If `docs/spec.md` exists, the plan **derives from it** — turn its requirements into delivery work and

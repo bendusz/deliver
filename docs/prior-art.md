@@ -25,6 +25,10 @@ The design of pm-skill was validated against the work below. See the design spec
 - **Task Master AI** — dependency-aware next-task selection. https://github.com/eyaltoledano/claude-task-master
 - **superpowers** (obra) — mandatory human sign-off gates and a two-stage review loop.
   https://github.com/obra/superpowers
+- **pstack** (Lauren Tan / poteto, Cursor) — engineering principles as named skills, multi-model
+  adversarial review with lead-reviewer triage, design-before-code (`architect` / `arena`), and
+  app-driving verification skills. Bundled as the optional `poteto` companion plugin (MIT).
+  https://github.com/cursor/plugins/tree/main/pstack
 - **deanpeters/Product-Manager-Skills** — PM discovery interview flows and INVEST stories.
   https://github.com/deanpeters/Product-Manager-Skills
 

@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here.
 
+## 0.14.0 - 2026-08-26
+
+poteto companion plugin. Lauren Tan's pstack skills ship in this marketplace as a second, optional
+plugin, and pm-skill's references learn to use them when they are present.
+
+- **New `poteto` plugin** (`plugins/poteto/`, MIT, copyright Lauren Tan) — 14 workflow skills
+  (`how`, `why`, `unslop`, `architect`, `arena`, `blast-radius`, `interrogate`,
+  `technical-writing`, `create-verification-skill`, `maintain-verification-skill`, `reflect`,
+  `teach`, `typescript-best-practices`, `bro`) and all 21 `principle-*` skills, ported from pstack
+  0.14.3. Patches are limited to Claude Code model aliases, subagent parameters, config lookups,
+  paths, tool names, and `/poteto:` namespacing; `PORT.md` lists every one and the upstream SHA.
+  Skills only, no hooks. Install with `/plugin install poteto@pm-skill`.
+- **Reference edits (optional, detect-and-adapt)** — planning and decomposition may run a
+  design-exploration skill for Architecture-sensitive work; review triage gains Act on / Consider /
+  Noted / Dismissed buckets and filtering rules; a blast-radius lens may join the panel for small
+  diffs into shared code; `pm-verifier` drives a project `verify-<app>` skill when one exists;
+  ship uses a Why / Scope / Tradeoffs / Blast radius / Verification PR body; `/pm-skill:handoff`
+  audits the log against repo state first; `technical-writer` applies a handed-in writing
+  standard; the constitution template offers the 21 principles as a menu.
+- **Validation** — `scripts/validate.sh` checks the second plugin's manifest, license, README,
+  skill frontmatter, and that no Cursor-only string survived the port.
+- **Docs** — README install step and Optional-enhancements entry, `docs/prior-art.md` pstack
+  entry, v0.14 spec and plan.
+
 ## 0.13.0 - 2026-08-22
 
 Codex precision builder. Opus remains the broad-context implementation worker; bounded stories and

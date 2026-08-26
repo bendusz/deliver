@@ -1,7 +1,10 @@
 {
   "name": "pm-skill",
   "description": "A Project/Product Manager skill that orchestrates software delivery through subagents.",
-  "owner": { "name": "bendusz", "url": "https://github.com/bendusz" },
+  "owner": {
+    "name": "bendusz",
+    "url": "https://github.com/bendusz"
+  },
   "plugins": [
     {
       "name": "pm-skill",
@@ -9,7 +12,27 @@
       "description": "Claude acts as a PM: discover, plan, get sign-off, decompose, and orchestrate build/review/ship via agents.",
       "category": "workflow",
       "homepage": "https://github.com/bendusz/pm-skill",
-      "tags": ["skill", "project-management", "orchestration", "agents", "workflow"]
+      "tags": [
+        "skill",
+        "project-management",
+        "orchestration",
+        "agents",
+        "workflow"
+      ]
+    },
+    {
+      "name": "poteto",
+      "source": "./plugins/poteto",
+      "description": "Lauren Tan's pstack engineering skills ported to Claude Code (MIT). Optional companion to pm-skill: design exploration, subsystem walkthroughs, multi-model review, blast-radius proofs, verification skills, unslop, 21 principles.",
+      "category": "workflow",
+      "homepage": "https://github.com/cursor/plugins/tree/main/pstack",
+      "tags": [
+        "skills",
+        "principles",
+        "review",
+        "architecture",
+        "pstack"
+      ]
     }
   ]
 }

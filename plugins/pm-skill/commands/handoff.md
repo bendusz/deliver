@@ -20,6 +20,9 @@ Rules for the content:
   gotchas learned the hard way, current blockers, and the **ordered** next steps with concrete
   files/commands.
 - Every claim must reflect real repo state — check `git status`/branch, don't recite from memory.
+- **Audit the log first.** Read this session's `pm/log.md` entries and check each maps to a real
+  commit, file, or command (`git log`, `git status`, the paths named). Correct or annotate any
+  entry that does not — the log must tell the truth before the handoff points at it.
 - **No secrets** — `pm/` is tracked. Reference secret *locations* (e.g. "`.env` on the box"),
   never values.
 

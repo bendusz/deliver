@@ -1,0 +1,10 @@
+{
+  "name": "poteto",
+  "description": "Lauren Tan's pstack engineering skills (how, why, architect, arena, interrogate, blast-radius, unslop, technical-writing, verification-skill generator, and 21 principles), ported to Claude Code as an optional companion to pm-skill. Skills only, no hooks.",
+  "version": "0.14.3",
+  "author": { "name": "Lauren Tan", "url": "https://github.com/cursor/plugins/tree/main/pstack" },
+  "homepage": "https://github.com/cursor/plugins/tree/main/pstack",
+  "repository": "https://github.com/bendusz/pm-skill",
+  "license": "MIT",
+  "keywords": ["pstack", "poteto", "skills", "principles", "review", "architecture", "unslop", "verification"]
+}

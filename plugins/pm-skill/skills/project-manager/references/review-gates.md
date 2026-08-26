@@ -28,6 +28,27 @@ only when **every selected lens** has no open `block`/`major`. Before acting, **
 findings — dedupe across lenses and drop false positives / out-of-scope items — and fix only the
 real `block`/`major` ones.
 
+### Triage — you are the lead reviewer, not an aggregator
+Sort every finding into one of four buckets and show the user all four (the Dismissed list is how
+they override you):
+- **Act on** — real correctness, security, or maintainability problems given the story's actual
+  goal. These are the `block`/`major` items that go to the fix round. More than ~5 means you are
+  not filtering hard enough.
+- **Consider** — legitimate, but you are not sure the fix is worth its cost now. Surface to the user.
+- **Noted** — valid but not actionable (context-dependent, premature, low impact).
+- **Dismissed** — wrong, nitpicky, or missing context, each with a one-line reason.
+
+Filtering rules: a finding raised independently by two lenses is high signal. A hypothetical
+("what if this is null") counts only if the call path can actually produce it — trace it. "I
+would have done it differently" is not a finding. A reviewer flagging code the story did not
+touch, or a pattern consistent with the rest of the codebase, is missing context. Be slower to
+dismiss security and correctness findings than style ones. (Buckets and rules adapted from the
+`interrogate` skill in pstack.)
+
+*Optional lens:* for a small diff into shared code, a blast-radius skill (for example
+`poteto:blast-radius`) finds what the change breaks beyond the diff and proves the one fact it is
+safe because of by running code. Its confirmed risks enter triage like any other finding.
+
 `technical-writer` and `debugger` are *delivery* agents, not review lenses — they never gate a story.
 
 ## Deterministic gates (you run these)

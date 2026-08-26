@@ -117,6 +117,12 @@ story is judged by the **same** deterministic gates and review panel below.
    - **Remote PR only if the user has explicitly asked for pushes/PRs** *and* `gh auth status`
      succeeds *and* a GitHub remote exists → push the branch, open a PR, and merge it.
    **Never push to a remote without an explicit request** (hard rule).
+   **PR / merge message format.** Title `type(scope): subject` (imperative, no trailing period).
+   Body sections in this order, dropping any that are empty: `## Why` (intent and why this
+   approach), `## Scope` (facts from the diff — real paths and symbols, what is in and out),
+   `## Tradeoffs` (real choices only), `## Blast radius` (who and what the change touches and why
+   it is safe or risky), `## Verification` (each check you ran and its outcome, not just the
+   command). No `## Summary` or `## Test plan` boilerplate.
 8. **Log.** Append the story outcome to `pm/log.md` (author-prefixed entry), update
    `pm/actors/<you>.json`, and **remove the story's entry from `assignments`** in
    `pm/pm-state.json`; clear `resolved_builder` after recording the outcome — then **commit this
@@ -127,7 +133,9 @@ story is judged by the **same** deterministic gates and review panel below.
    are merged, you may dispatch `technical-writer` to refresh user-facing docs (README, usage,
    CHANGELOG) and, at project end, produce the completion report at `docs/completion-report.md` from
    `${CLAUDE_PLUGIN_ROOT}/templates/completion-report.md.template`. It writes docs only — never
-   source. Log that it ran, or that you skipped it.
+   source. Log that it ran, or that you skipped it. When a technical-writing standard skill is
+   installed (for example `poteto:technical-writing`), pass its `SKILL.md` path in the dispatch so
+   the writer applies it.
 
 ## Handoff contracts (keep them tight)
 - Send `expert-builder` the story file path and the absolute worktree root when using an isolated
