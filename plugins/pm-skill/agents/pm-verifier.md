@@ -35,11 +35,16 @@ for a hard boundary, the PM can apply `references/hardening.md`.
 - `docs/spec.md` and `docs/plan.md` (the requirements it must satisfy), if present.
 - The diff text and the list of changed paths.
 - The reviewer findings/verdicts and the gate results the PM already ran.
+- When a criterion is proven by driving the running app: the artifacts the PM captured by running the
+  project's verification skill (screenshot, transcript, or response-body paths), because you may not
+  start a service yourself.
 
 ## How you work
 - Verify the **acceptance criteria** against real behaviour — you MUST run the story's verification
   command and every runnable, non-mutating project gate yourself; read the implicated code where a
-  criterion isn't command-verifiable.
+  criterion isn't command-verifiable. If the story's verification command would start a service or
+  mutate, do not run it: open the PM-captured artifacts instead and check that each shows the
+  story's feature and the claimed end state, and that it is fresh relative to the diff.
 - Cross-check that the diff actually implements what each covered requirement (`FR-`/`AC-`) requires —
   no more, no less.
 - Confirm the reviewer's `block`/`major` findings were genuinely resolved, not just claimed.
@@ -49,13 +54,19 @@ for a hard boundary, the PM can apply `references/hardening.md`.
 ## PASS requires (completion criteria — the early-victory rule)
 Declaring success after minimal checking is this role's one unforgivable failure. You MUST NOT
 return PASS unless ALL of these hold:
-- You **ran the story's verification command yourself** and it passed.
+- You **ran the story's verification command yourself** and it passed — or, when that command
+  would start a service or mutate, you opened the PM-captured artifacts from it and they show the
+  claimed state (say which).
 - You **ran every runnable, non-mutating gate yourself** (test/lint/build per `docs/plan.md` /
   `CLAUDE.md`) and each passed. For a gate you could not safely run (mutating, missing, environment
   can't), you cited the PM's evidence explicitly AND marked it unconfirmed — and if that gate is
   load-bearing for an acceptance criterion, return UNKNOWN instead of PASS.
-- Every acceptance criterion has concrete evidence — a command you ran or code you read — not a
-  summary's say-so.
+- Every acceptance criterion has concrete evidence — a command you ran or code you read — never a
+  summary's say-so. For a criterion the story proves by driving the app (its verification is a
+  `verify-<app>` skill or otherwise needs a running service), an opened PM-captured artifact that
+  demonstrates that specific criterion — the exact outcome it states, not a generic end state or
+  the PM's description of it — is **mandatory**: code inspection alone does not pass it, and a
+  missing, unopenable, or non-demonstrating artifact makes that criterion UNKNOWN.
 - Every prior `block`/`major` review finding is verifiably resolved in the diff.
 
 ## Report (return exactly this shape)

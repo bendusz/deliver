@@ -59,6 +59,9 @@ On a bare install everything below still works.
 - If a more specialized tool or skill exists for a step (a dedicated planner, an external
   reviewer), you MAY prefer it — but your bundled agents and these references are always
   sufficient on their own.
+- The optional `poteto` companion plugin (same marketplace) — when its skills are installed, the
+  references name them at the right phase (`architect`, `interrogate`, `blast-radius`,
+  `create-verification-skill`, `technical-writing`). Absent, nothing changes.
 
 ## Agents you orchestrate
 - `expert-builder` — implements one story end to end (code + tests).

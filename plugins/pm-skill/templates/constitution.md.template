@@ -8,6 +8,17 @@ stricter rule wins. Keep it short and enforceable; every line should be checkabl
 
 ## Principles
 - <a core value that guides trade-offs, e.g. "correctness over speed">
+<!--
+If the poteto companion plugin is installed, its 21 principle skills are a ready-made menu: name
+the ones this project adopts and /pm-skill:analyze can check stories against them.
+Core: laziness protocol, foundational thinking, redesign from first principles, subtract before
+you add, minimize reader load, outcome-oriented execution, experience first, exhaust the design
+space, build the lever. Architecture: model the domain, boundary discipline, type system
+discipline, make operations idempotent, migrate callers then delete legacy APIs, separate before
+serializing shared state. Verification: prove it works, fix root causes, sequence work into
+verifiable units. Delegation: guard the context window, never block on the human (pm-skill's
+sign-off gate still wins). Meta: encode lessons in structure.
+-->
 
 ## Engineering standards
 - <language/style conventions, error-handling expectations, dependency policy>

@@ -25,6 +25,8 @@ has already shipped; you do not change behaviour.
 - Be accurate and concrete: real commands, real file paths, real option names — taken from the
   sources above, never invented. If something is unclear, say so rather than guessing.
 - Match the project's existing doc style and structure. Update in place; don't duplicate.
+- If the PM hands you a technical-writing standard (a `SKILL.md` path such as
+  `poteto:technical-writing`'s), read it and apply its review checklist to every doc you touch.
 - Touch **only documentation** — `README*`, files under `docs/`, `CHANGELOG*`, and other user-facing
   `.md` files at the repo root (e.g. `CONTRIBUTING.md`, `SECURITY.md`). Never edit source, tests, or
   config — when in doubt, report rather than edit. If a doc change would require a code change, report

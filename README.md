@@ -33,6 +33,18 @@ machines without a GitHub SSH key/host key set up.
 
 If it doesn't appear right away, restart your Claude Code session.
 
+**3. (Optional) Install the `poteto` companion**
+
+```
+/plugin install poteto@pm-skill
+```
+
+Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack) engineering skills
+(`how`, `why`, `architect`, `arena`, `interrogate`, `blast-radius`, `unslop`, a technical-writing
+standard, verification-skill generators, and 21 principles), ported to Claude Code under her MIT
+license. pm-skill uses them when present and works without them. See
+[`plugins/poteto/README.md`](plugins/poteto/README.md).
+
 ## Use
 
 - Just describe the work — e.g. *"act as my PM to build a CLI todo app"* — and the
@@ -148,6 +160,8 @@ Scratch under `tmp/` (gitignored, disposable — never load-bearing for resume):
 - **No secrets in tracked state:** a bundled hook blocks secret-shaped content (key tokens, PEM
   blocks, credential assignments) from being written into the git-tracked `pm/` directory.
 - **Actor isolation:** a bundled hook blocks writes to another person's `pm/actors/` state files.
+- **Companion plugin is inert:** the optional `poteto` plugin ships skills only — no hooks, agents,
+  or commands — so it cannot change any guardrail above.
 - **Repository safety:** the PM never overwrites your files without asking, commits only what it
   created for the current story, runs `git init` only after asking, and never pushes without an
   explicit request.
@@ -159,6 +173,12 @@ Scratch under `tmp/` (gitignored, disposable — never load-bearing for resume):
 pm-skill is fully functional on its own. If your environment also has any of these, the PM may
 prefer them where useful — but nothing here is a dependency:
 
+- The **`poteto` companion plugin** from this marketplace — design exploration before code
+  (`architect` / `arena`), subsystem walkthroughs (`how` / `why`), multi-model adversarial review
+  with lead-reviewer triage (`interrogate`), change-impact proofs (`blast-radius`), a generator for
+  a project skill that drives the real app (`create-verification-skill`), a technical-writing
+  standard, `unslop`, and 21 named engineering principles. Skills only, no hooks. MIT, copyright
+  Lauren Tan. The PM's references name these as optional examples; nothing breaks without them.
 - A dedicated planning / TDD skill suite for richer discovery and planning.
 - An external code-review tool (for example an OpenAI Codex–based reviewer, or another model's CLI)
   for the optional independent review step.

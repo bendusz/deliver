@@ -20,9 +20,11 @@ for f in .claude-plugin/marketplace.json \
   if [ -f "$f" ]; then jq empty "$f" 2>/dev/null || err "invalid JSON: $f"; else err "missing: $f"; fi
 done
 
-# 2) marketplace source resolves to the plugin dir
-src="$(jq -r '.plugins[0].source' .claude-plugin/marketplace.json 2>/dev/null)"
-[ -d "$src" ] || err "marketplace source is not a directory: $src"
+# 2) every marketplace source resolves to a plugin dir with a manifest
+while IFS= read -r src; do
+  [ -d "$src" ] || err "marketplace source is not a directory: $src"
+  [ -f "$src/.claude-plugin/plugin.json" ] || err "marketplace source has no plugin.json: $src"
+done < <(jq -r '.plugins[].source' .claude-plugin/marketplace.json 2>/dev/null)
 
 # 3) required files
 for f in plugins/pm-skill/skills/project-manager/SKILL.md README.md LICENSE CHANGELOG.md; do
@@ -124,6 +126,40 @@ fi
 if ! bash "$(dirname "$0")/test-builder-benchmark.sh" >/dev/null 2>&1; then
   bash "$(dirname "$0")/test-builder-benchmark.sh" || true
   err "builder benchmark tests failed (scripts/test-builder-benchmark.sh)"
+fi
+
+# 15) poteto companion plugin (plugins/poteto): manifest, attribution, skills, no Cursor residue
+pp=plugins/poteto
+if [ -d "$pp" ]; then
+  jq empty "$pp/.claude-plugin/plugin.json" 2>/dev/null || err "invalid JSON: $pp/.claude-plugin/plugin.json"
+  [ "$(jq -r '.license' "$pp/.claude-plugin/plugin.json" 2>/dev/null)" = "MIT" ] || err "poteto plugin.json license must be MIT"
+  for f in "$pp/LICENSE" "$pp/README.md" "$pp/PORT.md"; do [ -f "$f" ] || err "missing required file: $f"; done
+  grep -q '^MIT License' "$pp/LICENSE" 2>/dev/null || err "poteto LICENSE is not the upstream MIT text"
+  grep -q 'Lauren Tan' "$pp/LICENSE" 2>/dev/null || err "poteto LICENSE lost the copyright holder"
+  n=0
+  for md in "$pp"/skills/*/SKILL.md; do
+    [ -f "$md" ] || continue
+    n=$((n+1))
+    head -n 12 "$md" | grep -q '^name:' || err "no 'name:' frontmatter in $md"
+    head -n 12 "$md" | grep -q '^description:' || err "no 'description:' frontmatter in $md"
+    fm="$(awk 'NR==1 && $0!="---"{exit} /^---$/{c++; next} c==1{print} c==2{exit}' "$md")"
+    [ -n "$fm" ] || { err "no frontmatter block in $md"; continue; }
+    while IFS= read -r line; do
+      case "$line" in [a-z]*': '*) ;; *) err "malformed frontmatter line in $md: ${line%%:*}"; continue ;; esac
+      val="${line#*: }"
+      case "$val" in \"*\"|\'*\') ;; *': '*) err "unquoted ': ' inside frontmatter value in $md: key '${line%%:*}'" ;; esac
+    done < <(printf '%s\n' "$fm")
+    if command -v ruby >/dev/null 2>&1; then
+      # shellcheck disable=SC2016
+      printf '%s\n' "$fm" | ruby -ryaml -e 'YAML.safe_load($stdin.read)' >/dev/null 2>&1 || err "frontmatter fails strict YAML parse: $md"
+    fi
+  done
+  want="$(grep -m1 -oE '^Skills bundled: [0-9]+' "$pp/PORT.md" 2>/dev/null | awk '{print $3}')"
+  { [ -n "$want" ] && [ "$want" = "$n" ]; } || err "poteto skill count mismatch: PORT.md says '${want:-?}', found $n"
+  if grep -rnE '\.cursor/|grok-4|sol-max|thinking-max|generalPurpose|pstack-models|agent-transcripts' "$pp/skills" >/dev/null 2>&1; then
+    grep -rnE '\.cursor/|grok-4|sol-max|thinking-max|generalPurpose|pstack-models|agent-transcripts' "$pp/skills" | head -5 >&2
+    err "Cursor-only string survived under $pp/skills (see above)"
+  fi
 fi
 
 if [ "$fail" -eq 0 ]; then echo "validate.sh: OK"; else echo "validate.sh: FAILED" >&2; exit 1; fi
