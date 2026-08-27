@@ -22,7 +22,11 @@ Skip when the conversation is trivial, off-topic, or already covered by an exist
 
 ### 1. Locate the active transcript
 
-The parent finds its own transcript file before fanning out. Claude Code stores transcripts under `~/.claude/projects/<slug>/`, where `<slug>` is the workspace path with each `/` replaced by `-` (so `/Users/you/proj` becomes `-Users-you-proj`). Use only the active workspace's directory. Do not glob across `~/.claude/projects/*/`. That crosses workspace boundaries and reads private chats from unrelated projects.
+The parent finds its own transcript file before fanning out. Claude Code stores transcripts under
+`~/.claude/projects/<slug>/`, where `<slug>` is the active workspace path encoded with `/` replaced
+by `-`. Use only the active workspace's directory. Do not glob across
+`~/.claude/projects/*/`. That crosses workspace boundaries and reads private chats from unrelated
+projects.
 
 ```bash
 ls -t ~/.claude/projects/<slug>/*.jsonl ~/.claude/projects/<slug>/*/subagents/*.jsonl 2>/dev/null | head -10

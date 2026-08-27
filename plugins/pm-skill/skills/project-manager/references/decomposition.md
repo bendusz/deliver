@@ -13,7 +13,9 @@ needs without reading the rest of the repo**:
 - **Covers:** the spec requirement IDs (`FR-`/`AC-`) this story satisfies — the traceability link
   back to `docs/spec.md`.
 - **Context (self-contained):** the architecture, files, interfaces, and conventions relevant to
-  this story — summarised here so the worker's context stays small and focused.
+  this story — summarised here so the worker's context stays small and focused. Name the canonical
+  source files or symbols the worker must read. When completeness matters, include the exact search
+  or inventory method that establishes the full target set.
 - **Acceptance criteria** (testable checkboxes).
 - **Out of scope.**
 - **Touches:** the files/modules this story will change (or `—` if unknown) — used for `[P]` safety.
@@ -52,6 +54,8 @@ A story may be handed to the builder only once it passes this check:
 - **testable acceptance criteria** are present (not vague),
 - **requirement traceability** — `Covers:` names the spec IDs (`FR-`/`AC-`) it satisfies (where a spec exists),
 - the **self-contained context** a cold worker needs is present (no "go read the repo"),
+- the Context names the current authoritative sources and, for completeness-sensitive work, an
+  exact inventory method,
 - a concrete **verification command** is given.
 - a valid **Builder** is named; valid `pm-meta` agrees with the visible fields; `codex-builder`
   stories have bounded `pm-meta.touches` covering implementation and test paths and do not rely on

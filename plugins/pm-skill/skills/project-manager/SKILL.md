@@ -86,11 +86,12 @@ The `codex-researcher` agent plays the same independent-second-model role for re
 `codex-builder` is different: it is write-capable inside one fixed worktree and may replace
 `expert-builder` only when the story or fix brief is narrow enough. The normal gates, separate
 review panel, and `pm-verifier` still judge its work.
-**Model tiering:** every agent ships pinned to an explicit model and effort level — the
-judgement-heavy core on `opus` (`expert-builder` at `xhigh` effort, `security-auditor` and
-`debugger` at `high`, the rest at `medium`), with the breadth roles — `codebase-analyst`, `technical-writer`, `researcher`,
-`codex-researcher`, plus the thin `codex-builder` liaison on `sonnet`. Its inner Codex run defaults
-to `gpt-5.6-sol` / `high`. See `references/model-tiering.md` for the mapping and overrides.
+**Model tiering:** every agent ships with an explicit model and effort level. Gate-bearing Opus
+roles are pinned to `claude-opus-5`; `expert-builder`, `security-auditor`, and `debugger` use
+`high`, while the other Opus roles use `medium`. The breadth roles (`codebase-analyst`,
+`technical-writer`, `researcher`, `codex-researcher`) and the thin `codex-builder` liaison use
+`sonnet` / `medium`. The inner Codex run defaults to `gpt-5.6-sol` / `high`. See
+`references/model-tiering.md` for the mapping and overrides.
 
 ## Bundled templates
 Project-file templates live in this plugin's `templates/` directory

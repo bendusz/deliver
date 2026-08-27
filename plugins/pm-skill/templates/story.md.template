@@ -8,7 +8,8 @@ Builder: <expert-builder|codex-builder|auto>
 <one paragraph>
 
 ## Context (self-contained)
-<architecture, files, interfaces, conventions the builder needs — so it need not read the whole repo>
+<architecture, canonical source files/symbols, interfaces, and conventions the builder needs; when
+completeness matters, include the exact search or inventory method that establishes the full set>
 
 ## Acceptance criteria (testable)
 - [ ] <criterion>
