@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## 0.15.0 - 2026-08-27
+
+Focused Opus 5 defaults. Gate-bearing Claude roles now use a stable model family, re-ground in
+current evidence, and stay inside a mechanically checked story boundary.
+
+- **Stable Opus selection.** All seven Opus agents request `claude-opus-5` instead of the moving
+  `opus` alias. `/pm-skill:doctor` records the Claude Code version, configured model and effort,
+  and host-level subagent override. Claude Code `v2.1.219` is the documented minimum for Opus 5.
+- **Builder effort reduced.** `expert-builder` defaults to `high`, down from `xhigh`. Its task
+  contract names the allowed path scope, stop condition, and ambiguity rule. No shipped Opus agent
+  uses `xhigh` or `max`.
+- **Role-specific focus.** Every Opus agent re-reads its current inputs, stays within one explicit
+  role and task, stops at its completion criteria, and reports missing evidence instead of guessing.
+  The prompts avoid generic extra-verification and delegation requests.
+- **Mechanical scope check.** Sequential and parallel delivery now derive changed paths from Git
+  after every writer run, compare them with authoritative `pm-meta.touches`, and stop before review
+  or ship on an unexplained path. Agent-reported file lists are not trusted as complete.
+- **Recovery and validation.** The PM checkpoints actor state before compaction and verifies it
+  after resume. The existing validation script locks exact Opus model and effort defaults without
+  adding a benchmark product or standalone test harness. The research behind the change is in
+  `docs/research/2026-08-26-opus-agent-performance.md`.
+
 ## 0.14.0 - 2026-08-26
 
 poteto companion plugin. Lauren Tan's pstack skills ship in this marketplace as a second, optional

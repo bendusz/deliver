@@ -42,11 +42,17 @@ there.**
   worktree-rooted paths for all edits and commands. Tell each to **implement and self-check only**.
   Do not run the full or exclusive test suite (you run the authoritative gates serially next; this
   avoids parallel builders colliding on shared ports/DBs). Take back only structured summaries.
+- **Before each writer's changes are committed**, derive that run's changed paths from the worktree
+  with `git -C <worktree> diff --name-only --diff-filter=ACDMRTUXB HEAD --` plus
+  `git -C <worktree> ls-files --others --exclude-standard`; sort and deduplicate them. Every path
+  must equal an authoritative `pm-meta.touches` entry or sit beneath an allowed directory entry.
+  Cross-check Codex paths with its snapshot-derived `actual_files_changed`. On any out-of-scope,
+  protected, or unexplained path, stop that story and preserve the worktree for inspection. Keep a
+  cumulative union of the accepted repository-derived paths across build and fix runs.
 - **Commit each story's edits to its story branch the moment that builder returns done** — before you
   process the next builder's result — so no work sits uncommitted in a worktree (story-path-scoped;
-  **never `git add -A`**). For Codex, use the runner's authoritative
-  `actual_files_changed`, not its model-reported list. Record the commit in `parallel_batch` and set
-  the story's status to `built`.
+  **never `git add -A`**). Commit only the checked path set. Record the commit in `parallel_batch`
+  and set the story's status to `built`.
 - If a builder returns **blocked** or fails, retry it up to **2** times with clarification; if still
   failing, mark its `parallel_batch` entry `blocked` (nothing to commit) and carry on with the rest.
 
@@ -64,7 +70,7 @@ Take one story at a time and land it before starting the next. **Work in that st
    `.env`), bootstrap them first (install only — **don't commit** those artifacts); if that isn't
    feasible, fall back to the sequential loop for this story.
 3. **Review + fix** exactly as in the sequential loop, **in the worktree**: cumulative
-   story-scoped diff from authoritative changed paths →
+   story-scoped diff from the repository-derived path union →
    risk-selected panel → triage → prefer `codex-builder` with a contained evidence brief for a
    localized fix, otherwise use `expert-builder`, **≤3 rounds** (dispatch `debugger` first when
    a gate fails or a round stalls), re-gating each round. Commit accepted fixes to the story branch.

@@ -9,6 +9,11 @@ Scope: $ARGUMENTS  (optional — a sub-path or component; default is the whole r
 
 Inspect (whichever apply):
 - **Toolchain & versions:** the language runtime(s), package manager, and their versions.
+- **Claude execution regime:** run `claude --version` when available and record the configured
+  `model` and `effort` frontmatter for every agent the active story may use. For an Opus 5 story,
+  flag Claude Code older than `v2.1.219`, a moving `model: opus` alias, or a host-level
+  `CLAUDE_CODE_SUBAGENT_MODEL` or `CLAUDE_CODE_EFFORT_LEVEL` override. Do not claim a delivered
+  model ID unless the host exposes it.
 - **Dependencies:** lockfiles present; whether install has been run (e.g. `node_modules`, a venv).
 - **Gates:** the `test` / `lint` / `build` / `run` commands from `docs/plan.md` / `CLAUDE.md`, and
   whether each actually **runs** — a non-mutating probe (`--version`/help, or the real command only if

@@ -114,7 +114,39 @@ for md in plugins/pm-skill/agents/*.md plugins/pm-skill/skills/project-manager/S
   fi
 done
 
-# 14) behavioral tests (quota-free; needs jq + git, both required above)
+# 14) Opus fleet defaults are deliberate and may not drift to a moving alias or excessive effort.
+check_agent_regime() {
+  agent="$1"
+  expected_model="$2"
+  expected_effort="$3"
+  path="plugins/pm-skill/agents/$agent.md"
+  actual_model="$(grep -m1 '^model:' "$path" 2>/dev/null | awk '{print $2}')"
+  actual_effort="$(grep -m1 '^effort:' "$path" 2>/dev/null | awk '{print $2}')"
+  [ "$actual_model" = "$expected_model" ] || \
+    err "$agent model must be $expected_model, found ${actual_model:-missing}"
+  [ "$actual_effort" = "$expected_effort" ] || \
+    err "$agent effort must be $expected_effort, found ${actual_effort:-missing}"
+}
+check_agent_regime expert-builder claude-opus-5 high
+check_agent_regime security-auditor claude-opus-5 high
+check_agent_regime debugger claude-opus-5 high
+check_agent_regime architecture-reviewer claude-opus-5 medium
+check_agent_regime code-integrity-reviewer claude-opus-5 medium
+check_agent_regime pm-verifier claude-opus-5 medium
+check_agent_regime test-engineer claude-opus-5 medium
+
+for md in plugins/pm-skill/agents/*.md; do
+  model="$(grep -m1 '^model:' "$md" 2>/dev/null | awk '{print $2}')"
+  effort="$(grep -m1 '^effort:' "$md" 2>/dev/null | awk '{print $2}')"
+  [ "$model" != "opus" ] || err "moving model alias is forbidden in $md"
+  if [ "$model" = "claude-opus-5" ]; then
+    case "$effort" in
+      xhigh|max) err "Opus agent may not ship at $effort effort: $md" ;;
+    esac
+  fi
+done
+
+# 15) behavioral tests (quota-free; needs jq + git, both required above)
 if ! bash "$(dirname "$0")/test-hooks.sh" >/dev/null 2>&1; then
   bash "$(dirname "$0")/test-hooks.sh" || true
   err "hook behavioral tests failed (scripts/test-hooks.sh)"
@@ -128,7 +160,7 @@ if ! bash "$(dirname "$0")/test-builder-benchmark.sh" >/dev/null 2>&1; then
   err "builder benchmark tests failed (scripts/test-builder-benchmark.sh)"
 fi
 
-# 15) poteto companion plugin (plugins/poteto): manifest, attribution, skills, no Cursor residue
+# 16) poteto companion plugin (plugins/poteto): manifest, attribution, skills, no Cursor residue
 pp=plugins/poteto
 if [ -d "$pp" ]; then
   jq empty "$pp/.claude-plugin/plugin.json" 2>/dev/null || err "invalid JSON: $pp/.claude-plugin/plugin.json"

@@ -21,8 +21,9 @@ story is judged by the **same** deterministic gates and review panel below.
 
 ## Per-story cycle
 0. **Ready, route & branch.** Confirm the story is **build-ready** with testable criteria,
-   self-contained context, a verification command, and Builder. See `decomposition.md`; if not, fix
-   the story first. For a story created before v0.13, add its `pm-meta` comment, verify it matches the
+   self-contained context that names authoritative sources and any completeness-sensitive inventory
+   method, a verification command, and Builder. See `decomposition.md`; if not, fix the story first.
+   For a story created before v0.13, add its `pm-meta` comment, verify it matches the
    visible Builder and Touches, and commit that story migration before dispatch. Ensure the working
    tree is **clean before writing route state or the log** (if it
    has unrelated changes, stop and ask — see Repository safety). Resolve `Builder: auto` now:
@@ -58,9 +59,14 @@ story is judged by the **same** deterministic gates and review panel below.
    environment, and structured output contract. Run the runner's quota-free `--preflight` first
    when readiness has not already been established. The builder edits the working tree; you own
    commits and all other git changes.
-   For Codex, trust `actual_files_changed`, which the runner derives from before/after content
-   snapshots, not the model's claimed list. Keep a cumulative union of these authoritative paths
-   across the initial run and every fix. If it reports that the work is broader than its brief, do not keep a
+   **After every writer run, derive the cumulative changed paths from repository state, not the
+   agent summary:** combine `git diff --name-only --diff-filter=ACDMRTUXB HEAD --` with
+   `git ls-files --others --exclude-standard`, then sort and deduplicate. Every path must equal an
+   entry in the story's authoritative `pm-meta.touches` or sit beneath an allowed directory entry.
+   For Codex, cross-check this set with the runner's snapshot-derived `actual_files_changed`; neither
+   source may omit a path present in the other. On any out-of-scope, protected, or unexplained path,
+   stop before gates or review and preserve the working tree for inspection. Keep the cumulative set
+   for diffing and ship. If the work is broader than its brief, do not keep a
    narrow Codex worker on the wrong task: update `resolved_builder` to `expert-builder` and append
    the reason to the log in the same coordination commit before routing the retry. If a builder returns
    *blocked* or fails, retry up to **2** times with clarification,
@@ -69,9 +75,9 @@ story is judged by the **same** deterministic gates and review panel below.
    the user.
 2. **Gate.** Run the project's deterministic gates yourself (test/lint/build per
    `review-gates.md`; skip any that are `N/A`). If a gate fails, go to Fix (step 4) before review.
-3. **Review.** Produce the diff yourself and pass it to the reviewers inline — they have no Bash and
-   cannot diff. Diff **only the story's cumulative changed paths** (for Codex, the union of the
-   runner's authoritative `actual_files_changed`; never the model's claim), e.g.
+3. **Review.** Re-derive and scope-check the cumulative changed paths as in step 1. Produce the diff
+   yourself and pass it to the reviewers inline — they have no Bash and cannot diff. Diff **only
+   those repository-derived paths**, e.g.
    `git add -N -- <changed paths> && git diff -- <changed paths>` — **never `git add -A`** (that
    would sweep in unrelated work). Dispatch the **review panel** per the risk triggers in
    `review-gates.md`: always `code-integrity-reviewer`, plus any further lenses it selects (e.g.
@@ -167,5 +173,8 @@ fresh counters. Never drip-feed new asks mid-flight.
   session's context is running long, offer `/pm-skill:handoff` — a committed
   `pm/actors/<id>.HANDOFF.md` is what lets the next session skip re-discovery. (A bundled
   SessionStart hook re-grounds new and freshly-compacted sessions from `pm/` automatically.)
+- **Checkpoint before compaction.** When compaction is imminent, write and commit the actor handoff
+  first. After resume, verify its base commit, branch, changed paths, last gate results, and next
+  action against repository state before dispatching another writer.
 
 See `review-gates.md` for the severity model and the definition of done.
