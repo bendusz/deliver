@@ -63,7 +63,9 @@ export function parseArgs(argv) {
   } else if (o.mode === 'review') {
     if (!SCOPES.has(o.scope)) throw new UsageError('review scope must be recent, worktree, or codebase');
     if (!o.preflight && !o.out) throw new UsageError('--out is required');
-    if (o.objective.length > 500 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(o.objective)) throw new UsageError('objective must be under 500 printable characters');
+    // "under 500" is exclusive, and tab/LF/CR are not printable either — the objective
+    // is embedded in a prompt and in a report filename slug.
+    if (o.objective.length >= 500 || /[\x00-\x1f\x7f]/.test(o.objective)) throw new UsageError('objective must be under 500 printable characters');
   } else {
     if (!o.preflight && !o.promptFile) throw new UsageError('--prompt-file is required');
     if (o.search !== 'auto' && o.search !== 'off') throw new UsageError('--search must be auto or off');

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { realpath } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel } from '../lib/git.mjs';
-import { findCodex, codexVersion, loginOk, execHelp, requireFlags, READONLY_FLAGS } from '../lib/preflight.mjs';
+import { findCodex, codexVersion, loginOk, execHelp, requireFlags, READONLY_FLAGS, PROBE_TIMEOUT, PROBE_TIMEOUT_REASON } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
 
@@ -17,8 +17,11 @@ export async function runAdvise(o) {
   const found = findCodex();
   if (!found) throw new RunnerError('unavailable', 'codex CLI not found; install @openai/codex');
   const version = codexVersion(found);
-  if (!loginOk(found)) throw new RunnerError('unavailable', 'Codex is not authenticated; run codex login', { codex_version: version });
+  const auth = loginOk(found);
+  if (auth === PROBE_TIMEOUT) throw new RunnerError('unavailable', PROBE_TIMEOUT_REASON, { codex_version: version });
+  if (!auth) throw new RunnerError('unavailable', 'Codex is not authenticated; run codex login', { codex_version: version });
   const help = execHelp(found);
+  if (help === PROBE_TIMEOUT) throw new RunnerError('unavailable', PROBE_TIMEOUT_REASON, { codex_version: version });
   if (help === null) throw new RunnerError('unavailable', 'codex exec --help failed', { codex_version: version });
   const missing = requireFlags(help, READONLY_FLAGS);
   if (missing) throw new RunnerError('unavailable', `installed Codex CLI lacks required flag ${missing}; update @openai/codex`, { codex_version: version });
@@ -31,7 +34,14 @@ export async function runAdvise(o) {
   const answer = path.join(scratch, 'answer.md');
   const stderrPath = path.join(scratch, 'stderr.log');
   const stdoutPath = path.join(scratch, 'stdout.log');
-  const args = ['exec', '--ignore-user-config', '--strict-config', '--sandbox', 'read-only', '--ephemeral', '--color', 'never', '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`, ...(useSearch ? ['--search'] : []), ...(root ? [] : ['--skip-git-repo-check']), '-o', answer, '-'];
+  // --ignore-user-config only skips $CODEX_HOME/config.toml. A trusted repository's
+  // .codex/config.toml can still launch MCP server processes (which run OUTSIDE the
+  // shell sandbox), enable hooks/agents, or force web search on, so --sandbox read-only
+  // alone does not make this mode host-read-only. web_search is left to the CLI's own
+  // --search handling ONLY when research asked for it; otherwise it is pinned off.
+  const args = ['exec', '--ignore-user-config', '--ignore-rules', '--strict-config', '--sandbox', 'read-only', '--ephemeral', '--color', 'never', '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`,
+    '-c', 'mcp_servers={}', '-c', 'features.hooks=false', '-c', 'agents.enabled=false', ...(useSearch ? ['--search'] : ['-c', 'web_search="disabled"']),
+    ...(root ? [] : ['--skip-git-repo-check']), '-o', answer, '-'];
   const run = await runCodex(found, args, { stdinText: prompt, cwd, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
   const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, stderr_path: stderrPath };
   if (run.timedOut) throw new RunnerError('timed-out', `codex exec exceeded the ${o.timeoutSeconds}s timeout`, extra);

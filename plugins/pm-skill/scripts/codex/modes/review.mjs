@@ -3,7 +3,7 @@ import path from 'node:path';
 import { realpath } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel, gitOut, gitOk, checkIgnore } from '../lib/git.mjs';
-import { findCodex, codexVersion, loginOk, execHelp, requireFlags, READONLY_FLAGS } from '../lib/preflight.mjs';
+import { findCodex, codexVersion, loginOk, execHelp, reviewHelp, requireFlags, READONLY_FLAGS, REVIEW_FLAGS, PROBE_TIMEOUT, PROBE_TIMEOUT_REASON } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
 
@@ -38,11 +38,21 @@ export async function runReview(o) {
   const found = findCodex();
   if (!found) throw new RunnerError('unavailable', 'codex CLI not found; install @openai/codex');
   const version = codexVersion(found);
-  if (!loginOk(found)) throw new RunnerError('unavailable', 'Codex is not authenticated; run codex login', { codex_version: version });
+  const auth = loginOk(found);
+  if (auth === PROBE_TIMEOUT) throw new RunnerError('unavailable', PROBE_TIMEOUT_REASON, { codex_version: version });
+  if (!auth) throw new RunnerError('unavailable', 'Codex is not authenticated; run codex login', { codex_version: version });
   const help = execHelp(found);
+  if (help === PROBE_TIMEOUT) throw new RunnerError('unavailable', PROBE_TIMEOUT_REASON, { codex_version: version });
   if (help === null) throw new RunnerError('unavailable', 'codex exec --help failed', { codex_version: version });
   const missing = requireFlags(help, READONLY_FLAGS);
   if (missing) throw new RunnerError('unavailable', `installed Codex CLI lacks required flag ${missing}; update @openai/codex`, { codex_version: version });
+  // `codex exec --help` says nothing about the review subcommand, so preflight must ask
+  // it directly before it can honestly answer "ready" for a commit/worktree review.
+  const rhelp = reviewHelp(found);
+  if (rhelp === PROBE_TIMEOUT) throw new RunnerError('unavailable', PROBE_TIMEOUT_REASON, { codex_version: version });
+  if (rhelp === null) throw new RunnerError('unavailable', 'codex exec review --help failed; update @openai/codex', { codex_version: version });
+  const missingReview = requireFlags(rhelp, REVIEW_FLAGS);
+  if (missingReview) throw new RunnerError('unavailable', `installed Codex CLI lacks required review flag ${missingReview}; update @openai/codex`, { codex_version: version });
 
   if (o.preflight) return { exit: 0, envelope: { runner_status: 'ready', preflight: true, mode: 'review', scope: o.scope, codex_version: version, quota_consumed: false } };
 
@@ -53,12 +63,25 @@ export async function runReview(o) {
   const outName = path.basename(o.out);
   if (!['untracked', 'codex'].includes(outName) || realpath(path.dirname(o.out)) !== base) throw new RunnerError('rejected', '--out must be <root>/untracked or <root>/codex');
   if (root && gitOut(root, ['ls-files', '--', outName]).trim() !== '') throw new RunnerError('rejected', `${outName}/ holds tracked files and cannot receive reports`);
+  // The parent resolving to base is not enough: `<root>/untracked` may itself be a
+  // symlink or a Windows junction that redirects the report outside the repository.
+  if (fs.existsSync(o.out)) {
+    let ls = null;
+    try { ls = fs.lstatSync(o.out); } catch { ls = null; }
+    if (ls && ls.isSymbolicLink()) throw new RunnerError('rejected', 'output directory must not be a symlink');
+    if (realpath(o.out) !== path.join(base, outName)) throw new RunnerError('rejected', 'output directory must resolve inside the repository root');
+  }
 
   const scratch = makeScratch(base, 'pm-codex-review');
   const report = path.join(scratch, 'report.md');
   const stderrPath = path.join(scratch, 'stderr.log');
   const stdoutPath = path.join(scratch, 'stdout.log');
-  const tail = ['--ignore-user-config', '--strict-config', '--ephemeral', '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`, '-o', report];
+  // --ignore-user-config only skips $CODEX_HOME/config.toml; a trusted repository's
+  // .codex/config.toml can still start MCP server processes (which run OUTSIDE the
+  // shell sandbox), enable hooks/agents, or turn web search back on. Review is
+  // read-only on every platform, so neutralise all four explicitly.
+  const tail = ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral', '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`,
+    '-c', 'mcp_servers={}', '-c', 'features.hooks=false', '-c', 'agents.enabled=false', '-c', 'web_search="disabled"', '-o', report];
   const clause = objectiveClause(o.objective);
   let args; let stdinText;
   if (o.scope === 'codebase') {
@@ -83,9 +106,17 @@ export async function runReview(o) {
 
   fs.mkdirSync(o.out, { recursive: true });
   const nameBase = `${stamp()}-codex-review-${o.scope}${o.objective ? `-${slug(o.objective)}` : ''}`;
+  // COPYFILE_EXCL makes the suffix loop atomic: two same-second, same-objective reviews
+  // cannot both pick the same name and have the last copy win.
   let reportPath = path.join(o.out, `${nameBase}.md`);
-  for (let n = 2; fs.existsSync(reportPath); n += 1) reportPath = path.join(o.out, `${nameBase}-${n}.md`);
-  fs.copyFileSync(report, reportPath);
+  let copied = false;
+  for (let n = 2; n <= 500; n += 1) {
+    try { fs.copyFileSync(report, reportPath, fs.constants.COPYFILE_EXCL); copied = true; break; } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      reportPath = path.join(o.out, `${nameBase}-${n}.md`);
+    }
+  }
+  if (!copied) throw new RunnerError('failed', 'could not place the review report without overwriting an existing one', { ...extra, stderr_path: stderrPath });
   const gitignoreRuleNeeded = root && !checkIgnore(root, `${outName}/probe`) ? `/${outName}/` : null;
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
   return { exit: 0, envelope: { runner_status: 'completed', mode: 'review', scope: o.scope, objective: o.objective, report_path: reportPath, codex_version: version, model: o.model, effort: o.effort, codex_exit: String(run.exit), gitignore_rule_needed: gitignoreRuleNeeded } };

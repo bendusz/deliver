@@ -9,8 +9,8 @@ import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
 import { parseStory } from '../codex/lib/story.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
 import { runCodex } from '../codex/lib/spawn.mjs';
-import { cmdFallbackPrefix } from '../codex/lib/preflight.mjs';
-import { PLUGIN_ROOT, tmpDir, gitIn, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath } from './helpers.mjs';
+import { cmdFallbackPrefix, CMD_FALLBACK_SUFFIX } from '../codex/lib/preflight.mjs';
+import { PLUGIN_ROOT, tmpDir, gitIn, canSymlink, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath } from './helpers.mjs';
 
 test('args: defaults per mode and validation', () => {
   const b = parseArgs(['--mode', 'build', '--worktree', '/w', '--story', 'docs/stories/S1-1.md']);
@@ -31,6 +31,12 @@ test('args: defaults per mode and validation', () => {
   assert.throws(() => parseArgs(['--mode', 'review', '--scope', 'everything', '--out', '/o']), UsageError);
   assert.throws(() => parseArgs(['--mode', 'review', '--scope', 'recent']), UsageError);
   assert.throws(() => parseArgs(['--mode', 'advise']), UsageError);
+  // "under 500" is exclusive, and tab/LF/CR are rejected with the other control characters.
+  assert.throws(() => parseArgs(['--mode', 'review', '--scope', 'recent', '--out', '/o', '--objective', 'x'.repeat(500)]), UsageError);
+  assert.equal(parseArgs(['--mode', 'review', '--scope', 'recent', '--out', '/o', '--objective', 'x'.repeat(499)]).objective.length, 499);
+  for (const ch of ['\t', '\n', '\r']) {
+    assert.throws(() => parseArgs(['--mode', 'review', '--scope', 'recent', '--out', '/o', '--objective', `a${ch}b`]), UsageError);
+  }
   assert.throws(() => parseArgs(['--mode', 'build', '--preflight', '--worktree', '/w', '--story', 'x.md', '--evidence', 'e.md']), UsageError);
   const pf = parseArgs(['--mode', 'build', '--preflight', '--worktree', '/w']);
   assert.equal(pf.preflight, true);
@@ -89,8 +95,13 @@ test('spawn: a synchronous spawn error still cleans up signal listeners and fds'
   assert.equal(process.listenerCount('SIGINT'), before);
 });
 
-test('preflight: cmdFallbackPrefix quotes the cmd.exe shim path and rejects unsafe ones', () => {
-  assert.deepEqual(cmdFallbackPrefix('C:\\Users\\Jane Smith\\npm\\codex.cmd'), ['/d', '/s', '/c', '"C:\\Users\\Jane Smith\\npm\\codex.cmd"']);
+test('preflight: cmdFallbackPrefix double-quotes the cmd.exe shim path and rejects unsafe ones', () => {
+  // `cmd.exe /s /c` strips the first and last character of the command string when both
+  // are quotes and runs the rest verbatim. Without the extra enclosing pair the path's
+  // own quotes are the ones consumed and a path with spaces splits into two arguments,
+  // so the prefix opens an outer quote and CMD_FALLBACK_SUFFIX closes it after the args.
+  assert.deepEqual(cmdFallbackPrefix('C:\\Users\\Jane Smith\\npm\\codex.cmd'), ['/d', '/s', '/c', '""C:\\Users\\Jane Smith\\npm\\codex.cmd"']);
+  assert.equal(CMD_FALLBACK_SUFFIX, '"');
   assert.equal(cmdFallbackPrefix('C:\\bad"path\\codex.cmd'), null);
 });
 
@@ -108,6 +119,36 @@ test('snapshot: detects content, new, deleted, mode, and ignored-protected chang
   const meta1 = gitMetadataFingerprint(p);
   gitIn(p, ['branch', 'other']);
   assert.notEqual(gitMetadataFingerprint(p), meta1);
+});
+
+test('snapshot: ignored files are fingerprinted cheaply and the runtime dir is skipped', () => {
+  const p = newBuildProject(true);
+  fs.appendFileSync(path.join(p, '.gitignore'), '.env\n');
+  fs.writeFileSync(path.join(p, '.env'), 'SECRET=1\n');
+  fs.mkdirSync(path.join(p, 'tmp', 'codex-runtime', 'run1'), { recursive: true });
+  fs.writeFileSync(path.join(p, 'tmp', 'codex-runtime', 'run1', 'noise.txt'), 'churn\n');
+  const before = snapshotWorktree(p);
+  assert.match(before.get('.env'), /^ignored:9:/);
+  assert.ok(!before.has('tmp/codex-runtime/run1/noise.txt'), 'the runner\'s own TMPDIR must stay out of the delta');
+  assert.ok(before.has('tmp/codex-builder/S1-1-round-1.md'), 'other ignored files are tracked by the snapshot');
+  fs.writeFileSync(path.join(p, '.env'), 'SECRET=exfiltrated\n');
+  fs.writeFileSync(path.join(p, 'tmp', 'codex-runtime', 'run1', 'noise.txt'), 'more churn\n');
+  assert.deepEqual(changedPaths(before, snapshotWorktree(p)), ['.env']);
+});
+
+test('snapshot: index flags, git hooks, and info/exclude are protected git state', () => {
+  const p = newBuildProject(true);
+  const base = gitMetadataFingerprint(p);
+  gitIn(p, ['update-index', '--skip-worktree', 'src/script.sh']);
+  assert.notEqual(gitMetadataFingerprint(p), base, 'skip-worktree must move the fingerprint');
+  gitIn(p, ['update-index', '--no-skip-worktree', 'src/script.sh']);
+  assert.equal(gitMetadataFingerprint(p), base);
+  fs.writeFileSync(path.join(p, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 0\n');
+  const withHook = gitMetadataFingerprint(p);
+  assert.notEqual(withHook, base, 'an installed git hook must move the fingerprint');
+  fs.mkdirSync(path.join(p, '.git', 'info'), { recursive: true });
+  fs.writeFileSync(path.join(p, '.git', 'info', 'exclude'), 'secrets/\n');
+  assert.notEqual(gitMetadataFingerprint(p), withHook, 'info/exclude must move the fingerprint');
 });
 
 test('snapshot: executable bit is part of the delta on POSIX', (t) => {
@@ -293,14 +334,64 @@ test('build 16: a structured blocked result with no edits completes', () => {
 
 test('build 17: timeout kills the process tree and preserves diagnostics', () => {
   const p = newBuildProject(true); const s = makeStub();
-  const r = runRunner(['--mode', 'build', '--timeout-seconds', '2'], { project: p, stub: s, env: { STUB_SLEEP: '1' } });
+  // 3 s, not 2: a loaded Windows runner needs room to start node, load the stub, spawn
+  // the grandchild, and write the pid file before the timeout fires.
+  const r = runRunner(['--mode', 'build', '--timeout-seconds', '3'], { project: p, stub: s, env: { STUB_SLEEP: '1' } });
   assert.equal(r.status, 124, JSON.stringify(r.out));
   assert.equal(r.out.runner_status, 'timed-out');
   assert.equal(r.out.diagnostics_retained, true);
+  // The timeout contract above holds either way; the liveness assertion needs the pid
+  // file, which a slow host may not have produced before the deadline.
+  if (!fs.existsSync(s.childPid)) return;
   const pid = Number(fs.readFileSync(s.childPid, 'utf8').trim());
+  if (!Number.isInteger(pid) || pid <= 0) return;
   let alive = true;
   try { process.kill(pid, 0); } catch { alive = false; }
   assert.equal(alive, false, 'sleeping grandchild must be dead');
+});
+
+test('build 27: a backgrounded descendant cannot outlive a clean Codex exit', async (t) => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_ORPHAN: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.out.runner_status, 'completed');
+  if (WIN) return t.skip('process.kill(pid, 0) cannot reliably probe a reaped win32 pid');
+  const pid = Number(fs.readFileSync(s.childPid, 'utf8').trim());
+  let alive = true;
+  for (let i = 0; i < 60 && alive; i += 1) {
+    try { process.kill(pid, 0); } catch { alive = false; break; }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.equal(alive, false, 'a descendant left running by Codex must be reaped before the runner exits');
+});
+
+test('build 28: an ignored file outside the story scope is a safety violation', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.appendFileSync(path.join(p, '.gitignore'), '.env\n');
+  fs.writeFileSync(path.join(p, '.env'), 'SECRET=1\n');
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: '.env', STUB_OMIT_REPORT: '1' } });
+  assert.equal(r.status, 74, JSON.stringify(r.out));
+  assert.equal(r.out.runner_status, 'safety-violation');
+  assert.ok(r.out.actual_files_changed.includes('.env'), JSON.stringify(r.out.actual_files_changed));
+});
+
+test('build 29: a skip-worktree index flag is a protected-git-state violation', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_SKIP_WORKTREE: '1' } });
+  assert.equal(r.status, 74, JSON.stringify(r.out));
+  assert.match(r.out.reason, /protected git state/);
+});
+
+test('build 30: a symlinked tmp/codex-runtime is blocked before Codex runs', (t) => {
+  const p = newBuildProject(true); const s = makeStub();
+  const outside = tmpDir('runtime-escape-');
+  fs.mkdirSync(path.join(p, 'tmp'), { recursive: true });
+  if (!canSymlink(outside, path.join(p, 'tmp', 'codex-runtime'))) return t.skip('symlinks unavailable');
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+  assert.equal(r.status, 66, JSON.stringify(r.out));
+  assert.match(r.out.reason, /tmp\/codex-runtime must be a real directory/);
+  assert.doesNotMatch(stubActions(s), /^exec --ignore-user-config/m);
+  assert.equal(fs.readdirSync(outside).length, 0);
 });
 
 test('build 19: a dirty baseline is isolated from this run', () => {
@@ -374,7 +465,10 @@ test('review: recent scope with an objective goes through exec review with promp
   const a = stubArgs(s);
   assert.equal(a[0], 'review');
   for (const x of ['--sandbox', '-C', '--cd', '--color', '--commit']) assert.ok(!has(a, x), `must not pass ${x}`);
-  for (const x of ['--ignore-user-config', '--strict-config', '--ephemeral', 'gpt-5.6-terra', 'model_reasoning_effort=high', '-o']) assert.ok(has(a, x), x);
+  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral', 'gpt-5.6-terra', 'model_reasoning_effort=high', '-o']) assert.ok(has(a, x), x);
+  // A trusted repository's .codex/config.toml must not be able to start MCP processes,
+  // hooks, or agents, or turn web search back on, in a read-only mode.
+  for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false', 'web_search="disabled"']) assert.ok(has(a, x), x);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /last commit \(HEAD\).*security/s);
   assert.ok(fs.existsSync(r.out.report_path));
   assert.match(path.basename(r.out.report_path), /^\d{8}-\d{6}-codex-review-recent-security\.md$/);
@@ -388,7 +482,7 @@ test('review: clean worktree is nothing-to-review; recent without objective uses
   const clean = runRunner(['--mode', 'review', '--scope', 'worktree', '--out', out], { stub: s, cwd: p });
   assert.equal(clean.status, 0);
   assert.equal(clean.out.runner_status, 'nothing-to-review');
-  assert.doesNotMatch(stubActions(s), /^exec review/m);
+  assert.doesNotMatch(stubActions(s), /^exec review (?!--help)/m);
   const r = runRunner(['--mode', 'review', '--scope', 'recent', '--out', out], { stub: s, cwd: p });
   assert.equal(r.status, 0);
   const a = stubArgs(s);
@@ -458,7 +552,21 @@ test('review: preflight reports readiness without running', () => {
   assert.equal(r.status, 0);
   assert.equal(r.out.runner_status, 'ready');
   assert.equal(r.out.quota_consumed, false);
-  assert.doesNotMatch(stubActions(s), /^exec review/m);
+  // Preflight now verifies review support itself, so `exec review --help` IS expected —
+  // what must not appear is a real review run.
+  assert.match(stubActions(s), /^exec review --help$/m);
+  assert.doesNotMatch(stubActions(s), /^exec review (?!--help)/m);
+});
+
+test('review: a symlinked output directory is rejected before Codex runs', (t) => {
+  const p = newBuildProject(true); const s = makeStub();
+  const outside = tmpDir('review-escape-');
+  if (!canSymlink(outside, path.join(p, 'untracked'))) return t.skip('symlinks unavailable');
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--out', path.join(p, 'untracked')], { stub: s, cwd: p });
+  assert.equal(r.status, 65, JSON.stringify(r.out));
+  assert.match(r.out.reason, /must not be a symlink/);
+  assert.doesNotMatch(stubActions(s), /^exec review (?!--help)/m);
+  assert.equal(fs.readdirSync(outside).length, 0);
 });
 
 test('advise: read-only exec with the prompt on stdin, answer retained', () => {
@@ -468,7 +576,8 @@ test('advise: read-only exec with the prompt on stdin, answer retained', () => {
   const r = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_ANSWER: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
-  for (const x of ['--sandbox', 'read-only', '--ephemeral', '--color', 'never', '--ignore-user-config', '--strict-config', 'gpt-5.6-sol', 'model_reasoning_effort=medium', '-o', '-']) assert.ok(has(a, x), x);
+  for (const x of ['--sandbox', 'read-only', '--ephemeral', '--color', 'never', '--ignore-user-config', '--ignore-rules', '--strict-config', 'gpt-5.6-sol', 'model_reasoning_effort=medium', '-o', '-']) assert.ok(has(a, x), x);
+  for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false', 'web_search="disabled"']) assert.ok(has(a, x), x);
   assert.ok(!has(a, '--search') && !has(a, '--skip-git-repo-check'));
   assert.equal(fs.readFileSync(s.promptFile, 'utf8'), 'Should we use X or Y?\n');
   assert.equal(fs.readFileSync(r.out.answer_path, 'utf8'), 'stub answer\n');
@@ -483,11 +592,27 @@ test('research: adds --search when available and --skip-git-repo-check outside a
   const withSearch = runRunner(['--mode', 'research', '--prompt-file', brief], { stub: s, cwd: noRepo, env: { STUB_ANSWER: '1', STUB_HAS_SEARCH: '1' } });
   assert.equal(withSearch.status, 0);
   assert.ok(has(stubArgs(s), '--search') && has(stubArgs(s), '--skip-git-repo-check'));
+  // The only argv that omits the web_search override: search was explicitly requested.
+  assert.ok(!has(stubArgs(s), 'web_search="disabled"'));
+  for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false']) assert.ok(has(stubArgs(s), x), x);
   assert.equal(withSearch.out.search_used, true);
   assert.ok(has(stubArgs(s), 'gpt-5.6-terra'));
   const off = runRunner(['--mode', 'research', '--prompt-file', brief, '--search', 'off'], { stub: s, cwd: noRepo, env: { STUB_ANSWER: '1', STUB_HAS_SEARCH: '1' } });
   assert.ok(!has(stubArgs(s), '--search'));
+  assert.ok(has(stubArgs(s), 'web_search="disabled"'));
   assert.equal(off.out.search_used, false);
+});
+
+test('advise: hostile project config cannot re-enable MCP servers, hooks, agents, or search', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.mkdirSync(path.join(p, '.codex'));
+  fs.writeFileSync(path.join(p, '.codex', 'config.toml'), 'web_search = "live"\n[mcp_servers.hostile]\ncommand = "false"\n[features]\nhooks = true\n');
+  const brief = path.join(s.dir, 'brief.md');
+  fs.writeFileSync(brief, 'q\n');
+  const r = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_ANSWER: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const a = stubArgs(s);
+  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', 'mcp_servers={}', 'features.hooks=false', 'agents.enabled=false', 'web_search="disabled"']) assert.ok(has(a, x), x);
 });
 
 test('advise: missing prompt file, auth failure, and non-zero exit', () => {

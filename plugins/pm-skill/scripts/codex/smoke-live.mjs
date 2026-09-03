@@ -24,4 +24,8 @@ const ok = r.status === 0 && out.runner_status === 'completed' && out.result.sta
   && fs.readFileSync(path.join(project, 'src', 'result.txt'), 'utf8').trim() === 'codex-builder-live-smoke'
   && fs.readFileSync(path.join(project, 'src', 'env-check.txt'), 'utf8').trim() === 'env-clean';
 console.log(ok ? 'smoke-live: OK' : `smoke-live: FAILED\n${JSON.stringify(out, null, 2)}`);
+// The disposable repository is removed unless PM_CODEX_KEEP=1 asks to keep it for
+// inspection; removal is best effort so a lock can never mask the real result.
+if (process.env.PM_CODEX_KEEP === '1') console.log(`smoke-live: kept ${project}`);
+else { try { fs.rmSync(project, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }); } catch { /* best effort */ } }
 process.exit(ok ? 0 : 1);

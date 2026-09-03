@@ -5,9 +5,9 @@ import { pmRelpath, realpath, readJson } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel, isTracked, checkIgnore, gitOut, gitOk } from '../lib/git.mjs';
 import { parseStory } from '../lib/story.mjs';
-import { findCodex, codexVersion, loginOk, execHelp, requireFlags, BUILD_FLAGS } from '../lib/preflight.mjs';
+import { findCodex, codexVersion, loginOk, execHelp, requireFlags, BUILD_FLAGS, PROBE_TIMEOUT, PROBE_TIMEOUT_REASON } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
-import { makeScratch, runtimeTmp } from '../lib/scratch.mjs';
+import { makeScratch, runtimeTmp, assertRuntimeRootReal } from '../lib/scratch.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../lib/snapshot.mjs';
 
 const WIN = process.platform === 'win32';
@@ -112,12 +112,16 @@ export async function runBuild(o) {
   const found = findCodex();
   if (!found) throw unavailable('codex CLI not found; install @openai/codex or use expert-builder');
   const version = codexVersion(found);
-  if (!loginOk(found)) throw unavailable('Codex is not authenticated; run codex login or use expert-builder', { codex_version: version });
+  const auth = loginOk(found);
+  if (auth === PROBE_TIMEOUT) throw unavailable(PROBE_TIMEOUT_REASON, { codex_version: version });
+  if (!auth) throw unavailable('Codex is not authenticated; run codex login or use expert-builder', { codex_version: version });
   const help = execHelp(found);
+  if (help === PROBE_TIMEOUT) throw unavailable(PROBE_TIMEOUT_REASON, { codex_version: version });
   if (help === null) throw unavailable('codex exec --help failed', { codex_version: version });
   const missing = requireFlags(help, BUILD_FLAGS);
   if (missing) throw unavailable(`installed Codex CLI lacks required flag ${missing}; update @openai/codex`, { codex_version: version });
   if (!fs.existsSync(SCHEMA)) throw new RunnerError('failed', 'bundled result schema is missing', { codex_version: version });
+  assertRuntimeRootReal(worktree);
   if (!checkIgnore(worktree, 'tmp/codex-runtime/probe')) throw blocked('tmp/ must be ignored before codex-builder can create an isolated runtime directory', { codex_version: version });
 
   if (o.preflight) {
@@ -127,8 +131,16 @@ export async function runBuild(o) {
   const scratch = makeScratch(worktree, 'pm-codex-builder');
   const runId = path.basename(scratch).split('.').at(-1);
   const rt = runtimeTmp(worktree, runId);
-  const runtimeParent = path.join(worktree, 'tmp', 'codex-runtime') + path.sep;
-  const cleanupRuntime = () => { try { if (rt.startsWith(runtimeParent)) fs.rmSync(rt, { recursive: true, force: true }); } catch { /* best effort */ } };
+  // Compare REAL paths, not lexical prefixes: a symlinked component would make a lexical
+  // check pass while the rm landed outside the worktree. (runtimeTmp already refuses to
+  // hand back such a path; this is the second half of the same guarantee.)
+  const runtimeRoot = realpath(path.join(worktree, 'tmp', 'codex-runtime'));
+  const cleanupRuntime = () => {
+    try {
+      const real = realpath(rt);
+      if (runtimeRoot && real && real.startsWith(runtimeRoot + path.sep)) fs.rmSync(rt, { recursive: true, force: true });
+    } catch { /* best effort */ }
+  };
   const files = { prompt: path.join(scratch, 'prompt.md'), result: path.join(scratch, 'result.json'), stdout: path.join(scratch, 'stdout.log'), stderr: path.join(scratch, 'stderr.log') };
   const diag = (codexExit, actual) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, actual_files_changed: actual });
 

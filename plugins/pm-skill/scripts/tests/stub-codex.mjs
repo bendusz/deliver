@@ -8,15 +8,22 @@ const env = process.env;
 const append = (file, text) => fs.appendFileSync(file, text);
 append(env.STUB_ACTIONS, `${argv.join(' ')}\n`);
 
-if (argv[0] === '--version') { console.log('codex-cli 9.9.9-stub'); process.exit(0); }
+const say = (text) => fs.writeSync(1, text);
+const err = (text) => fs.writeSync(2, text);
+
+if (argv[0] === '--version') { say('codex-cli 9.9.9-stub\n'); process.exit(0); }
 if (argv[0] === 'login' && argv[1] === 'status') process.exit(Number(env.STUB_LOGIN_EXIT || 0));
+if (argv[0] === 'exec' && argv[1] === 'review' && argv[2] === '--help') {
+  say(['--commit', '--uncommitted', '--output-last-message'].join('\n') + '\n');
+  process.exit(0);
+}
 if (argv[0] === 'exec' && argv[1] === '--help') {
   const flags = ['--cd', '--sandbox', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config', '--output-schema', '--output-last-message'];
   if (env.STUB_HAS_SEARCH === '1') flags.push('--search');
-  console.log(flags.join('\n'));
+  say(flags.join('\n') + '\n');
   process.exit(0);
 }
-if (argv[0] !== 'exec') { console.error('unexpected stub command'); process.exit(2); }
+if (argv[0] !== 'exec') { err('unexpected stub command\n'); process.exit(2); }
 
 const rest = argv.slice(1);
 const isReview = rest[0] === 'review';
@@ -38,7 +45,7 @@ for (let i = 0; i < rest.length; i++) {
 if (positional.length) fs.writeFileSync(env.STUB_PROMPT, positional.join('\n'));
 
 if (isReview) {
-  if (env.STUB_EXEC_EXIT && env.STUB_EXEC_EXIT !== '0') { console.error('stub review failure'); process.exit(Number(env.STUB_EXEC_EXIT)); }
+  if (env.STUB_EXEC_EXIT && env.STUB_EXEC_EXIT !== '0') { err('stub review failure\n'); process.exit(Number(env.STUB_EXEC_EXIT)); }
   fs.writeFileSync(out, '# Review\n\n- [major] stub finding\n');
   process.exit(0);
 }
@@ -48,6 +55,9 @@ if (env.STUB_STAGE_GIT === '1') {
   execFileSync('git', ['-C', worktree, 'add', 'src/staged.txt']);
 }
 if (env.STUB_CREATE_REF === '1') execFileSync('git', ['-C', worktree, 'branch', 'codex-mutated-ref']);
+// A skip-worktree bit changes no file content and leaves `diff --cached` empty, so only
+// the index-flag component of the metadata fingerprint can see it.
+if (env.STUB_SKIP_WORKTREE === '1') execFileSync('git', ['-C', worktree, 'update-index', '--skip-worktree', 'src/script.sh']);
 let writePath = env.STUB_WRITE_PATH || '';
 if (writePath) {
   fs.mkdirSync(path.dirname(path.join(worktree, writePath)), { recursive: true });
@@ -57,12 +67,19 @@ if (env.STUB_CHMOD_PATH) {
   fs.chmodSync(path.join(worktree, env.STUB_CHMOD_PATH), 0o755);
   writePath = env.STUB_CHMOD_PATH;
 }
+// A backgrounded descendant that survives the stub's own clean exit. It is NOT detached,
+// so it stays in the process group the runner spawned and a group-wide kill must reap it.
+if (env.STUB_ORPHAN === '1') {
+  const orphan = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true });
+  fs.writeFileSync(env.STUB_CHILD_PID, `${orphan.pid}\n`);
+  orphan.unref();
+}
 if (env.STUB_SLEEP === '1') {
   const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true });
   fs.writeFileSync(env.STUB_CHILD_PID, `${child.pid}\n`);
   await new Promise((resolve) => child.on('exit', resolve));
 }
-if (env.STUB_EXEC_EXIT && env.STUB_EXEC_EXIT !== '0') { console.error('stub codex failure'); process.exit(Number(env.STUB_EXEC_EXIT)); }
+if (env.STUB_EXEC_EXIT && env.STUB_EXEC_EXIT !== '0') { err('stub codex failure\n'); process.exit(Number(env.STUB_EXEC_EXIT)); }
 if (env.STUB_ANSWER === '1') { fs.writeFileSync(out, 'stub answer\n'); process.exit(0); }
 
 if (env.STUB_BAD_RESULT === '1') {
@@ -75,4 +92,4 @@ if (env.STUB_BAD_RESULT === '1') {
   if (env.STUB_DUPLICATE_REPORT === '1' && reportPath) files = [reportPath, reportPath];
   fs.writeFileSync(out, JSON.stringify({ status: 'done', root_cause: null, files_changed: files, summary: ['Applied the focused fix.'], tests: [{ command: 'true', status: 'passed', summary: 'verification passed' }], out_of_scope_changes: [], risks: [] }));
 }
-console.log('stub complete');
+say('stub complete\n');

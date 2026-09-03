@@ -117,6 +117,9 @@ export function readHookInput() {
 
 export function readJson(file) {
   try {
+    // Refuse a symlink outright: PM state and actor files are in-repo artifacts, and a
+    // link is a redirect to content this project does not own. Fail-open (null) as usual.
+    if (fs.lstatSync(file).isSymbolicLink()) return null;
     // Refuse FIFOs, devices, etc. — reading them can hang or return garbage.
     const st = fs.statSync(file);
     if (!st.isFile()) return null;
