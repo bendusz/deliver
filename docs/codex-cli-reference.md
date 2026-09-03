@@ -204,11 +204,11 @@ Every mode emits exactly one JSON envelope on stdout. Common to all: `runner_sta
   (`workspace-write` or `none (win32)`), `actual_files_changed`, `git_status_short`, and the
   builder's own `result` object (`status`, `summary`, `files_changed`, `tests`,
   `out_of_scope_changes`, `risks`, `root_cause`). `--preflight` instead returns `codex_version`,
-  `worktree`, `story`, `story_builder`, `allowed_paths`, and `policy` (the platform's sandbox/
-  network/environment shape), with `quota_consumed: false`.
-- **review**: `scope`, `objective`, `report_path`, `model`, `effort`, `codex_exit`.
-  `--preflight` returns `scope` and `quota_consumed: false`; a clean worktree or no commit
-  returns `nothing-to-review` with a `reason` instead of running Codex.
+  `worktree`, `story`, `story_builder`, `story_scope_checked`, `allowed_paths`, and `policy` (the
+  platform's sandbox/network/environment shape), with `quota_consumed: false`.
+- **review**: `mode` (always `'review'`), `scope`, `objective`, `report_path`, `model`, `effort`,
+  `codex_exit`. `--preflight` returns `scope` and `quota_consumed: false`; a clean worktree or no
+  commit returns `nothing-to-review` with a `reason` instead of running Codex.
 - **advise/research**: `mode`, `answer_path`, `stderr_path`, `scratch_dir`, `model`, `effort`,
   `codex_exit`, `search_used`. `--preflight` returns `mode`, `search_available`, and
   `quota_consumed: false`.

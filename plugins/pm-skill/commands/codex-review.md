@@ -53,8 +53,11 @@ holds tracked files and asks for another; in that case ask the user where report
 
 Dispatch one `codex-reviewer` agent per objective (or a single one with no objective),
 all in one message so they run in parallel, each with: `Scope`, `Out dir`, `Objective`
-(preset name or phrase), and any `Model` / `Effort` / `Timeout seconds` overrides. Do not
-poll processes; the agents return when the runner returns.
+(preset name or phrase), and any `Model` / `Effort` overrides. The parsed `timeout=<minutes>`
+is a **minutes** value; the agent's `Timeout seconds` input is **seconds**, so convert:
+pass `Timeout seconds: <timeout minutes × 60>` (e.g. `timeout=5` → `Timeout seconds: 300`).
+Omit `Timeout seconds` entirely when the user did not set `timeout=` — the agent's own default
+of 600 seconds then applies. Do not poll processes; the agents return when the runner returns.
 
 ## 5. Index
 

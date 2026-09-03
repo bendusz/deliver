@@ -78,12 +78,14 @@ optional Codex-CLI-backed precision builder (**`codex-builder`**), a risk-select
 **review panel** (**`code-integrity-reviewer`**, **`architecture-reviewer`**, **`security-auditor`**),
 a **`test-engineer`** (tests only), a **`debugger`** (read-only root-cause → fix plan), a read-only
 final **`pm-verifier`** (independent PASS/FAIL before ship), a **`technical-writer`** (docs only), a
-**`codebase-analyst`** for brownfield work, and three Codex-CLI-backed second-opinion roles —
-**`codex-researcher`** (independent research), **`codex-reviewer`** (independent code review), and
-**`codex-advisor`** (independent recommendation) — alongside the web-capable **`researcher`**, whose
-sourced reports land under `docs/research/`. Every Codex invocation goes through one of these thin
-Sonnet wrappers and the bundled Node runner; the PM never runs `codex` itself. The PM stays an
-orchestrator and protects its own context by handing each agent only what it needs.
+**`codebase-analyst`** for brownfield work, a web-capable **`researcher`**, and three
+Codex-CLI-backed second-opinion roles — **`codex-researcher`** (independent research),
+**`codex-reviewer`** (independent code review), and **`codex-advisor`** (independent
+recommendation). `researcher` and `codex-researcher` write sourced reports under
+`docs/research/`; `codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`;
+`codex-advisor` relays its answer directly in chat. Every Codex invocation goes through one of
+these thin Sonnet wrappers and the bundled Node runner; the PM never runs `codex` itself. The PM
+stays an orchestrator and protects its own context by handing each agent only what it needs.
 
 Each story declares `Builder: expert-builder | codex-builder | auto` and carries matching one-line
 `pm-meta` JSON with its machine-readable touch paths. Opus remains the default for broad features,
