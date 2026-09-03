@@ -46,7 +46,7 @@ for h in plugins/pm-skill/hooks/*.mjs; do
 done
 for h in plugins/pm-skill/hooks/*.sh; do
   [ -e "$h" ] || continue
-  [ "$(basename "$h")" = "lib.sh" ] || err "bash hook found under plugins/pm-skill/hooks/ (runtime must be Node only): $h"
+  err "bash hook found under plugins/pm-skill/hooks/ (runtime must be Node only): $h"
 done
 grep -lE '\bjq\b' plugins/pm-skill/hooks/*.mjs >/dev/null 2>&1 && err "jq referenced under plugins/pm-skill/hooks/"
 node -e '
@@ -61,10 +61,15 @@ for (const ev of Object.values(h)) for (const m of ev) for (const e of m.hooks) 
 }
 process.exit(bad);
 ' || err "hooks.json references a missing hook script"
-[ -x plugins/pm-skill/scripts/codex-builder-run.sh ] || err "Codex builder runner is not executable"
 [ -x plugins/pm-skill/scripts/score-builder-benchmark.sh ] || err "builder benchmark scorer is not executable"
-[ -x plugins/pm-skill/scripts/smoke-codex-builder-live.sh ] || err "bundled live Codex builder smoke test is not executable"
 [ -x scripts/smoke-codex-builder-live.sh ] || err "live Codex builder smoke test is not executable"
+for f in plugins/pm-skill/scripts/codex/run.mjs plugins/pm-skill/scripts/codex/lib/*.mjs plugins/pm-skill/scripts/codex/modes/*.mjs plugins/pm-skill/scripts/codex/smoke-live.mjs; do
+  node --check "$f" 2>/dev/null || err "runner file does not parse: $f"
+done
+grep -rlE '\b(jq|bash)\b' plugins/pm-skill/scripts/codex >/dev/null 2>&1 && err "bash or jq referenced under plugins/pm-skill/scripts/codex/"
+# No agent or command may call codex directly; only the runner does.
+# Task 10 widens this to commands/ once they become dispatchers
+grep -rlE 'codex exec' plugins/pm-skill/agents >/dev/null 2>&1 && err "direct codex invocation found in an agent prompt (use the runner)"
 
 # 6) the installed plugin must stay generic (no third-party *plugin* names).
 # The OpenAI Codex CLI is an intentional, documented external dependency of the
@@ -153,6 +158,10 @@ check_agent_regime architecture-reviewer claude-opus-5 medium
 check_agent_regime code-integrity-reviewer claude-opus-5 medium
 check_agent_regime pm-verifier claude-opus-5 medium
 check_agent_regime test-engineer claude-opus-5 medium
+check_agent_regime codex-builder sonnet medium
+check_agent_regime codex-reviewer sonnet medium
+check_agent_regime codex-advisor sonnet medium
+check_agent_regime codex-researcher sonnet medium
 
 for md in plugins/pm-skill/agents/*.md; do
   model="$(grep -m1 '^model:' "$md" 2>/dev/null | awk '{print $2}')"
@@ -170,9 +179,9 @@ if ! node --test plugins/pm-skill/scripts/tests/lib.test.mjs plugins/pm-skill/sc
   node --test plugins/pm-skill/scripts/tests/lib.test.mjs plugins/pm-skill/scripts/tests/hooks.test.mjs || true
   err "hook behavioral tests failed (node --test plugins/pm-skill/scripts/tests)"
 fi
-if ! bash "$(dirname "$0")/test-codex-builder.sh" >/dev/null 2>&1; then
-  bash "$(dirname "$0")/test-codex-builder.sh" || true
-  err "Codex builder behavioral tests failed (scripts/test-codex-builder.sh)"
+if ! node --test plugins/pm-skill/scripts/tests/codex-run.test.mjs >/dev/null 2>&1; then
+  node --test plugins/pm-skill/scripts/tests/codex-run.test.mjs || true
+  err "Codex runner tests failed (node --test plugins/pm-skill/scripts/tests/codex-run.test.mjs)"
 fi
 if ! bash "$(dirname "$0")/test-builder-benchmark.sh" >/dev/null 2>&1; then
   bash "$(dirname "$0")/test-builder-benchmark.sh" || true

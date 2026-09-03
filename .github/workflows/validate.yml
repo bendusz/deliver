@@ -18,7 +18,7 @@ jobs:
       - name: Run validation
         run: bash scripts/validate.sh
       - name: Shellcheck maintainer scripts
-        run: shellcheck scripts/*.sh plugins/pm-skill/hooks/lib.sh
+        run: shellcheck scripts/*.sh
 
   node-tests:
     strategy:
