@@ -22,7 +22,8 @@ conflicts — then continue from your recorded `next` step. Pull/rebase first if
 teammates' claims and ships only become visible after a fetch.
 
 - If `AGENTS.md` is absent at the project root, say so in one line and point to the migration
-  in `references/instruction-layers.md`; do not write it during resume.
+  in `references/instruction-layers.md`; do not write it during resume — offer to perform the
+  migration when the user asks.
 
 **Migration — pre-0.10.1 actor id** (a `pm/actors/<email-local-part>.json` exists that matches
 your email's local part but not the full-email id): `git mv` that `.json` (and its `.HANDOFF.md`

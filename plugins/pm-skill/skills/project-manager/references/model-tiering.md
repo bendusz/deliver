@@ -2,7 +2,7 @@
 
 Control cost/quality by giving heavier work a stronger model and routine work a cheaper one.
 
-## Shipped defaults (v0.15)
+## Shipped defaults (v0.16)
 Every agent declares a model and effort level. Opus roles use `claude-opus-5` instead of the moving
 `opus` alias. This keeps a future Opus release from changing the gate-bearing fleet without an
 explicit plugin update and evaluation. The Sonnet breadth roles still use the moving `sonnet` alias,
@@ -42,7 +42,7 @@ agent is not evidence.
 `codex-builder` has two model settings. Its Claude liaison stays on `sonnet` / `medium`; the
 bundled runner defaults the actual implementation run to `gpt-5.6-sol` / `high`. Override the
 inner model or effort only in an explicit dispatch. Valid Sol efforts are
-`none|low|medium|high|xhigh|max`. The runner ignores Codex user config and overrides
+`none|minimal|low|medium|high|xhigh|max`. The runner ignores Codex user config and overrides
 safety-sensitive project settings so local defaults cannot silently change its sandbox, model,
 effort, network, web, MCP, or hook posture.
 

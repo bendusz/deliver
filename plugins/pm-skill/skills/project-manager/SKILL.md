@@ -55,6 +55,7 @@ Read only the reference for the phase you are in. Do not preload them all.
 
 ## Environment — detect and adapt, never depend
 On a bare install everything below still works.
+- `node` 20 or newer — required; the hooks and the Codex runner are Node scripts.
 - `git` — version control. Offer to init if absent and the user wants it.
 - `gh` + a GitHub remote — only then open real PRs; otherwise use local merges.
 - If a more specialized tool or skill exists for a step (a dedicated planner, an external

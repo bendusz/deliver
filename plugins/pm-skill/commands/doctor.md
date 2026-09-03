@@ -8,7 +8,8 @@ read-mostly: inspect and probe, do not modify project files.
 Scope: $ARGUMENTS  (optional — a sub-path or component; default is the whole repo)
 
 Inspect (whichever apply):
-- **Toolchain & versions:** the language runtime(s), package manager, and their versions.
+- **Toolchain & versions:** the language runtime(s), package manager, and their versions, and
+  `node --version` reports 20 or newer, which the hooks and the Codex runner need.
 - **Claude execution regime:** run `claude --version` when available and record the configured
   `model` and `effort` frontmatter for every agent the active story may use. For an Opus 5 story,
   flag Claude Code older than `v2.1.219`, a moving `model: opus` alias, or a host-level
@@ -34,7 +35,7 @@ Inspect (whichever apply):
   `AGENTS.md` is under 200 lines and under 32 KiB (the Codex budget; report the numbers);
   list any `AGENTS.md` lines that restate skill rules (sign-off before implementation, the PM
   writes no code, log after every step, verifier PASS before ship, traceability to FR/AC ids) as
-  trim candidates; `node --version` reports 20 or newer (the hooks and Codex runner need it).
+  trim candidates.
 - **PM state health** (when `pm/` exists — report `OK` / `DRIFT` per check):
   - `pm/pm-state.json` parses as JSON (`jq empty` or equivalent).
   - `git check-ignore pm/pm-state.json pm/log.md pm/actors/<you>.json` **fails** — check the state

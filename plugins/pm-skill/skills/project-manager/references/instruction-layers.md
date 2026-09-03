@@ -4,14 +4,15 @@ Four layers carry what an agent needs. Keep each thing in exactly one of them.
 
 | Layer | Holds | Where it lives | Loaded |
 |---|---|---|---|
-| Facts | commands, layout, non-default conventions, gotchas, safety norms | `AGENTS.md` (Claude Code reads it through the `@AGENTS.md` line in `CLAUDE.md`; Codex, Cursor, and Copilot read it natively) | every session, every subagent dispatch |
+| Facts | commands, layout, non-default conventions, gotchas, safety norms | `AGENTS.md` (Claude Code reads it through the `@AGENTS.md` line in `CLAUDE.md`; Codex, Cursor, and Copilot read it natively) | every session, every custom subagent dispatch (Claude Code's built-in Explore and Plan agents skip it) |
 | Procedure | phases, checklists, hand-off contracts, review and verification rules | this skill's `SKILL.md` and `references/` | on demand, one reference per phase |
 | Constraints | sign-off, secrets, actor isolation, `pm-meta.touches` | the bundled hooks and the Codex runner | enforced mechanically |
 | Persona | role, tone, boundaries, stop conditions | each `agents/*.md` body; the runner prompt for Codex | per dispatch |
 
 ## Rules
 - `AGENTS.md` is written once from `templates/AGENTS.md.template` and stays under 200 lines and
-  32 KiB (the Codex budget). Every subagent receives the whole file on every dispatch, so each
+  32 KiB (the Codex budget); target 30 to 40 lines when filled. Every custom subagent receives the
+  whole file on every dispatch (Claude Code's built-in Explore and Plan agents skip it), so each
   extra line is paid many times over. The test for a line: would removing it cause mistakes?
 - Never copy procedure or hard rules from this skill into `AGENTS.md`. The hooks enforce them and
   the skill explains them; a restatement drifts and costs context.
@@ -25,6 +26,10 @@ Four layers carry what an agent needs. Keep each thing in exactly one of them.
   offers this for `pm/` at `standard` scale and above (`Instruction rules: pm-state`).
 
 ## Migrating an existing project
+
+The PM performs this migration on request at any time, not only at scaffold; `/pm-skill:resume`
+offers it when `AGENTS.md` is absent.
+
 - `CLAUDE.md` exists, `AGENTS.md` does not: propose moving the content into a new `AGENTS.md`,
   trimmed to the template shape, and replacing `CLAUDE.md` with the bridge. Show the diff and
   ask. On refusal, leave both files alone and log that the project keeps a standalone `CLAUDE.md`.

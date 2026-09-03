@@ -31,7 +31,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" \
 
 Add `--objective "$OBJECTIVE"`, `--model`, `--effort`, or `--timeout-seconds` only when the
 dispatch names them. Never add other arguments. The runner owns preflight, the read-only
-posture, and report placement; it never edits `.gitignore` itself.
+posture, and report placement; it never edits `.gitignore` itself. It also rejects a symlinked
+output directory (exit 65) rather than following it out of the repository.
 
 ## Return (at most 15 lines)
 

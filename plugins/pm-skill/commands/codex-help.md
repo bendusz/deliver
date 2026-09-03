@@ -6,8 +6,8 @@ Ask **Codex** (OpenAI's coding agent CLI) a specific question and relay its answ
 `codex-advisor` wrapper agent and the bundled Node runner. This is a second pair of eyes from an
 independent model — use it **sparingly**: real design decisions, risky refactors, tricky
 tradeoffs. Not for routine questions you can answer yourself. Wrappers never pass sandbox or
-approval flags; the runner owns them per platform (workspace-write on macOS and Linux, full
-access on Windows with post-run scope detection).
+approval flags; these commands run Codex read-only on every platform (the runner owns the
+flags).
 
 Arguments: $ARGUMENTS
 

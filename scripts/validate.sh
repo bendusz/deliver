@@ -234,6 +234,7 @@ fi
 if [ -f plugins/pm-skill/templates/CLAUDE.md.template ]; then
   [ "$(sed -n '1p' plugins/pm-skill/templates/CLAUDE.md.template)" = "@AGENTS.md" ] || err "CLAUDE.md.template must start with @AGENTS.md"
 fi
+# Scoped to agents/: commands and references legitimately discuss the CLAUDE.md bridge.
 if grep -n 'CLAUDE\.md' plugins/pm-skill/agents/*.md | grep -v 'AGENTS\.md' >/dev/null 2>&1; then
   grep -n 'CLAUDE\.md' plugins/pm-skill/agents/*.md | grep -v 'AGENTS\.md' >&2
   err "agent prompt names CLAUDE.md without AGENTS.md (see above)"

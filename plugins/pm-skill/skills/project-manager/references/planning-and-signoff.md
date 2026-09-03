@@ -69,7 +69,9 @@ can be disabled, so holding the line is still your responsibility.
   conventions, gotchas; see `references/instruction-layers.md`), then `CLAUDE.md` from
   `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.template` (a two-line `@AGENTS.md` bridge). Never
   overwrite an existing file: if `CLAUDE.md` exists without `AGENTS.md`, propose the migration in
-  `instruction-layers.md`, show the diff, and ask. When the plan's Delivery mode says
+  `references/instruction-layers.md`, show the diff, and ask. If both files exist and `CLAUDE.md`
+  is not an `@AGENTS.md` bridge, leave both and log a WARN; `/pm-skill:doctor` reports it.
+  When the plan's Delivery mode says
   `Instruction rules: pm-state`, also write `.claude/rules/pm-state.md` from
   `rules-pm-state.md.template` and `pm/AGENTS.md` from `pm-AGENTS.md.template`.
 - Ensure `.gitignore` includes `tmp/` (append; don't clobber an existing `.gitignore`) — `tmp/` is

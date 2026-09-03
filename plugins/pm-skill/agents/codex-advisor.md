@@ -36,9 +36,10 @@ other arguments.
 
 ## Return (at most 20 lines)
 
-Read `answer_path` and return Codex's recommendation and reasoning, attributed ("Codex
-(<model>) recommends …"), condensed, never pasted wholesale; then the answer path, model,
-effort, and Codex version. After reading the answer file, remove the runner's `scratch_dir` with
-`rm -rf "$SCRATCH_DIR"` via Bash, using only the exact path the envelope returned, so temp
-directories do not accumulate. On a non-zero runner exit return the runner status, reason, and
-retained diagnostic paths without retrying.
+Read `answer_path` and return the answer CONTENT — Codex's recommendation and reasoning,
+attributed ("Codex (<model>) recommends …"), condensed, never pasted wholesale — then
+`codex_version`, model, and effort. Do NOT return `answer_path`: the last step deletes it. After
+reading the answer file, delete the scratch directory the envelope named (use `rm -rf` on macOS
+and Linux, `Remove-Item -Recurse -Force` on Windows), using only the exact path the envelope
+returned, so temp directories do not accumulate. On a non-zero runner exit return the runner
+status, reason, and retained diagnostic paths without retrying.

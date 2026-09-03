@@ -16,6 +16,10 @@ happen to have other tools.
 Run these two steps **separately** — submit the first, wait for it to finish, then run the second
 (don't paste both at once, or the second line gets swallowed into the first command's argument):
 
+**Requirements.** Node.js 20 or newer on your PATH. The plugin's hooks and its Codex runner are
+Node scripts, so the same install works on macOS, Linux, and Windows without bash or jq. The
+OpenAI Codex CLI is optional and only needed for the `codex-*` agents and commands.
+
 **1. Add the marketplace**
 
 ```
@@ -32,10 +36,6 @@ Use the full `https://` URL above — the `owner/repo` shorthand resolves to SSH
 machines without a GitHub SSH key/host key set up.
 
 If it doesn't appear right away, restart your Claude Code session.
-
-**Requirements.** Node.js 20 or newer on your PATH. The plugin's hooks and its Codex runner are
-Node scripts, so the same install works on macOS, Linux, and Windows without bash or jq. The
-OpenAI Codex CLI is optional and only needed for the `codex-*` agents and commands.
 
 **3. (Optional) Install the `poteto` companion**
 
@@ -153,7 +153,8 @@ Scratch under `tmp/` (gitignored, disposable — never load-bearing for resume):
 - `tmp/environment-check.md` — `/pm-skill:doctor`'s readiness report.
 - `tmp/codex-builder/*.md`. Focused fix briefs passed to `codex-builder`; never authoritative and
   safe to discard after the story.
-- `tmp/codex-runtime/*`. Per-run tool temp directories; ignored and removed on every runner exit.
+- `tmp/codex-runtime/*`. Per-run tool temp directories; ignored and removed on exit (best effort;
+  an antivirus or indexer lock on Windows can leave them).
 - `tmp/builder-benchmark/*`. Opt-in two-builder evaluations; never part of delivery or resume state.
 - `untracked/` or `codex/` (gitignored) — `/pm-skill:codex-review` reports: `<stamp>-codex-review-<scope>[-<objective>].md` (+ an index file for multi-objective runs).
 - Worktrees, prompts, raw agent output, and other ephemera.
@@ -163,13 +164,16 @@ Scratch under `tmp/` (gitignored, disposable — never load-bearing for resume):
 - **No implementation before your sign-off** — behavioural rule plus a bundled fail-open hook.
 - **Guarded Codex writes:** the `codex-builder` runner fails closed unless tracked PM state exists
   and is signed off, requires the exact git worktree root, mechanically enforces the story's
-  `pm-meta.touches`, and uses `workspace-write` with host temporary paths, network, web search, MCP
-  servers, lifecycle hooks, subagents, login shells, user config, and execution rules disabled. Tool
-  shells get a reduced secret-filtered environment and an ignored, worktree-local `TMPDIR` that is
-  deleted after every exit. Before/after content snapshots catch unreported,
-  protected, and out-of-scope repository edits; git checks cover HEAD, every ref, staged contents,
-  local config, and worktree registrations. Runs time out after 10 minutes by default and retain
-  partial changes plus diagnostics on failure. `--preflight` checks readiness and story scope
+  `pm-meta.touches`, and uses `workspace-write` **on macOS and Linux** with host temporary paths,
+  network **(on macOS and Linux)**, web search, MCP servers, lifecycle hooks, subagents, login
+  shells, user config, and execution rules disabled. Tool shells get a reduced secret-filtered
+  environment and an ignored, worktree-local `TMPDIR` that is removed on exit (best effort; a
+  Windows lock can leave it). Before/after snapshots of tracked, untracked, and ignored files
+  inside the worktree catch unreported, protected, and out-of-scope repository edits; git checks
+  cover HEAD, every ref, staged contents, index flags, hooks, `info/exclude`, local config, and
+  worktree registrations. `--timeout-seconds` (10 minutes by default) bounds the model process
+  itself, not the preflight probes, which have their own 30-second limit; a run that exceeds it
+  retains partial changes plus diagnostics. `--preflight` checks readiness and story scope
   without model inference or task quota. Codex may edit working files but never owns Git.
 - Repository `AGENTS.md`/`CLAUDE.md` and non-safety project configuration remain trusted project
   inputs; command-line overrides win for every safety-sensitive setting above. This is an OS
@@ -187,12 +191,14 @@ Scratch under `tmp/` (gitignored, disposable — never load-bearing for resume):
 
 The bundled hooks are fail-open accident tripwires scoped to the Write, Edit, and MultiEdit tools,
 not a security boundary; Bash coverage is the optional hardening allowlist described in
-`references/hardening.md`.
+`plugins/pm-skill/skills/project-manager/references/hardening.md`.
 
-**Windows.** Hooks and the Codex runner run under `node` directly (no Git Bash needed). Codex's
-Windows sandbox is not enabled by the runner: build and fix run with full access there, and the
-runner detects out-of-scope writes after the run (safety violation, changes preserved) instead of
-preventing them. Review, advice, and research modes are read-only on every platform.
+**Windows.** Hooks and the Codex runner run under `node` directly (no Git Bash needed). There is
+no platform sandbox on Windows: build and fix run with **full host access and network**. The runner
+audits only the worktree afterwards — tracked, untracked, and ignored files inside it — so writes
+elsewhere on the machine and any network use are **not detectable**, and out-of-scope edits inside
+the worktree are reported after the fact (safety violation, changes preserved) rather than
+prevented. Review, advice, and research modes are read-only on every platform.
 
 ## Optional enhancements (work alongside — not required)
 
@@ -214,9 +220,10 @@ prefer them where useful — but nothing here is a dependency:
   rather than switching workers silently.
 - To exercise the real write path after an install or Codex upgrade, run
   `PM_CODEX_LIVE=1 node plugins/pm-skill/scripts/codex/smoke-live.mjs` (or the equivalent
-  `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh` wrapper). It uses one low-effort Codex
-  task in a disposable signed-off repository and is intentionally excluded from default
-  validation.
+  `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh` wrapper); in PowerShell,
+  `$env:PM_CODEX_LIVE='1'; node plugins/pm-skill/scripts/codex/smoke-live.mjs`. It uses one
+  low-effort Codex task in a disposable signed-off repository (removed afterwards unless
+  `PM_CODEX_KEEP=1`) and is intentionally excluded from default validation.
 - `gh` plus a GitHub remote for real pull requests (otherwise the PM uses local merges).
 
 The spec / clarify / analyze / constitution steps add spec-driven rigor (inspired by spec-driven

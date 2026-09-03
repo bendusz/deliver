@@ -3,9 +3,9 @@ description: Spawn OpenAI Codex CLI review agents over the last commit, the work
 ---
 
 Run an independent **Codex CLI code review**. You dispatch `codex-reviewer` agents backed by the
-bundled Node runner; you do not review the code yourself and never run `codex` directly. Wrappers
-never pass sandbox or approval flags; the runner owns them per platform (workspace-write on macOS
-and Linux, full access on Windows with post-run scope detection).
+bundled Node runner; you do not review the code yourself and never run `codex` directly.
+Wrappers never pass sandbox or approval flags; these commands run Codex read-only on every
+platform (the runner owns the flags).
 
 Arguments: $ARGUMENTS
 
@@ -30,8 +30,10 @@ Run once, from the repository root (or the current directory for `codebase`):
 node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" --mode review --scope "$SCOPE" --preflight
 ```
 
-Stop with the runner's reason on any non-zero exit (missing CLI, not logged in, unsupported
-CLI). Never run `codex` yourself.
+Preflight verifies the CLI is present, that you are logged in, and that the installed CLI
+supports the review flags the runner needs (`--commit` and `--uncommitted`). Stop with the
+runner's reason on any non-zero exit (missing CLI, not logged in, unsupported CLI). Never run
+`codex` yourself.
 
 ## 3. Output directory
 

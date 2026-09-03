@@ -13,7 +13,7 @@ exist).
 | Task | Command |
 |---|---|
 | One-shot non-interactive run | `codex exec [OPTIONS] [PROMPT]` (alias `codex e`; prompt via arg, stdin, or `-`) |
-| Non-interactive code review | `codex exec review [OPTIONS] [SCOPE]` (`codex review` is a thin alias) |
+| Non-interactive code review | `codex exec review [OPTIONS] [PROMPT]` (`codex review` is a thin alias) |
 | Resume a prior exec session | `codex exec resume --last "<follow-up>"` or `codex exec resume <SESSION_ID>` |
 | Auth check | `codex login status` — exit 0 logged in, non-zero logged out |
 
@@ -109,7 +109,8 @@ any direct `codex exec` string found in an agent or command prompt.
 ```
 node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" --mode <mode> [common] [mode options]
 
-common:   [--model <id>] [--effort <level>] [--timeout-seconds <n>] [--preflight]
+common:   [--model <id>] [--effort <level>] [--timeout-seconds <n>]
+          [--preflight]  (build, review, advise, research — NOT fix)
 build:    --worktree <abs> --story <docs/stories/x.md>
 fix:      --worktree <abs> --story <docs/stories/x.md> --evidence <tmp/codex-builder/x.md>
 review:   --scope recent|worktree|codebase [--objective "<text>"] --out <dir>
@@ -119,10 +120,16 @@ research: --prompt-file <abs> [--search auto|off]
 
 No free-form Codex flags are accepted; unrecognized arguments are a usage error. Model id is
 checked against a safe-character regex; effort against `none|minimal|low|medium|high|xhigh|max`;
-timeout is bounded 1–7200 seconds (default 600). `--preflight` never invokes model inference and
-always reports `quota_consumed: false`. Defaults per mode: build/fix `gpt-5.6-sol` / `high`;
+timeout is bounded 1–7200 seconds (default 600) and bounds the model process only — the preflight
+probes (`--version`, `login status`, `exec --help`, `exec review --help`) have their own 30-second
+limit each, and a probe that hits it returns `unavailable` with reason "codex did not respond
+within 30 s". `--preflight` never invokes model inference and always reports
+`quota_consumed: false`. Defaults per mode: build/fix `gpt-5.6-sol` / `high`;
 review/research `gpt-5.6-terra` / `high`; advise `gpt-5.6-sol` / `medium` — unchanged from the
 retired bash runner.
+
+A usage error is the one invocation that emits **no** envelope: it writes the message and the
+usage line to stderr and exits 64.
 
 Exit codes (mirroring the old bash runner): `64` usage · `65` rejected (bad input) · `66` blocked
 (fail-closed precondition, e.g. missing sign-off) · `69` unavailable (`codex` missing, unauthenticated,
@@ -156,11 +163,14 @@ codex exec --ignore-user-config --ignore-rules --strict-config -C "$WORKTREE" \
 
 On `win32` the `--sandbox` value and the three `sandbox_workspace_write.*`/network config keys
 change — see Windows behaviour below; every other flag is identical on all platforms. The runner
-independently snapshots tracked and non-ignored untracked content before and after the run,
-derives `actual_files_changed`, cross-checks it against Codex's own claim, fingerprints HEAD,
-every ref, staged contents, local Git config, and worktree registrations, and turns any mismatch
-or out-of-scope/protected-path change into a safety violation (exit 74) rather than an accepted
-result — the worktree is preserved for inspection either way.
+independently snapshots the worktree before and after the run — tracked files and untracked files
+by content hash, ignored files by a cheap size/mtime/inode fingerprint, and the protected PM paths
+even when an ignore rule hides them — derives `actual_files_changed`, cross-checks it against
+Codex's own claim, fingerprints HEAD, every ref, staged contents, index flags (`assume-unchanged`,
+`skip-worktree`), the git hooks directory, `info/exclude`, local Git config, and worktree
+registrations, and turns any mismatch or out-of-scope/protected-path change into a safety violation
+(exit 74) rather than an accepted result — the worktree is preserved for inspection either way.
+The audit covers the worktree only: it says nothing about writes elsewhere on the host.
 
 **`review`** — one of three native scopes, or a whole-codebase read-only audit; an objective is
 expressed in the prompt (the CLI forbids a custom prompt alongside a native scope flag):
@@ -173,14 +183,23 @@ recent/worktree, w/ obj.: codex exec review <tail> "Review the <recent|uncommitt
 codebase, w/ objective:   codex exec --sandbox read-only --skip-git-repo-check --color never <tail> -
   (stdin: "<codebase prompt> <objective clause>")
 
-tail = --ignore-user-config --strict-config --ephemeral -m "$MODEL" \
-       -c model_reasoning_effort="$EFFORT" -o "$REPORT"
+tail = --ignore-user-config --ignore-rules --strict-config --ephemeral -m "$MODEL" \
+       -c model_reasoning_effort="$EFFORT" -c mcp_servers={} -c features.hooks=false \
+       -c agents.enabled=false -c web_search="disabled" -o "$REPORT"
 ```
+
+`--ignore-user-config` only skips `$CODEX_HOME/config.toml`, so the read-only modes also pin
+`mcp_servers`, `features.hooks`, `agents.enabled`, and `web_search` on the command line: a trusted
+repository's `.codex/config.toml` could otherwise start MCP server processes, which run outside the
+shell sandbox. `research` omits the `web_search` override only when `--search` was actually
+requested and the CLI supports it.
 
 `--sandbox`, `-C`, and `--color` are never passed to `codex exec review` (exit 2 otherwise). The
 report is written to a scratch directory outside the repo, then copied into `--out` (must be
-`<root>/untracked` or `<root>/codex`, holding no tracked files). The runner never edits
-`.gitignore` itself; when run inside a git repo and the output directory is not already ignored,
+`<root>/untracked` or `<root>/codex`, holding no tracked files, and not itself a symlink or
+junction — the runner `lstat`s it, requires its realpath to be `<root>/<name>`, and copies with
+`COPYFILE_EXCL` so a same-second collision cannot overwrite an earlier report). The runner never
+edits `.gitignore` itself; when run inside a git repo and the output directory is not already ignored,
 it reports the root-anchored rule that is needed (`gitignore_rule_needed: '/<dir>/'`) so the PM
 can apply it, asking the user first for a pre-existing non-ignored directory that may already
 hold user files.
@@ -228,9 +247,12 @@ Every mode emits exactly one JSON envelope on stdout. Common to all: `runner_sta
   runner-validated argv (never user-controlled text) with a strict character check
   (`"`, `%`, CR, LF) that refuses to spawn rather than risk shell reinterpretation. The prompt
   always arrives on stdin, never on the command line, on every platform. With a bare `codex.cmd`
-  and no npm `node_modules/@openai/codex/bin/codex.js` beside it, build and fix are rejected
-  (their argv contains quoted config values that the cmd.exe fallback refuses); install
-  `codex.exe` or the npm package.
+  and no npm `node_modules/@openai/codex/bin/codex.js` beside it (global) or
+  `../@openai/codex/bin/codex.js` (a project-local `node_modules/.bin` shim), build and fix stop
+  with exit **70** (`failed`) and the read-only modes with exit **65** (`rejected`): their argv
+  contains quoted config values that the cmd.exe fallback refuses. Install `codex.exe` or the npm
+  package. `codex.exe` is preferred over any shim regardless of `PATHEXT` order — the runner sweeps
+  the whole `PATH` for it first.
 - **Process tree kill**: timeout and `INT`/`TERM`/`HUP` run `taskkill /T /F /PID <pid>` on
   `win32`; POSIX signals the detached process group.
 - **`build`/`fix` sandbox**: Codex's Windows sandbox is off by default, and with it off
@@ -240,16 +262,21 @@ Every mode emits exactly one JSON envelope on stdout. Common to all: `runner_sta
   inside that sandbox are dropped. The envelope records `sandbox: "none (win32)"`. Everything
   else the runner enforces is unchanged: fail-closed sign-off, tracked story, the touches
   allowlist, before/after snapshots, the git metadata fingerprint, and out-of-scope detection —
-  still a safety violation (exit 74) with the worktree preserved for inspection. The difference
-  from POSIX is **prevention versus detection**: a POSIX sandbox blocks an out-of-scope write
-  during the run; Windows only catches it after the run completes.
+  still a safety violation (exit 74) with the worktree preserved for inspection. But on Windows
+  build and fix run with **full host access and network**. The runner audits only the worktree
+  afterwards (tracked, untracked, and ignored files inside it), so a write elsewhere on the machine
+  or any network use is **not detectable at all**. For edits inside the worktree, the difference
+  from POSIX is prevention versus detection: a POSIX sandbox blocks an out-of-scope write during
+  the run; Windows only catches it after the run completes.
 - **`review`/`advise`/`research` sandbox**: `--sandbox read-only` everywhere, including Windows —
   a policy shape only, since these modes never write.
 - **Paths**: worktree containment and the exact-root check use native realpath resolution; the
   worktree root compares the two native realpaths exactly; git output is read tolerant of both
   path separators.
 - **Runtime temp**: `TMPDIR`, `TMP`, and `TEMP` all point at the worktree-local
-  `tmp/codex-runtime/<run>` directory, which the runner deletes on every exit (build/fix only).
+  `tmp/codex-runtime/<run>` directory, which the runner removes on exit (build/fix only). Scratch
+  and runtime cleanup are best effort: an antivirus or indexer lock on Windows (`EBUSY`/`EPERM`)
+  can leave either directory behind after an otherwise successful run.
 - **Snapshots**: on `win32` the executable bit is ignored (git's index mode for tracked files,
   `100644` for untracked), since Windows has no POSIX exec bit.
 - Bypass flags (`--yolo` / `--dangerously-bypass-approvals-and-sandbox`) are never passed on any
@@ -268,12 +295,14 @@ node plugins/pm-skill/scripts/codex/run.mjs --mode build --preflight --worktree 
 ```
 
 validates sign-off, authentication, required CLI flags, the ignored `tmp/` setup, the bundled
-result schema, and optional story metadata; it returns JSON with `quota_consumed: false` and
-performs no model inference. The opt-in live smoke test,
+result schema, and optional story metadata; review preflight additionally verifies that
+`codex exec review` exists and offers `--commit` and `--uncommitted`. It returns JSON with
+`quota_consumed: false` and performs no model inference. The opt-in live smoke test,
 `PM_CODEX_LIVE=1 node plugins/pm-skill/scripts/codex/smoke-live.mjs` (also reachable as
 `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh`, now a thin wrapper around the same script),
-exercises environment filtering, local `TMPDIR`, host-temp denial, bounded writes, structured
-output, and cleanup in a disposable repository.
+checks exactly two things in a disposable repository: that the two expected result files are
+written with their exact content, and that a secret-shaped environment variable was filtered out of
+the tool shell. It removes the temporary repository afterwards unless `PM_CODEX_KEEP=1`.
 
 This remains an OS sandbox rather than a VM-level security boundary. Use the builder only with
 trusted repositories and stories.

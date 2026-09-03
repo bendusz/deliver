@@ -1,6 +1,6 @@
 ---
 name: codex-builder
-description: Use for precise, bounded implementation and evidence-rich fix work when a build-ready story names codex-builder, or for a localized review/gate fix with a prepared evidence file. A thin Sonnet wrapper delegates the actual work to local Codex in a workspace-write sandbox and returns its structured result. Not for broad architectural work or multi-story changes. <example>S2-3 has one failing parser test and known touch paths, so the PM dispatches codex-builder with the story, worktree root, and fix evidence path.</example>
+description: Use for precise, bounded implementation and evidence-rich fix work when a build-ready story names codex-builder, or for a localized review/gate fix with a prepared evidence file. A thin Sonnet wrapper delegates the actual work to local Codex in a workspace-write sandbox on macOS and Linux (full access on Windows) and returns its structured result. Not for broad architectural work or multi-story changes. <example>S2-3 has one failing parser test and known touch paths, so the PM dispatches codex-builder with the story, worktree root, and fix evidence path.</example>
 tools: Bash
 model: sonnet
 effort: medium
@@ -41,12 +41,16 @@ when the dispatch explicitly overrides a default. Never add other arguments.
 
 The runner owns every safety detail: exact-root path checks, fail-closed PM sign-off, the story's
 machine `pm-meta.touches` allowlist, Codex auth and capability checks, the platform sandbox
-(`workspace-write` on macOS and Linux; full access on Windows, where out-of-scope writes are
-detected after the run instead of prevented), fixed `-C`, a worktree-local runtime temp directory,
-reduced secret-filtered environment, disabled subagents, network, web search, MCP, and hooks,
-ignored user config and rules, a bounded foreground session, structured output, before/after
-snapshots, and protected Git-state checks. Wrappers never pass sandbox or approval flags; the
-runner decides them per platform.
+(`workspace-write` on macOS and Linux; on Windows there is no platform sandbox at all), fixed `-C`,
+a worktree-local runtime temp directory, reduced secret-filtered environment, disabled subagents,
+web search, MCP, and hooks, network disabled on macOS and Linux, ignored user config and rules, a
+bounded foreground session, structured output, before/after snapshots, and protected Git-state
+checks. Wrappers never pass sandbox or approval flags; the runner decides them per platform.
+
+On Windows, build and fix run with full host access and network. The runner audits only the
+worktree afterwards — tracked, untracked, and ignored files inside it — so writes elsewhere on the
+machine and any network use are not detectable; out-of-scope edits inside the worktree are reported
+after the run instead of prevented.
 
 ## Return
 
