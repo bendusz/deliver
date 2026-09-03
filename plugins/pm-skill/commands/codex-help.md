@@ -1,51 +1,37 @@
 ---
-description: Ask the OpenAI Codex CLI for a second opinion — advice, a recommendation, or help with a decision — on the current work. Reserve for consequential changes, not routine questions.
+description: Ask the OpenAI Codex CLI for a second opinion on the current work, whether advice, a recommendation, or help with a decision. Reserve for consequential changes, not routine questions.
 ---
 
-Ask **Codex** (OpenAI's coding agent CLI) a specific question and relay its answer. This is a
-second pair of eyes from an independent model — use it **sparingly**: real design decisions,
-risky refactors, tricky tradeoffs. Not for routine questions you can answer yourself.
+Ask Codex, OpenAI's coding agent CLI, a specific question and relay its answer, via the
+`codex-advisor` wrapper agent and the bundled Node runner. This is a second pair of eyes from an
+independent model, so use it sparingly: real design decisions, risky refactors, tricky tradeoffs. Not
+for routine questions you can answer yourself. Wrappers never pass sandbox or approval flags; these
+commands run Codex read-only on every platform, and the runner owns the flags.
 
 Arguments: $ARGUMENTS
 
 ## 1. Parse arguments
 
-- **model=<id>** — default `gpt-5.6-sol` (judgment work gets the top tier).
-- **effort=<level>** — `minimal|low|medium|high|xhigh` (model-dependent `max`/`ultra`);
-  default `medium`.
-- Everything else is the **question**. If empty, ask the user what they want Codex's opinion on.
+- **model=<id>**, default `gpt-5.6-sol`, because judgment work gets the top tier.
+- **effort=<level>**: `none|minimal|low|medium|high|xhigh|max`, default `medium`.
+- Everything else is the question. If it is empty, ask the user what they want Codex's opinion on.
 
-## 2. Preflight
+## 2. Compose the brief
 
-1. `command -v codex` — if missing, stop: install with `npm install -g @openai/codex` or
-   `brew install codex`.
-2. `codex login status` — non-zero exit → stop; tell the user to run `codex login` (or
-   `printenv OPENAI_API_KEY | codex login --with-api-key`).
+Codex can read the repo but knows nothing about this conversation. Write a self-contained brief: the
+question, the relevant file paths, the options being weighed with their trade-offs, and any
+constraints. End with: `Give a concrete recommendation and your reasoning. Read the referenced files
+before answering.`
 
-## 3. Compose the prompt
+## 3. Dispatch
 
-Codex can read the repo but knows nothing about this conversation. Write a self-contained brief:
-the question, the relevant file paths, the options being weighed with their tradeoffs, and any
-constraints (conventions, deadlines, non-negotiables). End with:
-`Give a concrete recommendation and your reasoning. Read the referenced files before answering.`
+Dispatch `codex-advisor` with the brief and any `model=` or `effort=` overrides. Never run `codex`
+yourself. The agent returns Codex's attributed answer or the runner's failure reason.
 
-## 4. Run
+## 4. Relay
 
-From the repo root (`--skip-git-repo-check` if not in one):
-
-```
-codex exec --sandbox read-only --ephemeral --color never \
-  -m "$MODEL" -c model_reasoning_effort="$EFFORT" \
-  -o <scratch file> "<prompt>"
-```
-
-Never pass `--dangerously-bypass-approvals-and-sandbox`, `--full-auto`, or `--yolo`. On non-zero
-exit, report the stderr cause (auth, usage error) instead of an answer.
-
-## 5. Relay
-
-Read the scratch file and present Codex's answer, clearly attributed ("Codex (gpt-…) recommends
-…"), followed by your own take — where you agree, where you differ, and why. You own the final
-recommendation; Codex is one input. If `pm/log.md` exists, append one entry in the shared-log schema (actor id derived from git
-identity as `references/logging-and-state.md` prescribes):
-`- <YYYY-MM-DD HH:MM> <actor-id> — codex-help: <question gist> → <answer gist>.`
+Present Codex's answer, clearly attributed as "Codex (gpt-...) recommends ...", followed by your own
+take: where you agree, where you differ, and why. You own the final recommendation. If `pm/log.md`
+exists, append one entry in the shared-log schema, with the actor id per
+`references/logging-and-state.md`: `- <YYYY-MM-DD HH:MM> <actor-id>: codex-help, <question gist>,
+<answer gist>.`

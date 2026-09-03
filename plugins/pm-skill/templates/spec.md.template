@@ -1,17 +1,17 @@
-# <Project> — Feature Specification
+# <Project> feature specification
 
 <!--
-Focus on WHAT users need and WHY — never HOW. No stack, no architecture; that belongs in docs/plan.md.
+Focus on WHAT users need and WHY, never HOW. No stack, no architecture; that belongs in docs/plan.md.
 Use stable IDs (US-001, FR-001, AC-001, SM-001). Stories and the plan trace to FR-/AC- (US- is narrative context; SM- is outcome metrics, often non-buildable); never renumber an existing ID.
 Every requirement must be testable, or explicitly marked as a non-buildable business metric.
-Mark every unknown inline as [NEEDS CLARIFICATION: <question>] — do not guess.
+Mark every unknown inline as [NEEDS CLARIFICATION: <question>]. Do not guess.
 -->
 
 ## Overview
 <what users need and why, without implementation details>
 
 ## User stories
-### US-001 — <title>
+### US-001: <title>
 As a <user>, I want <capability>, so that <outcome>.
 
 ## Functional requirements
@@ -23,7 +23,7 @@ As a <user>, I want <capability>, so that <outcome>.
 - AC-001: WHEN <condition/event>, THE SYSTEM SHALL <observable behaviour>.
 
 ## Edge cases
-- <edge case or failure mode — and the expected behaviour>
+- <edge case or failure mode, and the expected behaviour>
 
 ## Success metrics
 - SM-001: <measurable success signal; mark non-buildable business metrics as such>

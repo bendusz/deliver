@@ -1,144 +1,68 @@
 ---
-description: Spawn OpenAI Codex CLI review agents over the last commit, the working tree, or the whole codebase — optionally several focused objectives in parallel — and write reports to an untracked folder.
+description: Spawn OpenAI Codex CLI review agents over the last commit, the working tree, or the whole codebase, optionally several focused objectives in parallel, and write reports to an untracked folder.
 ---
 
-Run an independent **Codex CLI code review**. You orchestrate the `codex` binary (OpenAI's coding
-agent CLI); you do not review the code yourself. Codex's reviewer is read-only by design — never
-pass `--dangerously-bypass-approvals-and-sandbox`, `--full-auto`, or `--yolo`.
+Run an independent Codex CLI code review. You dispatch `codex-reviewer` agents backed by the bundled
+Node runner. You do not review the code yourself and never run `codex` directly. Wrappers never pass
+sandbox or approval flags; these commands run Codex read-only on every platform, and the runner owns
+the flags.
 
 Arguments: $ARGUMENTS
 
 ## 1. Parse arguments
 
-All optional, any order, from `$ARGUMENTS`:
+All optional, in any order, from `$ARGUMENTS`:
 
-- **scope** — `recent` | `worktree` | `codebase`. Default `worktree`.
-- **model=<id>** — Codex model id (e.g. `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`).
+- **scope**: `recent`, `worktree`, or `codebase`. Default `worktree`.
+- **model=<id>**: a Codex model id such as `gpt-5.6-sol`, `gpt-5.6-terra`, or `gpt-5.6-luna`.
   Default `gpt-5.6-terra`.
-- **effort=<level>** — `minimal|low|medium|high|xhigh` (`max`/`ultra` only on models that
-  support them). Default `high`.
-- **timeout=<minutes>** — per-agent timeout. Default `10`.
-- **objectives** — every remaining token. Presets: `security`, `bugs`, `architecture`, `tests`,
-  `performance`; `panel` expands to all five. Any other word or quoted phrase is a **free-form
-  objective**. Zero objectives → one general review.
+- **effort=<level>**: `none|minimal|low|medium|high|xhigh|max`. Default `high`.
+- **timeout=<minutes>**: the per-agent timeout. Default `10`.
+- **objectives**: every remaining token. The presets are `security`, `bugs`, `architecture`, `tests`,
+  and `performance`, and `panel` expands to all five. Any other word or quoted phrase is a free-form
+  objective. Zero objectives means one general review. The runner owns each preset's focus clause.
 
-Preset focus lines (use verbatim in prompts):
+## 2. Preflight
 
-| Preset | Focus |
-|---|---|
-| security | authn/authz gaps, injection, secret handling, unsafe deserialization, dependency risk |
-| bugs | logic errors, edge cases, error handling, race conditions, silent failures |
-| architecture | module boundaries, coupling, abstraction fit, structural drift |
-| tests | coverage of changed behavior, missing edge cases, assertion quality, flakiness risk |
-| performance | algorithmic complexity, N+1 patterns, unnecessary allocation/IO, hot paths |
+Run once, from the repository root, or from the current directory for `codebase`:
 
-## 2. Preflight — stop with clear instructions on any failure
-
-1. `command -v codex` — if missing, stop: install with `npm install -g @openai/codex` or
-   `brew install codex`.
-2. `codex login status` — non-zero exit means logged out; stop and tell the user to run
-   `codex login` (or `printenv OPENAI_API_KEY | codex login --with-api-key`). Never start an
-   unauthenticated run — it burns ~20 s in retries before failing.
-3. `git rev-parse --show-toplevel` — `recent` and `worktree` scopes require a git repo; stop if
-   absent. `codebase` works without one (add `--skip-git-repo-check` to its command).
-4. Scope sanity: `worktree` with a clean tree (`git status --porcelain` empty) or `recent` with
-   no commit — report "nothing to review" and stop.
-
-## 3. Output directory (at the repo root, or CWD when not a repo)
-
-Decide the directory now, but **defer creating it and editing `.gitignore` until after the run**
-(see "No worktree contamination" in step 4).
-
-- If `untracked/` exists → candidate. Else `codex/` → candidate.
-- In a git repo, a candidate is usable only if it holds **no tracked files**:
-  `git ls-files -- <dir>` must be empty — a tracked directory must never receive reports, and
-  appending to `.gitignore` does NOT ignore already-tracked files. `untracked/` unusable → fall
-  back to `codex/`; both unusable → stop and ask the user where reports should go.
-- Ignore status is finalized only **after** the run, when moving the reports in (step 4, "No
-  worktree contamination") — and only **inside a git repo** (a non-git `codebase` run just moves
-  the reports; no `.gitignore`, no `git check-ignore`): if `git check-ignore -q <dir>` fails,
-  append the **root-anchored** rule `/<dir>/` (never bare `<dir>/`, which would hide same-named
-  nested directories like `src/codex/`), then re-confirm — if it still fails (e.g. a negation
-  rule), warn the user and ask before leaving files there. Because this edits a user-owned file after an
-  otherwise read-only review, **announce the plan when launching the run** ("reports will go to
-  `codex/`; I'll add `/codex/` to `.gitignore` afterwards") so the user can object before it
-  happens. For a `codex/` directory this run created itself, that announcement is sufficient;
-  for a **pre-existing** non-ignored directory (an existing `untracked/` may hold user files
-  that the rule would hide from `git status`), explicitly ask before editing `.gitignore`.
-
-Set `STAMP=$(date +%Y-%m-%d-%H%M)`. Report paths:
-- single review → `<dir>/<STAMP>-codex-review-<scope>.md`
-- per objective → `<dir>/<STAMP>-codex-review-<scope>-<objective-slug>.md`
-  (slug: lowercase, spaces→hyphens, alphanumerics/hyphens only, ≤40 chars)
-- index (only when ≥2 agents) → `<dir>/<STAMP>-codex-review-<scope>-index.md`
-
-Collision safety: dedupe objectives **by final slug**, not raw text (`panel bugs` = the five
-presets once; two free-form phrases truncating to one slug get `-2`, `-3`, …). The slug `index`
-is reserved for the index file — rename such an objective's slug to `index-objective`. If a
-report path already exists (rerun within the same minute), suffix `-2`, `-3`, … to the whole
-run's filenames rather than overwriting.
-
-**No worktree contamination:** the review must see the tree exactly as the user left it. Point
-every agent's `-o` (and stderr sidecar) at a fresh temp directory *outside* the repo
-(`mktemp -d`); only after all agents exit, move the reports into the output directory and apply
-the `.gitignore` change from step 3. Never modify `.gitignore` — or create files inside the
-repo — before or while a review runs.
-
-## 4. Build each agent's command
-
-Common tail for every invocation (`$MODEL`, `$EFFORT`, `$OUT` per agent):
-
-```
--m "$MODEL" -c model_reasoning_effort="$EFFORT" --ephemeral -o "$OUT"
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" --mode review --scope "$SCOPE" --preflight
 ```
 
-Do not pass `--color`, `--sandbox`, or `-C` to `codex exec review` — it rejects them (exit 2);
-they exist only on plain `codex exec`.
+Preflight verifies the CLI is present and that you are logged in. For the `recent` and `worktree`
+scopes it also verifies that the installed CLI supports the review flags the runner needs, among them
+`--commit`, `--uncommitted`, and `--ignore-rules`. The `codebase` scope uses plain `exec` and is not
+gated on that check. Stop with the runner's reason on any non-zero exit: missing CLI, not logged in,
+or unsupported CLI. Never run `codex` yourself.
 
-**No objectives** (one general review; native scope flags):
-- `recent` → `codex exec review --commit HEAD <tail>`
-- `worktree` → `codex exec review --uncommitted <tail>`
-- `codebase` → `codex exec --sandbox read-only --skip-git-repo-check <tail> "<codebase prompt>"`
+## 3. Output directory
 
-**With objectives** — one agent per objective. Prefer native target flags whenever no custom
-objective is required; prompt-as-scope below is a deliberate capability fallback, not an
-interchangeable style: the CLI forbids combining a custom prompt with a native scope flag, so the
-prompt must restate the target precisely:
-- `recent` → `codex exec review <tail> "Review the changes introduced by the last commit (HEAD). <objective clause>"`
-- `worktree` → `codex exec review <tail> "Review the uncommitted changes — staged, unstaged, and untracked. <objective clause>"`
-- `codebase` → `codex exec --sandbox read-only --skip-git-repo-check <tail> "<codebase prompt> <objective clause>"`
+Use `<root>/untracked` if it exists, else `<root>/codex`. Announce the output directory when
+launching. The runner rejects a directory that holds tracked files with exit 65, and if both
+`untracked/` and `codex/` are unusable the user must clear one of them first. After the run, if any
+digest reports `gitignore_rule_needed`, append that root-anchored rule to `.gitignore`. For a
+pre-existing non-ignored directory, an `untracked/` that may already hold user files, ask the user
+before editing `.gitignore`.
 
-Objective clause — presets: `Focus exclusively on <preset focus line>.`; free-form:
-`Focus exclusively on this objective: <text>.` Always append:
-`Report prioritized findings with file:line references and a severity (critical/major/minor) for each, then a short overall verdict.`
+## 4. Dispatch
 
-Codebase prompt: `Perform a thorough code review of the entire codebase in the current directory. First survey the architecture and conventions, then review the most important modules in depth.`
+Dispatch one `codex-reviewer` agent per objective, or a single one with no objective, all in one
+message so they run in parallel, each with `Scope`, `Out dir`, `Objective` (a preset name or phrase),
+and any `Model` or `Effort` overrides. The parsed `timeout=<minutes>` is in minutes and the agent's
+`Timeout seconds` input is in seconds, so convert: pass
+`Timeout seconds: <timeout minutes times 60>`, meaning `timeout=5` becomes `Timeout seconds: 300`.
+Omit `Timeout seconds` entirely when the user did not set `timeout=`, and the agent's own default of
+600 seconds then applies. Do not poll processes; the agents return when the runner returns.
 
-## 5. Run
+## 5. Index
 
-From the repo root (`codex review` accepts no `-C`), launch every agent **in parallel in the
-background**, redirecting each agent's stderr to a sidecar `<report-path>.stderr.log`. Then wait,
-enforcing the timeout: poll every ~30 s; kill any agent still running after `timeout` minutes and
-mark it `TIMEOUT`.
+When two or more reports exist, write `<scope>-index.md` in the output directory, prefixed with the
+same `YYYYMMDD-HHMMSS` stamp the runner used for the reports, listing each report path and its top
+three findings. Then relay the digests.
 
-Exit codes: `0` success · `1` runtime/auth failure · `2` CLI usage error (a bug in the command you
-built — read the sidecar log). Delete an agent's sidecar log on success; keep it on failure and
-say so.
+## 6. Report and log
 
-One agent failing never discards the others — always collect partial results.
-
-## 6. Report
-
-- **≥2 agents:** write the index file with a run-metadata table (date, scope, model, effort,
-  timeout) and one row per objective: objective, exit status (`OK`/`FAIL`/`TIMEOUT`), report
-  path, and a one-line summary of its top finding. The per-objective reports are Codex's `-o`
-  output, untouched.
-- **1 agent:** the `-o` file is the report; no index.
-- If `pm/log.md` exists, append one entry in the shared-log schema
-  (`- <YYYY-MM-DD HH:MM> <actor-id> — …`, actor id derived from git identity exactly as
-  `references/logging-and-state.md` prescribes):
-  `- <YYYY-MM-DD HH:MM> <actor-id> — codex-review <scope> [objectives] → <n> report(s) in <dir>/.`
-
-Finish by telling the user: each report path, and the top findings per objective (read the
-report files — do not paraphrase from memory). If every agent failed, say exactly why (auth,
-timeout, usage error) and where the sidecar logs are.
+Relay the most severe findings across all reports, with report paths. If `pm/log.md` exists, append
+one line in the shared-log schema: `- <YYYY-MM-DD HH:MM> <actor-id>: codex-review <scope>
+[<objectives>], <n> reports, <top finding gist>.`

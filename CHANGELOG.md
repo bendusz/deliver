@@ -2,6 +2,56 @@
 
 All notable changes to this project are documented here.
 
+## 0.16.0 - 2026-09-03
+
+AGENTS.md instructions layer and a cross-platform Node runtime. One instructions file for every
+agent, the hooks and the Codex runner no longer need bash or jq, and every Codex call behind a
+Sonnet wrapper.
+
+- **AGENTS.md is canonical.** The scaffold writes a facts-only `AGENTS.md` (commands, layout,
+  conventions, gotchas; about 30 lines) and a two-line `CLAUDE.md` bridge starting with
+  `@AGENTS.md`. Existing files are never overwritten; the PM proposes a migration. Optional
+  `.claude/rules/pm-state.md` and `pm/AGENTS.md` carry `pm/` discipline at `standard` scale and
+  above. `references/instruction-layers.md` records where facts, procedure, constraints, and
+  persona live; `SOUL.md` is deliberately not adopted. Every agent that reads project context
+  reads `AGENTS.md`; `/pm-skill:doctor` checks the layout, size, and duplicated rules.
+- **Hooks in Node.** The four guardrails and their shared library are Node ESM in exec form
+  (`"command": "node"`), with identical exit codes, messages, and actor ids (POSIX `cksum`
+  reimplemented and pinned to captured vectors). `jq` is no longer needed. `node lib.mjs scan`
+  and `node lib.mjs actor-id` replace the bash CLI.
+- **One Codex runner.** `scripts/codex/run.mjs` provides `build`, `fix`, `review`, `advise`, and
+  `research` modes with the bash runner's POSIX safety posture; Windows runs without a platform
+  sandbox. It resolves `codex.exe` or the npm shim on Windows, kills process trees on timeout, and
+  feeds prompts on stdin. On Windows, build and fix run with full host access and network, so
+  writes elsewhere on the machine and network use are not detectable; the runner audits only the
+  worktree afterwards (tracked, untracked, and ignored files inside it). Two new Sonnet wrappers,
+  `codex-reviewer` and `codex-advisor`, join `codex-builder` and `codex-researcher`;
+  `/pm-skill:codex-review` and `/pm-skill:codex-help` dispatch them and never run `codex` in the
+  main session (validate enforces it).
+- **Leaner runtime prose.** The references the agents load lost their duplicated copies: state
+  migrations moved to `references/migrations.md`, doctor's `pm/` checks to
+  `references/artifact-consistency.md`, and the model-tiering rationale out of the loaded set into
+  `docs/model-tiering.md`. The verifier now receives only the `FR-` and `AC-` entries its story
+  covers plus the plan's Commands section, instead of both documents whole. Agent descriptions drop
+  their `<example>` blocks, and the reviewer bodies state their verdict rule once.
+- **CI on three operating systems.** `node --test` runs on ubuntu, macos, and windows.
+- **Requirement.** Node.js 20 or newer at runtime.
+- **Hardening from review.** Line-oriented secret scan, canonical case and symlink handling,
+  sanitised session context, synchronous hook output, a `hooks.json` wiring check in validate,
+  `.gitignore` consent for Codex review reports, report-name collision handling, and a `git` probe
+  in the runner.
+- **Ignored files are audited, not enforced.** The runner fingerprints git-ignored files inside
+  the worktree and reports changes in a new `ignored_files_changed` envelope field. Only tracked
+  and non-ignored files are enforced against a story's Touches, so caches and build outputs no
+  longer abort a story; `codex-builder` surfaces a modified pre-existing ignored file outside
+  Touches as a review finding.
+- **Node benchmark scorer.** `scripts/score-builder-benchmark.sh` is now
+  `scripts/score-builder-benchmark.mjs` with identical output; `/pm-skill:benchmark-builders`
+  calls it with `node`.
+- **Log entry separator.** Shared-log entries now read `- <YYYY-MM-DD HH:MM> <actor-id>: <event>`;
+  the template and references use a colon instead of a dash. Existing logs keep their old lines;
+  nothing parses the separator.
+
 ## 0.15.0 - 2026-08-27
 
 Focused Opus 5 defaults. Gate-bearing Claude roles now use a stable model family, re-ground in

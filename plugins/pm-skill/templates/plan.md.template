@@ -1,17 +1,18 @@
-# <Project> — Delivery Plan
-<!-- Source spec: docs/spec.md (or "none — intent captured inline"). The plan derives from the spec
+# <Project> delivery plan
+<!-- Source spec: docs/spec.md (or "none, intent captured inline"). The plan derives from the spec
      and traces each story back to its FR-/AC- IDs. -->
 
 ## Overview
-<what + why, 2–3 sentences>
+<what and why, 2 to 3 sentences>
 
 ## Source spec
-- docs/spec.md  <!-- or: none — intent captured inline -->
+- docs/spec.md  <!-- or: none, intent captured inline -->
 
 ## Delivery mode
 - Scale: <tiny | small | standard | large | regulated>  <!-- see references/scale-profiles.md -->
 - Checkpoint policy: <story-level | sprint-level | autonomous>
 - Autonomy: <approve each story | approve each sprint | fully autonomous>
+- Instruction rules: <none | pm-state>  <!-- pm-state writes .claude/rules/pm-state.md and pm/AGENTS.md at scaffold -->
 
 ## Goals
 - <goal>
@@ -35,7 +36,7 @@
 <stack, key decisions, patterns>
 
 ## Traceability
-<!-- Every spec requirement maps to at least one story; flag any that don't. -->
+<!-- Every spec requirement maps to at least one story; flag any that do not. -->
 | requirement | covered by | notes |
 |-------------|-----------|-------|
 | FR-001 | S1-1 | |

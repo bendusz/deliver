@@ -13,7 +13,7 @@ Before starting:
 
 - Require one tracked, build-ready story and a clean repository at a fixed base commit.
 - Require valid story `pm-meta`, signed-off tracked PM state, an ignored `tmp/`, and passing
-  `codex-builder-run.sh --preflight --worktree <root> --story <story>`.
+  `node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" --mode build --preflight --worktree <root> --story <story>`.
 - If `$ARGUMENTS` is missing or identifies more than one story, stop and ask for one story.
 - Record the base commit and create a timestamped directory under
   `tmp/builder-benchmark/<stamp>/`. Keep all reports there.
@@ -41,7 +41,7 @@ Write `results.json` matching
 `${CLAUDE_PLUGIN_ROOT}/schemas/builder-benchmark-result.schema.json`, then generate `summary.md` with:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/score-builder-benchmark.sh" \
+node "${CLAUDE_PLUGIN_ROOT}/scripts/score-builder-benchmark.mjs" \
   tmp/builder-benchmark/<stamp>/results.json \
   > tmp/builder-benchmark/<stamp>/summary.md
 ```

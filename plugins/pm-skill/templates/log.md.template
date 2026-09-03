@@ -1,8 +1,8 @@
-# PM Log — <project>
+# PM log: <project>
 
-<!-- Append-only. One entry per line; never edit or reorder old entries.        -->
-<!-- Current position lives in pm/pm-state.json + pm/actors/<id>.json — NOT here -->
+<!-- Append-only. One entry per line; never edit or reorder old entries.         -->
+<!-- Current position lives in pm/pm-state.json + pm/actors/<id>.json, NOT here  -->
 <!-- (mutable blocks in this file would conflict under concurrent editing).      -->
 
 ## Log
-- <YYYY-MM-DD HH:MM> <actor-id> — <2–3 sentence summary, written for a colleague with zero context>
+- <YYYY-MM-DD HH:MM> <actor-id>: <2 to 3 sentence summary, written for a colleague with zero context>

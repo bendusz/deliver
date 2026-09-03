@@ -1,61 +1,49 @@
 ---
-description: Check environment readiness before implementation — tooling, versions, and whether the project's gates actually run.
+description: Check environment readiness before implementation, covering tooling, versions, and whether the project's gates actually run.
 ---
 
-Use the `project-manager` skill to run a pre-implementation **environment readiness** check. This is
+Use the `project-manager` skill to run a pre-implementation environment readiness check. This is
 read-mostly: inspect and probe, do not modify project files.
 
-Scope: $ARGUMENTS  (optional — a sub-path or component; default is the whole repo)
+Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo)
 
 Inspect (whichever apply):
-- **Toolchain & versions:** the language runtime(s), package manager, and their versions.
-- **Claude execution regime:** run `claude --version` when available and record the configured
+- **Toolchain and versions.** The language runtimes, the package manager, and their versions, and
+  whether `node --version` reports 20 or newer, which the hooks and the Codex runner need.
+- **Claude execution regime.** Run `claude --version` when available and record the configured
   `model` and `effort` frontmatter for every agent the active story may use. For an Opus 5 story,
   flag Claude Code older than `v2.1.219`, a moving `model: opus` alias, or a host-level
   `CLAUDE_CODE_SUBAGENT_MODEL` or `CLAUDE_CODE_EFFORT_LEVEL` override. Do not claim a delivered
   model ID unless the host exposes it.
-- **Dependencies:** lockfiles present; whether install has been run (e.g. `node_modules`, a venv).
-- **Gates:** the `test` / `lint` / `build` / `run` commands from `docs/plan.md` / `CLAUDE.md`, and
-  whether each actually **runs** — a non-mutating probe (`--version`/help, or the real command only if
-  it is safe and fast). Record `N/A` for ones the project doesn't have.
-- **Config:** a missing `.env.example` or required env vars; CI config.
-- **Containers:** a `Dockerfile` / devcontainer that defines the expected environment.
-- **Setup steps:** any documented bootstrap (README/CONTRIBUTING) needed before the gates pass.
-- **Codex builder readiness:** if any build-ready story selects `codex-builder`, or the active
+- **Dependencies.** Lockfiles present, and whether install has been run (`node_modules`, a venv).
+- **Gates.** The `test`, `lint`, `build`, and `run` commands from `docs/plan.md` and `AGENTS.md`, and
+  whether each actually runs. Use a non-mutating probe (`--version` or help, or the real command only
+  when it is safe and fast). Record `N/A` for the ones the project does not have.
+- **Config.** A missing `.env.example` or required env vars; CI config.
+- **Containers.** A `Dockerfile` or devcontainer that defines the expected environment.
+- **Setup steps.** Any documented bootstrap (README, CONTRIBUTING) needed before the gates pass.
+- **Codex builder readiness.** If any build-ready story selects `codex-builder`, or the active
   story's `Builder: auto` may resolve to it, call the bundled runner with
   `--preflight --worktree <absolute-root> --story <story>` (omit `--story` for environment-only
   readiness). Treat `runner_status: ready` as authoritative. It checks exact-root Git state,
-  sign-off, ignored runtime temp, Codex auth/capabilities, schemas, and machine story scope, then
-  reports the fixed sandbox/environment policy. It never starts model inference and reports
-  `quota_consumed: false`. A missing or logged-out Codex is a blocker only for an explicit
-  `codex-builder` story; `auto` may resolve to `expert-builder` and should record that fallback.
-- **PM state health** (when `pm/` exists — report `OK` / `DRIFT` per check):
-  - `pm/pm-state.json` parses as JSON (`jq empty` or equivalent).
-  - `git check-ignore pm/pm-state.json pm/log.md pm/actors/<you>.json` **fails** — check the state
-    *files*, not the directory (a `pm/*` ignore rule passes a directory check while still ignoring
-    the files) — and `tmp/` **is** ignored; `pm/` has no uncommitted changes older than the last
-    work commit; `.gitattributes` carries `pm/log.md merge=union`.
-  - **Team health:** every actor file's `current_story` agrees with `assignments` (flag a claim
-    conflict — an actor working a story the map assigns to someone else, or two actor files
-    sharing one **non-null** `current_story` — idle actors are all `null`, never a conflict; the
-    map itself can only show one claimant) and every assignment's
-    actor is actually on that story with a matching story branch (flag stale or half-made claims —
-    an assignment whose actor's file is idle or on a different story, or whose actor has no branch
-    or recent activity); every `pm/actors/*.json` parses and matches a recent git author (flag
-    orphans from a changed git identity); every in-flight sequential story has a valid
-    `resolved_builder` and every active parallel entry has a valid `builder`; your own actor id is derivable (git `user.email` /
-    `user.name` set).
-  - `docs/plan.md`'s Sign-off line agrees with `signed_off` in `pm/pm-state.json` (the v0.9 log is
-    append-only and has no Current State block to cross-check).
-  - `handoff_written` vs `updated` in `pm/actors/<you>.json`: flag a stale
-    `pm/actors/<you>.HANDOFF.md` (updated is newer) so resume doesn't trust an outdated briefing.
+  sign-off, ignored runtime temp, Codex auth and capabilities, schemas, and machine story scope, then
+  reports the fixed sandbox and environment policy. It never starts model inference and reports
+  `quota_consumed: false`. A missing or logged-out Codex blocks only an explicit `codex-builder`
+  story; `auto` may resolve to `expert-builder` and should record that fallback.
+- **Instructions layer.** `AGENTS.md` exists at the project root; `CLAUDE.md` exists and its first
+  line is `@AGENTS.md` (report `standalone` when it is not, and `missing` when absent); `AGENTS.md`
+  is under 200 lines and under 32 KiB, the Codex budget, and report both numbers; list any
+  `AGENTS.md` lines that restate skill rules (sign-off before implementation, the PM writes no code,
+  log after every step, verifier PASS before ship, traceability to FR and AC ids) as trim candidates.
+- **PM state health.** When `pm/` exists, run the checks under "State health (doctor)" in
+  `references/artifact-consistency.md` and report `OK` or `DRIFT` for each.
 
-Stay read-only where you can and run only **non-mutating** probes. Do **not** install, upgrade, or
-write project files (delegate heavy reading to a read-only subagent if useful).
+Stay read-only where you can and run only non-mutating probes. Do **not** install, upgrade, or write
+project files. Delegate heavy reading to a read-only subagent if that helps.
 
-Write the findings to `tmp/environment-check.md` (runtime-only): each check → `OK` / `MISSING` /
-`UNKNOWN` with the evidence, then a one-line verdict (ready / blockers + what's missing). Append a
-one-line entry to `pm/log.md`.
+Write the findings to `tmp/environment-check.md` (runtime-only): each check as `OK`, `MISSING`, or
+`UNKNOWN` with the evidence, then a one-line verdict (ready, or the blockers and what is missing).
+Append a one-line entry to `pm/log.md`.
 
-Run this before the implementation loop on an unfamiliar or freshly-cloned project — environment and
+Run this before the implementation loop on an unfamiliar or freshly-cloned project. Environment and
 dependency gaps are a common cause of mid-build failure.

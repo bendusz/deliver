@@ -1,36 +1,36 @@
-<!-- pm/actors/<id>.HANDOFF.md — agent-to-agent handoff. Terse by design: fragments over sentences, pointers
-     over prose. Overwrite on every handoff. Omit any empty section. NO SECRETS — pm/ is tracked;
-     reference locations, never values. -->
+<!-- pm/actors/<id>.HANDOFF.md, an agent-to-agent handoff. Terse by design: fragments over sentences,
+     pointers over prose. Overwrite on every handoff. Omit any empty section. NO SECRETS, because pm/
+     is tracked; reference locations, never values. -->
 # HANDOFF <YYYY-MM-DD HH:MM>
 
 OBJECTIVE: <one line>
-PHASE: <phase> · SCALE: <scale> · SIGNED_OFF: <no | yes — <name>, <date>>
-POSITION: sprint <n>/<N> · story <id> "<title>" — <status> · verification: <pending|PASS|FAIL|UNKNOWN>
+PHASE: <phase> · SCALE: <scale> · SIGNED_OFF: <no | yes by <name> on <date>>
+POSITION: sprint <n>/<N> · story <id> "<title>" · status <status> · verification: <pending|PASS|FAIL|UNKNOWN>
 
 BRANCH: <current> · INTEGRATION: <branch> · UNCOMMITTED: <none | paths>
 GATES: test=`<cmd|N/A>` lint=`<cmd|N/A>` build=`<cmd|N/A>`
-LAST_GATE_RESULTS: <e.g. test PASS 2026-07-05 · lint N/A · build PASS>
+LAST_GATE_RESULTS: <for example test PASS 2026-07-05 · lint N/A · build PASS>
 
-READ_FIRST: <ordered, minimal — e.g. docs/stories/S2-1-*.md, docs/plan.md#commands>
-SKIP: <looks relevant but isn't — spare the next agent the tokens>
+READ_FIRST: <ordered, minimal; for example docs/stories/S2-1-*.md, docs/plan.md#commands>
+SKIP: <looks relevant but is not; spare the next agent the tokens>
 
 DONE_THIS_RUN:
-- <story/step — outcome, merge commit/PR>
+- <story or step: outcome, merge commit or PR>
 
 IN_FLIGHT:
-- <story id — exactly where it stopped: built/not-built, which gate/review round, what remains>
+- <story id: exactly where it stopped, built or not, which gate or review round, what remains>
 
 OPEN_FINDINGS: <none | reviewer findings not yet fixed, severity + file>
 
 DECISIONS (made this run, not yet in docs):
-- <decision — why — where it belongs (spec/plan/story/constitution)>
+- <decision, why, and where it belongs: spec, plan, story, or constitution>
 
 GOTCHAS:
-- <trap the next agent will hit — how to avoid it>
+- <trap the next agent will hit, and how to avoid it>
 
 BLOCKERS:
-- <blocker — what/who it waits on>
+- <blocker, and what or who it waits on>
 
 NEXT (ordered):
-1. <concrete step — file/command>
+1. <concrete step: file or command>
 2. <...>

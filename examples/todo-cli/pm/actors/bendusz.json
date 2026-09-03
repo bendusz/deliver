@@ -1,7 +1,7 @@
 {
   "actor": "bendusz",
   "current_story": "S1-2",
-  "current_story_status": "in review",
+  "current_story_status": "in-review",
   "current_story_rounds": 1,
   "current_story_retries": 0,
   "branch": "pm/S1-2-add-and-list",

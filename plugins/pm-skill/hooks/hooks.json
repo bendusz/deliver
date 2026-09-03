@@ -1,13 +1,10 @@
 {
-  "description": "pm-skill guardrails (all fail-open, kill switch PM_SKILL_NO_ENFORCE=1): block implementation writes until the plan is signed off, block secret-shaped content from entering the git-tracked pm/ state directory, and re-ground new/compacted sessions from pm/ state, and block edits to another actor's pm/actors/ state files.",
+  "description": "pm-skill guardrails (all fail-open, kill switch PM_SKILL_NO_ENFORCE=1): block implementation writes until the plan is signed off, block secret-shaped content from entering the git-tracked pm/ state directory, re-ground new/compacted sessions from pm/ state, and block edits to another actor's pm/actors/ state files. Node.js 20+ is the only runtime dependency.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-context.sh\""
-          }
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/session-context.mjs"] }
         ]
       }
     ],
@@ -15,18 +12,9 @@
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/require-signoff.sh\""
-          },
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pm-secrets-guard.sh\""
-          },
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/actor-guard.sh\""
-          }
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/require-signoff.mjs"] },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/pm-secrets-guard.mjs"] },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/actor-guard.mjs"] }
         ]
       }
     ]
