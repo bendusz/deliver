@@ -79,8 +79,7 @@ but it is fail-open and can be disabled, so holding the line is still your respo
   not an `@AGENTS.md` bridge, leave both and log a WARN; `/pm-skill:doctor` reports it. When the
   plan's Delivery mode says `Instruction rules: pm-state`, also write `.claude/rules/pm-state.md`
   from `rules-pm-state.md.template` and `pm/AGENTS.md` from `pm-AGENTS.md.template`.
-- At `standard` scale and above, write `docs/wiki/schema.md` and `docs/wiki/index.md` from
-  `wiki-schema.md.template` and `wiki-index.md.template`; `knowledge.md` owns the wiki.
+- At `standard` scale and above, scaffold `docs/wiki/` from the wiki templates per `knowledge.md`.
 - Ensure `.gitignore` includes `tmp/`, appending rather than clobbering an existing `.gitignore`.
   `tmp/` is ephemeral scratch and never enters git. The tracked `pm/` state files must **not** be
   ignored, and `.gitattributes` must carry `pm/log.md merge=union`.
