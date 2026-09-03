@@ -347,3 +347,69 @@ test('build: untracked story and unignored tmp/ are blocked', () => {
   const r2 = runRunner(['--mode', 'build'], { project: p, stub: s });
   assert.equal(r2.status, 66); assert.match(r2.out.reason, /tmp\/ must be ignored/);
 });
+
+test('review: recent scope with an objective goes through exec review with prompt-as-scope', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', 'security', '--out', out], { stub: s, cwd: p });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const a = stubArgs(s);
+  assert.equal(a[0], 'review');
+  for (const x of ['--sandbox', '-C', '--cd', '--color', '--commit']) assert.ok(!has(a, x), `must not pass ${x}`);
+  for (const x of ['--ignore-user-config', '--strict-config', '--ephemeral', 'gpt-5.6-terra', 'model_reasoning_effort=high', '-o']) assert.ok(has(a, x), x);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /last commit \(HEAD\).*security/s);
+  assert.ok(fs.existsSync(r.out.report_path));
+  assert.match(path.basename(r.out.report_path), /^\d{8}-\d{6}-codex-review-recent-security\.md$/);
+  assert.match(fs.readFileSync(path.join(p, '.gitignore'), 'utf8'), /^\/untracked\/$/m);
+});
+
+test('review: clean worktree is nothing-to-review; recent without objective uses --commit HEAD', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'codex');
+  const clean = runRunner(['--mode', 'review', '--scope', 'worktree', '--out', out], { stub: s, cwd: p });
+  assert.equal(clean.status, 0);
+  assert.equal(clean.out.runner_status, 'nothing-to-review');
+  assert.doesNotMatch(stubActions(s), /^exec review/m);
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--out', out], { stub: s, cwd: p });
+  assert.equal(r.status, 0);
+  const a = stubArgs(s);
+  assert.ok(has(a, '--commit') && has(a, 'HEAD'));
+});
+
+test('review: worktree scope uses --uncommitted; codebase uses exec read-only', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.writeFileSync(path.join(p, 'src', 'dirty.txt'), 'x');
+  const out = path.join(p, 'untracked');
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'worktree', '--out', out], { stub: s, cwd: p }).status, 0);
+  assert.ok(has(stubArgs(s), '--uncommitted'));
+  const cb = runRunner(['--mode', 'review', '--scope', 'codebase', '--objective', 'find dead code', '--out', out], { stub: s, cwd: p });
+  assert.equal(cb.status, 0);
+  const a = stubArgs(s);
+  assert.notEqual(a[0], 'review');
+  assert.ok(has(a, '--sandbox') && has(a, 'read-only'));
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /find dead code/);
+  assert.match(path.basename(cb.out.report_path), /codebase-find-dead-code\.md$/);
+});
+
+test('review: out dir must be untracked/ or codex/ with no tracked files; failures keep stderr', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const bad = runRunner(['--mode', 'review', '--scope', 'recent', '--out', path.join(p, 'reports')], { stub: s, cwd: p });
+  assert.equal(bad.status, 65);
+  fs.mkdirSync(path.join(p, 'codex')); fs.writeFileSync(path.join(p, 'codex', 'keep.md'), 'x');
+  gitIn(p, ['add', 'codex/keep.md']); gitIn(p, ['commit', '-qm', 'tracked report dir']);
+  const tracked = runRunner(['--mode', 'review', '--scope', 'recent', '--out', path.join(p, 'codex')], { stub: s, cwd: p });
+  assert.equal(tracked.status, 65);
+  const failed = runRunner(['--mode', 'review', '--scope', 'recent', '--out', path.join(p, 'untracked')], { stub: s, cwd: p, env: { STUB_EXEC_EXIT: '3' } });
+  assert.equal(failed.status, 70);
+  assert.equal(failed.out.codex_exit, '3');
+  assert.ok(fs.existsSync(failed.out.stderr_path));
+});
+
+test('review: preflight reports readiness without running', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--preflight'], { stub: s, cwd: p });
+  assert.equal(r.status, 0);
+  assert.equal(r.out.runner_status, 'ready');
+  assert.equal(r.out.quota_consumed, false);
+  assert.doesNotMatch(stubActions(s), /^exec review/m);
+});
