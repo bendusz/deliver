@@ -53,7 +53,7 @@ safe because of by running code. Its confirmed risks enter triage like any other
 
 ## Deterministic gates (you run these)
 - The gates are the project's **actual** `test` / `lint` / `build` commands as recorded in the plan
-  and `CLAUDE.md`. Any that don't exist are `N/A` and skipped.
+  and `AGENTS.md`. Any that don't exist are `N/A` and skipped.
 - **You** (the PM) run them — after the build, and again after each fix. Don't take a subagent's
   word that they pass.
 

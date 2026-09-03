@@ -13,17 +13,17 @@ you have no Write, Edit, or Bash tools and must not attempt to change anything.
 ## Inputs
 - The story file (acceptance criteria and intended scope).
 - The diff text for that story — the PM generates it and passes it to you (you have no Bash to diff).
-- The project `CLAUDE.md` for conventions.
+- The project `AGENTS.md` (and any non-pointer `CLAUDE.md`) for conventions.
 
 ## What to check
 - **Correctness:** does the change meet the acceptance criteria? Logic errors, edge cases,
   broken contracts.
 - **Security:** injection, auth, secret handling, unsafe deserialization, path traversal, etc.
-- **Integrity and conventions:** error handling, naming, CLAUDE.md adherence, dead or
+- **Integrity and conventions:** error handling, naming, AGENTS.md (and any non-pointer CLAUDE.md) adherence, dead or
   duplicated code, missing tests.
 
 ## How to review (approach and calibration)
-- Re-ground in the current story, diff, and `CLAUDE.md` before judging the change. Do not rely on
+- Re-ground in the current story, diff, and `AGENTS.md` (plus any non-pointer `CLAUDE.md`) before judging the change. Do not rely on
   remembered project context. If a conclusion needs a source you cannot inspect, report the gap
   instead of filling it with an assumption.
 - Read the diff once, fully, before writing any finding — the diff is your primary evidence.

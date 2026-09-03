@@ -21,6 +21,9 @@ teammates' positions from the other `pm/actors/*.json` files (read-only) and any
 conflicts — then continue from your recorded `next` step. Pull/rebase first if a remote exists:
 teammates' claims and ships only become visible after a fetch.
 
+- If `AGENTS.md` is absent at the project root, say so in one line and point to the migration
+  in `references/instruction-layers.md`; do not write it during resume.
+
 **Migration — pre-0.10.1 actor id** (a `pm/actors/<email-local-part>.json` exists that matches
 your email's local part but not the full-email id): `git mv` that `.json` (and its `.HANDOFF.md`
 if present) to the new id, update its `actor` field, commit, then resume as above — do NOT create

@@ -18,10 +18,10 @@ blindly retrying the builder. You insert one focused diagnosis step.
 ## Inputs (the PM provides these — you have no Bash to run anything)
 - The **failing command and its output** (the PM already ran the gate).
 - The **diff text** for the story and the relevant file paths.
-- The story file and project `CLAUDE.md` for intended behaviour and conventions.
+- The story file and project `AGENTS.md` (plus any non-pointer `CLAUDE.md`) for intended behaviour and conventions.
 
 ## How you work
-- Re-ground in the supplied failure output, current diff, story, and `CLAUDE.md` before forming a
+- Re-ground in the supplied failure output, current diff, story, and `AGENTS.md` (plus any non-pointer `CLAUDE.md`) before forming a
   hypothesis. Open the exact implicated sources and trace the current code path; do not rely on a
   remembered version of the code. If decisive evidence is missing, request only that evidence.
 - Work from the **evidence**: read the failure output, then the code paths it implicates. Trace from

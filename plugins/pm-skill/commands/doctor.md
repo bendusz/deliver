@@ -15,7 +15,7 @@ Inspect (whichever apply):
   `CLAUDE_CODE_SUBAGENT_MODEL` or `CLAUDE_CODE_EFFORT_LEVEL` override. Do not claim a delivered
   model ID unless the host exposes it.
 - **Dependencies:** lockfiles present; whether install has been run (e.g. `node_modules`, a venv).
-- **Gates:** the `test` / `lint` / `build` / `run` commands from `docs/plan.md` / `CLAUDE.md`, and
+- **Gates:** the `test` / `lint` / `build` / `run` commands from `docs/plan.md` / `AGENTS.md`, and
   whether each actually **runs** — a non-mutating probe (`--version`/help, or the real command only if
   it is safe and fast). Record `N/A` for ones the project doesn't have.
 - **Config:** a missing `.env.example` or required env vars; CI config.
@@ -29,6 +29,12 @@ Inspect (whichever apply):
   reports the fixed sandbox/environment policy. It never starts model inference and reports
   `quota_consumed: false`. A missing or logged-out Codex is a blocker only for an explicit
   `codex-builder` story; `auto` may resolve to `expert-builder` and should record that fallback.
+- **Instructions layer:** `AGENTS.md` exists at the project root; `CLAUDE.md` exists and its
+  first line is `@AGENTS.md` (report `standalone` when it is not, and `missing` when absent);
+  `AGENTS.md` is under 200 lines and under 32 KiB (the Codex budget; report the numbers);
+  list any `AGENTS.md` lines that restate skill rules (sign-off before implementation, the PM
+  writes no code, log after every step, verifier PASS before ship, traceability to FR/AC ids) as
+  trim candidates; `node --version` reports 20 or newer (the hooks and Codex runner need it).
 - **PM state health** (when `pm/` exists — report `OK` / `DRIFT` per check):
   - `pm/pm-state.json` parses as JSON (`jq empty` or equivalent).
   - `git check-ignore pm/pm-state.json pm/log.md pm/actors/<you>.json` **fails** — check the state

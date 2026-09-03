@@ -47,7 +47,7 @@ git operations untouched.
    esac
    case "$cmd" in
      "git status"*|"git diff"*|"git log"*|"git show"*|"ls "*|"cat "*|"grep "*|"rg "*|"head "*|"tail "*|"wc "*) exit 0 ;;
-     # the project's gates — EDIT to match docs/plan.md / CLAUDE.md:
+     # the project's gates — EDIT to match docs/plan.md / AGENTS.md:
      "npm test"*|"npm run lint"*|"npm run build"*|"pytest"*|"ruff check"*|"make test"*) exit 0 ;;
    esac
    echo "pm-skill hardening: pm-verifier may run only read-only inspection and the project gates" >&2

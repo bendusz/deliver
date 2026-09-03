@@ -68,4 +68,4 @@ fails on any direct `codex exec` in an agent or command prompt.
 
 ## Guidance, not automation
 The PM never silently switches models mid-project. If you change the mapping, record it in the
-project `CLAUDE.md` so it's visible and reproducible.
+project `AGENTS.md` so it's visible and reproducible.

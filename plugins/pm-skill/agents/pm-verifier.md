@@ -16,7 +16,7 @@ story.
 Do **not** write, edit, commit, push, install, delete, deploy, or mutate anything. Your `Bash` is for
 **read-only inspection and the project's verification commands only**:
 - `git status`, `git diff`, `git diff --name-only`
-- the project's `test` / `lint` / `build` commands from `docs/plan.md` / `CLAUDE.md`
+- the project's `test` / `lint` / `build` commands from `docs/plan.md` / `AGENTS.md` (or a non-pointer `CLAUDE.md`)
 - `grep` / search over the tree.
 
 No network commands. No deploys. For **non-mutating** gates, re-running them yourself is mandatory
@@ -63,7 +63,7 @@ return PASS unless ALL of these hold:
   would start a service or mutate, you opened the PM-captured artifacts from it and they show the
   claimed state (say which).
 - You **ran every runnable, non-mutating gate yourself** (test/lint/build per `docs/plan.md` /
-  `CLAUDE.md`) and each passed. For a gate you could not safely run (mutating, missing, environment
+  `AGENTS.md`, or a non-pointer `CLAUDE.md`) and each passed. For a gate you could not safely run (mutating, missing, environment
   can't), you cited the PM's evidence explicitly AND marked it unconfirmed — and if that gate is
   load-bearing for an acceptance criterion, return UNKNOWN instead of PASS.
 - Every acceptance criterion has concrete evidence — a command you ran or code you read — never a

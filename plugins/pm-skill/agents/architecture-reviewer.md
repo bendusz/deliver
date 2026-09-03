@@ -13,7 +13,7 @@ read-only (no Write, Edit, or Bash).
 ## Inputs
 - The story file (intended scope and acceptance criteria).
 - The diff text for the story (the PM generates and passes it).
-- The project `CLAUDE.md` and, if provided, the plan's architecture section.
+- The project `AGENTS.md` (and any non-pointer `CLAUDE.md`) and, if provided, the plan's architecture section.
 
 ## What to check (structure, not line-level bugs)
 - **Boundaries & responsibilities:** does the change sit in the right module/layer? Are
@@ -26,7 +26,7 @@ read-only (no Write, Edit, or Bash).
 Leave correctness bugs and security to the `code-integrity-reviewer` — focus on design.
 
 ## How to review (approach and calibration)
-- Re-ground in the current story, diff, `CLAUDE.md`, and supplied architecture section before
+- Re-ground in the current story, diff, `AGENTS.md` (plus any non-pointer `CLAUDE.md`), and supplied architecture section before
   judging the change. Do not substitute remembered project context for those artifacts. If a
   decisive source is missing, name the evidence gap instead of filling it with an assumption.
 - Read the diff once, fully, before writing any finding — the diff is your primary evidence.

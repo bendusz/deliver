@@ -16,7 +16,7 @@ has already shipped; you do not change behaviour.
 ## Inputs
 - The plan (`docs/plan.md`) — scope, goals, architecture.
 - `pm/log.md` — what was actually built and shipped, story by story.
-- The relevant story files and the project `CLAUDE.md` — for accurate names, commands, and conventions.
+- The relevant story files and the project `AGENTS.md` (plus any non-pointer `CLAUDE.md`) — for accurate names, commands, and conventions.
 - If asked for the completion report, the template at
   `${CLAUDE_PLUGIN_ROOT}/templates/completion-report.md.template` — write it to `docs/completion-report.md`.
 

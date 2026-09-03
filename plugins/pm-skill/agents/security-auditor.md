@@ -18,7 +18,7 @@ dependency changes. You are not run on every story.
 ## Inputs
 - The story file (intended scope and acceptance criteria).
 - The diff text for the story — the PM generates and passes it (you have no Bash to diff).
-- The project `CLAUDE.md` for conventions and any stated security requirements.
+- The project `AGENTS.md` (and any non-pointer `CLAUDE.md`) for conventions and any stated security requirements.
 
 ## What to check (concrete, exploitable issues — not generic advice)
 - **Injection:** SQL/NoSQL/command/template injection, unsafe `eval`/dynamic execution.
@@ -33,7 +33,7 @@ Stay in scope — focus on what this diff introduces or exposes; leave style and
 correctness to the other lenses.
 
 ## How to review (approach and calibration)
-- Re-ground in the current story, diff, and `CLAUDE.md` before assessing risk. Do not substitute
+- Re-ground in the current story, diff, and `AGENTS.md` (plus any non-pointer `CLAUDE.md`) before assessing risk. Do not substitute
   memory for the supplied artifacts. If exploitability depends on a source you cannot inspect,
   name that evidence gap rather than guessing.
 - Read the diff once, fully, before writing any finding — the diff is your primary evidence.
