@@ -1,0 +1,23 @@
+# Wiki schema
+
+The wiki is the project's durable knowledge, maintained only by the `librarian` agent. Raw
+artifacts under `docs/` stay authoritative; the wiki summarises and links them.
+
+## Layout
+- `index.md`: one line per page, `- [<title>](<relative path>): <one sentence>`.
+- `decisions/<slug>.md`: one decision each, with Context and Decision sections.
+- `concepts/<slug>.md`: one domain or architecture concept each.
+- `sources/<slug>.md`: one summary per raw artifact, citing it.
+
+## Page header
+Line 1 is the title. Line 2 is
+`Type: <decision|concept|source> · Status: <current|superseded by <slug>> · Sources: <path[, path]>`.
+
+## Rules
+- Search the index before creating a page.
+- Cite a repo-relative source path on every claim.
+- Supersede, never delete. A superseded page keeps its content and names its replacement.
+- Every page is linked from the index and from at least one other page.
+- Split the index per directory at about 150 entries.
+- No secrets. `pm-secrets-guard.mjs` blocks secret-shaped values under `docs/wiki/`.
+- The librarian never commits. The PM commits wiki changes with the work they describe.

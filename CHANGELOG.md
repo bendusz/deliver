@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## 0.18.0 - 2026-09-04
+
+A project wiki with one writer.
+
+- **Wiki under `docs/wiki/`.** An index, a schema, and decision, concept, and source pages. Raw
+  artifacts, `pm/` state, and the log do not move. On at `standard` scale and above; created at
+  scaffold from two new templates.
+- **`librarian` agent.** Sonnet, medium. The only writer under `docs/wiki/`, with three modes:
+  `ingest` (artifacts to pages), `query` (an answer with citations), `lint` (orphans, dead links,
+  contradictions). Supersedes instead of deleting, never runs git, never writes the log.
+- **Hand-off points** in `references/knowledge.md`: first ingest after scaffold, after each research
+  report, after each shipped story, after correct-course; lint at sprint boundaries and before the
+  completion report. Resume reads the index after state and handoff.
+- **Hooks.** The session line shows the index entry count; the secrets guard covers `docs/wiki/`.
+- **Analyze.** Five wiki detectors, run only when the wiki exists.
+- **Example.** `examples/todo-cli/docs/wiki/` shows the shape.
+
 ## 0.17.0 - 2026-09-03
 
 Smaller dispatches with the same behaviour. The story header and every agent body now carry only

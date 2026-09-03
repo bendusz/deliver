@@ -15,6 +15,8 @@ project:
   log line format and are kept verbatim, the way a real project's history would be.
 - `todo-cli/pm/actors/bendusz.HANDOFF.md`, an end-of-session handoff from `/pm-skill:handoff`:
   terse, agent-to-agent, pointers over prose.
+- `todo-cli/docs/wiki/`, the project wiki the `librarian` maintains: an index, the schema, and
+  three pages.
 
 In a real run these live in *your* project. `pm/` is git-tracked, the durable resume point committed
 alongside the work, while `tmp/` holds only ephemeral scratch and is gitignored.
