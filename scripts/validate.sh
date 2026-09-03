@@ -8,6 +8,7 @@ err(){ echo "FAIL: $*" >&2; fail=1; }
 
 command -v jq >/dev/null 2>&1 || { echo "validate.sh: jq is required" >&2; exit 2; }
 command -v node >/dev/null 2>&1 || { echo "validate.sh: node (20+) is required" >&2; exit 2; }
+node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)' || { echo "validate.sh: node 20 or newer is required (found $(node --version))" >&2; exit 2; }
 
 # 1) JSON validity
 for f in .claude-plugin/marketplace.json \

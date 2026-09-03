@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFileSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -126,4 +126,45 @@ test('lib.mjs CLI: scan and actor-id', () => {
   const id = spawnSync(process.execPath, [lib, 'actor-id', p], { encoding: 'utf8' });
   assert.equal(id.status, 0);
   assert.equal(id.stdout.trim(), 'casey-example-com-589b8fa8ab93');
+});
+
+test('pmRelpath resolves a symlink whose relative target traverses another symlink', (t) => {
+  const p = newProj();
+  fs.mkdirSync(path.join(p, 'pm'), { recursive: true });
+  fs.writeFileSync(path.join(p, 'pm', 'log.md'), '');
+  if (!canSymlink(path.join(p, 'src'), path.join(p, 'docs', 'impl-link'))) return t.skip('symlinks unavailable');
+  fs.symlinkSync('impl-link/../pm/log.md', path.join(p, 'docs', 'alias'));
+  assert.equal(pmRelpath(p, path.join(p, 'docs', 'alias')), 'pm/log.md');
+});
+
+test('pmActorId chomps only trailing newlines, matching bash command substitution', () => {
+  const p = newProj();
+  gitIn(p, ['config', 'user.email', ' casey@example.com ']);
+  assert.equal(pmActorId(p), 'casey-example-com-4d8988c65278');
+});
+
+test('pmRelpath resolves Windows drive-relative paths against the drive cwd', (t) => {
+  if (process.platform !== 'win32') return t.skip('win32 only');
+  const p = newProj();
+  fs.mkdirSync(path.join(p, 'pm'), { recursive: true });
+  fs.writeFileSync(path.join(p, 'pm', 'log.md'), '');
+  const cwd = process.cwd();
+  process.chdir(p);
+  try {
+    assert.equal(pmRelpath(p, 'C:pm\\log.md'.replace('C:', p.slice(0, 2))), 'pm/log.md');
+  } finally {
+    process.chdir(cwd);
+  }
+});
+
+test('readJson refuses non-regular files (FIFO) and returns promptly', (t) => {
+  if (process.platform === 'win32') return t.skip('no mkfifo on win32');
+  const p = newProj();
+  const fifo = path.join(p, 'pm', 'fifo');
+  try {
+    execFileSync('mkfifo', [fifo]);
+  } catch {
+    return t.skip('mkfifo unavailable');
+  }
+  assert.equal(readJson(fifo), null);
 });

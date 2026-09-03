@@ -10,6 +10,10 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+// chomp(s) — strip only trailing newlines, mirroring bash command substitution
+// (which strips trailing \n but leaves other whitespace, unlike String#trim()).
+const chomp = (s) => s.replace(/(\r?\n)+$/, '');
+
 // git(cwd, args) — stdout of `git -C cwd args...`, or null on any failure.
 export function git(cwd, args) {
   try {
@@ -17,6 +21,7 @@ export function git(cwd, args) {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       windowsHide: true,
+      timeout: 5000,
     });
   } catch {
     return null;
@@ -41,8 +46,8 @@ export function realpath(p) {
 export function pmRoot(cwd) {
   const env = process.env.CLAUDE_PROJECT_DIR;
   if (env && path.isAbsolute(env) && isDir(env)) return env;
-  const top = git(cwd, ['rev-parse', '--show-toplevel']);
-  if (top && top.trim()) return top.trim();
+  const top = chomp(git(cwd, ['rev-parse', '--show-toplevel']) || '');
+  if (top) return top;
   return cwd;
 }
 
@@ -58,6 +63,9 @@ export function pmRelpath(root, target) {
   if (!target) return null;
   const realRoot = realpath(root);
   if (!realRoot) return null;
+  // 'C:foo' is drive-relative on Windows (relative to that drive's own working
+  // directory), not project-relative — resolve it before treating it as a path.
+  if (process.platform === 'win32' && /^[A-Za-z]:(?![\\/])/.test(target)) target = path.resolve(target);
   // Concatenate rather than path.join so '..' is resolved by the filesystem, not lexically.
   let p = path.isAbsolute(target) ? target : `${realRoot}${path.sep}${target}`;
   let hops = 0;
@@ -65,8 +73,15 @@ export function pmRelpath(root, target) {
     if (++hops > 8) return null;
     let link;
     try { link = fs.readlinkSync(p); } catch { return null; }
-    p = path.isAbsolute(link) ? link : path.join(path.dirname(p), link);
+    // Concatenate (not path.join) so a '..' in the link is resolved by the filesystem
+    // against the on-disk directory, not collapsed lexically before earlier symlinks
+    // in the directory chain are followed.
+    p = path.isAbsolute(link) ? link : `${path.dirname(p)}${path.sep}${link}`;
   }
+  // Canonicalise an EXISTING final path so case-insensitive filesystems (macOS,
+  // Windows) return on-disk casing rather than the caller's alias casing.
+  const real = realpath(p);
+  if (real) p = real;
   const rest = [];
   let dir = p;
   while (!isDir(dir)) {
@@ -85,20 +100,30 @@ export function pmRelpath(root, target) {
   return rel.split(path.sep).join('/');
 }
 
+// isRecord(x) — true for a non-null, non-array object (a JSON "object", not an array).
+export const isRecord = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+
 // readHookInput() — the hook JSON from stdin, or null on empty/invalid input.
 export function readHookInput() {
   try {
     const raw = fs.readFileSync(0, 'utf8');
     if (!raw.trim()) return null;
     const v = JSON.parse(raw);
-    return v && typeof v === 'object' ? v : null;
+    return isRecord(v) ? v : null;
   } catch {
     return null;
   }
 }
 
 export function readJson(file) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+  try {
+    // Refuse FIFOs, devices, etc. — reading them can hang or return garbage.
+    const st = fs.statSync(file);
+    if (!st.isFile()) return null;
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
 }
 
 // POSIX cksum: CRC-32, polynomial 0x04C11DB7, MSB first, length appended, complemented.
@@ -128,8 +153,8 @@ export function cksum(input) {
 // digest of two cksum values (raw, raw+salt). Byte-identical to the bash version.
 // ASCII-only lowercasing mirrors `tr '[:upper:]' '[:lower:]'` in the C locale.
 export function pmActorId(root) {
-  let src = (git(root, ['config', 'user.email']) || '').trim();
-  if (!src) src = (git(root, ['config', 'user.name']) || '').trim();
+  let src = chomp(git(root, ['config', 'user.email']) || '');
+  if (!src) src = chomp(git(root, ['config', 'user.name']) || '');
   if (!src) return null;
   src = src.replace(/[A-Z]/g, (c) => c.toLowerCase());
   const slug = src.replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
@@ -175,12 +200,14 @@ if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
     let text = '';
     try { text = fs.readFileSync(0, 'utf8'); } catch { text = ''; }
     const reason = pmSecretScan(text);
-    if (reason) { process.stderr.write(`${reason}\n`); process.exit(1); }
+    // Synchronous write: a stream write immediately followed by process.exit() can
+    // be truncated if the fd is non-blocking (e.g. piped output on some platforms).
+    if (reason) { fs.writeSync(2, `${reason}\n`); process.exit(1); }
     process.exit(0);
   } else if (cmd === 'actor-id') {
     const id = pmActorId(process.argv[3] || process.cwd());
     if (!id) process.exit(1);
-    process.stdout.write(`${id}\n`);
+    fs.writeSync(1, `${id}\n`);
     process.exit(0);
   }
 }

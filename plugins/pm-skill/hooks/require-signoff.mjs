@@ -7,9 +7,13 @@
 // the write targets a non-planning path. Inert for anyone not running the PM skill.
 import fs from 'node:fs';
 import path from 'node:path';
-import { readHookInput, readJson, pmRoot, pmRelpath } from './lib.mjs';
 
 if (process.env.PM_SKILL_NO_ENFORCE === '1') process.exit(0);
+
+// A damaged or missing lib.mjs must not block writes — fail open.
+let lib;
+try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
+const { readHookInput, readJson, pmRoot, pmRelpath, isRecord } = lib;
 
 const input = readHookInput();
 const file = input?.tool_input?.file_path;
@@ -22,7 +26,7 @@ if (!fs.existsSync(state)) state = path.join(root, 'tmp', 'pm-state.json');
 if (!fs.existsSync(state)) process.exit(0);
 
 const st = readJson(state);
-if (!st || typeof st !== 'object' || st.signed_off !== false) process.exit(0);
+if (!isRecord(st) || st.signed_off !== false) process.exit(0);
 
 const rel = pmRelpath(root, file);
 if (rel === null) process.exit(0);
@@ -31,7 +35,8 @@ const ALLOWED_FILES = new Set(['CLAUDE.md', 'AGENTS.md', '.gitignore', '.gitattr
 const ALLOWED_PREFIXES = ['docs/', 'pm/', 'tmp/', '.git/', '.claude/rules/'];
 if (ALLOWED_FILES.has(rel) || ALLOWED_PREFIXES.some((prefix) => rel.startsWith(prefix))) process.exit(0);
 
-process.stderr.write(`pm-skill: implementation is blocked until the plan is signed off.
+// Synchronous write: a stream write immediately followed by process.exit() can be truncated.
+fs.writeSync(2, `pm-skill: implementation is blocked until the plan is signed off.
 A PM-managed project is in planning (pm/pm-state.json: signed_off=false).
 Get the user's explicit approval on docs/plan.md, record it, and set
 signed_off=true in pm/pm-state.json — then implementation may proceed.

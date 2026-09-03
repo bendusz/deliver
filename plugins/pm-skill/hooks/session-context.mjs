@@ -7,15 +7,22 @@
 // output) in any project that is not PM-managed. Fail-open throughout.
 import fs from 'node:fs';
 import path from 'node:path';
-import { readHookInput, readJson, pmRoot, pmActorId, isDir, listDir } from './lib.mjs';
 
 if (process.env.PM_SKILL_NO_ENFORCE === '1') process.exit(0);
+
+// A damaged or missing lib.mjs must not block the session — fail open (silent).
+let lib;
+try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
+const { readHookInput, readJson, pmRoot, pmActorId, isDir, listDir, isRecord } = lib;
 
 const input = readHookInput();
 const cwd = pmRoot(typeof input?.cwd === 'string' && input.cwd ? input.cwd : process.cwd());
 const out = [];
 const say = (line) => out.push(line);
-const v = (x, d) => (x === undefined || x === null || x === false ? d : String(x));
+// Actor files are attacker-controllable content (another actor's JSON): strip control
+// characters (including newlines) and cap length before this text becomes session context.
+const sanitize = (s) => s.replace(/[\x00-\x1f\x7f]+/g, ' ').slice(0, 200);
+const v = (x, d) => (x === undefined || x === null || x === false ? d : sanitize(String(x)));
 const RESUME = 'To continue: run /pm-skill:resume (or read the pm/ files directly). Before ending a long session, offer /pm-skill:handoff.';
 
 const state = path.join(cwd, 'pm', 'pm-state.json');
@@ -29,7 +36,7 @@ if (!fs.existsSync(state)) {
 
 say('pm-skill: this is a PM-managed project (pm/pm-state.json present).');
 const st = readJson(state);
-if (!st || typeof st !== 'object') {
+if (!isRecord(st)) {
   say('To continue: run /pm-skill:resume (or read the pm/ files directly).');
   finish();
 }
@@ -48,7 +55,7 @@ if (!isDir(actorsDir)) {
 const me = pmActorId(cwd) || 'unknown-actor';
 const myFile = path.join(actorsDir, `${me}.json`);
 const my = fs.existsSync(myFile) ? readJson(myFile) : null;
-if (my && typeof my === 'object') {
+if (isRecord(my)) {
   say(`you (${v(my.actor, '?')}): story=${v(my.current_story, '-')} status=${v(my.current_story_status, '-')} builder=${v(my.resolved_builder, '-')} branch=${v(my.branch, '-')} next=${v(my.next, '?')}`);
   const hw = typeof my.handoff_written === 'string' ? my.handoff_written : '';
   const up = typeof my.updated === 'string' ? my.updated : '';
@@ -61,10 +68,10 @@ if (my && typeof my === 'object') {
 }
 
 for (const name of listDir(actorsDir).filter((n) => n.endsWith('.json')).sort()) {
-  const other = name.slice(0, -'.json'.length);
+  const other = sanitize(name.slice(0, -'.json'.length));
   if (other === me) continue;
   const o = readJson(path.join(actorsDir, name));
-  if (!o || typeof o !== 'object') continue;
+  if (!isRecord(o)) continue;
   say(`teammate ${v(o.actor, other)}: story=${v(o.current_story, '-')} status=${v(o.current_story_status, '-')} branch=${v(o.branch, '-')}`);
 }
 
@@ -72,6 +79,7 @@ say(RESUME);
 finish();
 
 function finish() {
-  if (out.length) process.stdout.write(out.join('\n') + '\n');
+  // Synchronous write: a stream write immediately followed by process.exit() can be truncated.
+  if (out.length) fs.writeSync(1, out.join('\n') + '\n');
   process.exit(0);
 }

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { parseArgs, UsageError } from '../codex/lib/args.mjs';
 import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
 import { parseStory } from '../codex/lib/story.mjs';
@@ -58,4 +59,12 @@ test('story: pm-meta parsing and visible-field cross checks', () => {
   // (case "/$item/" in */../*|*/./*) also fires first). The whole-worktree guard is
   // defense-in-depth for symlink aliasing, not reachable via a literal "." here.
   expectBlocked(original.replace('"touches":["src"]', '"touches":["."]').replace('Touches: src', 'Touches: .'), /traversal|whole worktree/);
+});
+
+test('result.emit: a synchronous write is not truncated by an immediate process.exit', () => {
+  const url = pathToFileURL(path.join(PLUGIN_ROOT, 'scripts', 'codex', 'lib', 'result.mjs')).href;
+  const code = `import { emit } from ${JSON.stringify(url)}; emit({ big: 'x'.repeat(200000) }); process.exit(74);`;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', maxBuffer: 1 << 24 });
+  assert.equal(JSON.parse(r.stdout).big.length, 200000);
+  assert.equal(r.status, 74);
 });

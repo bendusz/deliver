@@ -1,4 +1,6 @@
 // Runner exit codes and the JSON envelope every mode emits on stdout.
+import fs from 'node:fs';
+
 export const EXIT = { OK: 0, USAGE: 64, REJECTED: 65, BLOCKED: 66, UNAVAILABLE: 69, FAILED: 70, SAFETY: 74, TIMEOUT: 124, INTERRUPTED: 130 };
 const STATUS_EXIT = { rejected: EXIT.REJECTED, blocked: EXIT.BLOCKED, unavailable: EXIT.UNAVAILABLE, failed: EXIT.FAILED, 'safety-violation': EXIT.SAFETY, 'timed-out': EXIT.TIMEOUT, interrupted: EXIT.INTERRUPTED };
 
@@ -29,7 +31,10 @@ export function envelope(status, reason, extra = {}) {
 }
 
 export function emit(obj) {
-  process.stdout.write(`${JSON.stringify(obj)}\n`);
+  // Synchronous write: process.stdout.write() immediately followed by process.exit()
+  // can truncate output that exceeds the pipe buffer (envelopes can carry a large
+  // actual_files_changed list and exceed 64 KiB).
+  fs.writeSync(1, `${JSON.stringify(obj)}\n`);
 }
 
 // fail(err) — print an envelope and exit with the matching code. Never returns.
