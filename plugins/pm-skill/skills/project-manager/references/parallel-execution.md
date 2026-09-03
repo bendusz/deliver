@@ -24,10 +24,11 @@ sequential loop. **Cap** concurrency, default 3, and raise it only with care, be
 coordination cost grows roughly with the square of the batch size. Run a larger set in waves.
 
 ## 2. Claim the whole batch, then build in parallel
-- Resolve every `Builder: auto` by the sequential loop's rules before dispatch. Then, in the clean
-  integration checkout, claim **every** batch story at once: set each `assignments` entry, persist
-  each resolved choice in its `parallel_batch` entry, append the choices and reasons to `pm/log.md`,
-  and commit assignments, actor state, and log together. Never leave route decisions only in prose.
+- Resolve every `pm-meta` builder of `auto` by the sequential loop's rules before dispatch. Then, in
+  the clean integration checkout, claim **every** batch story at once: set each `assignments` entry,
+  persist each resolved choice in its `parallel_batch` entry, append the choices and reasons to
+  `pm/log.md`, and commit assignments, actor state, and log together. Never leave route decisions
+  only in prose.
 - Give each story its own branch and worktree. Prefer the host's native worktree isolation if it
   offers any; otherwise
   `git worktree add tmp/worktrees/<slug> -b pm/S<sprint>-<n>-<slug> <integration_branch>`, having

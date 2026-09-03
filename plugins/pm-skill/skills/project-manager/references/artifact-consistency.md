@@ -25,16 +25,16 @@ reading to a read-only subagent such as `codebase-analyst` and take back only th
 - **Sign-off.** Missing or inconsistent sign-off across `docs/plan.md`, `pm/log.md`, and
   `pm/pm-state.json`.
 - **Constitution alignment.** A plan or story that conflicts with a rule in `docs/constitution.md`.
-- **Story metadata.** Missing, malformed, duplicated, or extra-key `pm-meta`; a machine `builder` or
-  `touches` value that disagrees with its visible story field; unsafe paths in `pm-meta.touches`.
+- **Story metadata.** Missing, malformed, duplicated, or extra-key `pm-meta`; unsafe paths in
+  `pm-meta.touches`; in a pre-0.17 story, a visible `Builder` or `Touches` field that disagrees with
+  `pm-meta`.
 - **Parallel safety.** `[P]` stories with overlapping `pm-meta.touches`, or with blank or unbounded
   scope.
 - **Dependencies.** `depends-on` pointing at a missing or invalid story ID; dependency cycles.
 - **Gate references.** Stories naming a gate that `docs/plan.md`'s Commands does not list.
 - **Risk lenses, declared against actual.** A story whose content looks security-sensitive (auth,
-  secrets, untrusted input, I/O, dependencies) but is not marked `Security-sensitive: yes` or omits
-  `security-auditor` from its `Review lenses`, and likewise architecture-changing stories that are
-  not marked `Architecture-sensitive` or that omit `architecture-reviewer`. Flag any mismatch
+  secrets, untrusted input, I/O, dependencies) but omits `security-auditor` from its `Review lenses`,
+  and likewise an architecture-changing story that omits `architecture-reviewer`. Flag any mismatch
   between the declared `Risk` and lenses and the real scope.
 - **Terminology drift.** The same concept named differently across spec, plan, and stories.
 - **State sanity.** Stale or contradictory `pm/pm-state.json` and `pm/log.md` against the `docs/`

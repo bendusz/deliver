@@ -22,17 +22,17 @@ same deterministic gates and review panel judge every story.
 ## Per-story cycle
 0. **Ready, route, and branch.** Confirm the story is build-ready: testable criteria, self-contained
    context that names authoritative sources and any completeness-sensitive inventory method, a
-   verification command, and a Builder. See `decomposition.md`; if it is not ready, fix the story
-   first. A story created before v0.13 needs its `pm-meta` comment added and committed first; see
-   `references/migrations.md`. Ensure the working tree is clean before you write route state or the
-   log. If it holds unrelated changes, stop and ask, per Repository safety. Resolve `Builder: auto`
-   now:
-   - choose `codex-builder` only for a precise outcome with bounded Touches, enough local context,
+   verification command, and valid `pm-meta`. See `decomposition.md`; if it is not ready, fix the
+   story first. A story created before v0.13 needs its `pm-meta` comment added and committed first;
+   see `references/migrations.md`. Ensure the working tree is clean before you write route state or
+   the log. If it holds unrelated changes, stop and ask, per Repository safety. Resolve a `pm-meta`
+   builder of `auto` now:
+   - choose `codex-builder` only for a precise outcome with bounded `touches`, enough local context,
      no open architecture decision, and an exact verification command;
    - choose `expert-builder` for broad features, cross-cutting work, uncertain scope, or anything
      that needs wide repo context or design judgement;
-   - if Codex is unavailable, `auto` falls back to `expert-builder`. An explicit
-     `Builder: codex-builder` is a readiness blocker and must not silently switch workers.
+   - if Codex is unavailable, `auto` falls back to `expert-builder`. An explicit `codex-builder` in
+     `pm-meta` is a readiness blocker and must not silently switch workers.
 
    The resolved builder owns the initial build. Now claim and route the story in one commit on the
    integration branch, following the claim procedure in `logging-and-state.md`: pull or rebase the

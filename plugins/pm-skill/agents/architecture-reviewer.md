@@ -1,6 +1,6 @@
 ---
 name: architecture-reviewer
-description: Use when a story is Architecture-sensitive, meaning it adds a module, changes structure or boundaries, introduces abstractions, or refactors, as a design-level lens alongside code-integrity-reviewer. Requires the PM-generated diff; read-only; returns severity-graded design findings and a verdict.
+description: Use when a story's Review lenses name architecture-reviewer, meaning it adds a module, changes structure or boundaries, introduces abstractions, or refactors, as a design-level lens alongside code-integrity-reviewer. Requires the PM-generated diff; read-only; returns severity-graded design findings and a verdict.
 tools: Read, Grep, Glob
 model: claude-opus-5
 effort: medium

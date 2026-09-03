@@ -177,10 +177,10 @@ out-of-scope or protected-path change, becomes a safety violation with exit 74 r
 accepted result, and the worktree is preserved for inspection either way.
 
 Ignored files inside the worktree are audited and reported separately as `ignored_files_changed`.
-Only tracked, non-ignored files are enforced against the story's Touches, so overwriting a
-pre-existing ignored file such as `.env` outside Touches is reported rather than blocked. Protected
-PM paths are still enforced on both lists. The audit covers the worktree only and says nothing about
-writes elsewhere on the host.
+Only tracked, non-ignored files are enforced against the story's `pm-meta.touches`, so overwriting a
+pre-existing ignored file such as `.env` outside `pm-meta.touches` is reported rather than blocked.
+Protected PM paths are still enforced on both lists. The audit covers the worktree only and says
+nothing about writes elsewhere on the host.
 
 **`review`.** One of three native scopes, or a whole-codebase read-only audit. An objective is
 expressed in the prompt, because the CLI forbids a custom prompt alongside a native scope flag.

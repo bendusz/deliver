@@ -91,11 +91,11 @@ relays its answer directly in chat. Every Codex invocation goes through one of t
 wrappers and the bundled Node runner; the PM never runs `codex` itself. The PM stays an orchestrator
 and protects its own context by handing each agent only what it needs.
 
-Each story declares `Builder: expert-builder | codex-builder | auto` and carries matching one-line
-`pm-meta` JSON with its machine-readable touch paths. Opus remains the default for broad features,
-architecture, and changes spread across the codebase. Codex is selected for bounded implementation,
-failing tests, and localized fixes with concrete evidence. Both feed the same deterministic gates,
-independent review panel, and final verifier.
+Each story carries a one-line `pm-meta` JSON comment naming its builder (`expert-builder`,
+`codex-builder`, or `auto`) and its machine-readable touch paths. Opus remains the default for broad
+features, architecture, and changes spread across the codebase. Codex is selected for bounded
+implementation, failing tests, and localized fixes with concrete evidence. Both feed the same
+deterministic gates, independent review panel, and final verifier.
 
 Default check-in is sprint-level, so you review at each sprint boundary, and it is configurable to
 story-level or fully autonomous. Pick a scale, `tiny` through `regulated`, to right-size the
