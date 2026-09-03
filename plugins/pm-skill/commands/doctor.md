@@ -23,7 +23,7 @@ Inspect (whichever apply):
 - **Containers.** A `Dockerfile` or devcontainer that defines the expected environment.
 - **Setup steps.** Any documented bootstrap (README, CONTRIBUTING) needed before the gates pass.
 - **Codex builder readiness.** If any build-ready story selects `codex-builder`, or the active
-  story's `Builder: auto` may resolve to it, call the bundled runner with
+  story's `auto` builder may resolve to it, call the bundled runner with
   `--preflight --worktree <absolute-root> --story <story>` (omit `--story` for environment-only
   readiness). Treat `runner_status: ready` as authoritative. It checks exact-root Git state,
   sign-off, ignored runtime temp, Codex auth and capabilities, schemas, and machine story scope, then

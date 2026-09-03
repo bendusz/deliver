@@ -2,17 +2,18 @@
 <!-- Generated to docs/checklists/story-readiness-<id>.md (or one shared file). Check per story before build. -->
 
 - [ ] The story states a clear Goal.
-- [ ] Context is self-contained; a cold builder needs nothing else.
+- [ ] Context is self-contained and names every source file or symbol a cold builder must inspect;
+      it does not require the full plan or repository.
 - [ ] `Covers:` lists the requirement IDs (FR-/AC-) this story satisfies.
 - [ ] Acceptance criteria are testable checkboxes.
 - [ ] Out-of-scope is explicit.
 - [ ] A concrete Verification command is given.
 - [ ] `depends-on` IDs are valid and (before build) already merged.
-- [ ] `[P]` and `Touches` are present; `[P]` stories have non-overlapping Touches.
-- [ ] A first-12-lines `pm-meta` JSON comment has exactly `builder` and `touches`; it matches the
-      visible fields and contains unique repo-relative file/directory roots with no globs,
-      placeholders, whole-repo grants, or traversal.
-- [ ] `Builder` is `expert-builder`, `codex-builder`, or `auto`; a Codex choice has one exact
-      verification command and bounded `pm-meta.touches` covering code and tests.
-- [ ] `Risk` is set and `Review lenses` are listed (`code-integrity-reviewer` plus any warranted).
-- [ ] `Security-sensitive` / `Architecture-sensitive` flags match the story's actual scope.
+- [ ] A first-12-lines `pm-meta` JSON comment has exactly `builder` and `touches`; `touches` holds
+      unique repo-relative file or directory roots with no globs, placeholders, whole-repo grants,
+      or traversal. `[P]` stories have non-overlapping `touches`.
+- [ ] `builder` is `expert-builder`, `codex-builder`, or `auto`; a Codex choice has one exact
+      verification command and bounded `touches` covering code and tests.
+- [ ] `Risk` is set and `Review lenses` lists `code-integrity-reviewer` plus `security-auditor`
+      when the story touches auth, secrets, untrusted input, I/O, or dependencies, and
+      `architecture-reviewer` when it changes structure or boundaries.

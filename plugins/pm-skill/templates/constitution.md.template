@@ -1,9 +1,9 @@
 # <Project> project constitution
 
 <!--
-Rules that are specific to THIS project and go beyond the pm-skill hard rules. The hard rules
-(sign-off, separate reviewer, deterministic gates, verifier PASS, scope freeze, repository safety,
-traceability) already apply and must not be restated here. This file never weakens them; where it
+Rules that are specific to THIS project and go beyond what pm-skill already enforces. Its hard
+rules (sign-off, separate reviewer, deterministic gates, repository safety) and its workflow
+(verifier PASS, scope freeze, traceability) already apply and must not be restated here. This file never weakens them; where it
 and a request conflict, the stricter rule wins. Every line should be checkable by /pm-skill:analyze.
 Delete any section this project has nothing to say about. If there is nothing at all, write
 "No additional project-specific rules." and keep the file short.

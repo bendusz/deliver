@@ -8,8 +8,7 @@ One repeatable way of working:
 
 > **discover → specify → clarify → plan → sign-off → analyze → decompose → build → gate → review → verify → ship → log**
 
-It is generic and self-contained: it works on a bare Claude Code install and gets richer if you
-happen to have other tools.
+It works on a bare Claude Code install and can use optional tools when they are present.
 
 ## Install
 
@@ -91,11 +90,11 @@ relays its answer directly in chat. Every Codex invocation goes through one of t
 wrappers and the bundled Node runner; the PM never runs `codex` itself. The PM stays an orchestrator
 and protects its own context by handing each agent only what it needs.
 
-Each story declares `Builder: expert-builder | codex-builder | auto` and carries matching one-line
-`pm-meta` JSON with its machine-readable touch paths. Opus remains the default for broad features,
-architecture, and changes spread across the codebase. Codex is selected for bounded implementation,
-failing tests, and localized fixes with concrete evidence. Both feed the same deterministic gates,
-independent review panel, and final verifier.
+Each story carries a one-line `pm-meta` JSON comment naming its builder (`expert-builder`,
+`codex-builder`, or `auto`) and its machine-readable touch paths. Opus remains the default for broad
+features, architecture, and changes spread across the codebase. Codex is selected for bounded
+implementation, failing tests, and localized fixes with concrete evidence. Both feed the same
+deterministic gates, independent review panel, and final verifier.
 
 Default check-in is sprint-level, so you review at each sprint boundary, and it is configurable to
 story-level or fully autonomous. Pick a scale, `tiny` through `regulated`, to right-size the
@@ -153,7 +152,8 @@ one.
   end-of-session briefing. Nobody writes anyone else's files, and a bundled hook enforces it.
 - State updates are committed alongside the work they describe. Never write secrets into `pm/`.
 
-Scratch under `tmp/`, gitignored and disposable, and never load-bearing for resume:
+Gitignored scratch and reports, disposable and never load-bearing for resume. The first four live
+under `tmp/`; the report directories sit at the repository root:
 
 - `tmp/environment-check.md`, `/pm-skill:doctor`'s readiness report.
 - `tmp/codex-builder/*.md`, focused fix briefs passed to `codex-builder`. Never authoritative and
@@ -172,23 +172,10 @@ Scratch under `tmp/`, gitignored and disposable, and never load-bearing for resu
   write when `pm/pm-state.json`, or the legacy `tmp/pm-state.json`, has `signed_off: false`. It
   exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`,
   and `.gitattributes`, fails open on any uncertainty, and does not see writes made through `Bash`.
-- **Guarded Codex writes.** The `codex-builder` runner fails closed unless tracked PM state exists
-  and is signed off, requires the exact git worktree root, mechanically enforces the story's
-  `pm-meta.touches`. On macOS and Linux the builder runs Codex under `workspace-write` with host
-  temporary paths, network, web search, MCP servers, lifecycle hooks, subagents, login shells,
-  user config, and execution rules disabled; on Windows it runs with full access and the runner
-  audits the worktree afterwards. Tool shells
-  get a reduced secret-filtered environment and an ignored, worktree-local `TMPDIR` that is removed
-  on exit, best effort, since a Windows lock can leave it. A symlinked `tmp/` or `tmp/codex-runtime`
-  is refused outright with exit 66 rather than followed. Before and after snapshots of tracked,
-  untracked, and ignored files inside the worktree catch unreported, protected, and out-of-scope
-  repository edits. Ignored files inside the worktree are audited and reported as
-  `ignored_files_changed`; only tracked, non-ignored files are enforced against the story's Touches.
-  Git checks cover HEAD, every ref, staged contents, index flags, hooks, `info/exclude`, local
-  config, and worktree registrations. `--timeout-seconds`, 10 minutes by default, bounds the model
-  process itself, not the preflight probes, which have their own 30-second limit; a run that exceeds
-  it retains partial changes plus diagnostics. `--preflight` checks readiness and story scope without
-  model inference or task quota. Codex may edit working files but never owns Git.
+- **Guarded Codex writes.** Codex builds require signed-off tracked state and bounded story touch
+  paths. POSIX runs use `workspace-write`. Windows runs with full host access and an after-run
+  worktree audit. See `docs/codex-cli-reference.md` for the exact flags, audited state, exit codes,
+  and platform limits.
 - Repository `AGENTS.md` and `CLAUDE.md`, and non-safety project configuration, remain trusted
   project inputs. Command-line overrides win for every safety-sensitive setting above. This is an OS
   sandbox, not a VM boundary.
@@ -218,8 +205,8 @@ prevented. Review, advice, and research modes are read-only on every platform.
 
 ## Optional enhancements (they work alongside and are not required)
 
-pm-skill is fully functional on its own. If your environment also has any of these, the PM may prefer
-them where useful, but nothing here is a dependency.
+pm-skill needs none of the optional tools below. If your environment has any of them, the PM may
+prefer them where useful.
 
 - The `poteto` companion plugin from this marketplace: design exploration before code with
   `architect` and `arena`, subsystem walkthroughs with `how` and `why`, multi-model adversarial

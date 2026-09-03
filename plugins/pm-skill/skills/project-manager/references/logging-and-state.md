@@ -45,7 +45,7 @@ construct it by hand. Changing git identity mid-project creates a second actor f
 `git config user.email` before claiming a story. The session hook shows `unknown-actor` for that
 case.
 
-If an actor file from an older layout shows up as an orphan, see `references/migrations.md`.
+If an actor file from an older layout shows up as an orphan, see `migrations.md`.
 
 ## `pm/pm-state.json` (shared, changes only at coordination moments)
 
@@ -54,8 +54,8 @@ Fields: `project`, `spec`, `constitution`, `scale`, `phase`, `signed_off` (bool)
 `assignments`, `updated`. Create it from
 `${CLAUDE_PLUGIN_ROOT}/templates/pm-state.json.template`.
 
-- `assignments` maps story id to actor id for active claims only. Set the entry when a story is
-  claimed and remove it in the ship commit. History lives in the log and the story files.
+- `assignments` maps story id to actor id for active claims only. History lives in the log and the
+  story files.
 - `signed_off` is load-bearing and global. While it is `false`, the `require-signoff.mjs` hook blocks
   every actor's `Write`, `Edit`, and `MultiEdit` calls, except those targeting `docs/`, `pm/`, `tmp/`,
   `.git/`, `.claude/rules/`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, or `.gitattributes`. It fails
@@ -107,23 +107,16 @@ the handoff is stale, so trust state and log instead.
 
 ## Claim and sync discipline (team of any size)
 
-- Pull or rebase before claiming a story and before shipping one.
-- A **claim** is one commit on the up-to-date integration branch that sets
-  `assignments[story] = you` in the shared state, records your position in `pm/actors/<you>.json`
-  (story, status, planned branch name, resolved builder, counters reset), and appends the route
-  decision to `pm/log.md`. A claim committed only to a story branch is invisible to teammates'
-  pull-and-check flow, and an assignment without the matching actor position reads as a stale claim.
-  Create the story branch after that commit. Push the claim only under the user's standing push
-  permission, since the never-push-without-explicit-request rule always wins. Until it is pushed the
-  claim is visible only locally, so say so.
-- If the integration tip moved after your gates ran, re-gate on the merged result before merging.
-  This is the same semantic-conflict rule as the parallel path.
-- **Release** the claim in the ship commit: remove the assignment and append the log entry.
+`implementation-loop.md` owns the per-story claim commit, the pull-or-rebase points, and the release
+in the ship commit. What holds beyond one story:
+
+- An assignment without the matching actor position reads as a stale claim. Until the claim commit is
+  pushed it is visible only locally, so say so.
 - Sprint advance: any actor may advance `current_sprint` once all the sprint's stories are merged.
   It is a shared-state write and gets a log entry.
 - Claims are visible, not locked, because git cannot make them atomic. A same-minute double-claim
-  races. `/pm-skill:doctor` and `/pm-skill:analyze` surface it within one fetch, and resolution is
-  human. Stale claims (an assignment with no matching branch or activity) are flagged the same way.
+  races. `/pm-skill:doctor` and `/pm-skill:analyze` report the race after one fetch, and a person
+  resolves it. Stale claims (an assignment with no matching branch or activity) are flagged the same way.
 
 ## Source of truth (committed)
 
@@ -133,12 +126,13 @@ The `pm/` files track *where everyone is*, not *what was decided*.
 
 ## On resume
 
-Read the shared `pm/pm-state.json`, then **your** `pm/actors/<you>.json` and, if it is current, your
-HANDOFF. The `/pm-skill:resume` command does exactly this, and the bundled `session-context.mjs` hook
+Pull or rebase first when a remote exists, because teammates' claims and ships become visible only
+after a fetch. Then read the shared `pm/pm-state.json`, followed by **your**
+`pm/actors/<you>.json` and, if it is current, your HANDOFF. The `/pm-skill:resume` command does exactly this, and the bundled `session-context.mjs` hook
 injects a short pointer, yours plus teammate one-liners, into every new or freshly-compacted session.
 Then continue from your recorded `next`, using the persisted `resolved_builder` and counters rather
 than re-deciding from memory. If you are a new actor on an existing project and have no
 `pm/actors/<you>.json` yet, create it from the template and commit it before continuing.
 
-If the state you find uses a pre-0.13, flat 0.8, or pre-0.8 layout, migrate it first per
-`references/migrations.md`.
+If the state you find uses a pre-0.10.1 actor id, a pre-0.13 actor file, a flat 0.8 layout, or a
+pre-0.8 `tmp/` layout, migrate it first per `migrations.md`.

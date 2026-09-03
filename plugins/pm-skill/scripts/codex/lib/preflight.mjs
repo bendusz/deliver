@@ -15,7 +15,7 @@ function isExecutable(p) {
   try { fs.accessSync(p, fs.constants.X_OK); return fs.statSync(p).isFile(); } catch { return false; }
 }
 
-// cmdFallbackPrefix(p) — the `cmd.exe /d /s /c <p>` argv prefix for the win32 .cmd
+// cmdFallbackPrefix(p): the `cmd.exe /d /s /c <p>` argv prefix for the win32 .cmd
 // fallback. With `/s`, cmd.exe strips the FIRST and LAST character of the command
 // string when both are quotes and runs the remainder verbatim; without the extra
 // enclosing pair, `/d /s /c "C:\path with spaces\codex.cmd" arg` loses the path's
@@ -31,7 +31,7 @@ export function cmdFallbackPrefix(p) {
 // The closing quote of the cmdFallbackPrefix pair, appended after the real arguments.
 export const CMD_FALLBACK_SUFFIX = '"';
 
-// shimEntry(dir) — the @openai/codex JS entry beside a codex.cmd shim, if any.
+// shimEntry(dir): the @openai/codex JS entry beside a codex.cmd shim, if any.
 // Global npm installs put the package under <dir>/node_modules/@openai/...; a
 // project-local install puts <dir> at node_modules/.bin, one level BELOW the
 // package root, so the entry is <dir>/../@openai/codex/bin/codex.js.
@@ -45,7 +45,7 @@ function shimEntry(dir) {
   return null;
 }
 
-// findCodex() — the codex executable on PATH, and how to spawn it without a shell.
+// findCodex(): the codex executable on PATH, and how to spawn it without a shell.
 // win32: codex.exe ALWAYS wins (a full PATH sweep runs before any .cmd/.bat is
 // considered, so a PATHEXT of `.CMD;.EXE` cannot select a shim over the real
 // binary); a codex.cmd npm shim is bypassed by running its JS entry with node

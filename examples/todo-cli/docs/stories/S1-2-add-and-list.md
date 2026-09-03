@@ -1,8 +1,7 @@
 # S1-2: add and list todos
 <!-- pm-meta: {"builder":"expert-builder","touches":["todo.py","test_todo.py"]} -->
-Sprint: 1 · Priority: high · Covers: FR-002, AC-002 · Depends on: S1-1 · Parallel-safe: no · Touches: todo.py, test_todo.py
-Risk: low · Review lenses: code-integrity-reviewer · Security-sensitive: no · Architecture-sensitive: no
-Builder: expert-builder
+Sprint: 1 · Priority: high · Covers: FR-002, AC-002 · Depends on: S1-1 · Parallel-safe: no
+Risk: low · Review lenses: code-integrity-reviewer
 
 ## Goal
 Implement the `add` and `list` subcommands on top of the S1-1 store.

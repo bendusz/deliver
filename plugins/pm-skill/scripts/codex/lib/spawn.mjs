@@ -17,7 +17,7 @@ function killTree(pid, signal) {
   try { process.kill(-pid, signal); } catch { try { process.kill(pid, signal); } catch { /* gone */ } }
 }
 
-// runCodex — spawn codex with the prompt on stdin, stdout/stderr to files, a hard
+// runCodex: spawn codex with the prompt on stdin, stdout/stderr to files, a hard
 // timeout that kills the whole process tree, and interrupt forwarding.
 // On POSIX the child leads its own process group (detached), so a final group-wide
 // SIGKILL at exit reaps any descendant it backgrounded; on win32 a second taskkill /T

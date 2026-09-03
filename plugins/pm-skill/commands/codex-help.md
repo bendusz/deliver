@@ -3,10 +3,10 @@ description: Ask the OpenAI Codex CLI for a second opinion on the current work, 
 ---
 
 Ask Codex, OpenAI's coding agent CLI, a specific question and relay its answer, via the
-`codex-advisor` wrapper agent and the bundled Node runner. This is a second pair of eyes from an
-independent model, so use it sparingly: real design decisions, risky refactors, tricky tradeoffs. Not
-for routine questions you can answer yourself. Wrappers never pass sandbox or approval flags; these
-commands run Codex read-only on every platform, and the runner owns the flags.
+`codex-advisor` wrapper agent and the bundled Node runner. Dispatch it only for consequential design
+decisions, risky refactors, or tradeoffs, never for a routine question you can answer yourself.
+Wrappers never pass sandbox or approval flags; the runner owns them and runs Codex read-only on
+every platform.
 
 Arguments: $ARGUMENTS
 

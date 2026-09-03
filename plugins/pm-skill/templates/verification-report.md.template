@@ -22,10 +22,10 @@
 
 ## pm-verifier
 - **STATUS:** PASS / FAIL / UNKNOWN
-- **Confidence:** high / medium / low
-- **Evidence:** <what was run or read, and what it showed>
-- **Open issues:** <none / …>
-- **Action:** <PASS: may ship. FAIL: issues to fix. UNKNOWN: missing evidence needed.>
+- AC-001: PASS / FAIL / UNKNOWN. Evidence: <command run or code read, and what it showed>
+- test | lint | build: PASS / FAIL / N/A / UNKNOWN. Evidence: <...>
+- Review findings: <each prior block or major: resolved or not, with evidence>
+- **Action** (FAIL or UNKNOWN only): <the failing IDs and the concrete fix, or the exact missing evidence>
 
 ## Final status
 <SHIPPED on <YYYY-MM-DD> via <merge or PR link>, or BLOCKED with the reason>

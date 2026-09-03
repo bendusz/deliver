@@ -1,8 +1,7 @@
 # S1-1: CLI skeleton and store
 <!-- pm-meta: {"builder":"expert-builder","touches":["todo.py","test_todo.py"]} -->
-Sprint: 1 · Priority: high · Covers: FR-001, AC-001 · Depends on: none · Parallel-safe: no · Touches: todo.py, test_todo.py
-Risk: low · Review lenses: code-integrity-reviewer · Security-sensitive: no · Architecture-sensitive: no
-Builder: expert-builder
+Sprint: 1 · Priority: high · Covers: FR-001, AC-001 · Depends on: none · Parallel-safe: no
+Risk: low · Review lenses: code-integrity-reviewer
 
 ## Goal
 Stand up the `todo.py` entry point with an `argparse` CLI and a JSON store that reads an existing

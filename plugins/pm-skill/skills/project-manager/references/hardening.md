@@ -1,9 +1,10 @@
 # Hardening (optional)
 
-pm-skill is safe by default through behavioural rules and each agent's tool surface. This reference
-adds an optional, Claude Code-native layer for teams that want mechanical enforcement. It is entirely
-opt-in and lives in the project's own config, not in the plugin, and needs no external process. The
-optional allowlist example does need `jq`.
+pm-skill uses behavioural rules, fail-open accident guards, and each agent's allowed tools. These
+controls are not a security boundary, and on Windows `codex-builder` runs with full host access and
+network. This reference adds an optional, Claude Code-native layer for teams that want mechanical
+enforcement. It is opt-in and lives in the project's own config, not in the plugin, and needs no
+external process. The optional allowlist example does need `jq`.
 
 ## What is already enforced
 - **Sign-off.** The bundled `PreToolUse` hook `hooks/require-signoff.mjs` matches `Write`, `Edit`,
@@ -24,8 +25,8 @@ optional allowlist example does need `jq`.
   and injects a short position pointer into new and freshly-compacted sessions. It only reads.
 - **Read-only review and verify agents.** `code-integrity-reviewer`, `architecture-reviewer`,
   `security-auditor`, `debugger`, and `codebase-analyst` carry only `Read`, `Grep`, and `Glob`, so
-  the tool surface itself blocks writes. `pm-verifier` also has `Bash`, because it must run the
-  gates; see below.
+  the allowed-tool list blocks writes. `pm-verifier` also has `Bash`, because it runs the gates; see
+  below.
 
 ## The Bash gap
 A subagent's `tools:` list is all-or-nothing for `Bash`: granting it allows any shell command, so
@@ -58,14 +59,18 @@ operations untouched.
    esac
    case "$cmd" in
      "git status"*|"git diff"*|"git log"*|"git show"*|"ls "*|"cat "*|"grep "*|"rg "*|"head "*|"tail "*|"wc "*) exit 0 ;;
-     # the project's gates: EDIT to match docs/plan.md and AGENTS.md
+     # the project's gates and the stories' verification commands: EDIT to match docs/plan.md and AGENTS.md
      "npm test"*|"npm run lint"*|"npm run build"*|"pytest"*|"ruff check"*|"make test"*) exit 0 ;;
+     "node scripts/check.mjs"*) exit 0 ;;
    esac
    echo "pm-skill hardening: pm-verifier may run only read-only inspection and the project gates" >&2
    exit 2
    ```
 
-   It is default-deny for the verifier. List your real gate commands above; anything else, including
+   It is default-deny for the verifier. List your real gate commands and the non-mutating
+   verification commands your stories use above, so the verifier can run the command a PASS needs.
+   Anything it rejects, the verifier reports from the PM's captured evidence, or as UNKNOWN when
+   that evidence is insufficient. Anything else, including
    shell chaining, redirection, substitution, and output-writing options, is blocked with `exit 2`,
    which takes precedence over allow rules. It requires `jq` and fails closed without it. Other
    agents, the PM and the builder, fall through to `exit 0`, so commits and merges still work.

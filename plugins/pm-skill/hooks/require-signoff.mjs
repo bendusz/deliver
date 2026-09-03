@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pm-skill PreToolUse hook — block implementation writes until the plan is signed off.
+// pm-skill PreToolUse hook: block implementation writes until the plan is signed off.
 //
 // FAIL-OPEN by design. Exits 0 (allow) on any uncertainty: kill switch, no state file,
 // unparseable JSON, or a target outside the project tree. Exits 2 (block, reason on
@@ -10,7 +10,7 @@ import path from 'node:path';
 
 if (process.env.PM_SKILL_NO_ENFORCE === '1') process.exit(0);
 
-// A damaged or missing lib.mjs must not block writes — fail open.
+// A damaged or missing lib.mjs must not block writes: fail open.
 let lib;
 try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
 const { readHookInput, readJson, hookFile, pmRelpath, isRecord } = lib;
@@ -34,10 +34,8 @@ const ALLOWED_PREFIXES = ['docs/', 'pm/', 'tmp/', '.git/', '.claude/rules/'];
 if (ALLOWED_FILES.has(rel) || ALLOWED_PREFIXES.some((prefix) => rel.startsWith(prefix))) process.exit(0);
 
 // Synchronous write: a stream write immediately followed by process.exit() can be truncated.
-fs.writeSync(2, `pm-skill: implementation is blocked until the plan is signed off.
-A PM-managed project is in planning (pm/pm-state.json: signed_off=false).
-Get the user's explicit approval on docs/plan.md, record it, and set
-signed_off=true in pm/pm-state.json — then implementation may proceed.
+fs.writeSync(2, `pm-skill blocked ${rel}: the plan is not signed off (pm/pm-state.json signed_off=false).
+Get the user's approval on docs/plan.md, set signed_off=true, and retry.
 (Set PM_SKILL_NO_ENFORCE=1 to disable this gate.)
 `);
 process.exit(2);

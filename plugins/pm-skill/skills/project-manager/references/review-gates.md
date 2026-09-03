@@ -35,10 +35,13 @@ they override you.
 - **Act on.** Real correctness, security, or maintainability problems, given the story's actual goal.
   These are the `block` and `major` items that go to the fix round. More than about 5 means you are
   not filtering hard enough.
-- **Consider.** Legitimate, but you are not sure the fix is worth its cost now. Surface it to the
-  user.
+- **Consider.** The finding is real, but its fix may not justify the cost now. Show it to the user.
 - **Noted.** Valid but not actionable: context-dependent, premature, or low impact.
 - **Dismissed.** Wrong, nitpicky, or missing context, each with a one-line reason.
+
+**The fix brief.** When Act-on findings go to `codex-builder`, the runtime-only brief carries the
+accepted findings or the failing command, the relevant output, the implicated paths, the exclusions,
+and the story's verification command. `implementation-loop.md` names its path and dispatches it.
 
 Filtering rules. A finding two lenses raised independently is high signal. A hypothetical, "what if
 this is null", counts only if the call path can actually produce it, so trace it. "I would have done

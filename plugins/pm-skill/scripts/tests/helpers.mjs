@@ -65,25 +65,31 @@ export function canSymlink(target, linkPath) {
 export const RUNNER = path.join(PLUGIN_ROOT, 'scripts', 'codex', 'run.mjs');
 const WIN = process.platform === 'win32';
 
+export const STORY_V2 = [
+  '# S1-1: focused fix',
+  '<!-- pm-meta: {"builder":"codex-builder","touches":["src"]} -->',
+  'Sprint: 1 · Priority: high · Covers: AC-1 · Depends on: none · Parallel-safe: yes',
+  'Risk: low · Review lenses: code-integrity-reviewer',
+  '',
+  '## Acceptance criteria (testable)',
+  '- [ ] fixed',
+  '',
+  '## Verification',
+  '- Prove done with: `true`',
+  '',
+].join('\n');
+
+// A story written before 0.17: the same pm-meta plus the visible Builder and Touches fields.
+export const STORY_LEGACY = STORY_V2
+  .replace('Parallel-safe: yes', 'Parallel-safe: yes · Touches: src')
+  .replace('Risk: low · Review lenses: code-integrity-reviewer', 'Risk: low · Review lenses: code-integrity-reviewer · Security-sensitive: no · Architecture-sensitive: no\nBuilder: codex-builder');
+
 export function newBuildProject(signedOff = true) {
   const d = tmpDir('pmbuild-');
   for (const sub of ['docs/stories', 'tmp/codex-builder', 'pm', 'src']) fs.mkdirSync(path.join(d, sub), { recursive: true });
   fs.writeFileSync(path.join(d, '.gitignore'), 'tmp/\n');
   fs.writeFileSync(path.join(d, 'pm', 'pm-state.json'), `{"signed_off":${signedOff},"phase":"implementation"}\n`);
-  fs.writeFileSync(path.join(d, 'docs', 'stories', 'S1-1-fix.md'), [
-    '# S1-1 — focused fix',
-    '<!-- pm-meta: {"builder":"codex-builder","touches":["src"]} -->',
-    'Sprint: 1 · Priority: high · Covers: AC-1 · Depends on: none · Parallel-safe: yes · Touches: src',
-    'Risk: low · Review lenses: code-integrity-reviewer · Security-sensitive: no · Architecture-sensitive: no',
-    'Builder: codex-builder',
-    '',
-    '## Acceptance criteria (testable)',
-    '- [ ] fixed',
-    '',
-    '## Verification',
-    '- Prove done with: `true`',
-    '',
-  ].join('\n'));
+  fs.writeFileSync(path.join(d, 'docs', 'stories', 'S1-1-fix.md'), STORY_V2);
   fs.writeFileSync(path.join(d, 'tmp', 'codex-builder', 'S1-1-round-1.md'), '# Evidence\nRun `true`; fix src/fix.txt.\n');
   fs.writeFileSync(path.join(d, 'src', 'script.sh'), '#!/usr/bin/env sh\nexit 0\n');
   gitIn(d, ['init', '-q']);
@@ -94,7 +100,7 @@ export function newBuildProject(signedOff = true) {
   return d;
 }
 
-export function makeStub({ layout = 'npm' } = {}) {
+export function makeStub() {
   const dir = tmpDir('pmstub-');
   const binDir = path.join(dir, 'bin');
   fs.mkdirSync(binDir, { recursive: true });
@@ -102,17 +108,11 @@ export function makeStub({ layout = 'npm' } = {}) {
   const launcher = fs.readFileSync(path.join(TESTS_DIR, 'stub-launcher.cjs'));
   const stub = fs.readFileSync(path.join(TESTS_DIR, 'stub-codex.mjs'));
   if (WIN) {
-    if (layout === 'npm') {
-      const pkg = path.join(binDir, 'node_modules', '@openai', 'codex', 'bin');
-      fs.mkdirSync(pkg, { recursive: true });
-      fs.writeFileSync(path.join(pkg, 'codex.js'), launcher);
-      fs.writeFileSync(path.join(pkg, 'stub-codex.mjs'), stub);
-      fs.writeFileSync(path.join(binDir, 'codex.cmd'), '@node "%~dp0node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n');
-    } else {
-      fs.writeFileSync(path.join(binDir, 'codex.js'), launcher);
-      fs.writeFileSync(path.join(binDir, 'stub-codex.mjs'), stub);
-      fs.writeFileSync(path.join(binDir, 'codex.cmd'), '@node "%~dp0codex.js" %*\r\n');
-    }
+    const pkg = path.join(binDir, 'node_modules', '@openai', 'codex', 'bin');
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(path.join(pkg, 'codex.js'), launcher);
+    fs.writeFileSync(path.join(pkg, 'stub-codex.mjs'), stub);
+    fs.writeFileSync(path.join(binDir, 'codex.cmd'), '@node "%~dp0node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n');
   } else {
     fs.writeFileSync(path.join(binDir, 'codex'), launcher, { mode: 0o755 });
     fs.writeFileSync(path.join(binDir, 'stub-codex.mjs'), stub);

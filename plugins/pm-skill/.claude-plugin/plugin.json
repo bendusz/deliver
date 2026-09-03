@@ -1,7 +1,7 @@
 {
   "name": "pm-skill",
-  "description": "Claude acts as a Project/Product Manager: discover, specify, plan, get sign-off, decompose into stories, and orchestrate build/gate/review/verify/ship via subagents — without writing the code itself.",
-  "version": "0.16.1",
+  "description": "Claude manages software delivery through discovery, planning, sign-off, delegated implementation, review, verification, and shipping. It does not write implementation code.",
+  "version": "0.17.0",
   "author": { "name": "bendusz", "url": "https://github.com/bendusz" },
   "homepage": "https://github.com/bendusz/pm-skill",
   "repository": "https://github.com/bendusz/pm-skill",

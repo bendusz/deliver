@@ -63,36 +63,35 @@ test('signoff: legacy tmp/pm-state.json is honoured', () => {
 test('signoff: block message names the gate', () => {
   const p = newProj(false);
   const r = runHook('require-signoff.mjs', writeInput(p, path.join(p, 'src', 'app.py')));
-  assert.match(r.stderr, /implementation is blocked until the plan is signed off/);
+  assert.match(r.stderr, /blocked src\/app\.py: the plan is not signed off/);
 });
 
 const secrets = (input, env) => runHook('pm-secrets-guard.mjs', input, env).status;
-const content = (cwd, f, c) => ({ cwd, tool_input: { file_path: f, content: c } });
 
 test('secrets: prose in pm/ is allowed, shaped values are blocked', () => {
   const g = newProj(false);
   const log = path.join(g, 'pm', 'log.md');
-  assert.equal(secrets(content(g, log, 'rotate the API key on the box')), 0);
-  assert.equal(secrets(content(g, log, 'api_key = "zq9x7c2v8b4n6m1k"')), 2);
-  assert.equal(secrets(content(g, log, 'API_KEY = "zq9x7c2v8b4n6m1k"')), 2);
-  assert.equal(secrets(content(g, log, 'API_KEY=abcdefghijklmno')), 2);
-  assert.equal(secrets(content(g, log, 'Password: hunter2hunter2')), 2);
-  assert.equal(secrets(content(g, log, 'TOKEN=$GITHUB_TOKEN and api_key = "$FROM_ENV_VAR"')), 0);
-  assert.equal(secrets(content(g, log, 'token = "<rotate-me-later>"')), 0);
-  assert.equal(secrets(content(g, log, 'key AKIAIOSFODNN7EXAMPLE ok')), 2);
-  assert.equal(secrets(content(g, log, 'ghp_abcdefghijklmnopqrstuvwxyz012345')), 2);
-  assert.equal(secrets(content(g, log, '-----BEGIN RSA PRIVATE KEY-----')), 2);
-  assert.equal(secrets(content(g, log, 'Password: "use a sentence here"')), 0);
-  assert.match(runHook('pm-secrets-guard.mjs', content(g, log, 'API_KEY=abcdefghijklmno')).stderr, /blocked a write to pm\/log\.md — the content contains a secret-shaped string/);
+  assert.equal(secrets(writeInput(g, log, 'rotate the API key on the box')), 0);
+  assert.equal(secrets(writeInput(g, log, 'api_key = "zq9x7c2v8b4n6m1k"')), 2);
+  assert.equal(secrets(writeInput(g, log, 'API_KEY = "zq9x7c2v8b4n6m1k"')), 2);
+  assert.equal(secrets(writeInput(g, log, 'API_KEY=abcdefghijklmno')), 2);
+  assert.equal(secrets(writeInput(g, log, 'Password: hunter2hunter2')), 2);
+  assert.equal(secrets(writeInput(g, log, 'TOKEN=$GITHUB_TOKEN and api_key = "$FROM_ENV_VAR"')), 0);
+  assert.equal(secrets(writeInput(g, log, 'token = "<rotate-me-later>"')), 0);
+  assert.equal(secrets(writeInput(g, log, 'key AKIAIOSFODNN7EXAMPLE ok')), 2);
+  assert.equal(secrets(writeInput(g, log, 'ghp_abcdefghijklmnopqrstuvwxyz012345')), 2);
+  assert.equal(secrets(writeInput(g, log, '-----BEGIN RSA PRIVATE KEY-----')), 2);
+  assert.equal(secrets(writeInput(g, log, 'Password: "use a sentence here"')), 0);
+  assert.match(runHook('pm-secrets-guard.mjs', writeInput(g, log, 'API_KEY=abcdefghijklmno')).stderr, /blocked pm\/log\.md: tracked pm\/ files cannot hold secret-shaped values/);
 });
 
 test('secrets: ignores writes outside pm/, guards traversal and symlinks into pm/', (t) => {
   const g = newProj(false);
-  assert.equal(secrets(content(g, path.join(g, 'src', 'config.py'), 'API_KEY=abcdefghijklmno')), 0);
-  assert.equal(secrets(content(g, path.join(g, 'docs', '..', 'pm', 'log.md'), 'API_KEY=abcdefghijklmno')), 2);
+  assert.equal(secrets(writeInput(g, path.join(g, 'src', 'config.py'), 'API_KEY=abcdefghijklmno')), 0);
+  assert.equal(secrets(writeInput(g, path.join(g, 'docs', '..', 'pm', 'log.md'), 'API_KEY=abcdefghijklmno')), 2);
   fs.writeFileSync(path.join(g, 'pm', 'log.md'), '');
   if (!canSymlink(path.join(g, 'pm', 'log.md'), path.join(g, 'docs', 'note.md'))) return t.skip('symlinks unavailable');
-  assert.equal(secrets(content(g, path.join(g, 'docs', 'note.md'), 'API_KEY=abcdefghijklmno')), 2);
+  assert.equal(secrets(writeInput(g, path.join(g, 'docs', 'note.md'), 'API_KEY=abcdefghijklmno')), 2);
 });
 
 test('secrets: scans Edit.new_string and MultiEdit.edits[].new_string', () => {
@@ -116,7 +115,7 @@ test('actor: own files allowed, other actors blocked, non-actor files allowed', 
   assert.equal(actor(writeInput(a, path.join(actors, 'jordan-example-com-000000000000.HANDOFF.md'))), 2);
   assert.equal(actor(writeInput(a, path.join(actors, 'README.txt'))), 0);
   assert.equal(actor(writeInput(a, path.join(a, 'pm', 'log.md'))), 0);
-  assert.match(runHook('actor-guard.mjs', writeInput(a, path.join(actors, 'jordan-example-com-000000000000.json'))).stderr, /that is 'jordan-example-com-000000000000's state file and you are 'casey-example-com-589b8fa8ab93'/);
+  assert.match(runHook('actor-guard.mjs', writeInput(a, path.join(actors, 'jordan-example-com-000000000000.json'))).stderr, /blocked pm\/actors\/jordan-example-com-000000000000\.json: that is 'jordan-example-com-000000000000's state file and you are 'casey-example-com-589b8fa8ab93'/);
 });
 
 test('actor: F4 cross-domain and bare local-part ids are other actors', () => {
@@ -160,16 +159,16 @@ test('session: prints the pointer, project line, and your actor line', () => {
   const s = newProj(false);
   fs.writeFileSync(path.join(s, 'pm', 'actors', `${ME}.json`), JSON.stringify({ actor: ME, current_story: 'S1-1' }) + '\n');
   const out = session({ cwd: s, source: 'startup' });
-  assert.match(out, /PM-managed/);
-  assert.match(out, /project: phase=implementation sprint=-\/- signed_off=false/);
+  assert.doesNotMatch(out, /PM-managed/);
+  assert.match(out, /pm: phase=implementation sprint=-\/- signed_off=false/);
   assert.match(out, new RegExp(`you \\(${ME}\\): story=S1-1 status=- builder=- branch=- next=\\?`));
   assert.match(out, /run \/pm-skill:resume/);
 });
 
 test('session: F1 subdirectory cwd finds the state (git fallback and CLAUDE_PROJECT_DIR)', () => {
   const s = newProj(false);
-  assert.match(session({ cwd: path.join(s, 'packages', 'foo'), source: 'startup' }), /PM-managed/);
-  assert.match(session({ cwd: path.join(s, 'packages', 'foo'), source: 'startup' }, { CLAUDE_PROJECT_DIR: s }), /PM-managed/);
+  assert.match(session({ cwd: path.join(s, 'packages', 'foo'), source: 'startup' }), /pm: phase=/);
+  assert.match(session({ cwd: path.join(s, 'packages', 'foo'), source: 'startup' }, { CLAUDE_PROJECT_DIR: s }), /pm: phase=/);
 });
 
 test('session: silent outside PM projects and with the kill switch', () => {
@@ -190,6 +189,10 @@ test('session: handoff freshness, teammates, no actor file, legacy layouts', () 
   assert.match(session({ cwd: s }), /A current pm\/actors\/.*HANDOFF\.md briefing exists/);
   fs.writeFileSync(path.join(actors, 'jordan-example-com-000000000000.json'), JSON.stringify({ actor: 'jordan', current_story: 'S1-2', branch: 'pm/S1-2' }));
   assert.match(session({ cwd: s }), /teammate jordan: story=S1-2 status=- branch=pm\/S1-2/);
+  fs.writeFileSync(path.join(actors, 'idle-example-com-000000000000.json'), JSON.stringify({ actor: 'idle', current_story: null, branch: 'main' }));
+  assert.doesNotMatch(session({ cwd: s }), /teammate idle/);
+  fs.writeFileSync(path.join(actors, 'nokey-example-com-000000000000.json'), JSON.stringify({ actor: 'nokey', branch: 'main' }));
+  assert.doesNotMatch(session({ cwd: s }), /teammate nokey/);
   fs.rmSync(actors, { recursive: true });
   assert.match(session({ cwd: s }), /Layout is flat single-actor/);
   fs.mkdirSync(path.join(s, 'tmp'));
@@ -215,9 +218,8 @@ test('session: malformed state still prints the resume pointer', () => {
   const s = newProj(false);
   fs.writeFileSync(path.join(s, 'pm', 'pm-state.json'), '{ nope');
   const out = session({ cwd: s });
-  assert.match(out, /PM-managed/);
   assert.match(out, /run \/pm-skill:resume/);
-  assert.doesNotMatch(out, /project: phase=/);
+  assert.doesNotMatch(out, /pm: phase=/);
 });
 
 test('session: a symlinked pm-state.json is read as unavailable, not followed', (t) => {
@@ -228,9 +230,8 @@ test('session: a symlinked pm-state.json is read as unavailable, not followed', 
   fs.rmSync(path.join(s, 'pm', 'pm-state.json'));
   if (!canSymlink(target, path.join(s, 'pm', 'pm-state.json'))) return t.skip('symlinks unavailable');
   const out = session({ cwd: s });
-  assert.match(out, /PM-managed/);
   assert.match(out, /run \/pm-skill:resume/);
-  assert.doesNotMatch(out, /project: phase=/);
+  assert.doesNotMatch(out, /pm: phase=/);
   // Fail-open is preserved: an unreadable state file never blocks a write.
   assert.equal(signoff(writeInput(s, path.join(s, 'src', 'app.py'))), 0);
 });
@@ -247,7 +248,7 @@ test('lib: a JSON array state file is treated as fail-open, not an object', () =
   const s = newProj(false);
   fs.writeFileSync(path.join(s, 'pm', 'pm-state.json'), '[]');
   const out = session({ cwd: s });
-  assert.doesNotMatch(out, /project: phase=/);
+  assert.doesNotMatch(out, /pm: phase=/);
   assert.equal(signoff(writeInput(s, path.join(s, 'src', 'app.py'))), 0);
 });
 

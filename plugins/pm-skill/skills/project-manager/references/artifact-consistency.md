@@ -7,8 +7,7 @@ contradictions and **never** fixes them. `/pm-skill:analyze` drives it.
 ## Read-only contract
 
 Read the artifacts and produce a report. **Never** edit, create, scaffold, or fix anything, not even
-logs or state. Offer remediation as suggestions only. If the artifact set is large, delegate the
-reading to a read-only subagent such as `codebase-analyst` and take back only the findings.
+logs or state. Offer remediation as suggestions only.
 
 ## Inputs (whichever exist)
 
@@ -25,16 +24,16 @@ reading to a read-only subagent such as `codebase-analyst` and take back only th
 - **Sign-off.** Missing or inconsistent sign-off across `docs/plan.md`, `pm/log.md`, and
   `pm/pm-state.json`.
 - **Constitution alignment.** A plan or story that conflicts with a rule in `docs/constitution.md`.
-- **Story metadata.** Missing, malformed, duplicated, or extra-key `pm-meta`; a machine `builder` or
-  `touches` value that disagrees with its visible story field; unsafe paths in `pm-meta.touches`.
+- **Story metadata.** Missing, malformed, duplicated, or extra-key `pm-meta`; unsafe paths in
+  `pm-meta.touches`; in a pre-0.17 story, a visible `Builder` or `Touches` field that disagrees with
+  `pm-meta`.
 - **Parallel safety.** `[P]` stories with overlapping `pm-meta.touches`, or with blank or unbounded
   scope.
 - **Dependencies.** `depends-on` pointing at a missing or invalid story ID; dependency cycles.
 - **Gate references.** Stories naming a gate that `docs/plan.md`'s Commands does not list.
 - **Risk lenses, declared against actual.** A story whose content looks security-sensitive (auth,
-  secrets, untrusted input, I/O, dependencies) but is not marked `Security-sensitive: yes` or omits
-  `security-auditor` from its `Review lenses`, and likewise architecture-changing stories that are
-  not marked `Architecture-sensitive` or that omit `architecture-reviewer`. Flag any mismatch
+  secrets, untrusted input, I/O, dependencies) but omits `security-auditor` from its `Review lenses`,
+  and likewise an architecture-changing story that omits `architecture-reviewer`. Flag any mismatch
   between the declared `Risk` and lenses and the real scope.
 - **Terminology drift.** The same concept named differently across spec, plan, and stories.
 - **State sanity.** Stale or contradictory `pm/pm-state.json` and `pm/log.md` against the `docs/`
@@ -45,9 +44,9 @@ reading to a read-only subagent such as `codebase-analyst` and take back only th
   story-to-actor map and can only ever show one claimant, so the race surfaces in the actor files;
   compare them against the map. Also a *stale or half-made claim*: an assignment whose actor's own
   file is not on that story (`current_story` null or different). Also an assignment pointing at a
-  nonexistent story or actor file; in-flight stories of different actors whose `Touches` overlap
-  (serialize or re-scope them); an in-flight sequential story without `resolved_builder`, or an
-  active parallel entry without `builder`.
+  nonexistent story or actor file; in-flight stories of different actors whose `pm-meta.touches`
+  overlap (serialize or re-scope them); an in-flight sequential story without `resolved_builder`, or
+  an active parallel entry without `builder`.
 
 ## State health (doctor)
 
@@ -96,6 +95,6 @@ reading to a read-only subagent such as `codebase-analyst` and take back only th
 
 ## After the report
 
-This is a gate of judgement, not automation. Present the report, then let the user, or the PM in a
-later non-analysis step, act on it. Resolve CRITICAL and HIGH findings before sign-off, or before the
-implementation loop begins.
+Present the report without changing any artifact. The user, or the PM in a later non-analysis step,
+acts on it. Resolve CRITICAL and HIGH findings before sign-off or before the implementation loop
+begins.

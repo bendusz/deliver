@@ -177,10 +177,11 @@ out-of-scope or protected-path change, becomes a safety violation with exit 74 r
 accepted result, and the worktree is preserved for inspection either way.
 
 Ignored files inside the worktree are audited and reported separately as `ignored_files_changed`.
-Only tracked, non-ignored files are enforced against the story's Touches, so overwriting a
-pre-existing ignored file such as `.env` outside Touches is reported rather than blocked. Protected
-PM paths are still enforced on both lists. The audit covers the worktree only and says nothing about
-writes elsewhere on the host.
+Tracked and untracked non-ignored files are both enforced against the story's `pm-meta.touches`, so
+overwriting a pre-existing ignored file such as `.env` outside `pm-meta.touches` is reported rather
+than blocked.
+Protected PM paths are still enforced on both lists. The audit covers the worktree only and says
+nothing about writes elsewhere on the host.
 
 **`review`.** One of three native scopes, or a whole-codebase read-only audit. An objective is
 expressed in the prompt, because the CLI forbids a custom prompt alongside a native scope flag.
@@ -232,7 +233,9 @@ not a repository.
 ### Envelope fields per mode
 
 Every mode emits exactly one JSON envelope on stdout, and `runner_status` says which shape it is.
-A completed run carries that mode's full field set. Any other status is a failure envelope, which
+There are three success shapes. A `completed` run carries that mode's full field set, a preflight
+probe carries `ready`, and review alone can return `nothing-to-review`, which exits 0 and carries
+`mode`, `scope`, `reason`, and `codex_version` only. Every other status is a failure envelope, which
 is much smaller and carries no mode context at all. Do not expect a completed run's fields on a
 failure.
 
@@ -240,7 +243,9 @@ failure.
 (`rejected`|`blocked`|`unavailable`|`failed`|`safety-violation`|`timed-out`|`interrupted`),
 `reason`, `scratch_dir`, `codex_version`, `codex_exit`, and `diagnostics_retained`. When the runner
 got far enough to snapshot the worktree it also carries `actual_files_changed` and
-`ignored_files_changed`; when it retained a stderr log it carries `stderr_path`. It never carries
+`ignored_files_changed`; when it retained a stderr log outside a build it carries `stderr_path`. A
+failed build instead retains `stderr.log` inside the `scratch_dir` it reports and emits no
+`stderr_path`. It never carries
 `model`, `effort`, `worktree`, `story`, `mode`, `sandbox`, `git_status_short`, `report_path`, or
 `answer_path`.
 
@@ -254,15 +259,16 @@ got far enough to snapshot the worktree it also carries `actual_files_changed` a
 - **review**: `runner_status: completed`, `mode` (always `'review'`), `scope`, `objective`,
   `report_path`, `model`, `effort`, `codex_version`, `codex_exit`, `gitignore_rule_needed` (a
   root-anchored `/<dir>/` string, or `null` when the output directory is already ignored). A clean
-  worktree or no commit returns `nothing-to-review` with a `reason` instead of running Codex.
+  worktree or no commit returns the `nothing-to-review` success shape instead of running Codex.
 - **advise/research**: `runner_status: completed`, `mode`, `answer_path`, `stderr_path`,
   `scratch_dir`, `codex_version`, `model`, `effort`, `codex_exit`, `search_used`.
 
 **Preflight envelopes** carry `runner_status: ready`, `preflight: true`, `codex_version`, and
 `quota_consumed: false`, never a Codex run's fields.
 
-- **build/fix**: plus `worktree`, `story`, `story_builder`, `story_scope_checked`, `allowed_paths`,
-  and `policy` (the platform's sandbox, network, and environment shape).
+- **build**: plus `worktree`, `story`, `story_builder`, `story_scope_checked`, `allowed_paths`, and
+  `policy` (the platform's sandbox, network, and environment shape). Preflight is rejected for
+  `fix`.
 - **review**: plus `mode` (always `'review'`) and `scope`.
 - **advise/research**: plus `mode` and `search_available`.
 
@@ -325,7 +331,7 @@ node plugins/pm-skill/scripts/codex/run.mjs --mode build --preflight --worktree 
 
 validates sign-off, authentication, required CLI flags, the ignored `tmp/` setup, the bundled
 result schema, and optional story metadata. For the `recent` and `worktree` scopes, review preflight
-additionally verifies that `codex exec review` exists and offers `--commit`, `--uncommitted`,
+also verifies that `codex exec review` exists and offers `--commit`, `--uncommitted`,
 `--ignore-rules`, `--ephemeral`, `--strict-config`, and `--ignore-user-config`. The `codebase` scope
 uses plain `exec` and is not gated on that check. It returns JSON with
 `quota_consumed: false` and performs no model inference. The opt-in live smoke test,

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pm-skill Codex runner — the only way any pm-skill agent invokes `codex`.
+// pm-skill Codex runner: the only way any pm-skill agent invokes `codex`.
 //   node run.mjs --mode build|fix|review|advise|research ...
 // Prints exactly one JSON envelope on stdout and exits with the documented code.
 // The one exception is a usage error: it exits 64 with a message on stderr and no envelope.
