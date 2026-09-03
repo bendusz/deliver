@@ -183,7 +183,8 @@ Scratch under `tmp/`, gitignored and disposable, and never load-bearing for resu
   is refused outright with exit 66 rather than followed. Before and after snapshots of tracked,
   untracked, and ignored files inside the worktree catch unreported, protected, and out-of-scope
   repository edits. Ignored files inside the worktree are audited and reported as
-  `ignored_files_changed`; only tracked, non-ignored files are enforced against the story's Touches.
+  `ignored_files_changed`; only tracked, non-ignored files are enforced against the story's
+  `pm-meta.touches`.
   Git checks cover HEAD, every ref, staged contents, index flags, hooks, `info/exclude`, local
   config, and worktree registrations. `--timeout-seconds`, 10 minutes by default, bounds the model
   process itself, not the preflight probes, which have their own 30-second limit; a run that exceeds

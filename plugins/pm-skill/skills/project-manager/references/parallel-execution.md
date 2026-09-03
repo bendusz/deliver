@@ -14,10 +14,9 @@ serial, and you run every worktree command from the main checkout.
 A batch is the sprint's stories that are all of:
 - build-ready, see `decomposition.md`, and marked `[P]`; and
 - their `Depends on` stories are already merged; and
-- they do not share a file domain. Compare each story's authoritative `pm-meta.touches`; the visible
-  Touches is its human-readable copy, so flag any mismatch. If two would write the same files,
-  **serialize** them: one this batch, the other after. A story with no bounded Touches is not
-  build-ready and cannot enter a batch.
+- they do not share a file domain. Compare each story's `pm-meta.touches`. If two would write the
+  same files, **serialize** them: one this batch, the other after. A story with no bounded
+  `pm-meta.touches` is not build-ready and cannot enter a batch.
 
 You need 2 or more stories after that filter, and `git worktree` must work. Otherwise run the
 sequential loop. **Cap** concurrency, default 3, and raise it only with care, because conflict and

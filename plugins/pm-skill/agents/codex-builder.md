@@ -60,8 +60,8 @@ completed`) preserve:
 - Codex `done` or `blocked` status, and the root cause when it is `blocked`;
 - authoritative `actual_files_changed`, summary, and test results;
 - `ignored_files_changed` verbatim. Only tracked, non-ignored files are enforced against the story's
-  Touches, so a modified pre-existing ignored file outside Touches, `.env` for example, is a review
-  finding you must raise to the PM rather than a runner failure;
+  `pm-meta.touches`, so a modified pre-existing ignored file outside `pm-meta.touches`, `.env` for
+  example, is a review finding you must raise to the PM rather than a runner failure;
 - actual `git_status_short` from the runner;
 - model, effort, story, mode, sandbox, and Codex version.
 

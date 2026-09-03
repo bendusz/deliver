@@ -12,8 +12,8 @@ gaps.
 
 ## Sequential or parallel? Decide at the start of each sprint
 - **Parallel fast path.** If the sprint has 2 or more build-ready `[P]` stories whose `Depends on`
-  are merged and whose Touches do not overlap, and `git worktree` works, build them at once in
-  isolated worktrees and integrate them serially. Load `parallel-execution.md`.
+  are merged and whose `pm-meta.touches` do not overlap, and `git worktree` works, build them at
+  once in isolated worktrees and integrate them serially. Load `parallel-execution.md`.
 - **Sequential, the default.** Otherwise run the per-story cycle below, one story at a time.
 
 Parallel is opt-in and best-effort; on any worktree trouble, fall back to sequential. Either way the

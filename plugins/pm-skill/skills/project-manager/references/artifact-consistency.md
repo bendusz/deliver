@@ -45,9 +45,9 @@ reading to a read-only subagent such as `codebase-analyst` and take back only th
   story-to-actor map and can only ever show one claimant, so the race surfaces in the actor files;
   compare them against the map. Also a *stale or half-made claim*: an assignment whose actor's own
   file is not on that story (`current_story` null or different). Also an assignment pointing at a
-  nonexistent story or actor file; in-flight stories of different actors whose `Touches` overlap
-  (serialize or re-scope them); an in-flight sequential story without `resolved_builder`, or an
-  active parallel entry without `builder`.
+  nonexistent story or actor file; in-flight stories of different actors whose `pm-meta.touches`
+  overlap (serialize or re-scope them); an in-flight sequential story without `resolved_builder`, or
+  an active parallel entry without `builder`.
 
 ## State health (doctor)
 
