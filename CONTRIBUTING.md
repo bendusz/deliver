@@ -10,7 +10,8 @@ Thanks for your interest! `pm-skill` is a generic, self-contained Claude Code pl
 
 ## Before opening a PR
 - Run `bash scripts/validate.sh` (and `claude plugin validate ./plugins/pm-skill` if you have the CLI).
-- If you change the sign-off hook, run its allow / block test cases.
+  Node.js 20 or newer is required to run the tests and the validator.
+- If you change the sign-off hook, run `node --test plugins/pm-skill/scripts/tests/`.
 - Update `CHANGELOG.md`.
 
 ## How it's built

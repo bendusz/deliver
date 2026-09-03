@@ -33,6 +33,10 @@ machines without a GitHub SSH key/host key set up.
 
 If it doesn't appear right away, restart your Claude Code session.
 
+**Requirements.** Node.js 20 or newer on your PATH. The plugin's hooks and its Codex runner are
+Node scripts, so the same install works on macOS, Linux, and Windows without bash or jq. The
+OpenAI Codex CLI is optional and only needed for the `codex-*` agents and commands.
+
 **3. (Optional) Install the `poteto` companion**
 
 ```
@@ -117,6 +121,15 @@ tiny work stays lightweight; regulated work makes every gate mandatory.
 
 ## Artifacts
 
+At the project root:
+
+- `AGENTS.md` — the project's instructions file (commands, layout, conventions, gotchas; facts
+  only, under 200 lines). Read natively by Codex, Cursor, and Copilot.
+- `CLAUDE.md` — a two-line bridge whose first line is `@AGENTS.md`, so Claude Code reads the same
+  file. Existing files are never overwritten; the PM proposes a migration instead.
+- `.claude/rules/pm-state.md` and `pm/AGENTS.md` — optional path-scoped `pm/` discipline
+  (`Instruction rules: pm-state` in the plan's Delivery mode).
+
 Committed under `docs/` (authoritative):
 
 - `docs/spec.md` — product specification (user stories, requirements, acceptance criteria, metrics).
@@ -171,6 +184,15 @@ Scratch under `tmp/` (gitignored, disposable — never load-bearing for resume):
   explicit request.
 - **Optional hardening:** for *mechanical* enforcement (a read-only Bash posture, sign-off), the
   bundled hardening guide uses plain Claude Code permissions/hooks — no external process or dependency.
+
+The bundled hooks are fail-open accident tripwires scoped to the Write, Edit, and MultiEdit tools,
+not a security boundary; Bash coverage is the optional hardening allowlist described in
+`references/hardening.md`.
+
+**Windows.** Hooks and the Codex runner run under `node` directly (no Git Bash needed). Codex's
+Windows sandbox is not enabled by the runner: build and fix run with full access there, and the
+runner detects out-of-scope writes after the run (safety violation, changes preserved) instead of
+preventing them. Review, advice, and research modes are read-only on every platform.
 
 ## Optional enhancements (work alongside — not required)
 

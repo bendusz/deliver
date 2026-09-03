@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here.
 
+## 0.16.0 - 2026-09-03
+
+AGENTS.md instructions layer and a cross-platform Node runtime. One instructions file for every
+agent, no bash or jq at runtime, and every Codex call behind a Sonnet wrapper.
+
+- **AGENTS.md is canonical.** The scaffold writes a facts-only `AGENTS.md` (commands, layout,
+  conventions, gotchas; about 40 lines) and a two-line `CLAUDE.md` bridge starting with
+  `@AGENTS.md`. Existing files are never overwritten; the PM proposes a migration. Optional
+  `.claude/rules/pm-state.md` and `pm/AGENTS.md` carry `pm/` discipline at `standard` scale and
+  above. `references/instruction-layers.md` records where facts, procedure, constraints, and
+  persona live; `SOUL.md` is deliberately not adopted. All agents read `AGENTS.md`;
+  `/pm-skill:doctor` checks the layout, size, and duplicated rules.
+- **Hooks in Node.** The four guardrails and their shared library are Node ESM in exec form
+  (`"command": "node"`), with identical exit codes, messages, and actor ids (POSIX `cksum`
+  reimplemented and pinned to captured vectors). `jq` is no longer needed. `node lib.mjs scan`
+  and `node lib.mjs actor-id` replace the bash CLI.
+- **One Codex runner.** `scripts/codex/run.mjs` provides `build`, `fix`, `review`, `advise`, and
+  `research` modes with the bash runner's full safety posture, resolves `codex.exe` or the npm
+  shim on Windows, kills process trees on timeout, and feeds prompts on stdin. On Windows build
+  and fix run with full access (no platform sandbox) and rely on the runner's post-run scope
+  detection. Two new Sonnet wrappers, `codex-reviewer` and `codex-advisor`, join `codex-builder`
+  and `codex-researcher`; `/pm-skill:codex-review` and `/pm-skill:codex-help` dispatch them and
+  never run `codex` in the main session (validate enforces it).
+- **CI on three operating systems.** `node --test` runs on ubuntu, macos, and windows.
+- **Requirement.** Node.js 20 or newer at runtime.
+- **Hardening from review.** Line-oriented secret scan, canonical case and symlink handling,
+  sanitised session context, synchronous hook output, a `hooks.json` wiring check in validate,
+  `.gitignore` consent for Codex review reports, report-name collision handling, and a `git` probe
+  in the runner.
+
 ## 0.15.0 - 2026-08-27
 
 Focused Opus 5 defaults. Gate-bearing Claude roles now use a stable model family, re-ground in
