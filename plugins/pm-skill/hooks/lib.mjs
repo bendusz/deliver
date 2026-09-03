@@ -135,3 +135,46 @@ export function pmActorId(root) {
 }
 
 export const LIB_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+// pmSecretScan(text) — null when clean, else a reason. Never echoes the matched value.
+// Token FORMATS are case-sensitive; credential ASSIGNMENTS are case-insensitive and match
+// quoted or unquoted values. Placeholders never trip: values starting '$', '<', or '{'
+// are outside the value character class.
+const TOKEN_FORMATS = [
+  /AKIA[0-9A-Z]{16}/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY/,
+  /gh[pousr]_[A-Za-z0-9]{30,}/,
+  /github_pat_[A-Za-z0-9_]{22,}/,
+  /xox[baprs]-[A-Za-z0-9-]{10,}/,
+  /sk-[A-Za-z0-9_-]{20,}/,
+  /AIza[0-9A-Za-z_-]{35}/,
+  /eyJ[A-Za-z0-9_-]{17,}\.eyJ[A-Za-z0-9_-]{10,}/,
+];
+const ASSIGNMENTS = [
+  /(api[_-]?key|secret|token|passw(or)?d|credential)["']?\s*[:=]\s*["'][A-Za-z0-9_/+=.-]{8,}["']/i,
+  /(api[_-]?key|secret|token|passw(or)?d|credential)\s*[:=]\s*[A-Za-z0-9_/+=.-]{8,}/i,
+];
+
+export function pmSecretScan(text) {
+  if (TOKEN_FORMATS.some((re) => re.test(text))) return 'secret-shaped token format detected';
+  if (ASSIGNMENTS.some((re) => re.test(text))) return 'credential assignment with a real-looking value detected';
+  return null;
+}
+
+// CLI mode.
+const invoked = process.argv[1] ? realpath(process.argv[1]) : null;
+if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
+  const cmd = process.argv[2];
+  if (cmd === 'scan') {
+    let text = '';
+    try { text = fs.readFileSync(0, 'utf8'); } catch { text = ''; }
+    const reason = pmSecretScan(text);
+    if (reason) { process.stderr.write(`${reason}\n`); process.exit(1); }
+    process.exit(0);
+  } else if (cmd === 'actor-id') {
+    const id = pmActorId(process.argv[3] || process.cwd());
+    if (!id) process.exit(1);
+    process.stdout.write(`${id}\n`);
+    process.exit(0);
+  }
+}

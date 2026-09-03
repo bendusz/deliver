@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cksum, pmActorId, pmRoot, pmRelpath, readJson } from '../../hooks/lib.mjs';
+import { cksum, pmActorId, pmRoot, pmRelpath, readJson, pmSecretScan } from '../../hooks/lib.mjs';
 import { newProj, gitIn, canSymlink, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
 test('cksum matches POSIX cksum vectors', () => {
@@ -98,4 +98,31 @@ test('readJson and readHookInput: parse valid input, fail open on bad input', ()
   assert.equal(run('not json').stdout, 'null');
   assert.equal(run('').stdout, 'null');
   assert.equal(run('5').stdout, 'null');
+});
+
+test('pmSecretScan: token formats and assignments', () => {
+  assert.equal(pmSecretScan('rotate the API key on the box'), null);
+  assert.equal(pmSecretScan('class APIClient: pass'), null);
+  assert.equal(pmSecretScan('TOKEN=$GITHUB_TOKEN and api_key = "$FROM_ENV_VAR"'), null);
+  assert.equal(pmSecretScan('token = "<rotate-me-later>"'), null);
+  assert.equal(pmSecretScan('Password: "use a sentence here"'), null);
+  assert.match(pmSecretScan('api_key = "zq9x7c2v8b4n6m1k"'), /credential assignment/);
+  assert.match(pmSecretScan('API_KEY = "zq9x7c2v8b4n6m1k"'), /credential assignment/);
+  assert.match(pmSecretScan('API_KEY=abcdefghijklmno'), /credential assignment/);
+  assert.match(pmSecretScan('Password: hunter2hunter2'), /credential assignment/);
+  assert.match(pmSecretScan('key AKIAIOSFODNN7EXAMPLE ok'), /token format/);
+  assert.match(pmSecretScan('ghp_abcdefghijklmnopqrstuvwxyz012345'), /token format/);
+  assert.match(pmSecretScan('-----BEGIN RSA PRIVATE KEY-----'), /token format/);
+});
+
+test('lib.mjs CLI: scan and actor-id', () => {
+  const lib = path.join(HOOKS_DIR, 'lib.mjs');
+  const bad = spawnSync(process.execPath, [lib, 'scan'], { input: 'diff\n+API_KEY=abcdefghijklmno\n', encoding: 'utf8' });
+  assert.equal(bad.status, 1);
+  const good = spawnSync(process.execPath, [lib, 'scan'], { input: 'diff\n+class APIClient: pass\n', encoding: 'utf8' });
+  assert.equal(good.status, 0);
+  const p = newProj();
+  const id = spawnSync(process.execPath, [lib, 'actor-id', p], { encoding: 'utf8' });
+  assert.equal(id.status, 0);
+  assert.equal(id.stdout.trim(), 'casey-example-com-589b8fa8ab93');
 });
