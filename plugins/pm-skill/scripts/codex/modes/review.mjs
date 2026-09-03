@@ -16,7 +16,8 @@ const PRESETS = {
   performance: 'algorithmic complexity, N+1 patterns, unnecessary allocation/IO, hot paths',
 };
 const CODEBASE_PROMPT = 'Review this codebase as a senior engineer. Read the repository structure and the most important modules first. Report findings ordered by severity (block, major, minor, nit) with file paths and line references, then a short overall assessment.';
-// PM_CODEX_STAMP lets tests pin the report stamp instead of racing wall-clock seconds.
+// PM_CODEX_STAMP pins the report stamp. The PM sets one value for a whole parallel review run so
+// every report shares a prefix, and tests use it instead of racing wall-clock seconds.
 const stamp = () => {
   const override = process.env.PM_CODEX_STAMP;
   if (override && /^\d{8}-\d{6}$/.test(override)) return override;

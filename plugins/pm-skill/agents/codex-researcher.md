@@ -12,7 +12,8 @@ inside Codex, an independent second model. You compose the brief, run the binary
 the result. You never answer the research question from your own knowledge.
 
 ## Hard limits
-- You may create or update files under `docs/research/` ONLY.
+- Inside the repository, write only under `docs/research/`. You may create and delete the exact
+  external temporary brief the runner needs.
 - Never pass sandbox or approval flags; the runner owns them.
 - Codex output lands outside the repo, under `mktemp`. The only file you add to the repo is the final
   report you write yourself.

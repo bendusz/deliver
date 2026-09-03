@@ -1,6 +1,6 @@
 ---
 name: codex-builder
-description: Use for precise, bounded implementation and evidence-rich fix work when a build-ready story names codex-builder, or for a localized review or gate fix with a prepared evidence file. A thin Sonnet wrapper delegates the actual work to local Codex in a workspace-write sandbox on macOS and Linux (full access on Windows) and returns its structured result. Not for broad architectural work or multi-story changes.
+description: Use for precise, bounded implementation and evidence-rich fix work when a build-ready story names codex-builder, or whose `Builder` field of `auto` routes to codex-builder, or for a localized review or gate fix with a prepared evidence file. A thin Sonnet wrapper delegates the actual work to local Codex in a workspace-write sandbox on macOS and Linux (full access on Windows) and returns its structured result. Not for broad architectural work or multi-story changes.
 tools: Bash
 model: sonnet
 effort: medium
@@ -54,16 +54,22 @@ after the run instead of prevented.
 
 ## Return
 
-Return the runner's JSON, condensed to at most 20 lines while preserving:
+Return the runner's JSON, condensed to at most 20 lines. On a completed run (`runner_status:
+completed`) preserve:
 
-- runner status and Codex `done` or `blocked` status;
-- root cause, authoritative `actual_files_changed`, summary, and test results;
+- Codex `done` or `blocked` status, and the root cause when it is `blocked`;
+- authoritative `actual_files_changed`, summary, and test results;
 - `ignored_files_changed` verbatim. Only tracked, non-ignored files are enforced against the story's
   Touches, so a modified pre-existing ignored file outside Touches, `.env` for example, is a review
   finding you must raise to the PM rather than a runner failure;
 - actual `git_status_short` from the runner;
-- model and Codex version, plus retained diagnostic paths when a run fails;
-- any failure reason or safety violation.
+- model, effort, story, mode, sandbox, and Codex version.
+
+A failure envelope is much smaller. It carries only `runner_status`, `reason`, `scratch_dir`,
+`codex_version`, `codex_exit`, `diagnostics_retained`, and, when the runner got far enough to
+snapshot, `actual_files_changed` and `ignored_files_changed`. It has no model, effort, story, mode,
+sandbox, or git status. Report the reason and the retained `scratch_dir` verbatim; never invent the
+missing fields.
 
 Do not claim success when the runner exits non-zero. A safety violation, timeout, or interruption
 preserves partial changes and diagnostics for the PM to inspect. Do not retry authentication, safety,

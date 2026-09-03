@@ -231,26 +231,40 @@ not a repository.
 
 ### Envelope fields per mode
 
-Every mode emits exactly one JSON envelope on stdout. Common to all: `runner_status`
-(`ready`|`completed`|`nothing-to-review`|`rejected`|`blocked`|`unavailable`|`failed`|
-`safety-violation`|`timed-out`|`interrupted`), `codex_version`, and, on failure, `reason` and
-`diagnostics_retained`.
+Every mode emits exactly one JSON envelope on stdout, and `runner_status` says which shape it is.
+A completed run carries that mode's full field set. Any other status is a failure envelope, which
+is much smaller and carries no mode context at all. Do not expect a completed run's fields on a
+failure.
 
-- **build/fix**: `model`, `effort`, `worktree`, `story`, `mode`, `timeout_seconds`, `sandbox`
-  (`workspace-write` or `none (win32)`), `actual_files_changed`, `ignored_files_changed`,
-  `git_status_short`, and the
-  builder's own `result` object (`status`, `summary`, `files_changed`, `tests`,
-  `out_of_scope_changes`, `risks`, `root_cause`). `--preflight` instead returns `codex_version`,
-  `worktree`, `story`, `story_builder`, `story_scope_checked`, `allowed_paths`, and `policy` (the
-  platform's sandbox/network/environment shape), with `quota_consumed: false`.
-- **review**: `mode` (always `'review'`), `scope`, `objective`, `report_path`, `model`, `effort`,
-  `codex_exit`, `gitignore_rule_needed` (a root-anchored `/<dir>/` string, or `null` when the
-  output directory is already ignored). `--preflight` returns `scope` and `quota_consumed: false`;
-  a clean worktree or no commit returns `nothing-to-review` with a `reason` instead of running
-  Codex.
-- **advise/research**: `mode`, `answer_path`, `stderr_path`, `scratch_dir`, `model`, `effort`,
-  `codex_exit`, `search_used`. `--preflight` returns `mode`, `search_available`, and
-  `quota_consumed: false`.
+**Failure envelope, identical for every mode.** `runner_status`
+(`rejected`|`blocked`|`unavailable`|`failed`|`safety-violation`|`timed-out`|`interrupted`),
+`reason`, `scratch_dir`, `codex_version`, `codex_exit`, and `diagnostics_retained`. When the runner
+got far enough to snapshot the worktree it also carries `actual_files_changed` and
+`ignored_files_changed`; when it retained a stderr log it carries `stderr_path`. It never carries
+`model`, `effort`, `worktree`, `story`, `mode`, `sandbox`, `git_status_short`, `report_path`, or
+`answer_path`.
+
+**Completed envelopes, per mode.**
+
+- **build/fix**: `runner_status: completed`, `codex_version`, `model`, `effort`, `worktree`,
+  `story`, `mode`, `timeout_seconds`, `sandbox` (`workspace-write` or `none (win32)`),
+  `diagnostics_retained: false`, `actual_files_changed`, `ignored_files_changed`,
+  `git_status_short`, and the builder's own `result` object (`status`, `summary`, `files_changed`,
+  `tests`, `out_of_scope_changes`, `risks`, `root_cause`).
+- **review**: `runner_status: completed`, `mode` (always `'review'`), `scope`, `objective`,
+  `report_path`, `model`, `effort`, `codex_version`, `codex_exit`, `gitignore_rule_needed` (a
+  root-anchored `/<dir>/` string, or `null` when the output directory is already ignored). A clean
+  worktree or no commit returns `nothing-to-review` with a `reason` instead of running Codex.
+- **advise/research**: `runner_status: completed`, `mode`, `answer_path`, `stderr_path`,
+  `scratch_dir`, `codex_version`, `model`, `effort`, `codex_exit`, `search_used`.
+
+**Preflight envelopes** carry `runner_status: ready`, `preflight: true`, `codex_version`, and
+`quota_consumed: false`, never a Codex run's fields.
+
+- **build/fix**: plus `worktree`, `story`, `story_builder`, `story_scope_checked`, `allowed_paths`,
+  and `policy` (the platform's sandbox, network, and environment shape).
+- **review**: plus `mode` (always `'review'`) and `scope`.
+- **advise/research**: plus `mode` and `search_available`.
 
 ### Windows behaviour
 

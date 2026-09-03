@@ -81,7 +81,7 @@ Bundled specialist agents do the work. They include a broad-context Opus builder
 and an optional Codex-CLI-backed precision builder (`codex-builder`), a risk-selected read-only
 review panel (`code-integrity-reviewer`, `architecture-reviewer`, `security-auditor`), a
 `test-engineer` that writes tests only, a read-only `debugger` that returns a root cause and a fix
-plan, a read-only final `pm-verifier` giving an independent PASS or FAIL before ship, a
+plan, a read-only final `pm-verifier` returning an independent PASS, FAIL, or UNKNOWN before ship, a
 `technical-writer` for docs only, a `codebase-analyst` for brownfield work, a web-capable
 `researcher`, and three Codex-CLI-backed second-opinion roles: `codex-researcher` for independent
 research, `codex-reviewer` for independent code review, and `codex-advisor` for an independent
@@ -167,7 +167,11 @@ Scratch under `tmp/`, gitignored and disposable, and never load-bearing for resu
 
 ## Safety
 
-- **No implementation before your sign-off.** A behavioural rule plus a bundled fail-open hook.
+- **No implementation before your sign-off.** A behavioural rule the PM holds, plus the bundled
+  `require-signoff.mjs` hook. The hook runs on `Write`, `Edit`, and `MultiEdit` only, and blocks a
+  write when `pm/pm-state.json`, or the legacy `tmp/pm-state.json`, has `signed_off: false`. It
+  exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`,
+  and `.gitattributes`, fails open on any uncertainty, and does not see writes made through `Bash`.
 - **Guarded Codex writes.** The `codex-builder` runner fails closed unless tracked PM state exists
   and is signed off, requires the exact git worktree root, mechanically enforces the story's
   `pm-meta.touches`. On macOS and Linux the builder runs Codex under `workspace-write` with host

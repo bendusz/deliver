@@ -1,5 +1,7 @@
 {
   "project": "todo-cli",
+  "spec": null,
+  "constitution": null,
   "scale": "standard",
   "phase": "implementation",
   "signed_off": true,
@@ -8,6 +10,7 @@
   "integration_branch": "main",
   "current_sprint": 1,
   "total_sprints": 1,
+  "last_analysis_status": "not-run",
   "assignments": { "S1-2": "bendusz" },
   "updated": "2026-06-04 15:20"
 }

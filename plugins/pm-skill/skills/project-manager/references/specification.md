@@ -31,9 +31,13 @@ non-event criteria. Sharper criteria make `test-engineer` and `pm-verifier` more
 ## Handling `[NEEDS CLARIFICATION]`
 - Mark every unknown inline as `[NEEDS CLARIFICATION: <question>]` instead of guessing. Carried
   ambiguity is the most common cause of a wrong build.
-- Resolve them with `/pm-skill:clarify`: one question at a time, 5 at most, each high-impact, with 2
-  or 3 options, a recommendation, and why it matters. Each answer updates the spec and clears its
-  marker.
+- Resolve them with `/pm-skill:clarify`. Ask **one** question at a time and wait for the answer.
+  Ask **at most 5** in a session, spent on what most changes the build. Give each as the question,
+  2 or 3 realistic options, a recommendation, and one line on why it matters.
+- Update `docs/spec.md` immediately after each answer: record the decision in the section it belongs
+  to, a requirement, an acceptance criterion, an assumption, or the Clarifications log, and delete
+  the matching marker. Stop when the markers are resolved, the user is out of answers, or you have
+  asked 5.
 
 ## Protect your context
 For heavy reading, dispatch a read-only subagent with a tight question and take back a short summary:

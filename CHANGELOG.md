@@ -2,6 +2,46 @@
 
 All notable changes to this project are documented here.
 
+## 0.16.1 - 2026-09-03
+
+Documentation and prompt fixes from a three-agent Codex review, plus one runner refactor. The
+behaviour of the plugin is unchanged; what it tells agents about itself is now accurate and
+smaller.
+
+- **Hook prose matches the code.** `references/hardening.md`, `references/logging-and-state.md`,
+  and the README Safety section now name what `require-signoff.mjs` does: `Write`, `Edit`, and
+  `MultiEdit` only, blocking only on `signed_off: false`, exempting `docs/`, `pm/`, `tmp/`,
+  `.git/`, `.claude/rules/` and four root files, failing open, and never seeing `Bash` writes.
+- **`AGENTS.md` is facts-only for real.** The `Working here` block is gone from
+  `templates/AGENTS.md.template`, this repo's `AGENTS.md`, and the worked example.
+  `references/instruction-layers.md` no longer claims the hooks enforce rules such as no-push;
+  the skill's hard rules carry those.
+- **Leaner skill, commands, and references.** `SKILL.md` drops the optional-command inventory,
+  the template catalog, the agent catalog, and the resume restatement. `/pm-skill:specify`,
+  `/pm-skill:clarify`, and `/pm-skill:resume` point at their references instead of repeating
+  them. `references/parallel-execution.md` is a delta on the sequential loop. `review-gates.md`
+  keeps lens selection and triage, `verification.md` keeps running-app evidence and the durable
+  report, and the implementation loop owns gate order, verifier handling, done, and escalation.
+  New `references/documentation.md` owns the `technical-writer` dispatch. The three reviewer
+  agents share a four-sentence review rule and no longer open with mandatory praise.
+- **Shared Codex argv helper.** `scripts/codex/lib/argv.mjs` holds the locked flags that `build`,
+  `review`, and `advise` all pass, so the three copies cannot drift. Every flag is preserved.
+- **Worked example state is current.** `examples/todo-cli` state files carry `spec`,
+  `constitution`, `last_analysis_status`, `current_story_verification_status`, and
+  `parallel_batch`; the plan says why the spec was skipped, and `examples/README.md` notes the
+  pre-0.10.1 actor id.
+- **Shared `codex-review` stamp.** The PM computes one `YYYYMMDD-HHMMSS` stamp per run and passes
+  it to every `codex-reviewer`, so reports and the index file
+  (`<stamp>-codex-review-<scope>-index.md`) share one prefix. The command also secret-scans the
+  outgoing code before launching.
+- Smaller fixes: the `codex-builder` failure envelope is documented separately from a completed
+  run, `codex-researcher` may create its own temporary brief, `/pm-skill:handoff` appends
+  corrective log entries instead of editing old ones, `/pm-skill:doctor` names its two permitted
+  writes, parallel worktree cleanup no longer contradicts itself, `codex-builder`'s description
+  covers the `auto` route, the actor-id fallback to `user.name` is documented, `decomposition.md`
+  uses the story template's header labels, and the README gives the verifier's full PASS, FAIL,
+  UNKNOWN vocabulary.
+
 ## 0.16.0 - 2026-09-03
 
 AGENTS.md instructions layer and a cross-platform Node runtime. One instructions file for every

@@ -9,11 +9,6 @@ Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 - Build: `N/A`
 - Run: `N/A` (install the marketplace into Claude Code to try it)
 
-## Working here
-- Runtime code is Node ESM only (`hooks/*.mjs`, `scripts/codex/**`). No bash or jq at runtime;
-  `scripts/validate.sh` is the maintainer-only exception.
-- Never push to a remote without an explicit request.
-
 ## Layout
 - `plugins/pm-skill/skills/project-manager/`: `SKILL.md` plus one reference per phase.
 - `plugins/pm-skill/agents/`, `commands/`, `templates/`, `schemas/`: the orchestrated fleet and its artifacts.
@@ -21,6 +16,8 @@ Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 - `docs/specs/`, `docs/plans/`: this repo's own design history, named `YYYY-MM-DD-vX.Y-topic.md`.
 
 ## Conventions
+- Runtime code is Node ESM only (`hooks/*.mjs`, `scripts/codex/**`). No bash or jq at runtime;
+  `scripts/validate.sh` is the maintainer-only exception.
 - Agent frontmatter pins `model` and `effort`; Opus roles use `claude-opus-5`, never the moving alias.
 - Every change to a reference or template must keep `bash scripts/validate.sh` green.
 

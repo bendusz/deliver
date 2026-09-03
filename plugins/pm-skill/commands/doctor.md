@@ -2,8 +2,8 @@
 description: Check environment readiness before implementation, covering tooling, versions, and whether the project's gates actually run.
 ---
 
-Use the `project-manager` skill to run a pre-implementation environment readiness check. This is
-read-mostly: inspect and probe, do not modify project files.
+Use the `project-manager` skill to run a pre-implementation environment readiness check. Inspect and
+probe only; the readiness report and its log entry are the only files you may write.
 
 Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo)
 
@@ -38,8 +38,9 @@ Inspect (whichever apply):
 - **PM state health.** When `pm/` exists, run the checks under "State health (doctor)" in
   `references/artifact-consistency.md` and report `OK` or `DRIFT` for each.
 
-Stay read-only where you can and run only non-mutating probes. Do **not** install, upgrade, or write
-project files. Delegate heavy reading to a read-only subagent if that helps.
+Run only non-mutating probes, and do **not** install or upgrade anything. The readiness report under
+`tmp/` and its one `pm/log.md` entry are the only permitted writes. Delegate heavy reading to a
+read-only subagent if that helps.
 
 Write the findings to `tmp/environment-check.md` (runtime-only): each check as `OK`, `MISSING`, or
 `UNKNOWN` with the evidence, then a one-line verdict (ready, or the blockers and what is missing).

@@ -45,24 +45,21 @@ orchestrate delivery through specialist subagents. You produce plans and coordin
 6. **Implementation loop.** `references/implementation-loop.md`. Per story: build, gate, review, fix,
    verify, ship, log. For independent `[P]` stories it may branch into
    `references/parallel-execution.md`, which builds in isolated worktrees and integrates serially.
-7. **Review and verification gates.** `references/review-gates.md` plus `references/verification.md`.
-   The severity model, the deterministic gates, the `pm-verifier` PASS gate, and the done definition.
+7. **Review and verification gates.** `references/review-gates.md` for lens selection and finding
+   triage, `references/verification.md` for running-app evidence and the durable report.
 8. **Logging and state.** `references/logging-and-state.md`. The shared `pm/pm-state.json` and
    `pm/log.md`, your `pm/actors/<id>.json`, the `docs/` artifacts, and resume.
 
-Optional, any time: `/pm-skill:constitution` records project-specific rules in
-`docs/constitution.md` that `/pm-skill:analyze` then checks the plan and stories against. At the end
-of a session, `/pm-skill:handoff` writes a token-efficient `pm/actors/<id>.HANDOFF.md` briefing that
-`/pm-skill:resume` reads to continue at full speed. When scope changes mid-flight,
-`/pm-skill:correct-course` is the one sanctioned path: it re-plans at the right level, spec or plan
-or story, and re-runs sign-off if the change is material. Right-size the workflow with a scale
-(`tiny` through `regulated`, default `standard`); see `references/scale-profiles.md`. For an optional
-read-only and sign-off hardening posture using Claude Code permissions and hooks, see
-`references/hardening.md`. Project instructions follow `references/instruction-layers.md`: facts in
-`AGENTS.md`, procedure here, constraints in hooks, persona in agent bodies. If a state read finds an
-older layout, `references/migrations.md` has the migration.
+Read only the reference for the phase you are in. Do not preload them all. Right-size the workflow
+with a scale (`tiny` through `regulated`, default `standard`); see `references/scale-profiles.md`.
+Project instructions follow `references/instruction-layers.md`: facts in `AGENTS.md`, procedure here,
+constraints in hooks, persona in agent bodies. If a state read finds an older layout,
+`references/migrations.md` has the migration. For optional mechanical enforcement using Claude Code
+permissions and hooks, see `references/hardening.md`.
 
-Read only the reference for the phase you are in. Do not preload them all.
+Optional workflows have their own commands. Use agent descriptions to choose specialists. When a
+phase creates an artifact, read its matching template from `${CLAUDE_PLUGIN_ROOT}/templates/`. If
+saved PM state exists, run `/pm-skill:resume`.
 
 ## Environment: detect and adapt, never depend
 On a bare install everything below still works.
@@ -76,12 +73,6 @@ On a bare install everything below still works.
   `create-verification-skill`, `technical-writing`). Absent, nothing changes.
 
 ## Agents you orchestrate
-Build: `expert-builder`, `codex-builder`. Review: `code-integrity-reviewer`,
-`architecture-reviewer`, `security-auditor`. Verify: `pm-verifier`. Support: `test-engineer`,
-`debugger`, `codebase-analyst`, `researcher`, `technical-writer`. Codex wrappers:
-`codex-researcher`, `codex-reviewer`, `codex-advisor`. Each agent's own description says when to use
-it.
-
 Run reviewers as a risk-selected **panel** (see `references/review-gates.md`), not always all of
 them.
 
@@ -99,21 +90,3 @@ separate review panel, and `pm-verifier` still judge its work.
 Every agent pins its model and effort in its frontmatter; see `docs/model-tiering.md` in the
 repository for the rationale.
 
-## Bundled templates
-Project-file templates live in this plugin's `templates/` directory
-(`${CLAUDE_PLUGIN_ROOT}/templates/`): `spec.md.template`, `plan.md.template`, `story.md.template`,
-`constitution.md.template`, `AGENTS.md.template`, `CLAUDE.md.template`,
-`rules-pm-state.md.template`, `pm-AGENTS.md.template`, `log.md.template`, `pm-state.json.template`,
-`actor-state.json.template`, `HANDOFF.md.template`, `completion-report.md.template`,
-`verification-report.md.template`, `claude-settings-hardening.json.template`, and the quality
-checklists (`checklist-spec-quality`, `checklist-plan-quality`, `checklist-story-readiness`,
-`checklist-verification-quality`). When a phase tells you to write one of these files, read the
-matching template first.
-
-## On resume
-If `pm/pm-state.json` or `pm/log.md` exists, read the shared state and **your**
-`pm/actors/<id>.json` first, or run `/pm-skill:resume`, to recover the objective, the current sprint
-and story, the branch state, the sign-off status, and the next step. Read
-`pm/actors/<id>.HANDOFF.md` when it is present and current, because it is the fastest route back in.
-Then continue from there. If the layout is flat 0.8, with personal fields in `pm-state.json`, or
-pre-0.8, under `tmp/`, migrate per `references/migrations.md` first.

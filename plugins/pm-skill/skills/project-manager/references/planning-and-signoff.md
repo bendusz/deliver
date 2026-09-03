@@ -88,3 +88,15 @@ but it is fail-open and can be disabled, so holding the line is still your respo
   cut every story branch from and merge each story back into.
 
 Log the scaffold step. Then load `decomposition.md`.
+
+## Checkpoint policy (recorded in Delivery mode, applied during the loop)
+- Default sprint-level: run all the sprint's stories, then pause for the user's review at the sprint
+  boundary. A project may set story-level, pausing before each merge, or fully autonomous.
+- Whatever the mode, **escalate** immediately before a high-risk merge or one that changes several
+  dependent components.
+- Offer `/pm-skill:handoff` at natural stops: a sprint checkpoint, a long pause, or a session whose
+  context is running long. A committed `pm/actors/<id>.HANDOFF.md` is what lets the next session skip
+  re-discovery, and the bundled SessionStart hook re-grounds new and compacted sessions from `pm/`.
+- Checkpoint before compaction. When compaction is imminent, write and commit the actor handoff
+  first. After resume, check its base commit, branch, changed paths, last gate results, and next
+  action against repository state before dispatching another writer.

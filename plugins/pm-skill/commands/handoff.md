@@ -23,8 +23,9 @@ Rules for the content:
 - Every claim must reflect real repo state. Check `git status` and the branch; do not recite from
   memory.
 - **Audit** the log first. Read this session's `pm/log.md` entries and check each maps to a real
-  commit, file, or command, using `git log`, `git status`, and the paths named. Correct or annotate
-  any entry that does not, because the log must tell the truth before the handoff points at it.
+  commit, file, or command, using `git log`, `git status`, and the paths named. For any entry that
+  does not, append a new corrective entry that cites the inaccurate one; never edit old entries. The
+  log must tell the truth before the handoff points at it.
 - **Never** write secrets, because `pm/` is tracked. Reference secret locations, "`.env` on the box"
   for example, never values.
 

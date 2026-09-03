@@ -64,8 +64,10 @@ same deterministic gates and review panel judge every story.
    retry up to **2** times with clarification, incrementing `current_story_retries` in
    `pm/actors/<you>.json` per retry. The **cap** counts retries a previous session already spent, and
    switching workers does not reset it. Then escalate to the user.
-2. **Gate.** Run the project's deterministic gates yourself: test, lint, and build per
-   `review-gates.md`, skipping any that are `N/A`. If a gate fails, go to Fix, step 4, before review.
+2. **Gate.** The gates are the project's actual `test`, `lint`, and `build` commands as recorded in
+   `docs/plan.md` and `AGENTS.md`; any the project does not have are `N/A` and skipped. Run them
+   **yourself**, here after the build and again after every fix, and never take a subagent's word
+   that they pass. If a gate fails, go to Fix, step 4, before review.
 3. **Review.** Re-derive and scope-check the cumulative changed paths as in step 1. Produce the diff
    yourself and pass it to the reviewers inline, since they have no Bash and cannot diff. Diff **only**
    those repository-derived paths, for example
@@ -93,23 +95,14 @@ same deterministic gates and review panel judge every story.
    regenerate the cumulative story diff for re-review, **up to 3 rounds**. Increment
    `current_story_rounds` in `pm/actors/<you>.json` as each round starts; the **cap** counts rounds a
    previous session already spent. If it is still failing, **escalate** to the user.
-5. **External review (optional).** Only if an external reviewer is explicitly available. Secret-scan
-   the exact outgoing diff first: prefer a real scanner when one is installed (`gitleaks`,
-   `trufflehog`), otherwise pipe the diff through the bundled value patterns with
-   `git diff <range> | node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" scan`. Quote the path, because
-   plugin roots can contain spaces; a non-zero exit means secret-shaped content. If it trips, do
-   **not** send code out. Scan values, not labels: a name like `APIClient` is not a secret, and real
-   credentials are often lowercase. Then run an independent review, feed the findings back, and fix.
-   If no external reviewer is available, **log** that it was skipped. Never silently.
-6. **Verify.** Before shipping, dispatch `pm-verifier`, which is read-only, to independently confirm
-   the story is shippable. Give it the story file, the `FR-` and `AC-` entries from `docs/spec.md`
-   that the story's `Covers:` line names, and the Commands section of `docs/plan.md`. Do not read
-   either document whole. Also give it the diff text plus changed paths, the reviewer verdicts, and
-   the gate results. It returns `STATUS: PASS | FAIL | UNKNOWN`. **A story may not ship unless STATUS
-   is PASS.** `FAIL` returns to Fix, step 4, under the same 3-round bound, then re-verify. `UNKNOWN`
-   means you obtain the exact missing evidence it names and re-verify, or escalate to the user. For
-   non-trivial work, record `docs/verification/<story-id>.md` and note STATUS, the gate results, and
-   the report link under the story's Verification evidence heading. See `references/verification.md`.
+5. **External review (optional).** `/pm-skill:codex-review` owns it, including the secret scan on any
+   code that leaves the machine. If you skip it, **log** that. Never silently.
+6. **Verify.** Once the gates are green and no `block` or `major` finding is still open, dispatch
+   `pm-verifier`, which is read-only, with the inputs its agent file lists. It returns
+   `STATUS: PASS | FAIL | UNKNOWN`. PASS is the only status that permits shipping. FAIL
+   returns to Fix, step 4, within the persisted 3-round cap, then re-verify; UNKNOWN means you obtain
+   the exact evidence it named and re-verify, or escalate to the user. `references/verification.md`
+   holds the running-app evidence rule and where the durable report goes.
 7. **Ship.** With gates green, no open `block` or `major`, and `pm-verifier` `PASS`, commit **only**
    this story's cumulative authoritative paths to the story branch. Sync first: pull or rebase the
    integration branch, and if its tip moved after your gates ran, re-gate on the merged result before
@@ -132,46 +125,21 @@ same deterministic gates and review panel judge every story.
    Clear `resolved_builder` after recording the outcome, then **commit** this `pm/` state update
    alongside the ship, on the integration branch right after the merge, so the pushed repo carries
    the current resume point and the released claim. Never write secrets into `pm/`.
-9. **Document (optional, at the sprint or project boundary, not per story).** Once a sprint's stories
-   are merged, you may dispatch `technical-writer` to refresh user-facing docs (README, usage,
-   CHANGELOG) and, at project end, produce the completion report at `docs/completion-report.md` from
-   `${CLAUDE_PLUGIN_ROOT}/templates/completion-report.md.template`. It writes docs only, never
-   source. Log that it ran, or that you skipped it. When a technical-writing standard skill is
-   installed, `poteto:technical-writing` for example, pass its `SKILL.md` path in the dispatch so the
-   writer applies it.
+9. **Document (optional, at the sprint or project boundary, not per story).** See
+   `references/documentation.md`.
 
-## Handoff contracts (keep them tight)
-- Send `expert-builder` the story file path, and the absolute worktree root when using an isolated
-  worktree. It returns status, a diff summary, what it built and tested, and follow-ups.
-- Send `codex-builder` the story file path, the absolute worktree root, and the mode. For fix mode,
-  also send a contained `tmp/codex-builder/*.md` evidence path. It returns runner and Codex status,
-  root cause, the authoritative actual files changed, a summary, tests, the actual short git status,
-  the model and version, and retained diagnostic paths on failure.
-- To the reviewer, down: the story file path plus the diff text you generated, since the reviewer
-  cannot diff. Up: findings plus a verdict.
-- To the verifier, down: the story file, the named `FR-` and `AC-` spec entries, the plan's Commands
-  section, the diff text, the reviewer verdicts, and the gate results. Up: `STATUS` (PASS, FAIL, or
-  UNKNOWN), per-criterion and per-gate evidence, and the action to take.
-- You, the PM, run the deterministic gates yourself. Their result is yours, not taken on a subagent's
-  word. Never read raw worker transcripts, only their summaries.
+Scope changes go through `/pm-skill:correct-course`, which owns the scope-freeze rule. Checkpoint
+policy, escalation triggers, and when to offer a handoff live in `planning-and-signoff.md`.
 
-## Scope freeze
-Once a story starts, its scope is **frozen**. If new requirements appear, stop and run
-`/pm-skill:correct-course`: checkpoint the in-flight work, apply the change at the right level, spec
-or plan or story, re-sign-off if the change is material, then restart the affected story with fresh
-counters. Never drip-feed new asks mid-flight.
+## Definition of done (a story)
+A story is done when all of these hold:
+- every acceptance criterion is met,
+- no open `block` or `major` findings across all selected review lenses,
+- all non-`N/A` gates are green,
+- `pm-verifier` returned `STATUS: PASS`,
+- the outcome is logged.
 
-## Checkpoints
-- Default: sprint-level. Run all stories in a sprint, then pause for the user's review at the sprint
-  boundary. A project can configure this to story-level, pausing before each merge, or to fully
-  autonomous.
-- Always **escalate** immediately for high-risk or large-blast-radius merges, whatever the mode.
-- Offer a handoff at natural stops: at a sprint checkpoint, before a long pause, or when the
-  session's context is running long, offer `/pm-skill:handoff`. A committed
-  `pm/actors/<id>.HANDOFF.md` is what lets the next session skip re-discovery. A bundled SessionStart
-  hook re-grounds new and freshly-compacted sessions from `pm/` automatically.
-- Checkpoint before compaction. When compaction is imminent, write and commit the actor handoff
-  first. After resume, verify its base commit, branch, changed paths, last gate results, and next
-  action against repository state before dispatching another writer.
-
-See `review-gates.md` for the severity model and the definition of done.
+## Escalation
+Stop and ask the user when a story is still not done after 3 fix and verify rounds, when a builder
+has spent its 2 retries, or when a gate keeps failing after `debugger` has root-caused it. Do not
+loop forever. `review-gates.md` holds the severity model and the lens selection.
