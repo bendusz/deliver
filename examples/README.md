@@ -6,7 +6,7 @@ writes into a real project:
 
 - `todo-cli/docs/plan.md` — the signed-off delivery plan.
 - `todo-cli/docs/stories/` — two self-contained story files.
-- `todo-cli/CLAUDE.md` — the generated project memory (workflow rules first).
+- `todo-cli/AGENTS.md` — the generated project instructions (facts only), and `todo-cli/CLAUDE.md` — the two-line `@AGENTS.md` bridge Claude Code reads.
 - `todo-cli/pm/pm-state.json` — shared machine-readable state.
 - `todo-cli/pm/actors/bendusz.json` — one actor's working position (solo = a team of one).
 - `todo-cli/pm/log.md` — the recovery logbook (a mid-run snapshot).
