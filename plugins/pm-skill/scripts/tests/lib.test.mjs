@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cksum, pmActorId, pmRoot, pmRelpath, readJson, pmSecretScan } from '../../hooks/lib.mjs';
+import { cksum, pmActorId, pmRoot, pmRelpath, readJson, pmSecretScan, hookFile } from '../../hooks/lib.mjs';
 import { newProj, gitIn, canSymlink, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
 test('cksum matches POSIX cksum vectors', () => {
@@ -167,4 +167,17 @@ test('readJson refuses non-regular files (FIFO) and returns promptly', (t) => {
     return t.skip('mkfifo unavailable');
   }
   assert.equal(readJson(fifo), null);
+});
+
+test('hookFile returns the write target with its cwd and project root, else null', () => {
+  const p = newProj();
+  delete process.env.CLAUDE_PROJECT_DIR;
+  for (const empty of [null, undefined, {}, { tool_input: null }, { tool_input: {} }, { tool_input: { file_path: '' } }, { tool_input: { file_path: 7 } }]) {
+    assert.equal(hookFile(empty), null, JSON.stringify(empty));
+  }
+  const file = path.join(p, 'src', 'app.py');
+  assert.deepEqual(hookFile({ cwd: p, tool_input: { file_path: file } }), { file, cwd: p, root: p });
+  // A payload with no usable cwd falls back to the process cwd, as each hook used to.
+  assert.equal(hookFile({ tool_input: { file_path: file } }).cwd, process.cwd());
+  assert.equal(hookFile({ cwd: '', tool_input: { file_path: file } }).cwd, process.cwd());
 });

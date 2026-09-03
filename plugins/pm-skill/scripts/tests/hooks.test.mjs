@@ -197,6 +197,20 @@ test('session: handoff freshness, teammates, no actor file, legacy layouts', () 
   assert.match(session({ cwd: s }), /legacy tmp\/ location/);
 });
 
+test('session: teammates are capped at five, newest first, with a count of the rest', () => {
+  const s = newProj(false);
+  const actors = path.join(s, 'pm', 'actors');
+  fs.writeFileSync(path.join(actors, `${ME}.json`), JSON.stringify({ actor: ME }));
+  for (let i = 1; i <= 7; i += 1) {
+    fs.writeFileSync(path.join(actors, `mate-${i}-000000000000.json`), JSON.stringify({ actor: `mate-${i}`, current_story: `S1-${i}`, updated: `2026-09-0${i} 10:00` }));
+  }
+  const out = session({ cwd: s });
+  const lines = out.split('\n').filter((l) => l.startsWith('teammate '));
+  assert.deepEqual(lines.map((l) => l.split(':')[0]), ['teammate mate-7', 'teammate mate-6', 'teammate mate-5', 'teammate mate-4', 'teammate mate-3']);
+  assert.doesNotMatch(out, /teammate mate-2/);
+  assert.match(out, /^teammates: 2 more$/m);
+});
+
 test('session: malformed state still prints the resume pointer', () => {
   const s = newProj(false);
   fs.writeFileSync(path.join(s, 'pm', 'pm-state.json'), '{ nope');

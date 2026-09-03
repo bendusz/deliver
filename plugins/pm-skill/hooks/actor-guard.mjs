@@ -11,13 +11,11 @@ if (process.env.PM_SKILL_NO_ENFORCE === '1') process.exit(0);
 // A damaged or missing lib.mjs must not block writes — fail open.
 let lib;
 try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
-const { readHookInput, pmRoot, pmRelpath, pmActorId } = lib;
+const { readHookInput, hookFile, pmRelpath, pmActorId } = lib;
 
-const input = readHookInput();
-const file = input?.tool_input?.file_path;
-if (typeof file !== 'string' || file === '') process.exit(0);
-const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd();
-const root = pmRoot(cwd);
+const write = hookFile(readHookInput());
+if (!write) process.exit(0);
+const { file, root } = write;
 
 // Canonical path: a symlink named after us must not authorise a write to its target.
 const rel = pmRelpath(root, file);

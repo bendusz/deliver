@@ -40,7 +40,6 @@ export function parseArgs(argv) {
       case '--out': o.out = v; break;
       case '--prompt-file': o.promptFile = v; break;
       case '--search': o.search = v; break;
-      default: throw new UsageError(`unsupported argument: ${a}`);
     }
   }
   if (!MODES.has(o.mode)) throw new UsageError('mode must be build, fix, review, advise, or research');

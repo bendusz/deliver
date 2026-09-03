@@ -5,7 +5,7 @@ import { pmRelpath, realpath, readJson } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel, isTracked, checkIgnore, gitOut, gitOk } from '../lib/git.mjs';
 import { parseStory } from '../lib/story.mjs';
-import { findCodex, codexVersion, loginOk, execHelp, requireFlags, BUILD_FLAGS, PROBE_TIMEOUT, PROBE_TIMEOUT_REASON } from '../lib/preflight.mjs';
+import { requireCodex, BUILD_FLAGS } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
 import { makeScratch, runtimeTmp, assertRuntimeRootReal } from '../lib/scratch.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../lib/snapshot.mjs';
@@ -109,17 +109,7 @@ export async function runBuild(o) {
   if (!st || typeof st !== 'object') throw blocked('pm/pm-state.json is malformed; refusing a write-capable run');
   if (st.signed_off !== true) throw blocked('the PM plan is not signed off; codex-builder may not write implementation files');
 
-  const found = findCodex();
-  if (!found) throw unavailable('codex CLI not found; install @openai/codex or use expert-builder');
-  const version = codexVersion(found);
-  const auth = loginOk(found);
-  if (auth === PROBE_TIMEOUT) throw unavailable(PROBE_TIMEOUT_REASON, { codex_version: version });
-  if (!auth) throw unavailable('Codex is not authenticated; run codex login or use expert-builder', { codex_version: version });
-  const help = execHelp(found);
-  if (help === PROBE_TIMEOUT) throw unavailable(PROBE_TIMEOUT_REASON, { codex_version: version });
-  if (help === null) throw unavailable('codex exec --help failed', { codex_version: version });
-  const missing = requireFlags(help, BUILD_FLAGS);
-  if (missing) throw unavailable(`installed Codex CLI lacks required flag ${missing}; update @openai/codex`, { codex_version: version });
+  const { found, version } = requireCodex(BUILD_FLAGS, { hint: ' or use expert-builder' });
   if (!fs.existsSync(SCHEMA)) throw new RunnerError('failed', 'bundled result schema is missing', { codex_version: version });
   assertRuntimeRootReal(worktree);
   if (!checkIgnore(worktree, 'tmp/codex-runtime/probe')) throw blocked('tmp/ must be ignored before codex-builder can create an isolated runtime directory', { codex_version: version });
@@ -142,7 +132,7 @@ export async function runBuild(o) {
     } catch { /* best effort */ }
   };
   const files = { prompt: path.join(scratch, 'prompt.md'), result: path.join(scratch, 'result.json'), stdout: path.join(scratch, 'stdout.log'), stderr: path.join(scratch, 'stderr.log') };
-  const diag = (codexExit, actual) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, actual_files_changed: actual });
+  const diag = (codexExit, actual, ignoredChanged) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, actual_files_changed: actual, ignored_files_changed: ignoredChanged });
 
   const prompt = buildPrompt({ worktree, storyRel, scopes, mode: o.mode, evidenceRel });
   try { fs.writeFileSync(files.prompt, prompt); } catch { cleanupRuntime(); throw new RunnerError('failed', 'could not write the prompt', { scratch_dir: scratch, codex_version: version }); }
@@ -168,23 +158,32 @@ export async function runBuild(o) {
 
   let after;
   try { after = snapshotWorktree(worktree); } catch { throw new RunnerError('failed', 'could not take the post-run worktree snapshot', { scratch_dir: scratch, codex_version: version, codex_exit: run.exit }); }
-  const actual = changedPaths(before, after);
+  // Git-ignored files are reported, not enforced. A pre-existing .env, cache, or build
+  // artifact is outside every story's Touches by construction, so enforcing it would fail
+  // any run whose tests write one. The PM reads ignored_files_changed and raises anything
+  // real. Protected PM paths are still enforced, ignored or not.
+  const isIgnored = (rel) => (before.get(rel) || '').startsWith('ignored:') || (after.get(rel) || '').startsWith('ignored:');
+  const delta = changedPaths(before, after);
+  const ignoredChanged = delta.filter(isIgnored);
+  const actual = delta.filter((rel) => !isIgnored(rel));
   const afterMeta = gitMetadataFingerprint(worktree);
   let gitStatus = '';
   try { gitStatus = gitOut(worktree, ['status', '--short', '--untracked-files=all']); } catch { gitStatus = ''; }
-  const safety = (reason) => new RunnerError('safety-violation', reason, diag(run.exit, actual));
+  const safety = (reason) => new RunnerError('safety-violation', reason, diag(run.exit, actual, ignoredChanged));
 
-  if (beforeMeta !== afterMeta) throw safety('Codex changed protected git state (HEAD, refs, index contents, local config, or worktree registrations); preserve the worktree and inspect it before continuing');
-  for (const rel of actual) {
+  if (beforeMeta !== afterMeta) throw safety('Codex changed protected git state (HEAD, refs, index contents and flags, local config, hooks, info/exclude, or worktree registrations); preserve the worktree and inspect it before continuing');
+  for (const rel of [...actual, ...ignoredChanged]) {
     if (isProtected(rel)) throw safety(`Codex changed a protected PM artifact: ${rel}`);
+  }
+  for (const rel of actual) {
     if (!allowed(rel, scopes)) throw safety(`Codex changed a path outside the story's pm-meta.touches: ${rel}`);
   }
-  if (run.timedOut) throw new RunnerError('timed-out', `codex exec exceeded the ${o.timeoutSeconds}s timeout; descendants were terminated and partial changes were preserved`, diag(run.exit, actual));
-  if (run.interrupted) throw new RunnerError('interrupted', `codex-builder was interrupted by ${run.interrupted.replace(/^SIG/, '')}; descendants were terminated and partial changes were preserved`, diag(run.exit, actual));
-  if (run.exit !== 0) throw new RunnerError('failed', 'codex exec exited non-zero; inspect stderr.log', diag(run.exit, actual));
-  if (!fs.existsSync(files.result) || fs.statSync(files.result).size === 0) throw new RunnerError('failed', 'codex exec returned no structured result', diag(run.exit, actual));
+  if (run.timedOut) throw new RunnerError('timed-out', `codex exec exceeded the ${o.timeoutSeconds}s timeout; descendants were terminated and partial changes were preserved`, diag(run.exit, actual, ignoredChanged));
+  if (run.interrupted) throw new RunnerError('interrupted', `codex-builder was interrupted by ${run.interrupted.replace(/^SIG/, '')}; descendants were terminated and partial changes were preserved`, diag(run.exit, actual, ignoredChanged));
+  if (run.exit !== 0) throw new RunnerError('failed', 'codex exec exited non-zero; inspect stderr.log', diag(run.exit, actual, ignoredChanged));
+  if (!fs.existsSync(files.result) || fs.statSync(files.result).size === 0) throw new RunnerError('failed', 'codex exec returned no structured result', diag(run.exit, actual, ignoredChanged));
   const result = readJson(files.result);
-  if (!validateBuilderResult(result)) throw new RunnerError('failed', 'Codex result did not satisfy the builder result contract', diag(run.exit, actual));
+  if (!validateBuilderResult(result)) throw new RunnerError('failed', 'Codex result did not satisfy the builder result contract', diag(run.exit, actual, ignoredChanged));
 
   const claimed = [];
   for (const c of result.files_changed) {
@@ -194,7 +193,7 @@ export async function runBuild(o) {
   }
   if (JSON.stringify([...new Set(claimed)].sort()) !== JSON.stringify(actual)) throw safety('Codex files_changed does not match the authoritative before/after worktree delta');
 
-  const envelope = { runner_status: 'completed', codex_version: version, model: o.model, effort: o.effort, worktree, story: storyRel, mode: o.mode, timeout_seconds: o.timeoutSeconds, sandbox: WIN ? 'none (win32)' : 'workspace-write', diagnostics_retained: false, actual_files_changed: actual, git_status_short: gitStatus, result };
+  const envelope = { runner_status: 'completed', codex_version: version, model: o.model, effort: o.effort, worktree, story: storyRel, mode: o.mode, timeout_seconds: o.timeoutSeconds, sandbox: WIN ? 'none (win32)' : 'workspace-write', diagnostics_retained: false, actual_files_changed: actual, ignored_files_changed: ignoredChanged, git_status_short: gitStatus, result };
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
   return { exit: 0, envelope };
 }

@@ -14,7 +14,10 @@ const err = (text) => fs.writeSync(2, text);
 if (argv[0] === '--version') { say('codex-cli 9.9.9-stub\n'); process.exit(0); }
 if (argv[0] === 'login' && argv[1] === 'status') process.exit(Number(env.STUB_LOGIN_EXIT || 0));
 if (argv[0] === 'exec' && argv[1] === 'review' && argv[2] === '--help') {
-  say(['--commit', '--uncommitted', '--output-last-message'].join('\n') + '\n');
+  if (env.STUB_REVIEW_HELP_EXIT && env.STUB_REVIEW_HELP_EXIT !== '0') { err('no review subcommand\n'); process.exit(Number(env.STUB_REVIEW_HELP_EXIT)); }
+  const flags = ['--commit', '--uncommitted', '--output-last-message', '--ephemeral', '--strict-config', '--ignore-user-config'];
+  if (env.STUB_NO_REVIEW_IGNORE_RULES !== '1') flags.push('--ignore-rules');
+  say(flags.join('\n') + '\n');
   process.exit(0);
 }
 if (argv[0] === 'exec' && argv[1] === '--help') {

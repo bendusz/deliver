@@ -41,7 +41,7 @@ Write `results.json` matching
 `${CLAUDE_PLUGIN_ROOT}/schemas/builder-benchmark-result.schema.json`, then generate `summary.md` with:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/score-builder-benchmark.sh" \
+node "${CLAUDE_PLUGIN_ROOT}/scripts/score-builder-benchmark.mjs" \
   tmp/builder-benchmark/<stamp>/results.json \
   > tmp/builder-benchmark/<stamp>/summary.md
 ```

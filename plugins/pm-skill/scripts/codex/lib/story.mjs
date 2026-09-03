@@ -37,8 +37,10 @@ export function parseStory(root, storyRel) {
   }
   const machine = [...new Set(scopes)].sort();
 
+  // The capture starts after the FIRST `Touches:` on the line, so a second label stays in
+  // the value and fails the path checks below. That is the safe reading of an odd line.
   const touchesLine = head.map((l) => l.match(/Touches:\s*(.*)$/)).find(Boolean);
-  const visibleRaw = touchesLine ? touchesLine[1].replace(/^.*Touches:\s*/, '').trim() : '';
+  const visibleRaw = touchesLine ? touchesLine[1].trim() : '';
   if (visibleRaw === '' || visibleRaw === '—' || visibleRaw === '-' || /[<>]/.test(visibleRaw)) throw blocked('visible Touches must match bounded story pm-meta touches');
   const visible = [];
   for (let item of visibleRaw.split(',')) {

@@ -67,13 +67,23 @@ if (isRecord(my)) {
   say(`No actor file for you (${me}) yet — /pm-skill:resume creates pm/actors/${me}.json.`);
 }
 
+// A long-running project can collect dozens of actor files, and every line here costs
+// context in every session. Show the five most recently updated and count the rest.
+const TEAMMATE_LINES = 5;
+const teammates = [];
 for (const name of listDir(actorsDir).filter((n) => n.endsWith('.json')).sort()) {
   const other = sanitize(name.slice(0, -'.json'.length));
   if (other === me) continue;
   const o = readJson(path.join(actorsDir, name));
   if (!isRecord(o)) continue;
+  teammates.push({ other, o, updated: typeof o.updated === 'string' ? o.updated : '' });
+}
+// Newest first; the file-name sort above breaks ties, so the output is stable.
+teammates.sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : 0));
+for (const { other, o } of teammates.slice(0, TEAMMATE_LINES)) {
   say(`teammate ${v(o.actor, other)}: story=${v(o.current_story, '-')} status=${v(o.current_story_status, '-')} branch=${v(o.branch, '-')}`);
 }
+if (teammates.length > TEAMMATE_LINES) say(`teammates: ${teammates.length - TEAMMATE_LINES} more`);
 
 say(RESUME);
 finish();

@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { RunnerError } from './result.mjs';
 
 const WIN = process.platform === 'win32';
 // Every preflight probe is bounded: --timeout-seconds only covers the model process,
 // so a wedged shim, credential helper, or login check must not hang the runner forever.
 export const PROBE_TIMEOUT_MS = 30000;
-// Sentinel returned by loginOk/execHelp/reviewHelp when a probe hit PROBE_TIMEOUT_MS.
+// Sentinel returned by loginOk/helpFor when a probe hit PROBE_TIMEOUT_MS.
 export const PROBE_TIMEOUT = Object.freeze({ probeTimedOut: true });
 export const PROBE_TIMEOUT_REASON = 'codex did not respond within 30 s';
 
@@ -91,13 +92,10 @@ export function loginOk(found) {
   if (r.timedOut) return PROBE_TIMEOUT;
   return r.status === 0;
 }
-export function execHelp(found) {
-  const r = probe(found, ['exec', '--help']);
-  if (r.timedOut) return PROBE_TIMEOUT;
-  return r.status === 0 ? r.stdout : null;
-}
-export function reviewHelp(found) {
-  const r = probe(found, ['exec', 'review', '--help']);
+// helpFor(found, subcommandArgs) returns the `--help` text of one codex subcommand, null
+// when it exited non-zero, or PROBE_TIMEOUT when it hung.
+export function helpFor(found, subcommandArgs) {
+  const r = probe(found, [...subcommandArgs, '--help']);
   if (r.timedOut) return PROBE_TIMEOUT;
   return r.status === 0 ? r.stdout : null;
 }
@@ -107,4 +105,36 @@ export function requireFlags(help, flags) {
 }
 export const BUILD_FLAGS = ['--cd', '--sandbox', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config', '--output-schema', '--output-last-message'];
 export const READONLY_FLAGS = ['--sandbox', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config', '--output-last-message'];
-export const REVIEW_FLAGS = ['--commit', '--uncommitted'];
+// Every flag the runner passes to `codex exec review`, so a stale CLI is caught in
+// preflight rather than halfway through a review that has already spent quota.
+export const REVIEW_FLAGS = ['--commit', '--uncommitted', '--ignore-rules', '--ephemeral', '--strict-config', '--ignore-user-config'];
+
+// requireCodex(flags, opts) is the one preflight every mode runs. It finds the CLI, reads
+// its version, checks the login, and confirms that `codex exec` carries every flag this
+// runner passes. When reviewFlags is given it checks `codex exec review` the same way.
+// The first failure throws RunnerError('unavailable'). `hint` is appended to the two
+// messages that can suggest a different builder. Returns { found, version, help }.
+export function requireCodex(flags, { hint = '', reviewFlags = null } = {}) {
+  const found = findCodex();
+  if (!found) throw new RunnerError('unavailable', `codex CLI not found; install @openai/codex${hint}`);
+  const version = codexVersion(found);
+  const unavailable = (reason) => new RunnerError('unavailable', reason, { codex_version: version });
+  const auth = loginOk(found);
+  if (auth === PROBE_TIMEOUT) throw unavailable(PROBE_TIMEOUT_REASON);
+  if (!auth) throw unavailable(`Codex is not authenticated; run codex login${hint}`);
+  const help = helpFor(found, ['exec']);
+  if (help === PROBE_TIMEOUT) throw unavailable(PROBE_TIMEOUT_REASON);
+  if (help === null) throw unavailable('codex exec --help failed');
+  const missing = requireFlags(help, flags);
+  if (missing) throw unavailable(`installed Codex CLI lacks required flag ${missing}; update @openai/codex`);
+  if (reviewFlags) {
+    // `codex exec --help` says nothing about the review subcommand, so preflight must ask
+    // it directly before it can honestly answer "ready" for a commit or worktree review.
+    const rhelp = helpFor(found, ['exec', 'review']);
+    if (rhelp === PROBE_TIMEOUT) throw unavailable(PROBE_TIMEOUT_REASON);
+    if (rhelp === null) throw unavailable('codex exec review --help failed; update @openai/codex');
+    const missingReview = requireFlags(rhelp, reviewFlags);
+    if (missingReview) throw unavailable(`installed Codex CLI lacks required review flag ${missingReview}; update @openai/codex`);
+  }
+  return { found, version, help };
+}

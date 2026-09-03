@@ -25,6 +25,9 @@ export function envelope(status, reason, extra = {}) {
   if (Array.isArray(actual_files_changed)) {
     out.diagnostics_retained = true;
     out.actual_files_changed = actual_files_changed;
+    // Reported alongside the enforced delta so the PM can raise a touched .env or cache
+    // as a review finding. Always present when actual_files_changed is, even when empty.
+    out.ignored_files_changed = Array.isArray(extra.ignored_files_changed) ? extra.ignored_files_changed : [];
   }
   if (typeof extra.stderr_path === 'string') out.stderr_path = extra.stderr_path;
   return out;

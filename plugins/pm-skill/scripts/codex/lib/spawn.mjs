@@ -56,7 +56,8 @@ export function runCodex(found, args, { stdinText, cwd, env, timeoutSeconds, std
       try { fs.closeSync(outFd); } catch {}
       try { fs.closeSync(errFd); } catch {}
     };
-    // reapDescendants — kill anything codex left behind, best effort and never fatal.
+    // reapDescendants kills descendants that stayed in the process group; a grandchild
+    // that called setsid() is out of reach. Best effort, never fatal.
     const reapDescendants = () => {
       if (WIN) { try { spawnSync('taskkill', ['/T', '/F', '/PID', String(child.pid)], { stdio: 'ignore', windowsHide: true }); } catch { /* gone */ } return; }
       try { process.kill(-child.pid, 'SIGKILL'); } catch { /* no surviving group */ }

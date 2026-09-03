@@ -115,6 +115,15 @@ export function readHookInput() {
   }
 }
 
+// hookFile(input) returns the write target and the roots every PreToolUse guard starts
+// from, or null when the payload names no file. The callers treat null as "allow".
+export function hookFile(input) {
+  const file = input?.tool_input?.file_path;
+  if (typeof file !== 'string' || file === '') return null;
+  const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd();
+  return { file, cwd, root: pmRoot(cwd) };
+}
+
 export function readJson(file) {
   try {
     // Refuse a symlink outright: PM state and actor files are in-repo artifacts, and a
@@ -166,8 +175,6 @@ export function pmActorId(root) {
   const h2 = cksum(`${src}:pm-skill`).toString(16).padStart(8, '0');
   return `${slug}-${(h1 + h2).slice(0, 12)}`;
 }
-
-export const LIB_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 // pmSecretScan(text) — null when clean, else a reason. Never echoes the matched value.
 // Token FORMATS are case-sensitive; credential ASSIGNMENTS are case-insensitive and match

@@ -9,7 +9,7 @@ import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
 import { parseStory } from '../codex/lib/story.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
 import { runCodex } from '../codex/lib/spawn.mjs';
-import { cmdFallbackPrefix, CMD_FALLBACK_SUFFIX } from '../codex/lib/preflight.mjs';
+import { cmdFallbackPrefix, CMD_FALLBACK_SUFFIX, requireCodex, BUILD_FLAGS, READONLY_FLAGS, REVIEW_FLAGS } from '../codex/lib/preflight.mjs';
 import { PLUGIN_ROOT, tmpDir, gitIn, canSymlink, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath } from './helpers.mjs';
 
 test('args: defaults per mode and validation', () => {
@@ -103,6 +103,32 @@ test('preflight: cmdFallbackPrefix double-quotes the cmd.exe shim path and rejec
   assert.deepEqual(cmdFallbackPrefix('C:\\Users\\Jane Smith\\npm\\codex.cmd'), ['/d', '/s', '/c', '""C:\\Users\\Jane Smith\\npm\\codex.cmd"']);
   assert.equal(CMD_FALLBACK_SUFFIX, '"');
   assert.equal(cmdFallbackPrefix('C:\\bad"path\\codex.cmd'), null);
+});
+
+test('preflight: requireCodex appends the builder hint only where the caller asks for it', () => {
+  const saved = process.env.PATH;
+  process.env.PATH = tmpDir('nocodex-');
+  try {
+    const messages = [];
+    for (const opts of [{ hint: ' or use expert-builder' }, {}]) {
+      assert.throws(() => requireCodex(BUILD_FLAGS, opts), (e) => {
+        assert.equal(e.status, 'unavailable');
+        messages.push(e.message);
+        return true;
+      });
+    }
+    assert.deepEqual(messages, [
+      'codex CLI not found; install @openai/codex or use expert-builder',
+      'codex CLI not found; install @openai/codex',
+    ]);
+  } finally { process.env.PATH = saved; }
+});
+
+test('preflight: the review flag list covers every flag the runner passes to exec review', () => {
+  for (const f of ['--commit', '--uncommitted', '--ignore-rules', '--ephemeral', '--strict-config', '--ignore-user-config']) {
+    assert.ok(REVIEW_FLAGS.includes(f), f);
+  }
+  assert.ok(READONLY_FLAGS.includes('--ignore-rules'));
 });
 
 test('snapshot: detects content, new, deleted, mode, and ignored-protected changes', () => {
@@ -365,14 +391,35 @@ test('build 27: a backgrounded descendant cannot outlive a clean Codex exit', as
   assert.equal(alive, false, 'a descendant left running by Codex must be reaped before the runner exits');
 });
 
-test('build 28: an ignored file outside the story scope is a safety violation', () => {
+test('build 28: an ignored file outside the story scope is reported, not enforced', () => {
   const p = newBuildProject(true); const s = makeStub();
   fs.appendFileSync(path.join(p, '.gitignore'), '.env\n');
   fs.writeFileSync(path.join(p, '.env'), 'SECRET=1\n');
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: '.env', STUB_OMIT_REPORT: '1' } });
+  assert.equal(r.status, 0, JSON.stringify(r.out));
+  assert.equal(r.out.runner_status, 'completed');
+  assert.deepEqual(r.out.ignored_files_changed, ['.env']);
+  assert.deepEqual(r.out.actual_files_changed, []);
+});
+
+test('build 28b: an ignored file that is also a protected PM artifact is still a violation', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.appendFileSync(path.join(p, '.gitignore'), 'pm/hidden.md\n');
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'pm/hidden.md', STUB_OMIT_REPORT: '1' } });
   assert.equal(r.status, 74, JSON.stringify(r.out));
-  assert.equal(r.out.runner_status, 'safety-violation');
-  assert.ok(r.out.actual_files_changed.includes('.env'), JSON.stringify(r.out.actual_files_changed));
+  assert.match(r.out.reason, /protected PM artifact: pm\/hidden\.md/);
+  // Every envelope carrying actual_files_changed carries the ignored list beside it.
+  assert.ok(Array.isArray(r.out.ignored_files_changed), JSON.stringify(r.out));
+});
+
+test('build 28c: an ignored file inside the story scope is reported and does not fail the run', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.appendFileSync(path.join(p, '.gitignore'), 'src/cache.bin\n');
+  fs.writeFileSync(path.join(p, 'src', 'cache.bin'), 'stale\n');
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/cache.bin', STUB_OMIT_REPORT: '1' } });
+  assert.equal(r.status, 0, JSON.stringify(r.out));
+  assert.deepEqual(r.out.ignored_files_changed, ['src/cache.bin']);
+  assert.deepEqual(r.out.actual_files_changed, []);
 });
 
 test('build 29: a skip-worktree index flag is a protected-git-state violation', () => {
@@ -530,6 +577,23 @@ test('review: colliding report names get a numeric suffix instead of overwriting
   assert.ok(fs.existsSync(r2.out.report_path));
 });
 
+test('review: the suffix loop tries every name through -500', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  fs.mkdirSync(out, { recursive: true });
+  // The report name carries a second-resolution stamp, so take every name from `.md` to
+  // `-499.md` for the whole window the run can land in. Only `-500` is left free.
+  const stampAt = (ms) => new Date(ms).toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+  for (let sec = 0; sec < 8; sec += 1) {
+    const nameBase = `${stampAt(Date.now() + sec * 1000)}-codex-review-recent-collide`;
+    fs.writeFileSync(path.join(out, `${nameBase}.md`), '');
+    for (let n = 2; n <= 499; n += 1) fs.writeFileSync(path.join(out, `${nameBase}-${n}.md`), '');
+  }
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', 'collide', '--out', out], { stub: s, cwd: p });
+  assert.equal(r.status, 0, JSON.stringify(r.out));
+  assert.match(path.basename(r.out.report_path), /-collide-500\.md$/);
+});
+
 test('review: an objective that slugs to empty falls back to "custom"', () => {
   const p = newBuildProject(true); const s = makeStub();
   const out = path.join(p, 'untracked');
@@ -567,6 +631,36 @@ test('review: a symlinked output directory is rejected before Codex runs', (t) =
   assert.match(r.out.reason, /must not be a symlink/);
   assert.doesNotMatch(stubActions(s), /^exec review (?!--help)/m);
   assert.equal(fs.readdirSync(outside).length, 0);
+});
+
+test('review: an output path that exists and is not a directory is rejected', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.writeFileSync(path.join(p, 'untracked'), 'a regular file, not a report directory\n');
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--out', path.join(p, 'untracked')], { stub: s, cwd: p });
+  assert.equal(r.status, 65, JSON.stringify(r.out));
+  assert.match(r.out.reason, /not a directory/);
+  assert.doesNotMatch(stubActions(s), /^exec review (?!--help)/m);
+});
+
+test('review: a stale CLI without --ignore-rules on the review subcommand is unavailable', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--out', out], { stub: s, cwd: p, env: { STUB_NO_REVIEW_IGNORE_RULES: '1' } });
+  assert.equal(r.status, 69, JSON.stringify(r.out));
+  assert.match(r.out.reason, /lacks required review flag --ignore-rules/);
+  assert.equal(r.out.codex_version, 'codex-cli 9.9.9-stub');
+  assert.doesNotMatch(stubActions(s), /^exec review (?!--help)/m);
+});
+
+test('review: codebase scope is not gated on the review subcommand', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const r = runRunner(['--mode', 'review', '--scope', 'codebase', '--out', out], { stub: s, cwd: p, env: { STUB_REVIEW_HELP_EXIT: '2' } });
+  assert.equal(r.status, 0, JSON.stringify(r.out));
+  assert.doesNotMatch(stubActions(s), /^exec review --help$/m);
+  const worktree = runRunner(['--mode', 'review', '--scope', 'worktree', '--preflight'], { stub: s, cwd: p, env: { STUB_REVIEW_HELP_EXIT: '2' } });
+  assert.equal(worktree.status, 69, JSON.stringify(worktree.out));
+  assert.match(worktree.out.reason, /codex exec review --help failed/);
 });
 
 test('advise: read-only exec with the prompt on stdin, answer retained', () => {

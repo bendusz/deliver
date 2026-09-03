@@ -3,7 +3,7 @@ import path from 'node:path';
 import { realpath } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel } from '../lib/git.mjs';
-import { findCodex, codexVersion, loginOk, execHelp, requireFlags, READONLY_FLAGS, PROBE_TIMEOUT, PROBE_TIMEOUT_REASON } from '../lib/preflight.mjs';
+import { requireCodex, READONLY_FLAGS } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
 
@@ -14,17 +14,7 @@ export async function runAdvise(o) {
     if (!path.isAbsolute(o.promptFile)) throw new RunnerError('rejected', '--prompt-file must be an absolute path');
     if (!fs.existsSync(o.promptFile) || !fs.statSync(o.promptFile).isFile()) throw new RunnerError('rejected', 'prompt file does not exist');
   }
-  const found = findCodex();
-  if (!found) throw new RunnerError('unavailable', 'codex CLI not found; install @openai/codex');
-  const version = codexVersion(found);
-  const auth = loginOk(found);
-  if (auth === PROBE_TIMEOUT) throw new RunnerError('unavailable', PROBE_TIMEOUT_REASON, { codex_version: version });
-  if (!auth) throw new RunnerError('unavailable', 'Codex is not authenticated; run codex login', { codex_version: version });
-  const help = execHelp(found);
-  if (help === PROBE_TIMEOUT) throw new RunnerError('unavailable', PROBE_TIMEOUT_REASON, { codex_version: version });
-  if (help === null) throw new RunnerError('unavailable', 'codex exec --help failed', { codex_version: version });
-  const missing = requireFlags(help, READONLY_FLAGS);
-  if (missing) throw new RunnerError('unavailable', `installed Codex CLI lacks required flag ${missing}; update @openai/codex`, { codex_version: version });
+  const { found, version, help } = requireCodex(READONLY_FLAGS);
   const searchAvailable = help.includes('--search');
   const useSearch = o.mode === 'research' && o.search === 'auto' && searchAvailable;
   if (o.preflight) return { exit: 0, envelope: { runner_status: 'ready', preflight: true, mode: o.mode, codex_version: version, search_available: searchAvailable, quota_consumed: false } };
