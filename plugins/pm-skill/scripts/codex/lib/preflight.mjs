@@ -8,6 +8,15 @@ function isExecutable(p) {
   try { fs.accessSync(p, fs.constants.X_OK); return fs.statSync(p).isFile(); } catch { return false; }
 }
 
+// cmdFallbackPrefix(p) — the `cmd.exe /d /s /c <p>` argv prefix for the win32 .cmd
+// fallback, with p double-quoted so a path containing spaces is not split into
+// separate arguments. Returns null if p contains a character that would let it
+// break out of quoting (matching cmdSafe's own refusal list in spawn.mjs).
+export function cmdFallbackPrefix(p) {
+  if (/["%\r\n]/.test(p)) return null;
+  return ['/d', '/s', '/c', `"${p}"`];
+}
+
 // findCodex() — the codex executable on PATH, and how to spawn it without a shell.
 // win32: prefer codex.exe; a codex.cmd npm shim is bypassed by running its JS entry
 // with node directly (no cmd.exe, no quoting); a bare .cmd falls back to cmd.exe
@@ -26,7 +35,9 @@ export function findCodex() {
       if (ext === '.exe') return { file: p, prefix: [], verbatim: false, display: p };
       const shim = path.join(d, 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
       if (fs.existsSync(shim)) return { file: process.execPath, prefix: [shim], verbatim: false, display: p };
-      return { file: 'cmd.exe', prefix: ['/d', '/s', '/c', p], verbatim: true, display: p };
+      const prefix = cmdFallbackPrefix(p);
+      if (!prefix) continue;
+      return { file: 'cmd.exe', prefix, verbatim: true, display: p };
     }
   }
   return null;

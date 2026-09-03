@@ -5,6 +5,7 @@ import { RunnerError } from './result.mjs';
 const WIN = process.platform === 'win32';
 
 // cmd.exe fallback only: refuse any argument that cmd.exe could reinterpret.
+// (found.prefix itself is pre-quoted by findCodex()'s cmdFallbackPrefix.)
 function cmdSafe(args) {
   for (const a of args) if (/["%\r\n]/.test(a)) throw new RunnerError('rejected', 'an argument is not safe for the cmd.exe codex shim; install codex.exe or the npm package');
   return args.map((a) => (/[\s&|<>^()]/.test(a) ? `"${a}"` : a));
@@ -28,14 +29,22 @@ export function runCodex(found, args, { stdinText, cwd, env, timeoutSeconds, std
       child = spawn(found.file, argv, { cwd, env, stdio: ['pipe', outFd, errFd], detached: !WIN, windowsHide: true, windowsVerbatimArguments: found.verbatim });
     } catch (e) { fs.closeSync(outFd); fs.closeSync(errFd); reject(e); return; }
     let timedOut = false; let interrupted = '';
+    const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
     const timer = setTimeout(() => { timedOut = true; killTree(child.pid, 'SIGTERM'); setTimeout(() => killTree(child.pid, 'SIGKILL'), 5000).unref(); }, timeoutSeconds * 1000);
     const onSignal = (sig) => { if (interrupted) return; interrupted = sig; killTree(child.pid, 'SIGTERM'); setTimeout(() => killTree(child.pid, 'SIGKILL'), 2000).unref(); };
-    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, onSignal);
-    child.on('error', (e) => { clearTimeout(timer); reject(e); });
-    child.on('exit', (code, signal) => {
+    for (const sig of SIGNALS) process.on(sig, onSignal);
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
       clearTimeout(timer);
-      for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.off(sig, onSignal);
-      fs.closeSync(outFd); fs.closeSync(errFd);
+      for (const sig of SIGNALS) process.off(sig, onSignal);
+      try { fs.closeSync(outFd); } catch {}
+      try { fs.closeSync(errFd); } catch {}
+    };
+    child.on('error', (e) => { cleanup(); reject(e); });
+    child.on('exit', (code, signal) => {
+      cleanup();
       const exit = code === null ? 128 + (signal === 'SIGKILL' ? 9 : 15) : code;
       resolve({ exit, timedOut, interrupted });
     });

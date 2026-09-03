@@ -8,6 +8,8 @@ import { parseArgs, UsageError } from '../codex/lib/args.mjs';
 import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
 import { parseStory } from '../codex/lib/story.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
+import { runCodex } from '../codex/lib/spawn.mjs';
+import { cmdFallbackPrefix } from '../codex/lib/preflight.mjs';
 import { PLUGIN_ROOT, tmpDir, gitIn, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath } from './helpers.mjs';
 
 test('args: defaults per mode and validation', () => {
@@ -68,6 +70,22 @@ test('result.emit: a synchronous write is not truncated by an immediate process.
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', maxBuffer: 1 << 24 });
   assert.equal(JSON.parse(r.stdout).big.length, 200000);
   assert.equal(r.status, 74);
+});
+
+test('spawn: a synchronous spawn error still cleans up signal listeners and fds', async () => {
+  const dir = tmpDir('nocodex-');
+  const before = process.listenerCount('SIGINT');
+  await assert.rejects(runCodex(
+    { file: path.join(dir, 'missing-codex'), prefix: [], verbatim: false, display: 'x' },
+    ['--version'],
+    { stdinText: '', cwd: process.cwd(), env: process.env, timeoutSeconds: 5, stdoutPath: path.join(dir, 'out.log'), stderrPath: path.join(dir, 'err.log') },
+  ));
+  assert.equal(process.listenerCount('SIGINT'), before);
+});
+
+test('preflight: cmdFallbackPrefix quotes the cmd.exe shim path and rejects unsafe ones', () => {
+  assert.deepEqual(cmdFallbackPrefix('C:\\Users\\Jane Smith\\npm\\codex.cmd'), ['/d', '/s', '/c', '"C:\\Users\\Jane Smith\\npm\\codex.cmd"']);
+  assert.equal(cmdFallbackPrefix('C:\\bad"path\\codex.cmd'), null);
 });
 
 test('snapshot: detects content, new, deleted, mode, and ignored-protected changes', () => {

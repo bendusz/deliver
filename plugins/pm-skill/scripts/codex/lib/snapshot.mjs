@@ -41,7 +41,8 @@ function fingerprint(root, rel, modes) {
     return `symlink:${gitOut(root, ['hash-object', '--stdin'], target).trim()}`;
   }
   if (st.isFile()) {
-    const mode = WIN ? (modes.get(rel) || '100644') : (st.mode & 0o111 ? '100755' : '100644');
+    // Owner exec bit only (0o100), matching git's index semantics and the original `[ -x ]` check.
+    const mode = WIN ? (modes.get(rel) || '100644') : (st.mode & 0o100 ? '100755' : '100644');
     return `file:${mode}:${gitOut(root, ['hash-object', '--no-filters', '--', abs]).trim()}`;
   }
   if (st.isDirectory()) {
