@@ -31,7 +31,7 @@ const me = pmActorId(root);
 if (!me || target === me) process.exit(0);
 
 // Synchronous write: a stream write immediately followed by process.exit() can be truncated.
-fs.writeSync(2, `pm-skill: blocked a write to pm/actors/${base}: that is '${target}'s state file and you are '${me}'.
+fs.writeSync(2, `pm-skill blocked a write to pm/actors/${base}: that is '${target}'s state file and you are '${me}'.
 Each actor writes only their own pm/actors/<id>.json and <id>.HANDOFF.md. Coordinate through
 pm/pm-state.json (assignments) and pm/log.md instead.
 (Set PM_SKILL_NO_ENFORCE=1 to disable this guard.)

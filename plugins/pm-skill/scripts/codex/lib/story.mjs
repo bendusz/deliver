@@ -38,9 +38,12 @@ export function parseStory(root, storyRel) {
   const builderLine = head.map((l) => l.match(/^Builder:\s*(.*?)\s*$/)).find(Boolean);
   if (builderLine && builderLine[1] !== meta.builder) throw blocked('story pm-meta builder does not match the visible Builder field');
 
-  // The capture starts after the FIRST `Touches:` on the line, so a second label stays in
-  // the value and fails the path checks below. That is the safe reading of an odd line.
-  const touchesLine = head.map((l) => l.match(/Touches:\s*(.*)$/)).find(Boolean);
+  // The legacy Touches field only ever sat in the pre-0.17 header, on lines 3 to 5 of the
+  // file. Anchoring the search to that window keeps a "Touches:" mentioned in the story's
+  // Context from being mistaken for the legacy field. The capture starts after the FIRST
+  // `Touches:` on the line, so a second label stays in the value and fails the path checks
+  // below. That is the safe reading of an odd line.
+  const touchesLine = head.slice(2, 5).map((l) => l.match(/Touches:\s*(.*)$/)).find(Boolean);
   if (touchesLine) {
     const visibleRaw = touchesLine[1].trim();
     if (visibleRaw === '' || visibleRaw === '-' || /[<>]/.test(visibleRaw)) throw blocked('visible Touches must match bounded story pm-meta touches');

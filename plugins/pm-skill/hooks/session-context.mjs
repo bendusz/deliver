@@ -64,7 +64,7 @@ if (isRecord(my)) {
     else say(`A current pm/actors/${me}.HANDOFF.md briefing exists: read it first; it replaces re-discovery.`);
   }
 } else {
-  say(`No actor file for you (${me}) yet: /pm-skill:resume creates pm/actors/${me}.json.`);
+  say(`No actor file for you (${me}) yet; /pm-skill:resume creates pm/actors/${me}.json.`);
 }
 
 // A long-running project can collect dozens of actor files, and every line here costs

@@ -89,6 +89,8 @@ test('story: pm-meta is authoritative; legacy visible fields are optional but mu
   expectBlocked(STORY_LEGACY.replace('Builder: codex-builder', 'Builder: expert-builder'), /does not match/);
   expectBlocked(STORY_LEGACY.replace('Touches: src', 'Touches: lib'), /visible Touches/);
   expectBlocked(STORY_LEGACY.replace('Touches: src', 'Touches: '), /visible Touches/);
+  fs.writeFileSync(story, STORY_V2.replace('## Acceptance criteria (testable)', '## Acceptance criteria (testable)\nTouches: nothing'));
+  assert.deepEqual(parseStory(p, rel), { builder: 'codex-builder', scopes: ['src'] });
 });
 
 test('result.emit: a synchronous write is not truncated by an immediate process.exit', () => {

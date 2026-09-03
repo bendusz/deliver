@@ -192,6 +192,8 @@ test('session: handoff freshness, teammates, no actor file, legacy layouts', () 
   assert.match(session({ cwd: s }), /teammate jordan: story=S1-2 status=- branch=pm\/S1-2/);
   fs.writeFileSync(path.join(actors, 'idle-example-com-000000000000.json'), JSON.stringify({ actor: 'idle', current_story: null, branch: 'main' }));
   assert.doesNotMatch(session({ cwd: s }), /teammate idle/);
+  fs.writeFileSync(path.join(actors, 'nokey-example-com-000000000000.json'), JSON.stringify({ actor: 'nokey', branch: 'main' }));
+  assert.doesNotMatch(session({ cwd: s }), /teammate nokey/);
   fs.rmSync(actors, { recursive: true });
   assert.match(session({ cwd: s }), /Layout is flat single-actor/);
   fs.mkdirSync(path.join(s, 'tmp'));
