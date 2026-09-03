@@ -6,6 +6,7 @@ import { toplevel, gitOut, gitOk, checkIgnore } from '../lib/git.mjs';
 import { requireCodex, READONLY_FLAGS, REVIEW_FLAGS } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
+import { lockedExecArgs } from '../lib/argv.mjs';
 
 const PRESETS = {
   security: 'authn/authz gaps, injection, secret handling, unsafe deserialization, dependency risk',
@@ -69,12 +70,9 @@ export async function runReview(o) {
   const report = path.join(scratch, 'report.md');
   const stderrPath = path.join(scratch, 'stderr.log');
   const stdoutPath = path.join(scratch, 'stdout.log');
-  // --ignore-user-config only skips $CODEX_HOME/config.toml; a trusted repository's
-  // .codex/config.toml can still start MCP server processes (which run OUTSIDE the
-  // shell sandbox), enable hooks/agents, or turn web search back on. Review is
-  // read-only on every platform, so neutralise all four explicitly.
-  const tail = ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral', '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`,
-    '-c', 'mcp_servers={}', '-c', 'features.hooks=false', '-c', 'agents.enabled=false', '-c', 'web_search="disabled"', '-o', report];
+  // `codex exec review` rejects --sandbox, -C, and --color, so the tail carries only the
+  // shared locked flags plus the report path. Review is read-only on every platform.
+  const tail = [...lockedExecArgs(o), '-o', report];
   const clause = objectiveClause(o.objective);
   let args; let stdinText;
   if (o.scope === 'codebase') {

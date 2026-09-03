@@ -9,6 +9,7 @@ import { requireCodex, BUILD_FLAGS } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
 import { makeScratch, runtimeTmp, assertRuntimeRootReal } from '../lib/scratch.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../lib/snapshot.mjs';
+import { lockedExecArgs } from '../lib/argv.mjs';
 
 const WIN = process.platform === 'win32';
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -143,11 +144,10 @@ export async function runBuild(o) {
 
   const sandboxArgs = WIN ? ['--sandbox', 'danger-full-access'] : ['--sandbox', 'workspace-write'];
   const sandboxConfig = WIN ? [] : ['-c', 'sandbox_workspace_write.network_access=false', '-c', 'sandbox_workspace_write.exclude_slash_tmp=true', '-c', 'sandbox_workspace_write.exclude_tmpdir_env_var=true'];
-  const args = ['exec', '--ignore-user-config', '--ignore-rules', '--strict-config', '-C', worktree, ...sandboxArgs, '--ephemeral', '--color', 'never',
-    '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`, '-c', 'allow_login_shell=false', ...sandboxConfig,
+  const args = ['exec', ...lockedExecArgs(o), '-C', worktree, ...sandboxArgs, '--color', 'never',
+    '-c', 'allow_login_shell=false', ...sandboxConfig,
     '-c', 'shell_environment_policy.inherit="core"', '-c', 'shell_environment_policy.ignore_default_excludes=false', '-c', 'shell_environment_policy.experimental_use_profile=false',
     '-c', `shell_environment_policy.set.TMPDIR=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TMP=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TEMP=${tomlString(rt)}`,
-    '-c', 'agents.enabled=false', '-c', 'web_search="disabled"', '-c', 'mcp_servers={}', '-c', 'features.hooks=false',
     '--output-schema', SCHEMA, '-o', files.result, '-'];
 
   let run;

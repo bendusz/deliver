@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { parseArgs, UsageError } from '../codex/lib/args.mjs';
+import { lockedExecArgs } from '../codex/lib/argv.mjs';
 import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
 import { parseStory } from '../codex/lib/story.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
@@ -40,6 +41,21 @@ test('args: defaults per mode and validation', () => {
   assert.throws(() => parseArgs(['--mode', 'build', '--preflight', '--worktree', '/w', '--story', 'x.md', '--evidence', 'e.md']), UsageError);
   const pf = parseArgs(['--mode', 'build', '--preflight', '--worktree', '/w']);
   assert.equal(pf.preflight, true);
+});
+
+test('argv: lockedExecArgs is the one shared flag set every mode passes', () => {
+  const o = { model: 'gpt-5.6-terra', effort: 'high' };
+  const a = lockedExecArgs(o);
+  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral',
+    'gpt-5.6-terra', 'model_reasoning_effort=high', 'mcp_servers={}', 'features.hooks=false',
+    'agents.enabled=false', 'web_search="disabled"']) assert.ok(a.includes(x), x);
+  // `codex exec review` rejects these, so no mode may inherit them from the shared set.
+  for (const x of ['--sandbox', '-C', '--color', '--skip-git-repo-check', '-o', '--output-schema']) {
+    assert.ok(!a.includes(x), `shared args must not carry ${x}`);
+  }
+  const withSearch = lockedExecArgs(o, { search: true });
+  assert.ok(withSearch.includes('--search'));
+  assert.ok(!withSearch.includes('web_search="disabled"'));
 });
 
 test('args: a usage error from the real runner prints usage on stderr with exit 64', () => {
