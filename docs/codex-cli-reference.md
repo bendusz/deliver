@@ -212,7 +212,7 @@ junction: the runner `lstat`s it, requires its realpath to be `<root>/<name>`, a
 edits `.gitignore` itself; when run inside a git repo and the output directory is not already ignored,
 it reports the root-anchored rule that is needed (`gitignore_rule_needed: '/<dir>/'`) so the PM
 can apply it, asking the user first for a pre-existing non-ignored directory that may already
-hold user files.
+hold user files. `PM_CODEX_STAMP` pins the report stamp; used by the tests.
 
 **`advise` and `research`.** Always read-only, on every platform.
 

@@ -15,7 +15,12 @@ const PRESETS = {
   performance: 'algorithmic complexity, N+1 patterns, unnecessary allocation/IO, hot paths',
 };
 const CODEBASE_PROMPT = 'Review this codebase as a senior engineer. Read the repository structure and the most important modules first. Report findings ordered by severity (block, major, minor, nit) with file paths and line references, then a short overall assessment.';
-const stamp = () => new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+// PM_CODEX_STAMP lets tests pin the report stamp instead of racing wall-clock seconds.
+const stamp = () => {
+  const override = process.env.PM_CODEX_STAMP;
+  if (override && /^\d{8}-\d{6}$/.test(override)) return override;
+  return new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+};
 const slug = (s) => {
   const base = s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
   if (base === '') return 'custom';
