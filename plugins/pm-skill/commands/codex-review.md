@@ -29,7 +29,7 @@ scanner when one is installed (`gitleaks`, `trufflehog`); otherwise pipe the dif
 value patterns with `git diff <range> | node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" scan`. Quote the
 path, because plugin roots can hold spaces; a non-zero exit means secret-shaped content. If it trips,
 do **not** launch the review. Scan values, not labels: a name like `APIClient` is not a secret, and
-real credentials are often lowercase.
+real credentials are often lowercase. For `codebase` scope there is no diff; scan the tracked tree instead with `git ls-files -z | xargs -0 cat | node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" scan` (PowerShell: `git ls-files | ForEach-Object { Get-Content $_ -Raw } | node ... scan`).
 
 ## 3. Preflight
 
