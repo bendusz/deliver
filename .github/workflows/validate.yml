@@ -31,7 +31,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Configure git identity for fixtures
+      - name: Set default branch for fixture repos
         run: git config --global init.defaultBranch main
       - name: Node tests
         run: node --test plugins/pm-skill/scripts/tests/

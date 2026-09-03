@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Retained only because scripts/codex-builder-run.sh still sources it; plan v0.16b deletes both.
+# Runtime hooks are the .mjs files in this directory.
 # pm-skill hooks — shared library. Sourced by every hook; also a tiny CLI:
 #   printf '%s' "$diff" | lib.sh scan   # exit 1 if secret-shaped content found
 #

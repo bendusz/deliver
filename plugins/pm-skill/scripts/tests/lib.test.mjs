@@ -113,6 +113,7 @@ test('pmSecretScan: token formats and assignments', () => {
   assert.match(pmSecretScan('key AKIAIOSFODNN7EXAMPLE ok'), /token format/);
   assert.match(pmSecretScan('ghp_abcdefghijklmnopqrstuvwxyz012345'), /token format/);
   assert.match(pmSecretScan('-----BEGIN RSA PRIVATE KEY-----'), /token format/);
+  assert.equal(pmSecretScan('Stored the deploy token:\nci-secrets-manager-2026'), null);
 });
 
 test('lib.mjs CLI: scan and actor-id', () => {

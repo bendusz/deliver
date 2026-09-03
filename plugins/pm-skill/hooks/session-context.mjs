@@ -7,7 +7,7 @@
 // output) in any project that is not PM-managed. Fail-open throughout.
 import fs from 'node:fs';
 import path from 'node:path';
-import { readHookInput, readJson, pmRoot, pmActorId } from './lib.mjs';
+import { readHookInput, readJson, pmRoot, pmActorId, isDir, listDir } from './lib.mjs';
 
 if (process.env.PM_SKILL_NO_ENFORCE === '1') process.exit(0);
 
@@ -37,7 +37,7 @@ if (!st || typeof st !== 'object') {
 say(`project: phase=${v(st.phase, '?')} sprint=${v(st.current_sprint, '-')}/${v(st.total_sprints, '-')} signed_off=${st.signed_off === undefined || st.signed_off === null ? '?' : String(st.signed_off)}`);
 
 const actorsDir = path.join(cwd, 'pm', 'actors');
-if (!fs.existsSync(actorsDir) || !fs.statSync(actorsDir).isDirectory()) {
+if (!isDir(actorsDir)) {
   say(`you: story=${v(st.current_story, '-')} status=${v(st.current_story_status, '-')} builder=${v(st.resolved_builder, '-')} next=${v(st.next, '?')}`);
   say('Layout is flat single-actor (pre-0.9) — /pm-skill:resume migrates it to pm/actors/.');
   say(RESUME);
@@ -60,7 +60,7 @@ if (my && typeof my === 'object') {
   say(`No actor file for you (${me}) yet — /pm-skill:resume creates pm/actors/${me}.json.`);
 }
 
-for (const name of fs.readdirSync(actorsDir).filter((n) => n.endsWith('.json')).sort()) {
+for (const name of listDir(actorsDir).filter((n) => n.endsWith('.json')).sort()) {
   const other = name.slice(0, -'.json'.length);
   if (other === me) continue;
   const o = readJson(path.join(actorsDir, name));

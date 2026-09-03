@@ -48,6 +48,18 @@ for h in plugins/pm-skill/hooks/*.sh; do
   [ "$(basename "$h")" = "lib.sh" ] || err "bash hook found under plugins/pm-skill/hooks/ (runtime must be Node only): $h"
 done
 grep -lE '\bjq\b' plugins/pm-skill/hooks/*.mjs >/dev/null 2>&1 && err "jq referenced under plugins/pm-skill/hooks/"
+node -e '
+const fs=require("fs");
+const root="plugins/pm-skill";
+const h=JSON.parse(fs.readFileSync(root+"/hooks/hooks.json","utf8")).hooks;
+let bad=0;
+for (const ev of Object.values(h)) for (const m of ev) for (const e of m.hooks) {
+  const p=(e.args||[])[0]; if(!p) continue;
+  const f=p.replace("${CLAUDE_PLUGIN_ROOT}",root);
+  if(!fs.existsSync(f)){console.error("hooks.json references a missing file: "+f);bad=1;}
+}
+process.exit(bad);
+' || err "hooks.json references a missing hook script"
 [ -x plugins/pm-skill/scripts/codex-builder-run.sh ] || err "Codex builder runner is not executable"
 [ -x plugins/pm-skill/scripts/score-builder-benchmark.sh ] || err "builder benchmark scorer is not executable"
 [ -x plugins/pm-skill/scripts/smoke-codex-builder-live.sh ] || err "bundled live Codex builder smoke test is not executable"

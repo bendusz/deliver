@@ -82,6 +82,7 @@ test('secrets: prose in pm/ is allowed, shaped values are blocked', () => {
   assert.equal(secrets(content(g, log, 'ghp_abcdefghijklmnopqrstuvwxyz012345')), 2);
   assert.equal(secrets(content(g, log, '-----BEGIN RSA PRIVATE KEY-----')), 2);
   assert.equal(secrets(content(g, log, 'Password: "use a sentence here"')), 0);
+  assert.match(runHook('pm-secrets-guard.mjs', content(g, log, 'API_KEY=abcdefghijklmno')).stderr, /blocked a write to pm\/log\.md — the content contains a secret-shaped string/);
 });
 
 test('secrets: ignores writes outside pm/, guards traversal and symlinks into pm/', (t) => {
@@ -99,6 +100,7 @@ test('secrets: scans Edit.new_string and MultiEdit.edits[].new_string', () => {
   assert.equal(secrets({ cwd: g, tool_input: { file_path: log, new_string: 'API_KEY=abcdefghijklmno' } }), 2);
   assert.equal(secrets({ cwd: g, tool_input: { file_path: log, edits: [{ new_string: 'fine' }, { new_string: 'API_KEY=abcdefghijklmno' }] } }), 2);
   assert.equal(secrets({ cwd: g, tool_input: { file_path: log } }), 0);
+  assert.equal(secrets({ cwd: g, tool_input: { file_path: log, edits: [{ new_string: 'Rotated the deploy token:' }, { new_string: 'ci-secrets-manager-2026' }] } }), 0);
 });
 
 const actor = (input, env) => runHook('actor-guard.mjs', input, env).status;
@@ -113,6 +115,7 @@ test('actor: own files allowed, other actors blocked, non-actor files allowed', 
   assert.equal(actor(writeInput(a, path.join(actors, 'jordan-example-com-000000000000.HANDOFF.md'))), 2);
   assert.equal(actor(writeInput(a, path.join(actors, 'README.txt'))), 0);
   assert.equal(actor(writeInput(a, path.join(a, 'pm', 'log.md'))), 0);
+  assert.match(runHook('actor-guard.mjs', writeInput(a, path.join(actors, 'jordan-example-com-000000000000.json'))).stderr, /that is 'jordan-example-com-000000000000's state file and you are 'casey-example-com-589b8fa8ab93'/);
 });
 
 test('actor: F4 cross-domain and bare local-part ids are other actors', () => {

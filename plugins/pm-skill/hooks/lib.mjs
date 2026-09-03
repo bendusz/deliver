@@ -23,8 +23,11 @@ export function git(cwd, args) {
   }
 }
 
-function isDir(p) {
+export function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch { return false; }
+}
+export function listDir(p) {
+  try { return fs.readdirSync(p); } catch { return []; }
 }
 function isSymlink(p) {
   try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; }
@@ -49,6 +52,8 @@ export function pmRoot(cwd) {
 // canonicalises through the deepest EXISTING ancestor, so 'pm/../src/app.py'
 // classifies as 'src/app.py' and a symlinked directory cannot alias one prefix
 // to another. Traversal segments in the non-existing tail are rejected.
+// Unlike the bash version, '..' through a symlinked directory resolves physically
+// (what the kernel opens), which is the safer classification.
 export function pmRelpath(root, target) {
   if (!target) return null;
   const realRoot = realpath(root);
@@ -156,8 +161,9 @@ const ASSIGNMENTS = [
 ];
 
 export function pmSecretScan(text) {
-  if (TOKEN_FORMATS.some((re) => re.test(text))) return 'secret-shaped token format detected';
-  if (ASSIGNMENTS.some((re) => re.test(text))) return 'credential assignment with a real-looking value detected';
+  const lines = String(text).split(/\r?\n/);
+  if (lines.some((l) => TOKEN_FORMATS.some((re) => re.test(l)))) return 'secret-shaped token format detected';
+  if (lines.some((l) => ASSIGNMENTS.some((re) => re.test(l)))) return 'credential assignment with a real-looking value detected';
   return null;
 }
 

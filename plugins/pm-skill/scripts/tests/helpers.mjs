@@ -10,7 +10,9 @@ export const HOOKS_DIR = path.join(PLUGIN_ROOT, 'hooks');
 
 const cleanup = [];
 process.on('exit', () => {
-  for (const d of cleanup) fs.rmSync(d, { recursive: true, force: true });
+  for (const d of cleanup) {
+    try { fs.rmSync(d, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }); } catch {}
+  }
 });
 
 export function tmpDir(prefix = 'pmtest-') {
