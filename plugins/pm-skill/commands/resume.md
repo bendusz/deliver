@@ -14,4 +14,7 @@ Summarise where things stand, including teammates' positions from the other `pm/
 If `AGENTS.md` is absent at the project root, say so in one line and point to the migration in
 `references/instruction-layers.md`. Do not write it during resume.
 
+On a `standard` or larger project with no `docs/wiki/`, offer the backfill in
+`references/knowledge.md`. Do not run it unasked.
+
 If no state file exists in any location, there is nothing to resume. Start from discovery instead.

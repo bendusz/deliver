@@ -42,7 +42,8 @@ non-event criteria. Sharper criteria make `test-engineer` and `pm-verifier` more
 ## Protect your context
 For heavy reading, dispatch a read-only subagent with a tight question and take back a short summary:
 `researcher` for prior art and external docs, whose findings land under `docs/research/`, and
-`codebase-analyst` for an existing codebase. Do not read large sources into your own context.
+`codebase-analyst` for an existing codebase. With a wiki, ingest each report per `knowledge.md`. Do
+not read large sources into your own context.
 
 ## Exit gate
 The spec has no blocking `[NEEDS CLARIFICATION]` before planning begins. A non-blocking unknown may

@@ -11,8 +11,8 @@ logs or state. Offer remediation as suggestions only.
 
 ## Inputs (whichever exist)
 
-`docs/constitution.md`, `docs/spec.md`, `docs/plan.md`, `docs/stories/*.md`, `pm/pm-state.json`,
-`pm/actors/*.json`, `pm/log.md`. Note in the report any that are absent.
+`docs/constitution.md`, `docs/spec.md`, `docs/plan.md`, `docs/stories/*.md`, `docs/wiki/**`,
+`pm/pm-state.json`, `pm/actors/*.json`, `pm/log.md`. Note in the report any that are absent.
 
 ## What to detect
 
@@ -47,6 +47,10 @@ logs or state. Offer remediation as suggestions only.
   nonexistent story or actor file; in-flight stories of different actors whose `pm-meta.touches`
   overlap (serialize or re-scope them); an in-flight sequential story without `resolved_builder`, or
   an active parallel entry without `builder`.
+- **Wiki (only when `docs/wiki/` exists).** An index entry that does not resolve; a page no other
+  page or the index links to; a plan decision or risk with no decision page; two `current`
+  decision pages on one subject (HIGH); a story whose Context cites a concept page marked
+  `superseded`. All MEDIUM unless stated.
 
 ## State health (doctor)
 

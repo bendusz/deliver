@@ -128,8 +128,10 @@ The `pm/` files track *where everyone is*, not *what was decided*.
 
 Pull or rebase first when a remote exists, because teammates' claims and ships become visible only
 after a fetch. Then read the shared `pm/pm-state.json`, followed by **your**
-`pm/actors/<you>.json` and, if it is current, your HANDOFF. The `/pm-skill:resume` command does exactly this, and the bundled `session-context.mjs` hook
-injects a short pointer, yours plus teammate one-liners, into every new or freshly-compacted session.
+`pm/actors/<you>.json` and, if it is current, your HANDOFF. Then, when `docs/wiki/index.md` exists,
+read it before any `docs/` scan. The `/pm-skill:resume` command does exactly this, and the bundled
+`session-context.mjs` hook injects a short pointer, yours plus teammate one-liners, into every new or
+freshly-compacted session.
 Then continue from your recorded `next`, using the persisted `resolved_builder` and counters rather
 than re-deciding from memory. If you are a new actor on an existing project and have no
 `pm/actors/<you>.json` yet, create it from the template and commit it before continuing.

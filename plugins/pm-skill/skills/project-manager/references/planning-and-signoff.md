@@ -10,7 +10,7 @@ this for a greenfield project.
 Greenfield or brownfield: if the plan hinges on an external unknown, a library choice or an
 unfamiliar SDK, dispatch `researcher`, and `codex-researcher` alongside it for a consequential or
 contested call when the codex CLI is installed. Then cite the `docs/research/` reports in the plan's
-decisions.
+decisions. With a wiki, ingest each report per `knowledge.md`.
 
 Design exploration, optional: if a design-exploration skill is installed, for example
 `poteto:architect`, which sketches types, signatures, and module boundaries across several competing
@@ -79,6 +79,8 @@ but it is fail-open and can be disabled, so holding the line is still your respo
   not an `@AGENTS.md` bridge, leave both and log a WARN; `/pm-skill:doctor` reports it. When the
   plan's Delivery mode says `Instruction rules: pm-state`, also write `.claude/rules/pm-state.md`
   from `rules-pm-state.md.template` and `pm/AGENTS.md` from `pm-AGENTS.md.template`.
+- At `standard` scale and above, write `docs/wiki/schema.md` and `docs/wiki/index.md` from
+  `wiki-schema.md.template` and `wiki-index.md.template`; `knowledge.md` owns the wiki.
 - Ensure `.gitignore` includes `tmp/`, appending rather than clobbering an existing `.gitignore`.
   `tmp/` is ephemeral scratch and never enters git. The tracked `pm/` state files must **not** be
   ignored, and `.gitattributes` must carry `pm/log.md merge=union`.
@@ -87,7 +89,8 @@ but it is fail-open and can be disabled, so holding the line is still your respo
 - The branch the scaffold commit lands on, `main` by default, is the integration branch: the base you
   cut every story branch from and merge each story back into.
 
-Log the scaffold step. Then load `decomposition.md`.
+Log the scaffold step. With a wiki, dispatch the first `librarian ingest` per `knowledge.md` and log
+its receipt. Then load `decomposition.md`.
 
 ## Checkpoint policy (recorded in Delivery mode, applied during the loop)
 - Default sprint-level: run all the sprint's stories, then pause for the user's review at the sprint
