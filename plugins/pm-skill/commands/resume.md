@@ -7,7 +7,7 @@ Use the `project-manager` skill to resume work on this project.
 First read the shared `pm/pm-state.json` (phase, sprint, sign-off status, `assignments`), then
 **your** `pm/actors/<actor-id>.json` (actor id per `references/logging-and-state.md`: full-email
 slug + digest, e.g. `v-bende-gmail-com-0719f22c3305` — derive it with
-`bash -c '. "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"; pm_actor_id .'`, never by hand) — your story,
+`node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" actor-id .`, never by hand) — your story,
 branch, loop counters
 (`current_story_rounds`/`current_story_retries`; the fix/retry caps count what earlier sessions
 already spent), persisted `resolved_builder`, and `next`. For a parallel batch, use each entry's

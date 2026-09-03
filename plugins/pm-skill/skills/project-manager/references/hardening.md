@@ -6,9 +6,9 @@ is entirely opt-in and lives in the *project's* own config, not in the plugin â€
 (the optional allowlist example needs `jq`).
 
 ## What's already enforced
-- **Sign-off:** the bundled `PreToolUse` hook (`hooks/require-signoff.sh`) blocks implementation writes
+- **Sign-off:** the bundled `PreToolUse` hook (`hooks/require-signoff.mjs`) blocks implementation writes
   until `pm/pm-state.json` has `signed_off: true`. Fail-open; kill switch `PM_SKILL_NO_ENFORCE=1`.
-- **No secrets in `pm/`:** the bundled `PreToolUse` hook (`hooks/pm-secrets-guard.sh`) blocks writes
+- **No secrets in `pm/`:** the bundled `PreToolUse` hook (`hooks/pm-secrets-guard.mjs`) blocks writes
   into the git-tracked `pm/` directory whose content matches high-confidence secret shapes (AWS/GitHub/
   Slack/API tokens, PEM private keys, JWTs, quoted credential assignments). A tripwire for accidents,
   not a scanner â€” prose about secrets never trips it. Same fail-open design and kill switch.

@@ -7,6 +7,7 @@ fail=0
 err(){ echo "FAIL: $*" >&2; fail=1; }
 
 command -v jq >/dev/null 2>&1 || { echo "validate.sh: jq is required" >&2; exit 2; }
+command -v node >/dev/null 2>&1 || { echo "validate.sh: node (20+) is required" >&2; exit 2; }
 
 # 1) JSON validity
 for f in .claude-plugin/marketplace.json \
@@ -38,10 +39,15 @@ for md in plugins/pm-skill/skills/project-manager/SKILL.md plugins/pm-skill/agen
   head -n 12 "$md" | grep -q '^description:' || err "no 'description:' frontmatter in $md"
 done
 
-# 5) every bundled hook script must be executable
-for h in plugins/pm-skill/hooks/*.sh; do
-  [ -x "$h" ] || err "hook not executable: $h"
+# 5) every bundled hook is valid Node ESM and no bash or jq survives under hooks/
+for h in plugins/pm-skill/hooks/*.mjs; do
+  node --check "$h" 2>/dev/null || err "hook does not parse: $h"
 done
+for h in plugins/pm-skill/hooks/*.sh; do
+  [ -e "$h" ] || continue
+  [ "$(basename "$h")" = "lib.sh" ] || err "bash hook found under plugins/pm-skill/hooks/ (runtime must be Node only): $h"
+done
+grep -lE '\bjq\b' plugins/pm-skill/hooks/*.mjs >/dev/null 2>&1 && err "jq referenced under plugins/pm-skill/hooks/"
 [ -x plugins/pm-skill/scripts/codex-builder-run.sh ] || err "Codex builder runner is not executable"
 [ -x plugins/pm-skill/scripts/score-builder-benchmark.sh ] || err "builder benchmark scorer is not executable"
 [ -x plugins/pm-skill/scripts/smoke-codex-builder-live.sh ] || err "bundled live Codex builder smoke test is not executable"
@@ -147,9 +153,9 @@ for md in plugins/pm-skill/agents/*.md; do
 done
 
 # 15) behavioral tests (quota-free; needs jq + git, both required above)
-if ! bash "$(dirname "$0")/test-hooks.sh" >/dev/null 2>&1; then
-  bash "$(dirname "$0")/test-hooks.sh" || true
-  err "hook behavioral tests failed (scripts/test-hooks.sh)"
+if ! node --test plugins/pm-skill/scripts/tests/lib.test.mjs plugins/pm-skill/scripts/tests/hooks.test.mjs >/dev/null 2>&1; then
+  node --test plugins/pm-skill/scripts/tests/lib.test.mjs plugins/pm-skill/scripts/tests/hooks.test.mjs || true
+  err "hook behavioral tests failed (node --test plugins/pm-skill/scripts/tests)"
 fi
 if ! bash "$(dirname "$0")/test-codex-builder.sh" >/dev/null 2>&1; then
   bash "$(dirname "$0")/test-codex-builder.sh" || true

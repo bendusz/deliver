@@ -105,7 +105,7 @@ story is judged by the **same** deterministic gates and review panel below.
 5. **External review (optional).** Only if an external reviewer is **explicitly available**:
    secret-scan the **exact outgoing diff** first — prefer a real scanner when one is installed
    (`gitleaks`, `trufflehog`); otherwise pipe the diff through the bundled value patterns:
-   `git diff <range> | "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh" scan` (quote the path — plugin roots
+   `git diff <range> | node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" scan` (quote the path — plugin roots
    can contain spaces; non-zero exit = secret-shaped content). If it trips, do **not** send code out. (Scan values, not labels — a name like
    `APIClient` is not a secret, and real credentials are often lowercase.) Then an independent review → feed findings back → fix. If no
    external reviewer is available, **log that it was skipped** — never silently.

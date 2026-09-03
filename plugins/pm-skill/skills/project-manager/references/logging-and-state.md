@@ -45,8 +45,8 @@ lowercased email (fallback source: `user.name`; last resort `unknown-actor`). Sl
 runs of non-alphanumerics → `-`, trimmed; digest = two POSIX `cksum` values in hex, truncated to 12 —
 `v.bende@gmail.com` → `v-bende-gmail-com-0719f22c3305`. The full email separates domains
 (`alex@company-a.com` vs `alex@company-b.com`) and the digest separates slug homographs
-(`alex.foo@` vs `alex-foo@`). Derive it with `hooks/lib.sh`'s `pm_actor_id` (hooks source it;
-commands can run `bash -c '. "${CLAUDE_PLUGIN_ROOT}/hooks/lib.sh"; pm_actor_id .'`) — never
+(`alex.foo@` vs `alex-foo@`). Derive it with `hooks/lib.mjs` (hooks import it; commands run
+`node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" actor-id .`) — never
 hand-compute it. Changing git identity mid-project creates a second actor file —
 `/pm-skill:doctor` flags orphans.
 
