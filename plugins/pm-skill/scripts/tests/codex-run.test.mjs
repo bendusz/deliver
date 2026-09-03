@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs, UsageError } from '../codex/lib/args.mjs';
 import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
 import { parseStory } from '../codex/lib/story.mjs';
+import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
 import { PLUGIN_ROOT, tmpDir, gitIn, newBuildProject } from './helpers.mjs';
 
 test('args: defaults per mode and validation', () => {
@@ -67,4 +68,28 @@ test('result.emit: a synchronous write is not truncated by an immediate process.
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', maxBuffer: 1 << 24 });
   assert.equal(JSON.parse(r.stdout).big.length, 200000);
   assert.equal(r.status, 74);
+});
+
+test('snapshot: detects content, new, deleted, mode, and ignored-protected changes', () => {
+  const p = newBuildProject(true);
+  const before = snapshotWorktree(p);
+  assert.ok(before.has('src/script.sh') && before.has('docs/stories/S1-1-fix.md') && before.has('pm/pm-state.json'));
+  assert.equal(before.get('docs/spec.md'), 'missing');
+  fs.writeFileSync(path.join(p, 'src', 'fix.txt'), 'new\n');
+  fs.appendFileSync(path.join(p, '.gitignore'), 'pm/hidden.md\n');
+  fs.writeFileSync(path.join(p, 'pm', 'hidden.md'), 'hidden\n');
+  fs.rmSync(path.join(p, 'src', 'script.sh'));
+  const after = snapshotWorktree(p);
+  assert.deepEqual(changedPaths(before, after), ['.gitignore', 'pm/hidden.md', 'src/fix.txt', 'src/script.sh']);
+  const meta1 = gitMetadataFingerprint(p);
+  gitIn(p, ['branch', 'other']);
+  assert.notEqual(gitMetadataFingerprint(p), meta1);
+});
+
+test('snapshot: executable bit is part of the delta on POSIX', (t) => {
+  if (process.platform === 'win32') return t.skip('no exec bit on win32');
+  const p = newBuildProject(true);
+  const before = snapshotWorktree(p);
+  fs.chmodSync(path.join(p, 'src', 'script.sh'), 0o755);
+  assert.deepEqual(changedPaths(before, snapshotWorktree(p)), ['src/script.sh']);
 });
