@@ -591,15 +591,14 @@ test('review: the suffix loop tries every name through -500', () => {
   const p = newBuildProject(true); const s = makeStub();
   const out = path.join(p, 'untracked');
   fs.mkdirSync(out, { recursive: true });
-  // The report name carries a second-resolution stamp, so take every name from `.md` to
-  // `-499.md` for the whole window the run can land in. Only `-500` is left free.
-  const stampAt = (ms) => new Date(ms).toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-  for (let sec = 0; sec < 8; sec += 1) {
-    const nameBase = `${stampAt(Date.now() + sec * 1000)}-codex-review-recent-collide`;
-    fs.writeFileSync(path.join(out, `${nameBase}.md`), '');
-    for (let n = 2; n <= 499; n += 1) fs.writeFileSync(path.join(out, `${nameBase}-${n}.md`), '');
-  }
-  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', 'collide', '--out', out], { stub: s, cwd: p });
+  // PM_CODEX_STAMP pins the runner's stamp so the pre-created names are guaranteed to
+  // collide, rather than racing the runner's own wall-clock stamp() call. Pre-create
+  // every name from `.md` to `-499.md`; only `-500` is left free.
+  const fixedStamp = '20260101-000000';
+  const nameBase = `${fixedStamp}-codex-review-recent-collide`;
+  fs.writeFileSync(path.join(out, `${nameBase}.md`), '');
+  for (let n = 2; n <= 499; n += 1) fs.writeFileSync(path.join(out, `${nameBase}-${n}.md`), '');
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', 'collide', '--out', out], { stub: s, cwd: p, env: { PM_CODEX_STAMP: fixedStamp } });
   assert.equal(r.status, 0, JSON.stringify(r.out));
   assert.match(path.basename(r.out.report_path), /-collide-500\.md$/);
 });
