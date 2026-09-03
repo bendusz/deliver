@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { newProj, runHook, writeInput, canSymlink, tmpDir } from './helpers.mjs';
+import { newProj, runHook, writeInput, canSymlink, tmpDir, gitIn } from './helpers.mjs';
 
 const signoff = (input, env) => runHook('require-signoff.mjs', input, env).status;
 
@@ -99,4 +99,45 @@ test('secrets: scans Edit.new_string and MultiEdit.edits[].new_string', () => {
   assert.equal(secrets({ cwd: g, tool_input: { file_path: log, new_string: 'API_KEY=abcdefghijklmno' } }), 2);
   assert.equal(secrets({ cwd: g, tool_input: { file_path: log, edits: [{ new_string: 'fine' }, { new_string: 'API_KEY=abcdefghijklmno' }] } }), 2);
   assert.equal(secrets({ cwd: g, tool_input: { file_path: log } }), 0);
+});
+
+const actor = (input, env) => runHook('actor-guard.mjs', input, env).status;
+const ME = 'casey-example-com-589b8fa8ab93';
+
+test('actor: own files allowed, other actors blocked, non-actor files allowed', () => {
+  const a = newProj(false);
+  const actors = path.join(a, 'pm', 'actors');
+  assert.equal(actor(writeInput(a, path.join(actors, `${ME}.json`))), 0);
+  assert.equal(actor(writeInput(a, path.join(actors, `${ME}.HANDOFF.md`))), 0);
+  assert.equal(actor(writeInput(a, path.join(actors, 'jordan-example-com-000000000000.json'))), 2);
+  assert.equal(actor(writeInput(a, path.join(actors, 'jordan-example-com-000000000000.HANDOFF.md'))), 2);
+  assert.equal(actor(writeInput(a, path.join(actors, 'README.txt'))), 0);
+  assert.equal(actor(writeInput(a, path.join(a, 'pm', 'log.md'))), 0);
+});
+
+test('actor: F4 cross-domain and bare local-part ids are other actors', () => {
+  const a = newProj(false);
+  const actors = path.join(a, 'pm', 'actors');
+  assert.equal(actor(writeInput(a, path.join(actors, 'casey-other-org.json'))), 2);
+  assert.equal(actor(writeInput(a, path.join(actors, 'casey.json'))), 2);
+});
+
+test('actor: a symlink named after us still blocks by real target', (t) => {
+  const a = newProj(false);
+  const actors = path.join(a, 'pm', 'actors');
+  const other = path.join(actors, 'jordan-example-com-000000000000.json');
+  fs.writeFileSync(other, '{}');
+  if (!canSymlink(other, path.join(actors, `${ME}.HANDOFF.md`))) return t.skip('symlinks unavailable');
+  assert.equal(actor(writeInput(a, path.join(actors, `${ME}.HANDOFF.md`))), 2);
+});
+
+test('actor: kill switch and no derivable identity allow', () => {
+  const a = newProj(false);
+  const other = path.join(a, 'pm', 'actors', 'jordan-example-com-000000000000.json');
+  assert.equal(actor(writeInput(a, other), { PM_SKILL_NO_ENFORCE: '1' }), 0);
+  const b = newProj(false);
+  gitIn(b, ['config', '--unset', 'user.email']);
+  gitIn(b, ['config', '--unset', 'user.name']);
+  const r = actor(writeInput(b, path.join(b, 'pm', 'actors', 'jordan-example-com-000000000000.json')), { GIT_CONFIG_GLOBAL: path.join(b, 'no-global'), GIT_CONFIG_SYSTEM: path.join(b, 'no-system') });
+  assert.equal(r, 0);
 });
