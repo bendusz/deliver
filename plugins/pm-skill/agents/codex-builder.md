@@ -30,21 +30,23 @@ Optional dispatch overrides are `Model`, `Effort`, and `Timeout seconds`. Defaul
 Call the bundled runner once, in the foreground, with every path quoted:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/codex-builder-run.sh" \
+node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" \
+  --mode "$MODE" \
   --worktree "$WORKTREE" \
-  --story "$STORY" \
-  --mode "$MODE"
+  --story "$STORY"
 ```
 
 For fix mode, add `--evidence "$EVIDENCE"`. Add `--model`, `--effort`, or `--timeout-seconds` only
 when the dispatch explicitly overrides a default. Never add other arguments.
 
 The runner owns every safety detail: exact-root path checks, fail-closed PM sign-off, the story's
-machine `pm-meta.touches` allowlist, Codex auth and capability checks, `workspace-write`, fixed `-C`,
-host-temp exclusion, a worktree-local runtime temp directory, reduced secret-filtered environment,
-disabled login shells/subagents/network/web/MCP/hooks, ignored user config and execution rules, a
-bounded foreground session, structured output, before/after snapshots, and protected Git-state
-checks. It never passes bypass, full-auto, or extra-directory flags.
+machine `pm-meta.touches` allowlist, Codex auth and capability checks, the platform sandbox
+(`workspace-write` on macOS and Linux; full access on Windows, where out-of-scope writes are
+detected after the run instead of prevented), fixed `-C`, a worktree-local runtime temp directory,
+reduced secret-filtered environment, disabled subagents, network, web search, MCP, and hooks,
+ignored user config and rules, a bounded foreground session, structured output, before/after
+snapshots, and protected Git-state checks. Wrappers never pass sandbox or approval flags; the
+runner decides them per platform.
 
 ## Return
 
@@ -53,7 +55,7 @@ Return the runner's JSON, condensed to at most 20 lines while preserving:
 - runner status and Codex `done` or `blocked` status;
 - root cause, authoritative `actual_files_changed`, summary, and test results;
 - actual `git_status_short` from the runner;
-- model, effort, timeout, Codex version, and retained diagnostic paths when a run fails;
+- model, effort, timeout, sandbox, Codex version, and retained diagnostic paths when a run fails;
 - any failure reason or safety violation.
 
 Do not claim success when the runner exits non-zero. A safety violation, timeout, or interruption

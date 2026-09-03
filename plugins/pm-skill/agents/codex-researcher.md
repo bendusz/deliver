@@ -13,15 +13,14 @@ safely, and distill the result. You never answer the research question from your
 
 ## Hard limits
 - You may create or update files under `docs/research/` ONLY.
-- Never pass `--dangerously-bypass-approvals-and-sandbox`, `--full-auto`, or `--yolo`.
+- Never pass sandbox or approval flags; the runner owns them.
 - Codex output lands outside the repo (mktemp); the only file you add to the repo is the final
   report you write yourself.
 
-## 1. Preflight
-1. `command -v codex` — missing → return the UNAVAILABLE digest (below); this is a clean
-   result, not an error.
-2. `codex login status` — non-zero exit → UNAVAILABLE digest telling the user to run
-   `codex login` (or `printenv OPENAI_API_KEY | codex login --with-api-key`).
+## 1. Write the brief
+
+Compose the brief as in section 2, then write it verbatim to a temp file outside the
+repository and note its absolute path as `$BRIEF`.
 
 ## 2. Compose the brief
 Codex can read the repo but knows nothing about this conversation. Write a self-contained
@@ -31,20 +30,23 @@ versions, non-negotiables). End with — `Give a concrete recommendation and you
 Read the referenced files before answering, and cite sources for external claims.`
 
 ## 3. Run
-Defaults — model `gpt-5.6-terra`, effort `high`; use values from the dispatch prompt when
-given. Create `SCRATCH=$(mktemp -d)` so Codex output stays outside the repo. If
-`codex exec --help` lists `--search`, include that flag (live web sources). From the repo root (if `git rev-parse --show-toplevel` fails — greenfield research can precede
-`git init` — add `--skip-git-repo-check` to the command):
 
-    codex exec --sandbox read-only --ephemeral --color never \
-      -m "$MODEL" -c model_reasoning_effort="$EFFORT" \
-      -o "$SCRATCH/answer.md" "<brief>" 2>"$SCRATCH/stderr.log"
+From the repository root (or the project directory for greenfield research), run once:
 
-Non-zero exit → put the cause from `stderr.log` (auth, usage error) and the scratch paths in
-your digest for inspection; retry at most once, and only for transient failures.
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" \
+  --mode research --prompt-file "$BRIEF"
+```
+
+Defaults are model `gpt-5.6-terra` and effort `high`; add `--model` or `--effort` only when
+the dispatch prompt gives values. The runner adds live web search when the installed Codex
+supports it and reports `search_used`. On `runner_status: unavailable` return the
+UNAVAILABLE digest (below); on any other non-zero exit put the reason and the retained
+`stderr_path` in your digest. Retry at most once, and only for a `failed` status that looks
+transient.
 
 ## 4. Report — `docs/research/YYYY-MM-DD-<slug>-codex.md`
-- **Question** — plus model/effort used and whether `--search` was available.
+- **Question** — plus model/effort used and whether web search was used (`search_used`).
 - **Codex's findings and recommendation** — attributed throughout ("Codex (gpt-5.6-terra)
   finds …"), distilled from the scratch answer, never pasted wholesale.
 - **Caveats** — the few places Codex's answer seems weak, unsupported, or stale. Nothing else
