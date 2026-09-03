@@ -1,8 +1,7 @@
-# Review and verification gates
+# Review lenses and finding triage
 
-How a story is judged done. Three independent checks: a reviewer agent for judgement, the
-deterministic gates for mechanics, and a final `pm-verifier` pass for independent confirmation. They
-are separate on purpose.
+Which reviewers a story gets, and what to do with what they return. The gate order, the verifier
+handling, the definition of done, and escalation live in `implementation-loop.md`.
 
 ## The reviewer (separate agent)
 - `code-integrity-reviewer` is **never** the agent that built the story, which avoids self-review
@@ -53,28 +52,3 @@ finds what the change breaks beyond the diff and proves, by running code, the on
 because of. Its confirmed risks enter triage like any other finding.
 
 `technical-writer` and `debugger` are delivery agents, not review lenses. They never gate a story.
-
-## Deterministic gates (you run these)
-- The gates are the project's actual `test`, `lint`, and `build` commands as recorded in the plan and
-  `AGENTS.md`. Any that do not exist are `N/A` and skipped.
-- You, the PM, run them, after the build and again after each fix. Do not take a subagent's word that
-  they pass.
-
-## Final verification gate (you dispatch this)
-After the review panel passes and the deterministic gates are green, dispatch `pm-verifier`, which is
-read-only, to independently confirm the story is shippable. It re-checks the acceptance criteria, the
-diff, the resolved findings, and the gates against actual repo state rather than summaries, and
-returns `STATUS: PASS | FAIL | UNKNOWN`. **PASS** is required before ship. `FAIL` returns to the fix
-loop, and `UNKNOWN` needs the missing evidence or a user escalation. Full handling in
-`verification.md`.
-
-## Definition of done (a story)
-A story is done when all of these hold:
-- every acceptance criterion is met,
-- no open `block` or `major` findings across all selected review lenses,
-- all non-`N/A` gates are green,
-- `pm-verifier` returned `STATUS: PASS`,
-- the outcome is logged.
-
-## Escalation
-If a story is not done after 3 fix and verify iterations, stop and ask the user. Do not loop forever.

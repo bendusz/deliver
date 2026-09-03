@@ -37,7 +37,8 @@ mechanical backstop for high-confidence token shapes; the rule is yours to hold.
 
 ## Actor identity (derived, never configured)
 
-Your actor id comes from git `user.email`. Derive it with the `actor-id` command in `hooks/lib.mjs`
+Your actor id comes from git `user.email`, or from `user.name` when no email is set. Derive it with
+the `actor-id` command in `hooks/lib.mjs`
 (hooks import it; commands run `node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" actor-id .`); never
 construct it by hand. Changing git identity mid-project creates a second actor file, which
 `/pm-skill:doctor` flags. Without any identity the command exits non-zero, so set
@@ -55,9 +56,13 @@ Fields: `project`, `spec`, `constitution`, `scale`, `phase`, `signed_off` (bool)
 
 - `assignments` maps story id to actor id for active claims only. Set the entry when a story is
   claimed and remove it in the ship commit. History lives in the log and the story files.
-- `signed_off` is load-bearing and global. The sign-off hook blocks implementation writes for *every*
-  actor while it is `false`. Set it `true`, with `approver` and `approved_date`, only at the sign-off
-  gate; `/pm-skill:correct-course` may set it back to `false` for a material change.
+- `signed_off` is load-bearing and global. While it is `false`, the `require-signoff.mjs` hook blocks
+  every actor's `Write`, `Edit`, and `MultiEdit` calls, except those targeting `docs/`, `pm/`, `tmp/`,
+  `.git/`, `.claude/rules/`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, or `.gitattributes`. It fails
+  open on any uncertainty, and it never sees writes made through `Bash`, so the behavioural rule
+  still carries the gate. The legacy `tmp/pm-state.json` location is read when `pm/` has none. Set
+  `signed_off` to `true`, with `approver` and `approved_date`, only at the sign-off gate;
+  `/pm-skill:correct-course` may set it back to `false` for a material change.
 
 ## `pm/actors/<you>.json` (yours alone)
 
@@ -131,7 +136,9 @@ The `pm/` files track *where everyone is*, not *what was decided*.
 Read the shared `pm/pm-state.json`, then **your** `pm/actors/<you>.json` and, if it is current, your
 HANDOFF. The `/pm-skill:resume` command does exactly this, and the bundled `session-context.mjs` hook
 injects a short pointer, yours plus teammate one-liners, into every new or freshly-compacted session.
-Then continue from your recorded `next`.
+Then continue from your recorded `next`, using the persisted `resolved_builder` and counters rather
+than re-deciding from memory. If you are a new actor on an existing project and have no
+`pm/actors/<you>.json` yet, create it from the template and commit it before continuing.
 
 If the state you find uses a pre-0.13, flat 0.8, or pre-0.8 layout, migrate it first per
 `references/migrations.md`.

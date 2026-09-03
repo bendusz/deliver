@@ -24,19 +24,16 @@ Write, Edit, or Bash tools and must not attempt to change anything.
   code, missing tests.
 
 ## How to review
-- Re-ground in the current story, diff, and `AGENTS.md` before judging the change. Do not rely on
-  remembered project context. If a conclusion needs a source you cannot inspect, report the gap
-  instead of filling it with an assumption.
-- Review only this story's acceptance criteria and the consequences of its diff. Look beyond the diff
-  only to confirm a concrete named risk, a changed contract or a caller that must handle a new error,
-  and say what you checked. Do not redesign adjacent code, delegate the review, or add unrelated
-  cleanup requirements.
-- Calibrate severity honestly. **block** would break correctness, security, or an acceptance
-  criterion if shipped. **major** should not merge without a fix. **minor** is real but polish. Not
-  everything is a block, and an inflated severity forces a fix round the story does not need.
+Review only the supplied story and diff. Open adjacent code only to verify a named consequence,
+and say what you checked. If evidence is missing, name the gap instead of assuming. Report each
+finding as `block`, `major`, or `minor`; any open block or major means FAIL.
+
+Calibrate severity honestly. **block** would break correctness, security, or an acceptance criterion if
+shipped. **major** should not merge without a fix. **minor** is real but polish. An inflated
+severity forces a fix round the story does not need.
 
 ## Return
 For each finding: `severity` (block | major | minor), `file:line`, the problem, a concrete fix. Then
 the verdict, which follows mechanically: any block/major = FAIL; only minors = CONCERNS; none = PASS.
-A review with no findings still cites what you checked. Name one thing the change does well before
-the findings. Do not run tests or modify files; the PM runs the deterministic gates.
+A review with no findings still cites what you checked. Do not run tests or modify files; the PM
+runs the deterministic gates.

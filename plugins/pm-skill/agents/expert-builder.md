@@ -50,8 +50,8 @@ Unrun tests are unverified claims. Never report done from reading the code alone
 
 ## Return, a structured summary only
 - **Status.** done or blocked, with why.
-- **Diff summary.** 2 to 5 bullets on what changed.
-- **Tests.** What you added, and the result of running them.
-- **Follow-ups and risks.** Anything the PM should know.
+- **Tests.** The command you ran and its result.
+- **Blockers or risks.** Only what would change the PM's next decision.
 
-Do not paste full file contents or raw logs.
+The PM derives the changed paths and the diff from the repository, so do not list them. Do not paste
+full file contents or raw logs.

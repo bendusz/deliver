@@ -6,6 +6,7 @@ import { toplevel } from '../lib/git.mjs';
 import { requireCodex, READONLY_FLAGS } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
+import { lockedExecArgs } from '../lib/argv.mjs';
 
 export async function runAdvise(o) {
   const cwd = realpath(process.cwd());
@@ -24,13 +25,9 @@ export async function runAdvise(o) {
   const answer = path.join(scratch, 'answer.md');
   const stderrPath = path.join(scratch, 'stderr.log');
   const stdoutPath = path.join(scratch, 'stdout.log');
-  // --ignore-user-config only skips $CODEX_HOME/config.toml. A trusted repository's
-  // .codex/config.toml can still launch MCP server processes (which run OUTSIDE the
-  // shell sandbox), enable hooks/agents, or force web search on, so --sandbox read-only
-  // alone does not make this mode host-read-only. web_search is left to the CLI's own
-  // --search handling ONLY when research asked for it; otherwise it is pinned off.
-  const args = ['exec', '--ignore-user-config', '--ignore-rules', '--strict-config', '--sandbox', 'read-only', '--ephemeral', '--color', 'never', '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`,
-    '-c', 'mcp_servers={}', '-c', 'features.hooks=false', '-c', 'agents.enabled=false', ...(useSearch ? ['--search'] : ['-c', 'web_search="disabled"']),
+  // web_search is left to the CLI's own --search handling ONLY when research asked for
+  // it; otherwise lockedExecArgs pins it off.
+  const args = ['exec', ...lockedExecArgs(o, { search: useSearch }), '--sandbox', 'read-only', '--color', 'never',
     ...(root ? [] : ['--skip-git-repo-check']), '-o', answer, '-'];
   const run = await runCodex(found, args, { stdinText: prompt, cwd, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
   const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, stderr_path: stderrPath };

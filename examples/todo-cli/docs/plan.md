@@ -5,7 +5,8 @@ A tiny command-line tool to add todos and list them, persisted to a local JSON f
 demonstrate the pm-skill workflow end to end.
 
 ## Source spec
-- none, intent captured inline. The `FR-` and `AC-` ids below are the authoritative requirements.
+- none. `standard` scale normally requires `docs/spec.md`, and the user asked to skip it for a
+  project this small. The `FR-` and `AC-` ids below are the authoritative requirements instead.
 
 ## Delivery mode
 - Scale: standard

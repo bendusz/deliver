@@ -7,8 +7,18 @@ Group the plan's stories into sprints. Each sprint should deliver something inde
 Foundations first; later sprints build on earlier ones.
 
 ## Story files
-For each story, create `docs/stories/S<sprint>-<n>-<slug>.md` holding everything a builder needs
-without reading the rest of the repo:
+For each story, create `docs/stories/S<sprint>-<n>-<slug>.md` from
+`${CLAUDE_PLUGIN_ROOT}/templates/story.md.template`, holding everything a builder needs without
+reading the rest of the repo. The template is canonical for the header. Use its labels and order
+exactly:
+
+```
+Sprint · Priority · Covers · Depends on · Parallel-safe · Touches
+Risk · Review lenses · Security-sensitive · Architecture-sensitive
+Builder
+```
+
+What each part carries:
 - **Goal**, one paragraph.
 - **Covers:** the spec requirement IDs (`FR-` and `AC-`) this story satisfies, the traceability link
   back to `docs/spec.md`.
@@ -41,14 +51,12 @@ without reading the rest of the repo:
   implements against a settled shape.
 - **Verification:** the exact commands that prove the story is done.
 
-Use `${CLAUDE_PLUGIN_ROOT}/templates/story.md.template` as the shape.
-
 ## Ordering
-- Record each story's `depends-on` and order so dependencies come first.
-- Tag stories with no dependency on un-merged work `[P]`, meaning parallel-safe, and record each
-  story's Touches. The PM uses `[P]` plus non-overlapping Touches to build several stories at once in
-  isolated worktrees; see `parallel-execution.md`. When unsure, leave a story un-`[P]` and it simply
-  runs sequentially.
+- Record each story's `Depends on` and order so dependencies come first.
+- Set `Parallel-safe: yes` on a story with no dependency on un-merged work, and record its Touches.
+  The plan table tags the same stories `[P]`. The PM uses `Parallel-safe` plus non-overlapping
+  Touches to build several stories at once in isolated worktrees; see `parallel-execution.md`. When
+  unsure, set `Parallel-safe: no` and the story simply runs sequentially.
 
 ## Story readiness
 A story may be handed to the builder only once it passes this check:

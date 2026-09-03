@@ -8,11 +8,6 @@
 - Build: `<cmd or N/A>`
 - Run: `<cmd or N/A>`
 
-## Working here
-- Delivery state lives in `pm/` and is git-tracked. Never edit another actor's
-  `pm/actors/<id>.json`. `tmp/` is scratch and ignored.
-- Never push to a remote without an explicit request.
-
 ## Layout
 <three to eight lines: top-level directories and what lives where>
 

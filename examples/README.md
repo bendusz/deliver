@@ -9,7 +9,8 @@ project:
 - `todo-cli/AGENTS.md`, the generated project instructions, facts only, and `todo-cli/CLAUDE.md`,
   the two-line `@AGENTS.md` bridge Claude Code reads.
 - `todo-cli/pm/pm-state.json`, the shared machine-readable state.
-- `todo-cli/pm/actors/bendusz.json`, one actor's working position. Solo is a team of one.
+- `todo-cli/pm/actors/bendusz.json`, one actor's working position. Solo is a team of one. Its bare
+  actor id predates 0.10.1, and `/pm-skill:resume` would migrate it to the current salted form.
 - `todo-cli/pm/log.md`, the recovery logbook, as a mid-run snapshot. Its entries predate the current
   log line format and are kept verbatim, the way a real project's history would be.
 - `todo-cli/pm/actors/bendusz.HANDOFF.md`, an end-of-session handoff from `/pm-skill:handoff`:
