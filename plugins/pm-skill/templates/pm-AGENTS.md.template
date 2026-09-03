@@ -1,0 +1,4 @@
+# pm/ state discipline
+- `pm/pm-state.json` is shared; claim a story there before working it and release it when done.
+- Write only your own `pm/actors/<your-id>.json` and `<your-id>.HANDOFF.md`; never another actor's.
+- `pm/log.md` is append-only; never rewrite history. Never write secrets into `pm/`.

@@ -1,0 +1,25 @@
+# <Project>
+
+<one or two lines: what this project is and why>
+
+## Commands
+- Test: `<cmd or N/A>`
+- Lint: `<cmd or N/A>`
+- Build: `<cmd or N/A>`
+- Run: `<cmd or N/A>`
+
+## Working here
+- This project is delivered with the pm-skill plugin. Process rules live in that skill and are
+  enforced by its hooks; do not restate them here.
+- Delivery state lives in `pm/` and is git-tracked. Never edit another actor's
+  `pm/actors/<id>.json`. `tmp/` is scratch and ignored.
+- Never push to a remote without an explicit request.
+
+## Layout
+<three to eight lines: top-level directories and what lives where>
+
+## Conventions
+<only rules that differ from the language or framework default>
+
+## Gotchas
+<anything non-obvious a contributor must know>

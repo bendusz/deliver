@@ -221,4 +221,26 @@ if [ -d "$pp" ]; then
   fi
 fi
 
+# 17) instructions layer: templates exist, the AGENTS.md template stays small, the bridge is exact,
+#     and no agent prompt names CLAUDE.md without AGENTS.md on the same line.
+for f in plugins/pm-skill/templates/AGENTS.md.template plugins/pm-skill/templates/CLAUDE.md.template \
+         plugins/pm-skill/templates/rules-pm-state.md.template plugins/pm-skill/templates/pm-AGENTS.md.template; do
+  [ -f "$f" ] || err "missing template: $f"
+done
+if [ -f plugins/pm-skill/templates/AGENTS.md.template ]; then
+  n="$(wc -l < plugins/pm-skill/templates/AGENTS.md.template | tr -d '[:space:]')"
+  [ "$n" -le 45 ] || err "AGENTS.md.template is $n lines; keep it at or under 45"
+fi
+if [ -f plugins/pm-skill/templates/CLAUDE.md.template ]; then
+  [ "$(sed -n '1p' plugins/pm-skill/templates/CLAUDE.md.template)" = "@AGENTS.md" ] || err "CLAUDE.md.template must start with @AGENTS.md"
+fi
+if grep -n 'CLAUDE\.md' plugins/pm-skill/agents/*.md | grep -v 'AGENTS\.md' >/dev/null 2>&1; then
+  grep -n 'CLAUDE\.md' plugins/pm-skill/agents/*.md | grep -v 'AGENTS\.md' >&2
+  err "agent prompt names CLAUDE.md without AGENTS.md (see above)"
+fi
+for f in AGENTS.md CLAUDE.md examples/todo-cli/AGENTS.md examples/todo-cli/CLAUDE.md; do
+  [ -f "$f" ] || err "dogfood file missing: $f"
+done
+[ "$(sed -n '1p' CLAUDE.md 2>/dev/null)" = "@AGENTS.md" ] || err "repo CLAUDE.md must be the @AGENTS.md bridge"
+
 if [ "$fail" -eq 0 ]; then echo "validate.sh: OK"; else echo "validate.sh: FAILED" >&2; exit 1; fi
