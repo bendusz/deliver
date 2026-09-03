@@ -66,7 +66,7 @@ message so they run in parallel, each with `Scope`, `Out dir`, `Stamp` (that sha
 `timeout=<minutes>` is in minutes and the agent's `Timeout seconds` input is in seconds, so convert:
 pass
 `Timeout seconds: <timeout minutes times 60>`, meaning `timeout=5` becomes `Timeout seconds: 300`.
-Omit `Timeout seconds` entirely when the user did not set `timeout=`, and the agent's own default of
+Omit `Timeout seconds` entirely when the user did not set `timeout=`, and the runner's default of
 600 seconds then applies. Do not poll processes; the agents return when the runner returns.
 
 ## 6. Index

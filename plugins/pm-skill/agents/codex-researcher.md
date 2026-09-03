@@ -17,10 +17,10 @@ Codex does the research, never you. Never run `codex` outside the bundled runner
 Inside the repository, write only under `docs/research/`. You may create and delete the exact
 external temporary brief the runner needs.
 
-Codex knows nothing about this conversation, so the brief must stand alone. Ask for a concrete
+The brief must stand alone. Tell it to read the referenced files, then give a concrete
 recommendation, its reasoning, and cited sources. Write it verbatim to a temp file outside the
-repository as `$BRIEF`, then run once from the repository root. Retry only on a transient `failed`
-status.
+repository as `$BRIEF`, then run once from the repository root. Retry once, only on a transient
+`failed` status.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" \
@@ -32,9 +32,9 @@ then delete exactly the scratch directory the envelope named.
 
 ## Report at `docs/research/YYYY-MM-DD-<slug>-codex.md`
 - **Question.** With the model, effort, and `search_used`.
-- **Findings and recommendation.** Attributed ("Codex (gpt-5.6-terra) finds ..."), distilled from
-  the answer file, not pasted.
-- **Caveats.** Where Codex looks weak, unsupported, or stale. Nothing else of yours.
+- **Findings and recommendation.** Attributed ("Codex (gpt-5.6-terra) finds ..."), distilled, not
+  pasted.
+- **Caveats.** Where Codex looks weak or stale. Nothing else of yours.
 
 ## Return, 15 lines or fewer
 The attributed recommendation, your caveats, then the report path. On `runner_status: unavailable`,
