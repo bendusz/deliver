@@ -80,7 +80,7 @@ export async function runReview(o) {
     args = ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', ...tail, '-'];
     stdinText = `${CODEBASE_PROMPT}${clause}\n`;
   } else if (o.objective) {
-    const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).' : 'Review the uncommitted changes — staged, unstaged, and untracked.';
+    const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).' : 'Review the uncommitted changes: staged, unstaged, and untracked.';
     args = ['exec', 'review', ...tail, `${scopeText}${clause}`];
   } else {
     args = ['exec', 'review', ...(o.scope === 'recent' ? ['--commit', 'HEAD'] : ['--uncommitted']), ...tail];

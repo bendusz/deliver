@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pm-skill hooks — shared library (Node ESM, zero dependencies).
+// pm-skill hooks: shared library (Node ESM, zero dependencies).
 // Also a tiny CLI:
 //   git diff <range> | node lib.mjs scan        # exit 1 if secret-shaped content found
 //   node lib.mjs actor-id [root]                # print this actor's id, exit 1 if none
@@ -10,11 +10,11 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-// chomp(s) — strip only trailing newlines, mirroring bash command substitution
+// chomp(s): strip only trailing newlines, mirroring bash command substitution
 // (which strips trailing \n but leaves other whitespace, unlike String#trim()).
 const chomp = (s) => s.replace(/(\r?\n)+$/, '');
 
-// git(cwd, args) — stdout of `git -C cwd args...`, or null on any failure.
+// git(cwd, args): stdout of `git -C cwd args...`, or null on any failure.
 export function git(cwd, args) {
   try {
     return execFileSync('git', ['-C', cwd, ...args], {
@@ -41,7 +41,7 @@ export function realpath(p) {
   try { return fs.realpathSync.native(p); } catch { return null; }
 }
 
-// pmRoot(cwd) — the PROJECT root, not the session cwd.
+// pmRoot(cwd): the PROJECT root, not the session cwd.
 // Order: $CLAUDE_PROJECT_DIR (absolute + a directory) → git top level → cwd.
 export function pmRoot(cwd) {
   const env = process.env.CLAUDE_PROJECT_DIR;
@@ -53,7 +53,7 @@ export function pmRoot(cwd) {
   return cwd;
 }
 
-// pmRelpath(root, target) — canonical root-relative path (forward slashes) of a
+// pmRelpath(root, target): canonical root-relative path (forward slashes) of a
 // possibly not-yet-existing target, '.' for the root itself, or null when the
 // target is outside the root. Resolves a final symlink chain (≤ 8 hops) and then
 // canonicalises through the deepest EXISTING ancestor, so 'pm/../src/app.py'
@@ -66,7 +66,7 @@ export function pmRelpath(root, target) {
   const realRoot = realpath(root);
   if (!realRoot) return null;
   // 'C:foo' is drive-relative on Windows (relative to that drive's own working
-  // directory), not project-relative — resolve it before treating it as a path.
+  // directory), not project-relative: resolve it before treating it as a path.
   if (process.platform === 'win32' && /^[A-Za-z]:(?![\\/])/.test(target)) target = path.resolve(target);
   // Concatenate rather than path.join so '..' is resolved by the filesystem, not lexically.
   let p = path.isAbsolute(target) ? target : `${realRoot}${path.sep}${target}`;
@@ -102,10 +102,10 @@ export function pmRelpath(root, target) {
   return rel.split(path.sep).join('/');
 }
 
-// isRecord(x) — true for a non-null, non-array object (a JSON "object", not an array).
+// isRecord(x): true for a non-null, non-array object (a JSON "object", not an array).
 export const isRecord = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 
-// readHookInput() — the hook JSON from stdin, or null on empty/invalid input.
+// readHookInput(): the hook JSON from stdin, or null on empty/invalid input.
 export function readHookInput() {
   try {
     const raw = fs.readFileSync(0, 'utf8');
@@ -131,7 +131,7 @@ export function readJson(file) {
     // Refuse a symlink outright: PM state and actor files are in-repo artifacts, and a
     // link is a redirect to content this project does not own. Fail-open (null) as usual.
     if (fs.lstatSync(file).isSymbolicLink()) return null;
-    // Refuse FIFOs, devices, etc. — reading them can hang or return garbage.
+    // Refuse FIFOs, devices, etc.: reading them can hang or return garbage.
     const st = fs.statSync(file);
     if (!st.isFile()) return null;
     return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -163,7 +163,7 @@ export function cksum(input) {
   return ~crc >>> 0;
 }
 
-// pmActorId(root) — slug of the FULL git user.email (else user.name) plus a 12-hex
+// pmActorId(root): slug of the FULL git user.email (else user.name) plus a 12-hex
 // digest of two cksum values (raw, raw+salt). Byte-identical to the bash version.
 // ASCII-only lowercasing mirrors `tr '[:upper:]' '[:lower:]'` in the C locale.
 export function pmActorId(root) {
@@ -178,7 +178,7 @@ export function pmActorId(root) {
   return `${slug}-${(h1 + h2).slice(0, 12)}`;
 }
 
-// pmSecretScan(text) — null when clean, else a reason. Never echoes the matched value.
+// pmSecretScan(text): null when clean, else a reason. Never echoes the matched value.
 // Token FORMATS are case-sensitive; credential ASSIGNMENTS are case-insensitive and match
 // quoted or unquoted values. Placeholders never trip: values starting '$', '<', or '{'
 // are outside the value character class.

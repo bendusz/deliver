@@ -94,6 +94,7 @@ for f in plugins/pm-skill/scripts/*.mjs plugins/pm-skill/scripts/codex/run.mjs p
   node --check "$f" 2>/dev/null || err "runner file does not parse: $f"
 done
 grep -rlE '\b(jq|bash)\b' plugins/pm-skill/scripts/*.mjs plugins/pm-skill/scripts/codex >/dev/null 2>&1 && err "bash or jq referenced under plugins/pm-skill/scripts/ (runtime must be Node only)"
+grep -rl -- '—' plugins/pm-skill/hooks plugins/pm-skill/scripts >/dev/null 2>&1 && err "em dash found in runtime code under plugins/pm-skill/hooks or scripts"
 # No agent or command may call codex directly; only the runner does.
 grep -rlE 'codex exec' plugins/pm-skill/agents plugins/pm-skill/commands >/dev/null 2>&1 && err "direct codex invocation found in an agent prompt (use the runner)"
 

@@ -4,20 +4,20 @@ import path from 'node:path';
 import { realpath } from '../../../hooks/lib.mjs';
 import { RunnerError } from './result.mjs';
 
-// inside(root, p) — true when p is root itself or below it. path.relative avoids the
+// inside(root, p): true when p is root itself or below it. path.relative avoids the
 // doubled-separator bug a `root + sep` prefix test has for a drive root ('C:\') or '/'.
 function inside(root, p) {
   const rel = path.relative(root, p);
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
-// notSymlink(p) — true when p is absent or is not a symlink. An absent component is
+// notSymlink(p): true when p is absent or is not a symlink. An absent component is
 // fine: mkdirSync creates it. An existing symlink is not, at any depth we control.
 function notSymlink(p) {
   try { return !fs.lstatSync(p).isSymbolicLink(); } catch { return true; }
 }
 
-// makeScratch(worktree, prefix) — a private temp dir OUTSIDE the worktree.
+// makeScratch(worktree, prefix): a private temp dir OUTSIDE the worktree.
 export function makeScratch(worktree, prefix) {
   let base = realpath(os.tmpdir());
   if (!base) throw new RunnerError('failed', 'temporary directory is unavailable');
@@ -33,7 +33,7 @@ export function makeScratch(worktree, prefix) {
 
 const runtimeBlocked = () => new RunnerError('blocked', 'tmp/codex-runtime must be a real directory inside the worktree');
 
-// assertRuntimeRootReal(worktree) — tmp/ and tmp/codex-runtime must not be symlinks.
+// assertRuntimeRootReal(worktree): tmp/ and tmp/codex-runtime must not be symlinks.
 // Called early, before the ignore probe: `check-ignore` cannot even traverse a symlinked
 // component, so without this the specific diagnostic would be lost behind the generic
 // "tmp/ must be ignored" message.
@@ -42,7 +42,7 @@ export function assertRuntimeRootReal(worktree) {
   if (!notSymlink(tmpParent) || !notSymlink(path.join(tmpParent, 'codex-runtime'))) throw runtimeBlocked();
 }
 
-// runtimeTmp(worktree, runId) — the per-run TMPDIR handed to Codex. It must be a real
+// runtimeTmp(worktree, runId): the per-run TMPDIR handed to Codex. It must be a real
 // directory physically inside <worktree>/tmp/codex-runtime: a symlinked `tmp` or
 // `tmp/codex-runtime` would let a workspace-write (or, on win32, full-access) run read
 // and write outside the worktree through a path the runner itself created.

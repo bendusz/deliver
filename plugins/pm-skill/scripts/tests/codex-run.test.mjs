@@ -267,7 +267,8 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
   assert.equal(r.out.diagnostics_retained, false);
   assert.match(r.out.git_status_short, /src\/fix\.txt/);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Do not run git commands that mutate/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/spec\.md, docs\/plan\.md, or docs\/constitution\.md\./);
+  assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
   assert.equal(fs.readdirSync(s.tmp).length, 0);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')) || fs.readdirSync(path.join(p, 'tmp', 'codex-runtime')).length === 0);
@@ -639,7 +640,7 @@ test('review: preflight reports readiness without running', () => {
   assert.equal(r.status, 0);
   assert.equal(r.out.runner_status, 'ready');
   assert.equal(r.out.quota_consumed, false);
-  // Preflight now verifies review support itself, so `exec review --help` IS expected —
+  // Preflight now verifies review support itself, so `exec review --help` IS expected:
   // what must not appear is a real review run.
   assert.match(stubActions(s), /^exec review --help$/m);
   assert.doesNotMatch(stubActions(s), /^exec review (?!--help)/m);

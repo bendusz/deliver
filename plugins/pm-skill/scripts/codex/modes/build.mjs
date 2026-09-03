@@ -38,11 +38,8 @@ export function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
       : 'Prefer a focused implementation. If the story needs broad architectural work or lacks enough context, return blocked instead of widening scope.',
     "Follow the story's Touches, Out of scope, acceptance criteria, and verification sections.",
     'Run the story verification command and the relevant project tests before reporting done.',
-    'Do not use the network. Do not edit pm/, any story, docs/spec.md, docs/plan.md, or docs/constitution.md.',
+    'Stay inside the allowed implementation paths. Do not use the network, change git state, or edit pm/, stories, docs/spec.md, docs/plan.md, or docs/constitution.md.',
     'Your shell environment is reduced and secret-like variables are removed. TMPDIR is an isolated directory inside this worktree.',
-    'Do not edit any path outside the allowed implementation paths listed above.',
-    'Do not run git commands that mutate repository state, including add, commit, restore, checkout, switch, reset, rebase, merge, branch, tag, stash, clean, config, worktree, or push. Read-only git inspection is allowed.',
-    'Do not create branches, commits, pull requests, or files outside this worktree.',
     'Return only JSON matching the supplied schema. List every changed path in files_changed. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
   return `${lines.join('\n')}\n`;
 }

@@ -36,7 +36,7 @@ function indexModes(root) {
   return m;
 }
 
-// classify(root, rel, modes) — either a finished fingerprint, or a request to content-hash
+// classify(root, rel, modes): either a finished fingerprint, or a request to content-hash
 // this regular file with the given index mode (batched by the caller).
 function classify(root, rel, modes) {
   if (hasControl(rel)) throw new Error(`unsupported path name: ${rel}`);
@@ -67,7 +67,7 @@ function classify(root, rel, modes) {
   throw new Error(`unsupported path type: ${rel}`);
 }
 
-// hashBatch(root, rels) — one `git hash-object --stdin-paths` process for every regular
+// hashBatch(root, rels): one `git hash-object --stdin-paths` process for every regular
 // file, instead of one process per file (which dominated snapshot cost on large trees).
 function hashBatch(root, rels) {
   if (rels.length === 0) return [];
@@ -76,9 +76,9 @@ function hashBatch(root, rels) {
   return out;
 }
 
-// snapshotWorktree(root) — rel path → fingerprint for tracked files, untracked files
+// snapshotWorktree(root): rel path → fingerprint for tracked files, untracked files
 // (respecting ignores), protected PM paths (included even if a hostile ignore rule hides
-// them), and ignored files (cheap stat fingerprint, no content hash — an ignored .env or
+// them), and ignored files (cheap stat fingerprint, no content hash: an ignored .env or
 // build output is still outside a story's pm-meta.touches).
 export function snapshotWorktree(root) {
   const rels = new Set();
@@ -121,7 +121,7 @@ export function changedPaths(before, after) {
 }
 
 
-// hookDirFingerprint(gitDir) — names, sizes, and modes of <gitdir>/hooks. A run that
+// hookDirFingerprint(gitDir): names, sizes, and modes of <gitdir>/hooks. A run that
 // installs or rewrites a git hook has changed protected repository state even though
 // nothing in the worktree moved.
 function hookDirFingerprint(gitDir) {
