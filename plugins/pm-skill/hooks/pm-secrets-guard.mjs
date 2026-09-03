@@ -34,9 +34,8 @@ if (!text) process.exit(0);
 
 if (pmSecretScan(text)) {
   // Synchronous write: a stream write immediately followed by process.exit() can be truncated.
-  fs.writeSync(2, `pm-skill blocked a write to ${rel}: the content contains a secret-shaped string.
-pm/ is git-tracked; secrets there enter history permanently. Reference the secret's
-LOCATION (e.g. ".env on the box"), never its value, then retry the write.
+  fs.writeSync(2, `pm-skill blocked ${rel}: tracked pm/ files cannot hold secret-shaped values.
+Store the value elsewhere, record only its path, and retry.
 (Set PM_SKILL_NO_ENFORCE=1 to disable this guard.)
 `);
   process.exit(2);

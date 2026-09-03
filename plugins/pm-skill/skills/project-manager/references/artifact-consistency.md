@@ -95,6 +95,6 @@ logs or state. Offer remediation as suggestions only.
 
 ## After the report
 
-This is a gate of judgement, not automation. Present the report, then let the user, or the PM in a
-later non-analysis step, act on it. Resolve CRITICAL and HIGH findings before sign-off, or before the
-implementation loop begins.
+Present the report without changing any artifact. The user, or the PM in a later non-analysis step,
+acts on it. Resolve CRITICAL and HIGH findings before sign-off or before the implementation loop
+begins.

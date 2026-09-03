@@ -78,7 +78,7 @@ twice.
    passed alone but break together. A failure here re-enters the loop's fix rounds in this worktree,
    and each fix is committed to the story branch before you move on.
 4. Ship from the main checkout, which already has the integration branch checked out: `--no-ff` merge
-   the story branch with the loop's message format. Set status `merged`.
+   the story branch, using `documentation.md`'s message format. Set status `merged`.
 5. Remove the now-clean, merged worktree with `git worktree remove`, also from the main checkout.
 
 A blocked story does not block the rest. A partial batch still checkpoints at the sprint boundary.

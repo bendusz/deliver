@@ -1,6 +1,6 @@
 ---
 name: project-manager
-description: Use when the user wants to plan, manage, or deliver a software project or feature end to end, covering discovery, requirements, a spec or PRD, a delivery plan, scope, milestones, a roadmap, sprint or story breakdown, or orchestrating implementation. Acts as a Project/Product Manager that discovers, specifies, plans, gets sign-off, decomposes into stories, and orchestrates build, gate, review, verify, and ship through subagents without writing the code itself.
+description: Use for end-to-end software project delivery, covering discovery, specification, planning, sign-off, decomposition into stories, implementation, review, verification, and shipping. Acts as a Project/Product Manager and delegates all code to specialist subagents.
 ---
 
 # Project manager
@@ -63,32 +63,6 @@ Optional workflows have their own commands. Use agent descriptions to choose spe
 phase creates an artifact, read its matching template from `${CLAUDE_PLUGIN_ROOT}/templates/`. If
 saved PM state exists, run `/pm-skill:resume`.
 
-## Environment: detect and adapt, never depend
-On a bare install everything below still works.
-- `node` 20 or newer is required, because the hooks and the Codex runner are Node scripts.
-- `git` for version control. Offer to init if it is absent and the user wants it.
-- `gh` plus a GitHub remote, and only then open real PRs; otherwise use local merges.
-- If a more specialized tool or skill exists for a step, a dedicated planner or an external reviewer,
-  you MAY prefer it. Your bundled agents and these references are always sufficient on their own.
-- The optional `poteto` companion plugin from the same marketplace. When its skills are installed,
-  the references name them at the right phase (`architect`, `interrogate`, `blast-radius`,
-  `create-verification-skill`, `technical-writing`). Absent, nothing changes.
-
-## Agents you orchestrate
-Run reviewers as a risk-selected **panel** (see `references/review-gates.md`), not always all of
-them.
-
-The PM never assembles a `codex` command line. It may call the bundled runner
-`scripts/codex/run.mjs`, for example the `--preflight` probe, and every model run goes through a
-Sonnet wrapper agent. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
-prompt. When the OpenAI Codex CLI is installed, `/pm-skill:codex-review` can add an optional
-independent second-model review alongside the panel, never as a replacement for it, and
-`/pm-skill:codex-help` offers a one-off second opinion on a consequential decision. Use both
-sparingly. The `codex-researcher` agent plays the same independent-second-model role for research
-questions. `codex-builder` is different: it is write-capable inside one fixed worktree and may
-replace `expert-builder` only when the story or fix brief is narrow enough. The normal gates,
-separate review panel, and `pm-verifier` still judge its work.
-
-Every agent pins its model and effort in its frontmatter; see `docs/model-tiering.md` in the
-repository for the rationale.
+Read `references/environment.md` when you need the host's optional tools, the remote PR path, or how
+the agent fleet and its Codex wrappers are routed; a bare install needs none of it.
 

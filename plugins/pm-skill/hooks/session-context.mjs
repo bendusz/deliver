@@ -24,20 +24,19 @@ const say = (line) => out.push(line);
 // characters (including newlines) and cap length before this text becomes session context.
 const sanitize = (s) => s.replace(/[\x00-\x1f\x7f]+/g, ' ').slice(0, 200);
 const v = (x, d) => (x === undefined || x === null || x === false ? d : sanitize(String(x)));
-const RESUME = 'To continue: run /pm-skill:resume (or read the pm/ files directly). Before ending a long session, offer /pm-skill:handoff.';
+const RESUME = 'To continue: run /pm-skill:resume.';
 
 const state = path.join(cwd, 'pm', 'pm-state.json');
 if (!fs.existsSync(state)) {
   if (fs.existsSync(path.join(cwd, 'tmp', 'pm-state.json'))) {
-    say('pm-skill: PM-managed project with state in the legacy tmp/ location.');
-    say('Run /pm-skill:resume to migrate it to the tracked pm/ directory and continue.');
+    say('pm-skill: state is in the legacy tmp/ location. Run /pm-skill:resume to migrate it.');
   }
   finish();
 }
 
 const st = readJson(state);
 if (!isRecord(st)) {
-  say('To continue: run /pm-skill:resume (or read the pm/ files directly).');
+  say(RESUME);
   finish();
 }
 

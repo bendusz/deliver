@@ -1,145 +1,99 @@
 # Implementation loop
 
-Run each story through this loop. **You orchestrate; you do not write code.** Take only summaries
-back, never raw transcripts, to protect your context.
+Run each story through the states below. Persisted counters, not memory, bound this loop, so a lost
+session resumes mid-story. The integration branch is the default branch the scaffold commit landed
+on. Cut every story branch from it, merge each back. Run `/pm-skill:doctor` before the first sprint
+on a fresh or unfamiliar clone.
 
-The integration branch is the project's default branch, `main` for example, that the scaffold commit
-landed on. You cut every story branch from it and merge each story back into it.
+**Parallel.** With 2 or more build-ready `[P]` stories whose `Depends on` are merged and whose
+`pm-meta.touches` do not overlap, and `git worktree` working, load `parallel-execution.md`; it owns
+every difference, including the fallback here. Otherwise take one story at a time.
 
-Before the first sprint on an unfamiliar or freshly-cloned project, run `/pm-skill:doctor` to confirm
-the toolchain installs and the gates actually run, so stories do not fail mid-build on environment
-gaps.
+### 0. Ready, then claim
+Confirm the story is build-ready against `decomposition.md`; fix an unready story first. A pre-0.13
+story needs its `pm-meta` added and committed first, per `migrations.md`. The working tree must be
+clean before you write route state or the log; unrelated changes mean stop and ask.
 
-## Sequential or parallel? Decide at the start of each sprint
-- **Parallel fast path.** If the sprint has 2 or more build-ready `[P]` stories whose `Depends on`
-  are merged and whose `pm-meta.touches` do not overlap, and `git worktree` works, build them at
-  once in isolated worktrees and integrate them serially. Load `parallel-execution.md`.
-- **Sequential, the default.** Otherwise run the per-story cycle below, one story at a time.
+Resolve a `pm-meta` builder of `auto` now, by `decomposition.md`'s rules for the field. Without Codex
+it falls back to `expert-builder`. An explicit `codex-builder` is a readiness blocker and never
+switches workers silently. That builder owns the initial build.
 
-Parallel is opt-in and best-effort; on any worktree trouble, fall back to sequential. Either way the
-same deterministic gates and review panel judge every story.
+**Claim.** Pull or rebase the integration branch and confirm no other actor holds the story in
+`assignments`. One commit on that branch sets `assignments[story] = you`, records your position in
+`pm/actors/<you>.json` (story, status, branch, `resolved_builder`, counters at 0), and appends the
+route decision to `pm/log.md`. Push that commit only under a standing push permission, then create
+and check out `pm/S<sprint>-<n>-<slug>`.
 
-## Per-story cycle
-0. **Ready, route, and branch.** Confirm the story is build-ready: testable criteria, self-contained
-   context that names authoritative sources and any completeness-sensitive inventory method, a
-   verification command, and valid `pm-meta`. See `decomposition.md`; if it is not ready, fix the
-   story first. A story created before v0.13 needs its `pm-meta` comment added and committed first;
-   see `migrations.md`. Ensure the working tree is clean before you write route state or
-   the log. If it holds unrelated changes, stop and ask, per Repository safety. Resolve a `pm-meta`
-   builder of `auto` now:
-   - choose `codex-builder` only for a precise outcome with bounded `touches`, enough local context,
-     no open architecture decision, and an exact verification command;
-   - choose `expert-builder` for broad features, cross-cutting work, uncertain scope, or anything
-     that needs wide repo context or design judgement;
-   - if Codex is unavailable, `auto` falls back to `expert-builder`. An explicit `codex-builder` in
-     `pm-meta` is a readiness blocker and must not silently switch workers.
+### 1. Build, then gate
+Optionally dispatch `test-engineer` first for TDD-red acceptance tests, then tell the builder they
+exist: make them pass, add only *further* coverage, never rewrite. Dispatch the persisted
+`resolved_builder` with the inputs its agent file lists, adding the absolute worktree root whenever
+it works outside the main checkout, and run Codex's quota-free `--preflight` first when readiness is
+not established. Builders edit the working tree; you own every git command.
 
-   The resolved builder owns the initial build. Now claim and route the story in one commit on the
-   integration branch, following the claim procedure in `logging-and-state.md`: pull or rebase the
-   integration branch, confirm no other actor holds the story in `assignments`, and commit the
-   shared state, your actor file, and the log together. Then create and check out the story branch
-   `pm/S<sprint>-<n>-<slug>`, where all of this story's work happens. Resume and the session hook
-   read your position from the actor file, and the loop bounds below are enforced from the persisted
-   counters rather than from memory, so everything survives a session loss mid-story.
-1. **Build.** Optionally, for clear acceptance criteria, first dispatch `test-engineer` to write the
-   acceptance tests for TDD red, then tell the builder those tests already exist: it must make them
-   pass and add only *further* coverage, not rewrite them. Dispatch the persisted `resolved_builder`.
-   `expert-builder` receives the story file path and, when operating outside the main checkout, the
-   absolute worktree root. `codex-builder` receives the story path, the absolute worktree root, and
-   `Mode: build`; its bundled runner supplies the fixed sandbox, the isolated shell environment, and
-   the structured output contract. Run the runner's quota-free `--preflight` first when readiness has
-   not already been established. The builder edits the working tree; you own commits and all other
-   git changes.
+**Scope check, after every writer run.** Derive the cumulative changed paths from the repository,
+never the summary: `git diff --name-only --diff-filter=ACDMRTUXB HEAD --` plus
+`git ls-files --others --exclude-standard`, sorted and deduplicated. Each must equal a
+`pm-meta.touches` entry or sit under an allowed directory entry. For Codex, neither your list nor the
+runner's `actual_files_changed` may omit a path the other holds. Any out-of-scope, protected, or
+unexplained path **stops** the story before gates or review, working tree preserved.
 
-   After every writer run, derive the cumulative changed paths from repository state, not from the
-   agent summary: combine `git diff --name-only --diff-filter=ACDMRTUXB HEAD --` with
-   `git ls-files --others --exclude-standard`, then sort and deduplicate. Every path must equal an
-   entry in the story's authoritative `pm-meta.touches` or sit beneath an allowed directory entry.
-   For Codex, cross-check this set with the runner's snapshot-derived `actual_files_changed`; neither
-   source may omit a path present in the other. On any out-of-scope, protected, or unexplained path,
-   **stop** before gates or review and preserve the working tree for inspection. Keep the cumulative
-   set for diffing and ship. If the work is broader than its brief, do not keep a narrow Codex worker
-   on the wrong task: update `resolved_builder` to `expert-builder` and append the reason to the log
-   in the same coordination commit before routing the retry. If a builder returns *blocked* or fails,
-   retry up to **2** times with clarification, incrementing `current_story_retries` in
-   `pm/actors/<you>.json` per retry. The **cap** counts retries a previous session already spent, and
-   switching workers does not reset it. Then escalate to the user.
-2. **Gate.** The gates are the project's actual `test`, `lint`, and `build` commands as recorded in
-   `docs/plan.md` and `AGENTS.md`; any the project does not have are `N/A` and skipped. Run them
-   **yourself**, here after the build and again after every fix, and never take a subagent's word
-   that they pass. If a gate fails, go to Fix, step 4, before review.
-3. **Review.** Re-derive and scope-check the cumulative changed paths as in step 1. Produce the diff
-   yourself and pass it to the reviewers inline, since they have no Bash and cannot diff. Diff **only**
-   those repository-derived paths, for example
-   `git add -N -- <changed paths> && git diff -- <changed paths>`. **Never** run `git add -A`, which
-   would sweep in unrelated work. Dispatch the review **panel** per the risk triggers in
-   `review-gates.md`: always `code-integrity-reviewer`, plus any further lenses it selects, such as
-   `architecture-reviewer` for structural changes, which also gets the plan's Architecture section.
-   Each lens gets the story file plus that diff text and returns severity-graded findings
-   (`block`, `major`, `minor`) and a `PASS`, `CONCERNS`, or `FAIL` verdict. Aggregate them.
-4. **Fix.** First **triage** the panel's findings: dedupe across lenses and drop false positives and
-   out-of-scope items, so you forward only real `block` and `major` findings. Prefer `codex-builder`
-   for a localized fix with known implicated paths and a concrete reproducer, even when
-   `expert-builder` built the story. Write a runtime-only brief at
-   `tmp/codex-builder/<story-id>-round-<n>.md` holding the accepted findings or failing command, the
-   relevant output, the implicated paths, the exclusions, and the verification command, then dispatch
-   Codex with `Mode: fix` and that evidence path. Use `expert-builder` when the finding is
-   architectural, cross-cutting, or ambiguous, or when Codex says the fix is broader than the brief.
-   If Codex is unavailable for an opportunistic fix, use `expert-builder`; an unavailable run earns
-   no extra retries and resets neither loop counter. If a *gate* is failing rather than a review
-   finding, or the builder returns the same failing result on a second attempt with no meaningful
-   progress, dispatch `debugger` first to root-cause it, giving it the story file path, the failing
-   command's output, the diff, and the implicated paths. Then put its fix plan into the evidence brief for `codex-builder`
-   when the fix is localized, or forward it to `expert-builder` when it is broad, instead of a blind
-   retry. `debugger` is read-only; a builder applies the fix. After each fix, re-run the gates and
-   regenerate the cumulative story diff for re-review, **up to 3 rounds**. Increment
-   `current_story_rounds` in `pm/actors/<you>.json` as each round starts; the **cap** counts rounds a
-   previous session already spent. If it is still failing, **escalate** to the user.
-5. **External review (optional).** `/pm-skill:codex-review` owns it, including the secret scan on any
-   code that leaves the machine. If you skip it, **log** that. Never silently.
-6. **Verify.** Once the gates are green and no `block` or `major` finding is still open, dispatch
-   `pm-verifier`, which is read-only, with the inputs its agent file lists. It returns
-   `STATUS: PASS | FAIL | UNKNOWN`. PASS is the only status that permits shipping. FAIL
-   returns to Fix, step 4, within the persisted 3-round cap, then re-verify; UNKNOWN means you obtain
-   the exact evidence it named and re-verify, or escalate to the user. `verification.md`
-   holds the running-app evidence rule and where the durable report goes.
-7. **Ship.** With gates green, no open `block` or `major`, and `pm-verifier` `PASS`, commit **only**
-   this story's cumulative authoritative paths to the story branch. Sync first: pull or rebase the
-   integration branch, and if its tip moved after your gates ran, re-gate on the merged result before
-   merging. Then integrate:
-   - **Local by default.** Check out the integration branch and `--no-ff` merge the story branch with
-     a PR-style message.
-   - **Remote PR only if the user has explicitly asked for pushes or PRs**, and `gh auth status`
-     succeeds, and a GitHub remote exists. Then push the branch, open a PR, and merge it.
+Work broader than its brief gets re-routed: set `resolved_builder` to `expert-builder` and log the
+reason in the same coordination commit before the retry. A blocked or failed builder earns
+**2** retries with clarification, incrementing `current_story_retries`; that **cap** counts earlier
+sessions' retries, and switching workers does not reset it. Then escalate.
 
-   **Never** push to a remote without an explicit request.
+### 2. Gate, then review or fix
+The gates are the project's actual `test`, `lint`, and `build` from `docs/plan.md` and `AGENTS.md`;
+whatever it lacks is `N/A`. Run them **yourself** after the build and after every fix, never on a
+subagent's word. A failing gate goes to Fix before review.
 
-   PR and merge message format: title `type(scope): subject`, imperative, no trailing period. Body
-   sections in this order, dropping any that are empty: `## Why` (intent and why this approach),
-   `## Scope` (facts from the diff, real paths and symbols, what is in and out), `## Tradeoffs` (real
-   choices only), `## Blast radius` (who and what the change touches, and why it is safe or risky),
-   `## Verification` (each check you ran and its outcome, not just the command). No `## Summary` or
-   `## Test plan` boilerplate.
-8. **Log.** Append the story outcome to `pm/log.md` as an author-prefixed entry, update
-   `pm/actors/<you>.json`, and remove the story's entry from `assignments` in `pm/pm-state.json`.
-   Clear `resolved_builder` after recording the outcome, then **commit** this `pm/` state update
-   alongside the ship, on the integration branch right after the merge, so the pushed repo carries
-   the current resume point and the released claim. Never write secrets into `pm/`.
-9. **Document (optional, at the sprint or project boundary, not per story).** See
-   `documentation.md`.
+### 3. Review, then fix or verify
+Re-derive and scope-check the paths, then produce the diff yourself, since reviewers have no Bash:
+`git add -N -- <changed paths> && git diff -- <changed paths>`, **never** `git add -A`. Dispatch the
+panel per `review-gates.md`'s risk triggers: always `code-integrity-reviewer`, plus the lenses they
+select; `architecture-reviewer` also gets the plan's Architecture section. Every lens gets the story
+file and that diff text. Aggregate their findings; any open `block` or `major` goes to Fix.
 
-Scope changes go through `/pm-skill:correct-course`, which owns the scope-freeze rule. Checkpoint
-policy, escalation triggers, and when to offer a handoff live in `planning-and-signoff.md`.
+### 4. Fix, then gate
+**Triage first**, per `review-gates.md`: dedupe, drop false positives and out-of-scope items,
+forward only real `block` and `major` findings. A localized fix with known paths and a reproducer
+goes to `codex-builder`, even where `expert-builder` built the story. Write the runtime-only brief
+`review-gates.md` specifies to `tmp/codex-builder/<story-id>-round-<n>.md`, then
+dispatch `Mode: fix` and that path. Architectural, cross-cutting, or ambiguous findings go to
+`expert-builder`, as does any fix Codex calls broader than its brief. Without Codex it takes the fix
+too; an unavailable run earns no extra retries and resets neither counter.
 
-## Definition of done (a story)
-A story is done when all of these hold:
-- every acceptance criterion is met,
-- no open `block` or `major` findings across all selected review lenses,
-- all non-`N/A` gates are green,
-- `pm-verifier` returned `STATUS: PASS`,
-- the outcome is logged.
+When a *gate* fails, or a builder repeats a failure with no progress, dispatch the read-only
+`debugger` first with the story path, the failing output, the diff, and the implicated paths. Its
+plan goes into the Codex brief for a localized fix, or to `expert-builder` for a broad one, never
+into a blind retry. A builder applies it.
 
-## Escalation
-Stop and ask the user when a story is still not done after 3 fix and verify rounds, when a builder
-has spent its 2 retries, or when a gate keeps failing after `debugger` has root-caused it. Do not
-loop forever. `review-gates.md` holds the severity model and the lens selection.
+Each round re-runs the gates and regenerates the cumulative diff for re-review, **up to 3 rounds**.
+Increment `current_story_rounds` as each starts; that **cap** counts earlier sessions' rounds. Still
+failing, **escalate**.
+
+### 5. Verify, then ship or fix
+External review is optional; `/pm-skill:codex-review` owns it. **Log** a skip. With the gates green
+and no `block` or `major` open, dispatch the read-only `pm-verifier` with the inputs its agent file
+lists. `PASS` alone permits shipping. `FAIL` returns to Fix inside the persisted 3-round cap,
+then re-verify. `UNKNOWN` means you obtain the evidence it named and re-verify, or escalate.
+`verification.md` holds the running-app evidence rule and the durable report's home.
+
+### 6. Ship, then log
+Commit **only** the story's cumulative authoritative paths to its branch. Pull or rebase the
+integration branch, and re-gate on the merged result if its tip moved after your gates ran. Then
+check it out and `--no-ff` merge the story branch. **Never** push without an explicit request.
+`environment.md` owns the opt-in remote PR path, `documentation.md` the merge and PR message format.
+
+### 7. Log, then take the next story
+Append the outcome to `pm/log.md` as an author-prefixed entry, update `pm/actors/<you>.json`, clear
+`resolved_builder`, and **release** the claim by removing the story from `assignments`. Commit that
+`pm/` update on the integration branch right after the merge. Never write secrets into `pm/`.
+`documentation.md` covers user-facing docs at a sprint or project boundary, never per story.
+
+A story is done only with every criterion met, no open `block` or `major`, green gates, a
+`pm-verifier` `PASS`, and the outcome logged. `/pm-skill:correct-course` owns scope changes and the
+scope freeze, `planning-and-signoff.md`
+checkpoint policy, escalation triggers, and handoff timing, and `review-gates.md` the severity model
+and lens selection.
