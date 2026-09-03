@@ -36,6 +36,12 @@ test('args: defaults per mode and validation', () => {
   assert.equal(pf.preflight, true);
 });
 
+test('args: a usage error from the real runner prints usage on stderr with exit 64', () => {
+  const r = runRunner([], {});
+  assert.equal(r.status, 64);
+  assert.match(r.stderr, /usage: run\.mjs/);
+});
+
 test('result: envelope shape mirrors the bash runner', () => {
   const e = envelope('failed', 'boom', { scratch_dir: '/s', codex_version: 'v', codex_exit: 7 });
   assert.deepEqual(e, { runner_status: 'failed', reason: 'boom', scratch_dir: '/s', codex_version: 'v', codex_exit: '7', diagnostics_retained: true });
@@ -146,6 +152,7 @@ test('build 4: non-zero codex exit preserves diagnostics and the exact exit', ()
   assert.equal(r.out.runner_status, 'failed');
   assert.equal(r.out.codex_exit, '7');
   assert.ok(r.out.scratch_dir.length > 0);
+  assert.ok(fs.existsSync(r.out.scratch_dir));
 });
 
 test('build 5: structured success uses the fixed safe invocation', () => {
@@ -153,17 +160,18 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
-  const common = ['--ignore-user-config', '--ignore-rules', '--strict-config', '--sandbox', '--ephemeral', '--color', 'never', '-C', p, 'gpt-5.6-sol', 'model_reasoning_effort=high', 'agents.enabled=false', 'web_search="disabled"', 'mcp_servers={}', 'features.hooks=false', '--output-schema', '-o', '-'];
+  const common = ['--ignore-user-config', '--ignore-rules', '--strict-config', '--sandbox', '--ephemeral', '--color', 'never', '-C', p, 'gpt-5.6-sol', 'model_reasoning_effort=high', 'allow_login_shell=false', 'agents.enabled=false', 'web_search="disabled"', 'mcp_servers={}', 'features.hooks=false', '--output-schema', '-o', '-'];
   for (const x of common) assert.ok(has(a, x), `missing ${x}`);
   if (WIN) {
     assert.ok(has(a, 'danger-full-access'));
     assert.equal(r.out.sandbox, 'none (win32)');
   } else {
-    for (const x of ['workspace-write', 'sandbox_workspace_write.network_access=false', 'sandbox_workspace_write.exclude_slash_tmp=true', 'sandbox_workspace_write.exclude_tmpdir_env_var=true', 'shell_environment_policy.inherit="core"', 'shell_environment_policy.ignore_default_excludes=false', 'shell_environment_policy.experimental_use_profile=false', 'allow_login_shell=false']) assert.ok(has(a, x), `missing ${x}`);
+    for (const x of ['workspace-write', 'sandbox_workspace_write.network_access=false', 'sandbox_workspace_write.exclude_slash_tmp=true', 'sandbox_workspace_write.exclude_tmpdir_env_var=true', 'shell_environment_policy.inherit="core"', 'shell_environment_policy.ignore_default_excludes=false', 'shell_environment_policy.experimental_use_profile=false']) assert.ok(has(a, x), `missing ${x}`);
     assert.equal(r.out.sandbox, 'workspace-write');
   }
   for (const x of ['--dangerously-bypass-approvals-and-sandbox', '--full-auto', '--yolo', '--add-dir']) assert.ok(!has(a, x));
   assert.ok(a.some((x) => x.startsWith('shell_environment_policy.set.TMPDIR="') && /tmp[\\/]+codex-runtime[\\/]+/.test(x)));
+  a.forEach((x, i) => { if (x === '-c') assert.match(a[i + 1], /=/, `-c at ${i} not followed by a key=value pair`); });
   assert.equal(r.out.runner_status, 'completed');
   assert.equal(r.out.result.status, 'done');
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
@@ -327,6 +335,7 @@ test('build 23: preflight checks readiness without a model task', () => {
   assert.deepEqual(r.out.allowed_paths, ['src']);
   assert.equal(r.out.quota_consumed, false);
   assert.equal(r.out.policy.host_tmp_writable, WIN);
+  assert.equal(r.out.policy.login_shell, false);
   assert.doesNotMatch(stubActions(s), /^exec --ignore-user-config/m);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')));
 });
@@ -387,7 +396,7 @@ test('review: worktree scope uses --uncommitted; codebase uses exec read-only', 
   const a = stubArgs(s);
   assert.notEqual(a[0], 'review');
   assert.ok(has(a, '--sandbox') && has(a, 'read-only'));
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /find dead code/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Focus exclusively on this objective: find dead code\./);
   assert.match(path.basename(cb.out.report_path), /codebase-find-dead-code\.md$/);
 });
 

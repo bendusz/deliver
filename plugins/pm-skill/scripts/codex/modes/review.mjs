@@ -21,7 +21,7 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$
 function objectiveClause(objective) {
   if (!objective) return '';
   const preset = PRESETS[objective.toLowerCase()];
-  return preset ? ` Focus on ${objective.toLowerCase()}: ${preset}.` : ` Focus on this objective: ${objective}.`;
+  return preset ? ` Focus on ${objective.toLowerCase()}: ${preset}.` : ` Focus exclusively on this objective: ${objective}.`;
 }
 
 export async function runReview(o) {
@@ -69,7 +69,7 @@ export async function runReview(o) {
   const run = await runCodex(found, args, { stdinText, cwd: base, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
   const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit };
   if (run.timedOut) throw new RunnerError('timed-out', `codex review exceeded the ${o.timeoutSeconds}s timeout`, { ...extra, stderr_path: stderrPath });
-  if (run.interrupted) throw new RunnerError('interrupted', `codex review was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, extra);
+  if (run.interrupted) throw new RunnerError('interrupted', `codex review was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, { ...extra, stderr_path: stderrPath });
   if (run.exit !== 0 || !fs.existsSync(report) || fs.statSync(report).size === 0) {
     const err = new RunnerError('failed', 'codex review exited non-zero or produced no report; inspect stderr.log', extra);
     err.extra.stderr_path = stderrPath;

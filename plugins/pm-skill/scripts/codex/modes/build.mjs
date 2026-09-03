@@ -63,7 +63,7 @@ export function validateBuilderResult(r) {
 
 function policy() {
   return WIN
-    ? { sandbox: 'danger-full-access', network_access: true, web_search: 'disabled', mcp_servers: false, hooks: false, subagents: false, login_shell: true, environment: 'core-with-secret-filtering', host_tmp_writable: true }
+    ? { sandbox: 'danger-full-access', network_access: true, web_search: 'disabled', mcp_servers: false, hooks: false, subagents: false, login_shell: false, environment: 'core-with-secret-filtering', host_tmp_writable: true }
     : { sandbox: 'workspace-write', network_access: false, web_search: 'disabled', mcp_servers: false, hooks: false, subagents: false, login_shell: false, environment: 'core-with-secret-filtering', host_tmp_writable: false };
 }
 
@@ -93,7 +93,7 @@ export async function runBuild(o) {
     evidenceRel = pmRelpath(worktree, o.evidence);
     if (evidenceRel === null) throw rejected('evidence path escapes the worktree or cannot be resolved');
     if (!/^tmp\/codex-builder\/.+\.md$/.test(evidenceRel)) throw rejected('fix evidence must be a Markdown file under tmp/codex-builder/');
-    if (!fs.existsSync(path.join(worktree, evidenceRel))) throw rejected('fix evidence file does not exist');
+    if (!fs.existsSync(path.join(worktree, evidenceRel)) || !fs.statSync(path.join(worktree, evidenceRel)).isFile()) throw rejected('fix evidence file does not exist');
   }
 
   const state = path.join(worktree, 'pm', 'pm-state.json');
@@ -126,21 +126,22 @@ export async function runBuild(o) {
   const scratch = makeScratch(worktree, 'pm-codex-builder');
   const runId = path.basename(scratch).split('.').at(-1);
   const rt = runtimeTmp(worktree, runId);
-  const cleanupRuntime = () => { try { fs.rmSync(rt, { recursive: true, force: true }); } catch { /* best effort */ } };
+  const runtimeParent = path.join(worktree, 'tmp', 'codex-runtime') + path.sep;
+  const cleanupRuntime = () => { try { if (rt.startsWith(runtimeParent)) fs.rmSync(rt, { recursive: true, force: true }); } catch { /* best effort */ } };
   const files = { prompt: path.join(scratch, 'prompt.md'), result: path.join(scratch, 'result.json'), stdout: path.join(scratch, 'stdout.log'), stderr: path.join(scratch, 'stderr.log') };
   const diag = (codexExit, actual) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, actual_files_changed: actual });
 
   const prompt = buildPrompt({ worktree, storyRel, scopes, mode: o.mode, evidenceRel });
-  fs.writeFileSync(files.prompt, prompt);
+  try { fs.writeFileSync(files.prompt, prompt); } catch { cleanupRuntime(); throw new RunnerError('failed', 'could not write the prompt', { scratch_dir: scratch, codex_version: version }); }
 
   let before;
   try { before = snapshotWorktree(worktree); } catch { cleanupRuntime(); throw blocked('the worktree contains an unsupported path type or a tab/newline filename; refusing an ambiguous baseline', { scratch_dir: scratch, codex_version: version }); }
   const beforeMeta = gitMetadataFingerprint(worktree);
 
   const sandboxArgs = WIN ? ['--sandbox', 'danger-full-access'] : ['--sandbox', 'workspace-write'];
-  const sandboxConfig = WIN ? [] : ['-c', 'sandbox_workspace_write.network_access=false', '-c', 'sandbox_workspace_write.exclude_slash_tmp=true', '-c', 'sandbox_workspace_write.exclude_tmpdir_env_var=true', '-c', 'allow_login_shell=false'];
+  const sandboxConfig = WIN ? [] : ['-c', 'sandbox_workspace_write.network_access=false', '-c', 'sandbox_workspace_write.exclude_slash_tmp=true', '-c', 'sandbox_workspace_write.exclude_tmpdir_env_var=true'];
   const args = ['exec', '--ignore-user-config', '--ignore-rules', '--strict-config', '-C', worktree, ...sandboxArgs, '--ephemeral', '--color', 'never',
-    '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`, ...sandboxConfig,
+    '-m', o.model, '-c', `model_reasoning_effort=${o.effort}`, '-c', 'allow_login_shell=false', ...sandboxConfig,
     '-c', 'shell_environment_policy.inherit="core"', '-c', 'shell_environment_policy.ignore_default_excludes=false', '-c', 'shell_environment_policy.experimental_use_profile=false',
     '-c', `shell_environment_policy.set.TMPDIR=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TMP=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TEMP=${tomlString(rt)}`,
     '-c', 'agents.enabled=false', '-c', 'web_search="disabled"', '-c', 'mcp_servers={}', '-c', 'features.hooks=false',
