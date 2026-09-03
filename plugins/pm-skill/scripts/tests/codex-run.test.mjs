@@ -413,3 +413,43 @@ test('review: preflight reports readiness without running', () => {
   assert.equal(r.out.quota_consumed, false);
   assert.doesNotMatch(stubActions(s), /^exec review/m);
 });
+
+test('advise: read-only exec with the prompt on stdin, answer retained', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const brief = path.join(s.dir, 'brief.md');
+  fs.writeFileSync(brief, 'Should we use X or Y?\n');
+  const r = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_ANSWER: '1' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const a = stubArgs(s);
+  for (const x of ['--sandbox', 'read-only', '--ephemeral', '--color', 'never', '--ignore-user-config', '--strict-config', 'gpt-5.6-sol', 'model_reasoning_effort=medium', '-o', '-']) assert.ok(has(a, x), x);
+  assert.ok(!has(a, '--search') && !has(a, '--skip-git-repo-check'));
+  assert.equal(fs.readFileSync(s.promptFile, 'utf8'), 'Should we use X or Y?\n');
+  assert.equal(fs.readFileSync(r.out.answer_path, 'utf8'), 'stub answer\n');
+  assert.equal(r.out.mode, 'advise');
+});
+
+test('research: adds --search when available and --skip-git-repo-check outside a repo', () => {
+  const s = makeStub();
+  const noRepo = tmpDir('norepo-');
+  const brief = path.join(s.dir, 'brief.md');
+  fs.writeFileSync(brief, 'Compare auth libraries.\n');
+  const withSearch = runRunner(['--mode', 'research', '--prompt-file', brief], { stub: s, cwd: noRepo, env: { STUB_ANSWER: '1', STUB_HAS_SEARCH: '1' } });
+  assert.equal(withSearch.status, 0);
+  assert.ok(has(stubArgs(s), '--search') && has(stubArgs(s), '--skip-git-repo-check'));
+  assert.equal(withSearch.out.search_used, true);
+  assert.ok(has(stubArgs(s), 'gpt-5.6-terra'));
+  const off = runRunner(['--mode', 'research', '--prompt-file', brief, '--search', 'off'], { stub: s, cwd: noRepo, env: { STUB_ANSWER: '1', STUB_HAS_SEARCH: '1' } });
+  assert.ok(!has(stubArgs(s), '--search'));
+  assert.equal(off.out.search_used, false);
+});
+
+test('advise: missing prompt file, auth failure, and non-zero exit', () => {
+  const s = makeStub();
+  const p = newBuildProject(true);
+  assert.equal(runRunner(['--mode', 'advise', '--prompt-file', path.join(s.dir, 'nope.md')], { stub: s, cwd: p }).status, 65);
+  const brief = path.join(s.dir, 'brief.md'); fs.writeFileSync(brief, 'q\n');
+  assert.equal(runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_LOGIN_EXIT: '1' } }).status, 69);
+  const failed = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_EXEC_EXIT: '5' } });
+  assert.equal(failed.status, 70);
+  assert.equal(failed.out.codex_exit, '5');
+});
