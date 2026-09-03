@@ -11,7 +11,7 @@ import { parseStory } from '../codex/lib/story.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
 import { runCodex } from '../codex/lib/spawn.mjs';
 import { cmdFallbackPrefix, CMD_FALLBACK_SUFFIX, requireCodex, BUILD_FLAGS, READONLY_FLAGS, REVIEW_FLAGS } from '../codex/lib/preflight.mjs';
-import { PLUGIN_ROOT, tmpDir, gitIn, canSymlink, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath } from './helpers.mjs';
+import { PLUGIN_ROOT, tmpDir, gitIn, canSymlink, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath, STORY_V2, STORY_LEGACY } from './helpers.mjs';
 
 test('args: defaults per mode and validation', () => {
   const b = parseArgs(['--mode', 'build', '--worktree', '/w', '--story', 'docs/stories/S1-1.md']);
@@ -74,22 +74,21 @@ test('result: envelope shape mirrors the bash runner', () => {
   assert.equal(EXIT.SAFETY, 74);
 });
 
-test('story: pm-meta parsing and visible-field cross checks', () => {
+test('story: pm-meta is authoritative; legacy visible fields are optional but must agree', () => {
   const p = newBuildProject(true);
-  assert.deepEqual(parseStory(p, 'docs/stories/S1-1-fix.md'), { builder: 'codex-builder', scopes: ['src'] });
-  const story = path.join(p, 'docs', 'stories', 'S1-1-fix.md');
-  const original = fs.readFileSync(story, 'utf8');
-  const expectBlocked = (text, re) => { fs.writeFileSync(story, text); assert.throws(() => parseStory(p, 'docs/stories/S1-1-fix.md'), (e) => e instanceof RunnerError && e.status === 'blocked' && re.test(e.message)); };
-  expectBlocked(original.replace('"touches":["src"]', '"touches":[]'), /pm-meta/);
-  expectBlocked(original.replace('Builder: codex-builder', 'Builder: expert-builder'), /does not match/);
-  expectBlocked(original.replace('Touches: src', 'Touches: lib'), /visible Touches/);
-  expectBlocked(original.replace('"touches":["src"]', '"touches":["../x"]'), /traversal|outside/);
-  expectBlocked(original.replace('"touches":["src"]', '"touches":["src/*"]'), /globs/);
-  // A literal "." touches item matches the traversal-segment regex (`/${item}/` === '/./')
-  // before the whole-worktree guard runs — confirmed identical in the bash reference
-  // (case "/$item/" in */../*|*/./*) also fires first). The whole-worktree guard is
-  // defense-in-depth for symlink aliasing, not reachable via a literal "." here.
-  expectBlocked(original.replace('"touches":["src"]', '"touches":["."]').replace('Touches: src', 'Touches: .'), /traversal|whole worktree/);
+  const rel = 'docs/stories/S1-1-fix.md';
+  const story = path.join(p, rel);
+  assert.deepEqual(parseStory(p, rel), { builder: 'codex-builder', scopes: ['src'] });
+  const expectBlocked = (text, re) => { fs.writeFileSync(story, text); assert.throws(() => parseStory(p, rel), (e) => e instanceof RunnerError && e.status === 'blocked' && re.test(e.message)); };
+  expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":[]'), /pm-meta/);
+  expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["../x"]'), /traversal|outside/);
+  expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["src/*"]'), /globs/);
+  expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["."]'), /traversal|whole worktree/);
+  fs.writeFileSync(story, STORY_LEGACY);
+  assert.deepEqual(parseStory(p, rel), { builder: 'codex-builder', scopes: ['src'] });
+  expectBlocked(STORY_LEGACY.replace('Builder: codex-builder', 'Builder: expert-builder'), /does not match/);
+  expectBlocked(STORY_LEGACY.replace('Touches: src', 'Touches: lib'), /visible Touches/);
+  expectBlocked(STORY_LEGACY.replace('Touches: src', 'Touches: '), /visible Touches/);
 });
 
 test('result.emit: a synchronous write is not truncated by an immediate process.exit', () => {
@@ -480,8 +479,7 @@ test('build 20, 24, 25: invalid effort, empty touches, and drifted fields fail b
   const p = newBuildProject(true); const s = makeStub();
   assert.equal(runRunner(['--mode', 'build', '--effort', 'ultra'], { project: p, stub: s }).status, 64);
   const story = path.join(p, 'docs', 'stories', 'S1-1-fix.md');
-  const original = fs.readFileSync(story, 'utf8');
-  for (const [text, re] of [[original.replace('"touches":["src"]', '"touches":[]'), /pm-meta/], [original.replace('Builder: codex-builder', 'Builder: expert-builder'), /does not match/], [original.replace('Touches: src', 'Touches: lib'), /visible Touches/]]) {
+  for (const [text, re] of [[STORY_LEGACY.replace('"touches":["src"]', '"touches":[]'), /pm-meta/], [STORY_LEGACY.replace('Builder: codex-builder', 'Builder: expert-builder'), /does not match/], [STORY_LEGACY.replace('Touches: src', 'Touches: lib'), /visible Touches/]]) {
     fs.writeFileSync(story, text);
     const r = runRunner(['--mode', 'build'], { project: p, stub: s });
     assert.equal(r.status, 66); assert.match(r.out.reason, re);

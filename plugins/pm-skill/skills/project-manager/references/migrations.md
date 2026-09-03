@@ -21,8 +21,15 @@ and the log together before another builder dispatch. Apply the same rule to any
 
 ## Stories created before v0.13 (no `pm-meta`)
 
-Add the story's `pm-meta` comment, confirm it matches the visible Builder and Touches, and commit
-that story migration before you dispatch a builder.
+Add the story's `pm-meta` comment with the builder and touch paths, and commit that story migration
+before you dispatch a builder.
+
+## Stories created before 0.17 (visible `Builder`, `Touches`, and sensitivity fields)
+
+No migration is needed. `pm-meta` is authoritative; the runner still checks that a visible `Builder`
+or `Touches` field agrees with it and blocks on a mismatch. When you next edit such a story, you may
+drop the visible fields and fold `Security-sensitive` and `Architecture-sensitive` into
+`Review lenses`.
 
 ## Flat 0.8 layout (personal fields in `pm-state.json`, no `pm/actors/`)
 
