@@ -72,10 +72,10 @@ but it is fail-open and can be disabled, so holding the line is still your respo
 - If the project is not a git repo, offer to `git init`, and **ask** first.
 - Generate the project instructions file `AGENTS.md` from
   `${CLAUDE_PLUGIN_ROOT}/templates/AGENTS.md.template`, facts only: commands, layout, non-default
-  conventions, gotchas, per `references/instruction-layers.md`. Then generate `CLAUDE.md` from
+  conventions, gotchas, per `instruction-layers.md`. Then generate `CLAUDE.md` from
   `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.template`, a two-line `@AGENTS.md` bridge. **Never**
   overwrite an existing file. If `CLAUDE.md` exists without `AGENTS.md`, propose the migration in
-  `references/instruction-layers.md`, show the diff, and ask. If both files exist and `CLAUDE.md` is
+  `instruction-layers.md`, show the diff, and ask. If both files exist and `CLAUDE.md` is
   not an `@AGENTS.md` bridge, leave both and log a WARN; `/pm-skill:doctor` reports it. When the
   plan's Delivery mode says `Instruction rules: pm-state`, also write `.claude/rules/pm-state.md`
   from `rules-pm-state.md.template` and `pm/AGENTS.md` from `pm-AGENTS.md.template`.

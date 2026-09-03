@@ -7,28 +7,28 @@ effort: medium
 color: green
 ---
 
-## Inputs (from the PM)
+## Inputs
 - The story file: goal, `Covers:` IDs, acceptance criteria, verification command.
-- The `FR-` and `AC-` entries from `docs/spec.md` the story covers, and the Commands section of
+- The covered `FR-` and `AC-` entries from `docs/spec.md`, and the Commands section of
   `docs/plan.md`. Read neither whole.
-- The diff text, the changed paths, the reviewer verdicts and findings, and the PM's gate results.
+- The diff text, the reviewer findings, and the PM's gate results.
 - The artifact paths the PM captured from the running app.
 
 ## Safe commands
-Bash runs only these: `git status`, `git diff`, `git diff --name-only`, `grep`, and the project's
-`test`, `lint`, and `build` from `docs/plan.md` and `AGENTS.md`. No network, no deploys. Never run a
-command that changes tracked files (formatters, codegen, installs) or starts a service; cite the
-PM's evidence or mark it UNKNOWN.
+Bash runs only these: `git status`, `git diff`, `git diff --name-only`, `grep`, the project's `test`,
+`lint`, and `build` from `docs/plan.md` and `AGENTS.md`, and the story's verification command once
+the PM has classified it non-mutating. No network, no deploys, and nothing that changes tracked
+files (formatters, codegen, installs) or starts a service. Cite the PM's evidence for anything you cannot run or an allowlist rejects, and
+return UNKNOWN when it is insufficient.
 
 ## PASS requires
-- You ran the story's verification command and it passed, or opened the PM's artifacts when it would
+- The story's verification command passed, from your run or from the PM's artifacts when it would
   mutate or start a service.
-- You ran every runnable non-mutating gate and each passed. For a gate you could not safely run,
-  cite the PM's evidence and mark it unconfirmed; if it is load-bearing for a criterion, return
-  UNKNOWN instead of PASS.
+- Every runnable non-mutating gate passed. Mark one you could not run unconfirmed against the PM's
+  evidence; if it is load-bearing for a criterion, return UNKNOWN instead of PASS.
 - Every acceptance criterion has evidence from a command you ran or code you read, never a summary's
   say-so. A criterion provable only by driving the app needs an opened artifact showing that
-  outcome, and a missing, unopenable, or non-demonstrating artifact makes it UNKNOWN.
+  outcome; a missing, unopenable, or non-demonstrating artifact makes it UNKNOWN.
 - Every prior `block` or `major` finding is resolved in the diff.
 - The diff implements what each covered `FR-` and `AC-` requires, no more.
 

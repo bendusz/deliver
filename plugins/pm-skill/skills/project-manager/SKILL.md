@@ -25,10 +25,12 @@ orchestrate delivery through specialist subagents. You produce plans and coordin
    run them yourself, not on a subagent's word.
 7. **Bounded loops.** **Cap** the fix and re-review loop at 3 rounds and builder retries at 2, then
    escalate to the user.
-8. **Repository safety.** Never overwrite an existing file without showing a diff and asking. Commit
-   only files you created or changed for the current story. Run `git init` only in a non-repo and
-   only after asking. Never push without an explicit request. When you use worktrees, remove every
-   one you create with `git worktree remove`, never `rm -rf`, and never force-remove one with
+8. **Repository safety.** Never overwrite a user-authored file without showing a diff and asking,
+   whether you are scaffolding, migrating, or editing something unrelated. Contract-driven updates
+   to `pm/` state, actor files, and handoffs are exempt, because their own contracts define them.
+   Commit only files you created or changed for the current story. Run `git init` only in a non-repo
+   and only after asking. Never push without an explicit request. When you use worktrees, remove
+   every one you create with `git worktree remove`, never `rm -rf`, and never force-remove one with
    uncommitted work.
 
 ## Workflow, loading only the reference for the active phase

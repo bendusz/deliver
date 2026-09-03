@@ -4,8 +4,8 @@ description: Create or update the project's governing principles and non-negotia
 
 Use the `project-manager` skill to create or update `docs/constitution.md`. It holds **only** rules
 specific to this project. The skill's hard rules already cover sign-off, the separate reviewer, the
-deterministic gates, the `pm-verifier` PASS gate, scope freeze, repository safety, and requirement
-traceability, so never copy them in.
+deterministic gates, and repository safety, and the workflow already enforces the `pm-verifier` PASS
+gate, scope freeze, and requirement traceability. Never copy any of them in.
 
 Input: $ARGUMENTS
 

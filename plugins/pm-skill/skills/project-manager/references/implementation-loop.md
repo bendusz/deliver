@@ -24,7 +24,7 @@ same deterministic gates and review panel judge every story.
    context that names authoritative sources and any completeness-sensitive inventory method, a
    verification command, and valid `pm-meta`. See `decomposition.md`; if it is not ready, fix the
    story first. A story created before v0.13 needs its `pm-meta` comment added and committed first;
-   see `references/migrations.md`. Ensure the working tree is clean before you write route state or
+   see `migrations.md`. Ensure the working tree is clean before you write route state or
    the log. If it holds unrelated changes, stop and ask, per Repository safety. Resolve a `pm-meta`
    builder of `auto` now:
    - choose `codex-builder` only for a precise outcome with bounded `touches`, enough local context,
@@ -88,8 +88,8 @@ same deterministic gates and review panel judge every story.
    If Codex is unavailable for an opportunistic fix, use `expert-builder`; an unavailable run earns
    no extra retries and resets neither loop counter. If a *gate* is failing rather than a review
    finding, or the builder returns the same failing result on a second attempt with no meaningful
-   progress, dispatch `debugger` first to root-cause it, giving it the failing command's output, the
-   diff, and the implicated paths. Then put its fix plan into the evidence brief for `codex-builder`
+   progress, dispatch `debugger` first to root-cause it, giving it the story file path, the failing
+   command's output, the diff, and the implicated paths. Then put its fix plan into the evidence brief for `codex-builder`
    when the fix is localized, or forward it to `expert-builder` when it is broad, instead of a blind
    retry. `debugger` is read-only; a builder applies the fix. After each fix, re-run the gates and
    regenerate the cumulative story diff for re-review, **up to 3 rounds**. Increment
@@ -101,7 +101,7 @@ same deterministic gates and review panel judge every story.
    `pm-verifier`, which is read-only, with the inputs its agent file lists. It returns
    `STATUS: PASS | FAIL | UNKNOWN`. PASS is the only status that permits shipping. FAIL
    returns to Fix, step 4, within the persisted 3-round cap, then re-verify; UNKNOWN means you obtain
-   the exact evidence it named and re-verify, or escalate to the user. `references/verification.md`
+   the exact evidence it named and re-verify, or escalate to the user. `verification.md`
    holds the running-app evidence rule and where the durable report goes.
 7. **Ship.** With gates green, no open `block` or `major`, and `pm-verifier` `PASS`, commit **only**
    this story's cumulative authoritative paths to the story branch. Sync first: pull or rebase the
@@ -126,7 +126,7 @@ same deterministic gates and review panel judge every story.
    alongside the ship, on the integration branch right after the merge, so the pushed repo carries
    the current resume point and the released claim. Never write secrets into `pm/`.
 9. **Document (optional, at the sprint or project boundary, not per story).** See
-   `references/documentation.md`.
+   `documentation.md`.
 
 Scope changes go through `/pm-skill:correct-course`, which owns the scope-freeze rule. Checkpoint
 policy, escalation triggers, and when to offer a handoff live in `planning-and-signoff.md`.

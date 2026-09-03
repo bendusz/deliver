@@ -45,7 +45,7 @@ construct it by hand. Changing git identity mid-project creates a second actor f
 `git config user.email` before claiming a story. The session hook shows `unknown-actor` for that
 case.
 
-If an actor file from an older layout shows up as an orphan, see `references/migrations.md`.
+If an actor file from an older layout shows up as an orphan, see `migrations.md`.
 
 ## `pm/pm-state.json` (shared, changes only at coordination moments)
 
@@ -122,8 +122,8 @@ the handoff is stale, so trust state and log instead.
 - Sprint advance: any actor may advance `current_sprint` once all the sprint's stories are merged.
   It is a shared-state write and gets a log entry.
 - Claims are visible, not locked, because git cannot make them atomic. A same-minute double-claim
-  races. `/pm-skill:doctor` and `/pm-skill:analyze` surface it within one fetch, and resolution is
-  human. Stale claims (an assignment with no matching branch or activity) are flagged the same way.
+  races. `/pm-skill:doctor` and `/pm-skill:analyze` report the race after one fetch, and a person
+  resolves it. Stale claims (an assignment with no matching branch or activity) are flagged the same way.
 
 ## Source of truth (committed)
 
@@ -141,4 +141,4 @@ than re-deciding from memory. If you are a new actor on an existing project and 
 `pm/actors/<you>.json` yet, create it from the template and commit it before continuing.
 
 If the state you find uses a pre-0.13, flat 0.8, or pre-0.8 layout, migrate it first per
-`references/migrations.md`.
+`migrations.md`.

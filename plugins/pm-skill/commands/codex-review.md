@@ -24,12 +24,23 @@ All optional, in any order, from `$ARGUMENTS`:
 
 ## 2. Scan the outgoing code for secrets
 
-A review sends repository content to an external service, so scan it before you launch. Prefer a real
-scanner when one is installed (`gitleaks`, `trufflehog`); otherwise pipe the diff through the bundled
-value patterns with `git diff <range> | node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" scan`. Quote the
-path, because plugin roots can hold spaces; a non-zero exit means secret-shaped content. If it trips,
-do **not** launch the review. Scan values, not labels: a name like `APIClient` is not a secret, and
-real credentials are often lowercase. For `codebase` scope there is no diff; scan the tracked tree instead with `git ls-files -z | xargs -0 cat | node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" scan` (PowerShell: `git ls-files | ForEach-Object { Get-Content $_ -Raw } | node ... scan`).
+A review sends repository content to an external service, so scan everything Codex can read before
+you launch. Prefer a real scanner when one is installed (`gitleaks`, `trufflehog`); otherwise pipe
+the content through the bundled value patterns with
+`node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" scan`. Quote the path, because plugin roots can hold
+spaces; a non-zero exit means secret-shaped content. If it trips, do **not** launch the review. Scan
+values, not labels: a name like `APIClient` is not a secret, and real credentials are often
+lowercase.
+
+What you feed the scanner depends on scope, and it must cover everything the runner exposes:
+
+- `recent` and `worktree` send tracked modifications plus untracked non-ignored files, so scan both:
+  `git diff <range>` and then
+  `git ls-files --others --exclude-standard -z | xargs -0 cat`, each piped through the scanner.
+- `codebase` gives Codex read access to the whole checkout, so scan every tracked and untracked
+  non-ignored file: `git ls-files --cached --others --exclude-standard -z | xargs -0 cat` piped
+  through the scanner. In PowerShell,
+  `git ls-files --cached --others --exclude-standard | ForEach-Object { Get-Content $_ -Raw } | node ... scan`.
 
 ## 3. Preflight
 

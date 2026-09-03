@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Portable validation for the pm-skill plugin — runs locally and in CI (no `claude` CLI needed).
+# Portable validation for the pm-skill plugin. It runs locally and in CI without the claude CLI.
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root" || exit 2

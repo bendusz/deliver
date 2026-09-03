@@ -19,7 +19,7 @@ and the log together before another builder dispatch. Apply the same rule to any
 `parallel_batch` entry that lacks `builder`. Idle actor files may simply add
 `resolved_builder: null` when they are next updated.
 
-## Stories created before v0.13 (no `pm-meta`)
+## Stories created before 0.13 (no `pm-meta`)
 
 Add the story's `pm-meta` comment with the builder and touch paths, and commit that story migration
 before you dispatch a builder.

@@ -1,5 +1,5 @@
 ---
-description: End a session cleanly by writing pm/actors/<id>.HANDOFF.md, a token-efficient briefing so the next agent resumes at full speed.
+description: End a session by writing pm/actors/<id>.HANDOFF.md so the next agent can resume from recorded state.
 ---
 
 Use the `project-manager` skill to write an end-of-session handoff.

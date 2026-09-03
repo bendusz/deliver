@@ -8,8 +8,7 @@ One repeatable way of working:
 
 > **discover → specify → clarify → plan → sign-off → analyze → decompose → build → gate → review → verify → ship → log**
 
-It is generic and self-contained: it works on a bare Claude Code install and gets richer if you
-happen to have other tools.
+It works on a bare Claude Code install and can use optional tools when they are present.
 
 ## Install
 
@@ -153,7 +152,8 @@ one.
   end-of-session briefing. Nobody writes anyone else's files, and a bundled hook enforces it.
 - State updates are committed alongside the work they describe. Never write secrets into `pm/`.
 
-Scratch under `tmp/`, gitignored and disposable, and never load-bearing for resume:
+Gitignored scratch and reports, disposable and never load-bearing for resume. The first four live
+under `tmp/`; the report directories sit at the repository root:
 
 - `tmp/environment-check.md`, `/pm-skill:doctor`'s readiness report.
 - `tmp/codex-builder/*.md`, focused fix briefs passed to `codex-builder`. Never authoritative and
@@ -183,8 +183,8 @@ Scratch under `tmp/`, gitignored and disposable, and never load-bearing for resu
   is refused outright with exit 66 rather than followed. Before and after snapshots of tracked,
   untracked, and ignored files inside the worktree catch unreported, protected, and out-of-scope
   repository edits. Ignored files inside the worktree are audited and reported as
-  `ignored_files_changed`; only tracked, non-ignored files are enforced against the story's
-  `pm-meta.touches`.
+  `ignored_files_changed`; tracked and untracked non-ignored files are both enforced against the
+  story's `pm-meta.touches`.
   Git checks cover HEAD, every ref, staged contents, index flags, hooks, `info/exclude`, local
   config, and worktree registrations. `--timeout-seconds`, 10 minutes by default, bounds the model
   process itself, not the preflight probes, which have their own 30-second limit; a run that exceeds

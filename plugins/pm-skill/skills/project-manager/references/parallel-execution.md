@@ -5,7 +5,7 @@ once in isolated git worktrees, then integrate them one at a time. The sequentia
 routing, path scope checks, retry and fix bounds, gates, review, verification, ship, and logging.
 Only the differences below apply. On any worktree trouble, finish the story sequentially.
 
-Why it is safe: builders make no commits, because you own git. The concurrent phase is pure
+This is safe because builders make no commits. You own git. The concurrent phase is pure
 file-editing in separate directories, with zero git writes, so nothing contends for the shared
 `.git`. Every git operation, meaning worktree add and remove, commit, and merge, is yours and
 serial, and you run every worktree command from the main checkout.
@@ -45,36 +45,47 @@ coordination cost grows roughly with the square of the batch size. Run a larger 
   `git -C <worktree> ls-files --others --exclude-standard`, then sort and deduplicate. The scope
   check is the loop's. On any out-of-scope, protected, or unexplained path, **stop** that story and
   preserve its worktree for inspection.
-- **Commit** each story's edits to its branch the moment that builder returns done, before you
-  process the next builder's result, so no work sits uncommitted in a worktree. Scope the commit to
-  the checked path set and **never** run `git add -A`. Record the commit in `parallel_batch` and set
-  the story's status to `built`.
+- Leave each story's edits **uncommitted** in its own worktree and set its status to `built`. The
+  tail below runs the loop's gates and review against that working tree, which is where the diff
+  lives, and commits only after `pm-verifier` passes. Nothing outside that worktree can see or
+  disturb the edits meanwhile.
 - A builder that stays blocked after the loop's retry cap gets its `parallel_batch` entry marked
-  `blocked`, with nothing to commit. The rest of the batch carries on.
+  `blocked`. The rest of the batch carries on.
 
 If the host serializes the dispatch, isolation still holds. You lose only the wall-clock win.
 
 ## 3. Integration tail, serial
-Take one story at a time and land it before starting the next, working in that story's worktree so
-every git command takes `-C <worktree>`.
+Take one story at a time and land it before starting the next. Steps 1 to 3 run in that story's
+worktree, so each git command takes `-C <worktree>`. Steps 4 and 5 run from the main checkout,
+because the integration branch is checked out there and git refuses to check the same branch out
+twice.
 
-1. Merge the latest integration tip into the story branch first. If that conflicts and you cannot
-   resolve it cleanly, **stop** rather than forcing it: escalate to the user with the story and the
+1. Run the loop's gate, review, fix, and verify steps in the worktree, in that order and against the
+   still-uncommitted changes, exactly as the sequential loop runs them. Set status `in-review`.
+   Re-derive and scope-check the changed paths as in section 2, diff **only** those paths, hand the
+   panel that diff text, run the bounded fix rounds, then dispatch `pm-verifier`. The diff exists
+   only while the changes are uncommitted, so do not commit before `PASS`. If the worktree lacks
+   runtime deps such as `node_modules` or `.env`, bootstrap them first, installing only and **never**
+   committing those artifacts. If that is not feasible, finish this story sequentially.
+2. On `pm-verifier` `PASS`, **commit** the checked path set to the story branch, scoped to those
+   paths and **never** with `git add -A`. Record the commit in `parallel_batch`. Do not touch another
+   worktree until this commit lands.
+3. Merge the latest integration tip into the story branch. If that conflicts and you cannot resolve
+   it cleanly, **stop** rather than forcing it: escalate to the user with the story and the
    conflicting paths, mark the story `blocked`, and move to the next. Optionally enable `git rerere`
-   so repeated resolutions are remembered.
-2. Run the loop's gate, review, fix, and verify steps on that combined result, which is where a
-   semantic conflict surfaces when two stories each passed alone but break together. If the worktree
-   lacks runtime deps such as `node_modules` or `.env`, bootstrap them first, installing only and
-   **never** committing those artifacts. If that is not feasible, finish this story sequentially.
-3. Ship per the loop, `--no-ff` merging the story branch into the integration branch. Set status
-   `merged`.
-4. Remove the now-clean, merged worktree with `git worktree remove`.
+   so repeated resolutions are remembered. The tip has moved since your gates ran, so re-run the
+   gates on the merged result, which is where a semantic conflict surfaces when two stories each
+   passed alone but break together. A failure here re-enters the loop's fix rounds in this worktree,
+   and each fix is committed to the story branch before you move on.
+4. Ship from the main checkout, which already has the integration branch checked out: `--no-ff` merge
+   the story branch with the loop's message format. Set status `merged`.
+5. Remove the now-clean, merged worktree with `git worktree remove`, also from the main checkout.
 
 A blocked story does not block the rest. A partial batch still checkpoints at the sprint boundary.
 
 ## Worktree safety
-- Capture before cleanup: **commit** a story's edits to its branch before touching any other worktree
-  and before removing this one.
+- Capture before cleanup: **never** remove or prune a worktree that still holds uncommitted work, and
+  **commit** a story's edits to its branch before the integration tail moves on to the next story.
 - Remove only with `git worktree remove`, **never** `rm -rf`. **Never** force-remove a worktree with
   uncommitted changes; check `git -C <wt> status --porcelain` first, then preserve and report.
 - Remove every clean, merged worktree. A blocked or dirty worktree **stays** until the user has
@@ -96,11 +107,13 @@ as its story merges.
 
 On resume, from the main checkout:
 - Continue each story with its persisted `builder`. Do not resolve `auto` again after a session loss.
-- Reconcile `parallel_batch` against `git worktree list`. If a `built` or `in-review` story's
-  worktree directory is missing because something deleted it externally, **log** the anomaly rather
-  than silently moving on. Its branch should already hold the committed work, so verify that first.
-- For a `building` worktree that still has uncommitted changes, **commit** them now, story-path
-  scoped, and advance it to `built`. Never prune a dirty worktree.
+- Reconcile `parallel_batch` against `git worktree list`. If a story's worktree directory is missing
+  because something deleted it externally, **log** the anomaly rather than silently moving on. Only
+  work already committed to the story branch survives, so check that branch before assuming the
+  story is intact.
+- A `building`, `built`, or `in-review` worktree with uncommitted changes is the expected state
+  before the tail commits. Re-derive and scope-check its changed paths, then re-enter the tail at
+  step 1. Never prune a dirty worktree.
 - For a `blocked` story, present the blocker to the user and re-enter the continuation its
   `pm/log.md` note calls for, resolving the tip-merge conflict from step 1 or re-running the fix
   loop, before continuing the remaining unmerged stories.

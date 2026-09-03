@@ -1,6 +1,6 @@
 ---
 name: expert-builder
-description: Use when a build-ready story is broad, cross-cutting, architecture-heavy, or needs wide repo context, or when the PM has resolved its Builder field to expert-builder. It writes code and tests for exactly that story, runs verification and tests, and returns a structured summary. Not for a story explicitly assigned to codex-builder, multi-story work, or unscoped changes.
+description: Use when a build-ready story is broad, cross-cutting, architecture-heavy, or needs wide repo context, or when the PM has resolved its pm-meta.builder to expert-builder. It writes code and tests for exactly that story, runs verification and tests, and returns a structured summary. Not for a story explicitly assigned to codex-builder, multi-story work, or unscoped changes.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: claude-opus-5
 effort: high

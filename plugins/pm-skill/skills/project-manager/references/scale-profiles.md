@@ -14,9 +14,9 @@ The default is `standard`.
 | `regulated` | compliance and high-assurance | All of the above mandatory, plus a required security review and full requirement to story to verification traceability. Nothing is waived. |
 
 ## Rules
-- Scaling **down** removes artifacts and ceremony, never the hard rules: sign-off before
-  implementation, a separate reviewer, deterministic gates, repository safety, and verifier PASS
-  before ship. Even `tiny` keeps those.
+- Scaling **down** removes artifacts and ceremony, never the rules the skill and workflow already
+  enforce: sign-off before implementation, a separate reviewer, deterministic gates, repository
+  safety, and verifier PASS before ship. Even `tiny` keeps those.
 - Scaling **up** makes optional things mandatory. It never loosens anything.
 - When unsure, pick the higher scale. You can raise the scale mid-project, adding the artifacts then;
   lowering it mid-project needs the user's agreement.
@@ -24,5 +24,5 @@ The default is `standard`.
 ## Recording it
 - `docs/plan.md`, Delivery mode: scale, checkpoint policy, autonomy.
 - `docs/plan.md`, Delivery mode also carries `Instruction rules: none | pm-state`. The default is
-  `none`; offer `pm-state` at `standard` scale and above, per `references/instruction-layers.md`.
+  `none`; offer `pm-state` at `standard` scale and above, per `instruction-layers.md`.
 - `pm/pm-state.json`: `"scale": "standard"`.
