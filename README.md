@@ -170,9 +170,10 @@ Scratch under `tmp/`, gitignored and disposable, and never load-bearing for resu
 - **No implementation before your sign-off.** A behavioural rule plus a bundled fail-open hook.
 - **Guarded Codex writes.** The `codex-builder` runner fails closed unless tracked PM state exists
   and is signed off, requires the exact git worktree root, mechanically enforces the story's
-  `pm-meta.touches`, and uses `workspace-write` on macOS and Linux with host temporary paths
-  disabled on macOS and Linux, and with network (on macOS and Linux), web search, MCP servers,
-  lifecycle hooks, subagents, login shells, user config, and execution rules disabled. Tool shells
+  `pm-meta.touches`. On macOS and Linux the builder runs Codex under `workspace-write` with host
+  temporary paths, network, web search, MCP servers, lifecycle hooks, subagents, login shells,
+  user config, and execution rules disabled; on Windows it runs with full access and the runner
+  audits the worktree afterwards. Tool shells
   get a reduced secret-filtered environment and an ignored, worktree-local `TMPDIR` that is removed
   on exit, best effort, since a Windows lock can leave it. A symlinked `tmp/` or `tmp/codex-runtime`
   is refused outright with exit 66 rather than followed. Before and after snapshots of tracked,

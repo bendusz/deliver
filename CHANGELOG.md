@@ -40,6 +40,17 @@ Sonnet wrapper.
   sanitised session context, synchronous hook output, a `hooks.json` wiring check in validate,
   `.gitignore` consent for Codex review reports, report-name collision handling, and a `git` probe
   in the runner.
+- **Ignored files are audited, not enforced.** The runner fingerprints git-ignored files inside
+  the worktree and reports changes in a new `ignored_files_changed` envelope field. Only tracked
+  and non-ignored files are enforced against a story's Touches, so caches and build outputs no
+  longer abort a story; `codex-builder` surfaces a modified pre-existing ignored file outside
+  Touches as a review finding.
+- **Node benchmark scorer.** `scripts/score-builder-benchmark.sh` is now
+  `scripts/score-builder-benchmark.mjs` with identical output; `/pm-skill:benchmark-builders`
+  calls it with `node`.
+- **Log entry separator.** Shared-log entries now read `- <YYYY-MM-DD HH:MM> <actor-id>: <event>`;
+  the template and references use a colon instead of a dash. Existing logs keep their old lines;
+  nothing parses the separator.
 
 ## 0.15.0 - 2026-08-27
 

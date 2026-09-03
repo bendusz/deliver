@@ -86,16 +86,15 @@ Run reviewers as a risk-selected **panel** (see `references/review-gates.md`), n
 them.
 
 The PM never assembles a `codex` command line. It may call the bundled runner
-`scripts/codex/run.mjs`, the `--preflight` probe for example, and every model run goes through a
+`scripts/codex/run.mjs`, for example the `--preflight` probe, and every model run goes through a
 Sonnet wrapper agent. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
-prompt. When the OpenAI Codex CLI
-is installed, `/pm-skill:codex-review` can add an optional independent second-model review alongside
-the panel, never as a replacement for it, and `/pm-skill:codex-help` offers a one-off second opinion
-on a consequential decision. Use both sparingly. The `codex-researcher` agent plays the same
-independent-second-model role for research questions. `codex-builder` is different: it is
-write-capable inside one fixed worktree and may replace `expert-builder` only when the story or fix
-brief is narrow enough. The normal gates, separate review panel, and `pm-verifier` still judge its
-work.
+prompt. When the OpenAI Codex CLI is installed, `/pm-skill:codex-review` can add an optional
+independent second-model review alongside the panel, never as a replacement for it, and
+`/pm-skill:codex-help` offers a one-off second opinion on a consequential decision. Use both
+sparingly. The `codex-researcher` agent plays the same independent-second-model role for research
+questions. `codex-builder` is different: it is write-capable inside one fixed worktree and may
+replace `expert-builder` only when the story or fix brief is narrow enough. The normal gates,
+separate review panel, and `pm-verifier` still judge its work.
 
 Every agent pins its model and effort in its frontmatter; see `docs/model-tiering.md` in the
 repository for the rationale.

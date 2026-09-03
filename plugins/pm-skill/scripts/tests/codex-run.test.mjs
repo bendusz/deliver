@@ -422,6 +422,16 @@ test('build 28c: an ignored file inside the story scope is reported and does not
   assert.deepEqual(r.out.actual_files_changed, []);
 });
 
+test('build 28d: an ignored file Codex honestly reports in files_changed still matches the delta', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.appendFileSync(path.join(p, '.gitignore'), '.env\n');
+  fs.writeFileSync(path.join(p, '.env'), 'SECRET=1\n');
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: '.env', STUB_REPORT_PATH: '.env' } });
+  assert.equal(r.status, 0, JSON.stringify(r.out));
+  assert.deepEqual(r.out.ignored_files_changed, ['.env']);
+  assert.deepEqual(r.out.actual_files_changed, []);
+});
+
 test('build 29: a skip-worktree index flag is a protected-git-state violation', () => {
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_SKIP_WORKTREE: '1' } });

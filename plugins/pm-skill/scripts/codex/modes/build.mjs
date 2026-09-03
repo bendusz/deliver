@@ -189,6 +189,7 @@ export async function runBuild(o) {
   for (const c of result.files_changed) {
     const rel = pmRelpath(worktree, c);
     if (rel === null) throw safety('Codex reported a changed path outside the worktree');
+    if (isIgnored(rel)) continue;
     claimed.push(rel);
   }
   if (JSON.stringify([...new Set(claimed)].sort()) !== JSON.stringify(actual)) throw safety('Codex files_changed does not match the authoritative before/after worktree delta');
