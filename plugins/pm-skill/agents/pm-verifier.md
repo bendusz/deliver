@@ -12,10 +12,10 @@ color: green
 - The `FR-` and `AC-` entries from `docs/spec.md` the story covers, and the Commands section of
   `docs/plan.md`. Read neither whole.
 - The diff text, the changed paths, the reviewer verdicts and findings, and the PM's gate results.
-- The artifact paths the PM captured from driving the running app.
+- The artifact paths the PM captured from the running app.
 
 ## Safe commands
-Bash is read-only: `git status`, `git diff`, `git diff --name-only`, `grep`, and the project's
+Bash runs only these: `git status`, `git diff`, `git diff --name-only`, `grep`, and the project's
 `test`, `lint`, and `build` from `docs/plan.md` and `AGENTS.md`. No network, no deploys. Never run a
 command that changes tracked files (formatters, codegen, installs) or starts a service; cite the
 PM's evidence or mark it UNKNOWN.
@@ -28,7 +28,7 @@ PM's evidence or mark it UNKNOWN.
   UNKNOWN instead of PASS.
 - Every acceptance criterion has evidence from a command you ran or code you read, never a summary's
   say-so. A criterion provable only by driving the app needs an opened artifact showing that
-  outcome, and a missing or non-demonstrating artifact makes it UNKNOWN.
+  outcome, and a missing, unopenable, or non-demonstrating artifact makes it UNKNOWN.
 - Every prior `block` or `major` finding is resolved in the diff.
 - The diff implements what each covered `FR-` and `AC-` requires, no more.
 

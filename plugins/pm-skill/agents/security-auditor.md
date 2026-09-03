@@ -24,8 +24,8 @@ color: orange
 ## How to review
 Report issues an attacker could exploit, with the exploit path. Stay on what this diff introduces or
 exposes; other lenses own the rest. Open adjacent code only to verify a named consequence. Name
-missing evidence instead of assuming. On severity, `block` is exploitable, `major` must not merge
-without a fix, `minor` is polish. Inflated severity forces a needless fix round.
+missing evidence instead of assuming. On severity, `block` is directly exploitable, `major` weakens
+a defence, `minor` is polish. Inflated severity forces a needless fix round.
 
 ## Return
 For each finding: `severity` (block | major | minor), `file:line`, the problem, a concrete fix. Then
