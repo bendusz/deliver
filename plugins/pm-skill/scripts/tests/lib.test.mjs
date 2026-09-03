@@ -1,9 +1,11 @@
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { cksum, pmActorId, pmRoot, pmRelpath } from '../../hooks/lib.mjs';
-import { newProj, gitIn, canSymlink, tmpDir } from './helpers.mjs';
+import { pathToFileURL } from 'node:url';
+import { cksum, pmActorId, pmRoot, pmRelpath, readJson } from '../../hooks/lib.mjs';
+import { newProj, gitIn, canSymlink, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
 test('cksum matches POSIX cksum vectors', () => {
   assert.equal(cksum('casey@example.com'), 1486589864);
@@ -81,4 +83,19 @@ test('pmRelpath resolves a directory symlink under docs/ pointing at src/', (t) 
   const p = newProj();
   if (!canSymlink(path.join(p, 'src'), path.join(p, 'docs', 'impl-link'))) return t.skip('symlinks unavailable');
   assert.equal(pmRelpath(p, path.join(p, 'docs', 'impl-link', 'app.py')), 'src/app.py');
+});
+
+test('readJson and readHookInput: parse valid input, fail open on bad input', () => {
+  const p = newProj();
+  fs.writeFileSync(path.join(p, 'ok.json'), '{"a":1}');
+  fs.writeFileSync(path.join(p, 'bad.json'), '{ nope');
+  assert.deepEqual(readJson(path.join(p, 'ok.json')), { a: 1 });
+  assert.equal(readJson(path.join(p, 'bad.json')), null);
+  assert.equal(readJson(path.join(p, 'missing.json')), null);
+  const lib = pathToFileURL(path.join(HOOKS_DIR, 'lib.mjs')).href;
+  const run = (input) => spawnSync(process.execPath, ['--input-type=module', '-e', `import { readHookInput } from ${JSON.stringify(lib)}; process.stdout.write(JSON.stringify(readHookInput()));`], { input, encoding: 'utf8' });
+  assert.equal(run('{"cwd":"/x"}').stdout, '{"cwd":"/x"}');
+  assert.equal(run('not json').stdout, 'null');
+  assert.equal(run('').stdout, 'null');
+  assert.equal(run('5').stdout, 'null');
 });
