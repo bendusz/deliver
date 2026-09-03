@@ -1,8 +1,8 @@
-# Plan Quality Checklist — <Project>
+# Plan quality checklist: <Project>
 <!-- Generated to docs/checklists/plan-quality.md. Check against docs/plan.md (and docs/spec.md). -->
 
 - [ ] The plan derives from `docs/spec.md` (requirements traced by ID).
-- [ ] Scope is explicit — both In and Out.
+- [ ] Scope is explicit, both In and Out.
 - [ ] The Stories table has a `covers` column mapping each story to requirement IDs.
 - [ ] Commands (test/lint/build/run) are real, or explicitly `N/A`.
 - [ ] Each risk has a mitigation.

@@ -1,4 +1,4 @@
-# Spec Quality Checklist — <Project>
+# Spec quality checklist: <Project>
 <!-- Generated to docs/checklists/spec-quality.md. Check against docs/spec.md. -->
 
 - [ ] No unresolved `[NEEDS CLARIFICATION]` markers remain.
@@ -8,4 +8,4 @@
 - [ ] Success metrics (SM-…) are measurable, or marked as non-buildable business metrics.
 - [ ] Assumptions are explicit.
 - [ ] Edge cases and failure modes are listed with their expected behaviour.
-- [ ] The spec stays at WHAT/WHY — no implementation, stack, or architecture detail.
+- [ ] The spec stays at WHAT and WHY, with no implementation, stack, or architecture detail.

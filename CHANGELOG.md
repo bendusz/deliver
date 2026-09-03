@@ -28,6 +28,12 @@ Sonnet wrapper.
   `codex-reviewer` and `codex-advisor`, join `codex-builder` and `codex-researcher`;
   `/pm-skill:codex-review` and `/pm-skill:codex-help` dispatch them and never run `codex` in the
   main session (validate enforces it).
+- **Leaner runtime prose.** The references the agents load lost their duplicated copies: state
+  migrations moved to `references/migrations.md`, doctor's `pm/` checks to
+  `references/artifact-consistency.md`, and the model-tiering rationale out of the loaded set into
+  `docs/model-tiering.md`. The verifier now receives only the `FR-` and `AC-` entries its story
+  covers plus the plan's Commands section, instead of both documents whole. Agent descriptions drop
+  their `<example>` blocks, and the reviewer bodies state their verdict rule once.
 - **CI on three operating systems.** `node --test` runs on ubuntu, macos, and windows.
 - **Requirement.** Node.js 20 or newer at runtime.
 - **Hardening from review.** Line-oriented secret scan, canonical case and symlink handling,

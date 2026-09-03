@@ -1,9 +1,9 @@
-# Verification Quality Checklist — <story id>
+# Verification quality checklist: <story id>
 <!-- Generated to docs/checklists/verification-<id>.md. Check before shipping a story. -->
 
-- [ ] Deterministic gates (test/lint/build) were run and recorded — green or explicit N/A.
+- [ ] Deterministic gates (test/lint/build) were run and recorded: green, or an explicit N/A.
 - [ ] Reviewer verdicts are recorded for every selected lens.
 - [ ] All `block` / `major` findings are resolved.
 - [ ] Every acceptance criterion is checked against actual behaviour.
-- [ ] `git status` / `git diff` were inspected — only the story's files changed.
+- [ ] `git status` / `git diff` were inspected; only the story's files changed.
 - [ ] `pm-verifier` returned STATUS: PASS before shipping.

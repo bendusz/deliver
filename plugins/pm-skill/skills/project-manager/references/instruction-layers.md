@@ -15,7 +15,9 @@ Four layers carry what an agent needs. Keep each thing in exactly one of them.
   whole file on every dispatch (Claude Code's built-in Explore and Plan agents skip it), so each
   extra line is paid many times over. The test for a line: would removing it cause mistakes?
 - Never copy procedure or hard rules from this skill into `AGENTS.md`. The hooks enforce them and
-  the skill explains them; a restatement drifts and costs context.
+  the skill explains them; a restatement drifts and costs context. That includes a line saying the
+  project is delivered with pm-skill: the agents already load this skill, so the note buys nothing
+  and is paid on every dispatch.
 - `CLAUDE.md` is a bridge: its first line is `@AGENTS.md`. Claude-only notes may follow it; keep
   them rare. Symlinks are not used (Windows needs Developer Mode; git needs `core.symlinks`).
 - `SOUL.md` files (an OpenClaw convention for persona) are not created by the PM. Neither Claude

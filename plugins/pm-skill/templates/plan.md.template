@@ -1,12 +1,12 @@
-# <Project> — Delivery Plan
-<!-- Source spec: docs/spec.md (or "none — intent captured inline"). The plan derives from the spec
+# <Project> delivery plan
+<!-- Source spec: docs/spec.md (or "none, intent captured inline"). The plan derives from the spec
      and traces each story back to its FR-/AC- IDs. -->
 
 ## Overview
-<what + why, 2–3 sentences>
+<what and why, 2 to 3 sentences>
 
 ## Source spec
-- docs/spec.md  <!-- or: none — intent captured inline -->
+- docs/spec.md  <!-- or: none, intent captured inline -->
 
 ## Delivery mode
 - Scale: <tiny | small | standard | large | regulated>  <!-- see references/scale-profiles.md -->
@@ -36,7 +36,7 @@
 <stack, key decisions, patterns>
 
 ## Traceability
-<!-- Every spec requirement maps to at least one story; flag any that don't. -->
+<!-- Every spec requirement maps to at least one story; flag any that do not. -->
 | requirement | covered by | notes |
 |-------------|-----------|-------|
 | FR-001 | S1-1 | |

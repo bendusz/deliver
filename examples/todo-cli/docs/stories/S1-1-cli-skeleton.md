@@ -1,5 +1,8 @@
-# S1-1 — CLI skeleton + store
-Sprint: 1 · Priority: high · Depends on: none · Parallel-safe: no
+# S1-1: CLI skeleton and store
+<!-- pm-meta: {"builder":"expert-builder","touches":["todo.py","test_todo.py"]} -->
+Sprint: 1 · Priority: high · Covers: FR-001, AC-001 · Depends on: none · Parallel-safe: no · Touches: todo.py, test_todo.py
+Risk: low · Review lenses: code-integrity-reviewer · Security-sensitive: no · Architecture-sensitive: no
+Builder: expert-builder
 
 ## Goal
 Stand up the `todo.py` entry point with an `argparse` CLI and a JSON store that reads an existing
@@ -7,9 +10,9 @@ Stand up the `todo.py` entry point with an `argparse` CLI and a JSON store that 
 
 ## Context (self-contained)
 - New file `todo.py` at the project root. Python 3.10+, standard library only.
-- Store lives in `todos.json` in the current directory; shape: `{"todos": ["text", ...]}`.
-- Use `argparse` with two subcommands to be filled in S1-2 (`add`, `list`); for now wire the parser
-  and a `load_store()` / `save_store()` pair.
+- The store lives in `todos.json` in the current directory, shaped `{"todos": ["text", ...]}`.
+- Use `argparse` with two subcommands to be filled in S1-2, `add` and `list`. For now wire the
+  parser and a `load_store()` and `save_store()` pair.
 - Tests in `test_todo.py` using `pytest`.
 
 ## Acceptance criteria (testable)
@@ -18,7 +21,11 @@ Stand up the `todo.py` entry point with an `argparse` CLI and a JSON store that 
 - [ ] `save_store()` then `load_store()` round-trips data.
 
 ## Out of scope
-- The actual add/list behaviour (S1-2).
+- The actual add and list behaviour, which is S1-2.
 
 ## Verification
 - Prove done with: `python -m pytest -q test_todo.py`
+
+## Verification evidence
+STATUS: PASS · gates: test PASS 2026-06-04 15:12, lint N/A, build N/A · inline verifier pass, no
+durable report at this scale.

@@ -1,5 +1,5 @@
 <!-- Write this file to: docs/completion-report.md -->
-# <project> — Completion Report
+# <project> completion report
 
 - **Date:** <YYYY-MM-DD>
 - **Spec:** docs/spec.md
@@ -8,10 +8,10 @@
 - **Log:** pm/log.md
 
 ## Overview
-<2–4 sentences: what was delivered and the outcome against the plan's goals.>
+<2 to 4 sentences: what was delivered, and the outcome against the plan's goals.>
 
 ## What shipped
-Per sprint / story — what landed and where.
+Per sprint and story, what landed and where.
 
 | story | covers | title | status | merge / PR |
 | --- | --- | --- | --- | --- |

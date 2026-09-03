@@ -12,11 +12,11 @@ Do this:
   - `plan` → `checklist-plan-quality.md.template` → `docs/checklists/plan-quality.md`
   - `story <id>` → `checklist-story-readiness.md.template` → `docs/checklists/story-readiness-<id>.md`
   - `verification <id>` → `checklist-verification-quality.md.template` → `docs/checklists/verification-<id>.md`
-- If the target file already exists, update it **in place** — never blind-overwrite (show a diff).
+- If the target file already exists, update it in place. Never blind-overwrite; show a diff.
 - You **may** evaluate each item against the real artifact (`docs/spec.md`, `docs/plan.md`,
   `docs/stories/<id>*.md`, the diff/gate evidence) and tick `[x]` **only with evidence**. Never mark an
   item complete without checking the artifact; leave unverifiable items unchecked and note why.
 - Append a one-line entry to `pm/log.md`.
 
 If no target is given, list the four checklist types and ask which to generate. Checklists are an
-optional quality aid — they don't replace `/pm-skill:analyze` or the review/verification gates.
+optional quality aid and do not replace `/pm-skill:analyze` or the review and verification gates.

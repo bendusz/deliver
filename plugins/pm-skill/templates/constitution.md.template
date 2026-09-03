@@ -1,8 +1,8 @@
-# <Project> — Project Constitution
+# <Project> project constitution
 
 <!--
 Project-specific governing principles and non-negotiable delivery rules. This COMPLEMENTS the
-pm-skill built-in hard rules — it never weakens them. When this file and a request conflict, the
+pm-skill built-in hard rules and never weakens them. When this file and a request conflict, the
 stricter rule wins. Keep it short and enforceable; every line should be checkable by /pm-skill:analyze.
 -->
 

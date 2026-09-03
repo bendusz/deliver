@@ -9,8 +9,6 @@
 - Run: `<cmd or N/A>`
 
 ## Working here
-- This project is delivered with the pm-skill plugin. Process rules live in that skill and are
-  enforced by its hooks; do not restate them here.
 - Delivery state lives in `pm/` and is git-tracked. Never edit another actor's
   `pm/actors/<id>.json`. `tmp/` is scratch and ignored.
 - Never push to a remote without an explicit request.

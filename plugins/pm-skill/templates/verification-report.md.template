@@ -1,10 +1,10 @@
 <!-- Write this file to: docs/verification/<story-id>.md -->
-# Verification — <story id> "<title>"
+# Verification: <story id> "<title>"
 
 - **Date:** <YYYY-MM-DD>
 - **Story:** docs/stories/<file>.md
 - **Covers:** <FR-…, AC-…>
-- **Branch:** <story branch> → <integration branch>
+- **Branch:** <story branch> into <integration branch>
 - **Changed files:**
   - <path>
 
@@ -23,12 +23,9 @@
 ## pm-verifier
 - **STATUS:** PASS / FAIL / UNKNOWN
 - **Confidence:** high / medium / low
-- **Evidence:** <what was run/read and what it showed>
-- **Gates:** <test: PASS|FAIL|N/A|UNKNOWN · lint: … · build: … — with evidence>
-- **Acceptance criteria:** <AC-001: PASS — evidence; …>
-- **Review findings:** <each prior block/major — resolved? evidence>
+- **Evidence:** <what was run or read, and what it showed>
 - **Open issues:** <none / …>
-- **Action:** <PASS: may ship · FAIL: issues to fix · UNKNOWN: missing evidence needed>
+- **Action:** <PASS: may ship. FAIL: issues to fix. UNKNOWN: missing evidence needed.>
 
 ## Final status
-<SHIPPED on <YYYY-MM-DD> via <merge / PR link> | BLOCKED — reason>
+<SHIPPED on <YYYY-MM-DD> via <merge or PR link>, or BLOCKED with the reason>

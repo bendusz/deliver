@@ -1,5 +1,5 @@
 {
-  "_comment": "Optional pm-skill hardening — merge into the PROJECT's .claude/settings.json (keep your existing keys). A PreToolUse Bash hook whose script enforces a read-only allowlist for the pm-verifier subagent (branching on the agent_type hook input), leaving the PM and other agents unaffected. See references/hardening.md.",
+  "_comment": "Optional pm-skill hardening. Merge into the PROJECT's .claude/settings.json (keep your existing keys). A PreToolUse Bash hook whose script enforces a read-only allowlist for the pm-verifier subagent (branching on the agent_type hook input), leaving the PM and other agents unaffected. See references/hardening.md.",
   "hooks": {
     "PreToolUse": [
       {

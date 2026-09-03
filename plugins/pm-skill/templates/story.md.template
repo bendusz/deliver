@@ -1,6 +1,6 @@
-# S<sprint>-<n> — <title>
+# S<sprint>-<n>: <title>
 <!-- pm-meta: {"builder":"<expert-builder|codex-builder|auto>","touches":["<repo-relative file or directory root>"]} -->
-Sprint: <n> · Priority: <high|med|low> · Covers: <FR-…, AC-…> · Depends on: <ids|none> · Parallel-safe: <yes|no> · Touches: <comma-separated repo-relative files or directory roots; no globs; or —>
+Sprint: <n> · Priority: <high|med|low> · Covers: <FR-…, AC-…> · Depends on: <ids|none> · Parallel-safe: <yes|no> · Touches: <comma-separated repo-relative files or directory roots; no globs; required and bounded>
 Risk: <low|med|high> · Review lenses: <code-integrity-reviewer[, architecture-reviewer][, security-auditor]> · Security-sensitive: <yes|no> · Architecture-sensitive: <yes|no>
 Builder: <expert-builder|codex-builder|auto>
 
@@ -8,8 +8,9 @@ Builder: <expert-builder|codex-builder|auto>
 <one paragraph>
 
 ## Context (self-contained)
-<architecture, canonical source files/symbols, interfaces, and conventions the builder needs; when
-completeness matters, include the exact search or inventory method that establishes the full set>
+<architecture, canonical source files and symbols, interfaces, and conventions the builder needs;
+when completeness matters, include the exact search or inventory method that establishes the full
+set>
 
 ## Acceptance criteria (testable)
 - [ ] <criterion>
@@ -21,5 +22,3 @@ completeness matters, include the exact search or inventory method that establis
 - Prove done with: `<command>`
 
 ## Verification evidence
-<!-- Filled after the verify step: pm-verifier STATUS (PASS/FAIL/UNKNOWN), gate results, and a link to
-     docs/verification/<story-id>.md if one was written. Empty until the story is verified. -->
