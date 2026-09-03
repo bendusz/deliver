@@ -77,6 +77,8 @@ On a bare install everything below still works.
 - `codebase-analyst` — read-only; maps an existing codebase into a context pack for planning/stories.
 - `researcher` — web-capable external research (libraries, SDKs, prior art); one scoped question per dispatch, sourced report under `docs/research/`, short digest back.
 - `codex-researcher` — optional second-model research opinion via the OpenAI Codex CLI; risk-selected alongside `researcher` for consequential or contested questions; returns UNAVAILABLE cleanly when `codex` is absent.
+- `codex-reviewer` — thin wrapper for an independent OpenAI Codex code review (last commit, working tree, or whole codebase; optionally objective-focused); runs the bundled runner once and returns a severity-ordered digest plus the report path.
+- `codex-advisor` — thin wrapper for a second opinion from OpenAI Codex on a consequential decision, risky refactor, or tricky trade-off; runs the bundled runner once and returns Codex's attributed answer.
 
 Run reviewers as a **risk-selected panel** (see `references/review-gates.md`), not always all of them.
 When the OpenAI Codex CLI is installed, `/pm-skill:codex-review` can add an optional independent

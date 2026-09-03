@@ -68,8 +68,7 @@ for f in plugins/pm-skill/scripts/codex/run.mjs plugins/pm-skill/scripts/codex/l
 done
 grep -rlE '\b(jq|bash)\b' plugins/pm-skill/scripts/codex >/dev/null 2>&1 && err "bash or jq referenced under plugins/pm-skill/scripts/codex/"
 # No agent or command may call codex directly; only the runner does.
-# Task 10 widens this to commands/ once they become dispatchers
-grep -rlE 'codex exec' plugins/pm-skill/agents >/dev/null 2>&1 && err "direct codex invocation found in an agent prompt (use the runner)"
+grep -rlE 'codex exec' plugins/pm-skill/agents plugins/pm-skill/commands >/dev/null 2>&1 && err "direct codex invocation found in an agent prompt (use the runner)"
 
 # 6) the installed plugin must stay generic (no third-party *plugin* names).
 # The OpenAI Codex CLI is an intentional, documented external dependency of the

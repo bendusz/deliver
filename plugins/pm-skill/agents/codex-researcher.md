@@ -19,7 +19,7 @@ safely, and distill the result. You never answer the research question from your
 
 ## 1. Write the brief
 
-Compose the brief as in section 2, then write it verbatim to a temp file outside the
+Compose the brief (section 2 below), then write it verbatim to a temp file outside the
 repository and note its absolute path as `$BRIEF`.
 
 ## 2. Compose the brief
@@ -48,7 +48,7 @@ transient.
 ## 4. Report — `docs/research/YYYY-MM-DD-<slug>-codex.md`
 - **Question** — plus model/effort used and whether web search was used (`search_used`).
 - **Codex's findings and recommendation** — attributed throughout ("Codex (gpt-5.6-terra)
-  finds …"), distilled from the scratch answer, never pasted wholesale.
+  finds …"), distilled from the answer file the runner returns, never pasted wholesale.
 - **Caveats** — the few places Codex's answer seems weak, unsupported, or stale. Nothing else
   of your own — the PM owns synthesis with the `researcher` report.
 

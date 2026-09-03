@@ -22,6 +22,8 @@ where a silent change has less delivery risk.
 | `technical-writer` | `sonnet` | `medium` | documents already-shipped facts |
 | `researcher` | `sonnet` | `medium` | web research; breadth and sourcing over depth |
 | `codex-researcher` | `sonnet` | `medium` | thin wrapper — the thinking happens inside Codex |
+| `codex-reviewer` | `sonnet` | `medium` | thin wrapper — the review happens inside Codex |
+| `codex-advisor` | `sonnet` | `medium` | thin wrapper — the opinion happens inside Codex |
 
 `high` is the builder default because higher effort increases latency, tool use, and token use, and
 focus failures are better addressed by current evidence, explicit scope, and observable completion
@@ -43,6 +45,12 @@ inner model or effort only in an explicit dispatch. Valid Sol efforts are
 `none|low|medium|high|xhigh|max`. The runner ignores Codex user config and overrides
 safety-sensitive project settings so local defaults cannot silently change its sandbox, model,
 effort, network, web, MCP, or hook posture.
+
+**The PM never runs `codex`.** Every Codex invocation goes through a Sonnet wrapper agent
+(`codex-builder`, `codex-reviewer`, `codex-advisor`, `codex-researcher`) and the bundled Node
+runner `scripts/codex/run.mjs`. Wrappers pass only the runner's documented inputs; the runner
+owns preflight, sandboxing per platform, output placement, and exit codes. `scripts/validate.sh`
+fails on any direct `codex exec` in an agent or command prompt.
 
 ## Overriding
 - **Per agent, model:** edit the `model:` field in the agent's frontmatter — any Claude Code model

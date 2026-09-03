@@ -78,9 +78,11 @@ optional Codex-CLI-backed precision builder (**`codex-builder`**), a risk-select
 **review panel** (**`code-integrity-reviewer`**, **`architecture-reviewer`**, **`security-auditor`**),
 a **`test-engineer`** (tests only), a **`debugger`** (read-only root-cause → fix plan), a read-only
 final **`pm-verifier`** (independent PASS/FAIL before ship), a **`technical-writer`** (docs only), a
-**`codebase-analyst`** for brownfield work, and two research roles — a web-capable
-**`researcher`** and an optional Codex-CLI-backed **`codex-researcher`** (independent
-second-model opinion) — whose sourced reports land under `docs/research/`. The PM stays an
+**`codebase-analyst`** for brownfield work, and three Codex-CLI-backed second-opinion roles —
+**`codex-researcher`** (independent research), **`codex-reviewer`** (independent code review), and
+**`codex-advisor`** (independent recommendation) — alongside the web-capable **`researcher`**, whose
+sourced reports land under `docs/research/`. Every Codex invocation goes through one of these thin
+Sonnet wrappers and the bundled Node runner; the PM never runs `codex` itself. The PM stays an
 orchestrator and protects its own context by handing each agent only what it needs.
 
 Each story declares `Builder: expert-builder | codex-builder | auto` and carries matching one-line
@@ -182,13 +184,15 @@ prefer them where useful — but nothing here is a dependency:
 - A dedicated planning / TDD skill suite for richer discovery and planning.
 - An external code-review tool (for example an OpenAI Codex–based reviewer, or another model's CLI)
   for the optional independent review step.
-- The OpenAI Codex CLI for `codex-builder`, `codex-researcher`, and the Codex commands. An
-  `auto` story or opportunistic fix falls back to `expert-builder` when Codex is unavailable; a
-  story that explicitly requires `codex-builder` waits for `codex login` rather than switching
-  workers silently.
+- The OpenAI Codex CLI for `codex-builder`, `codex-researcher`, `codex-reviewer`, `codex-advisor`,
+  and the Codex commands. An `auto` story or opportunistic fix falls back to `expert-builder` when
+  Codex is unavailable; a story that explicitly requires `codex-builder` waits for `codex login`
+  rather than switching workers silently.
 - To exercise the real write path after an install or Codex upgrade, run
-  `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh`. It uses one low-effort Codex task in a
-  disposable signed-off repository and is intentionally excluded from default validation.
+  `PM_CODEX_LIVE=1 node plugins/pm-skill/scripts/codex/smoke-live.mjs` (or the equivalent
+  `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh` wrapper). It uses one low-effort Codex
+  task in a disposable signed-off repository and is intentionally excluded from default
+  validation.
 - `gh` plus a GitHub remote for real pull requests (otherwise the PM uses local merges).
 
 The spec / clarify / analyze / constitution steps add spec-driven rigor (inspired by spec-driven

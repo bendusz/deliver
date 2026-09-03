@@ -94,71 +94,177 @@ Scope keywords: `recent` = last commit (`--commit HEAD`), `worktree` = `--uncomm
 - Streams: progress + session header (model/sandbox/effort/session id) → **stderr**; final
   message → **stdout** (or the `-o` file).
 
-## Write-capable builder invocation, added 2026-08-22 with codex-cli 0.149.0
+## Runner, rewritten in Node with codex-cli 0.149.0 (v0.16)
 
-The builder does not assemble this command in agent prose. It calls the bundled
-`scripts/codex-builder-run.sh`, which validates the worktree, story, fix evidence, PM sign-off,
-auth, and required CLI flags before launching:
+No pm-skill agent or command assembles a Codex command line in prose or shells out to `codex`
+directly. Every invocation goes through one bundled cross-platform CLI,
+`plugins/pm-skill/scripts/codex/run.mjs` (`node --test`-covered under
+`plugins/pm-skill/scripts/tests/`), called by a thin Sonnet wrapper agent (`codex-builder`,
+`codex-reviewer`, `codex-advisor`, `codex-researcher`). `scripts/validate.sh` fails the build on
+any direct `codex exec` string found in an agent or command prompt.
 
-```sh
-codex exec \
-  --ignore-user-config \
-  --ignore-rules \
-  --strict-config \
-  -C "$WORKTREE" \
-  --sandbox workspace-write \
-  --ephemeral \
-  --color never \
-  -m gpt-5.6-sol \
-  -c model_reasoning_effort=high \
-  -c 'sandbox_workspace_write.network_access=false' \
-  -c 'sandbox_workspace_write.exclude_slash_tmp=true' \
-  -c 'sandbox_workspace_write.exclude_tmpdir_env_var=true' \
-  -c 'shell_environment_policy.inherit="core"' \
-  -c 'shell_environment_policy.ignore_default_excludes=false' \
-  -c 'shell_environment_policy.experimental_use_profile=false' \
-  -c 'shell_environment_policy.set.TMPDIR="<worktree>/tmp/codex-runtime/<run>"' \
-  -c 'allow_login_shell=false' \
-  -c 'agents.enabled=false' \
-  -c 'web_search="disabled"' \
-  -c 'mcp_servers={}' \
-  -c 'features.hooks=false' \
-  --output-schema "$RESULT_SCHEMA" \
-  -o "$SCRATCH/result.json" \
-  - < "$SCRATCH/prompt.md"
+### CLI
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" --mode <mode> [common] [mode options]
+
+common:   [--model <id>] [--effort <level>] [--timeout-seconds <n>] [--preflight]
+build:    --worktree <abs> --story <docs/stories/x.md>
+fix:      --worktree <abs> --story <docs/stories/x.md> --evidence <tmp/codex-builder/x.md>
+review:   --scope recent|worktree|codebase [--objective "<text>"] --out <dir>
+advise:   --prompt-file <abs>
+research: --prompt-file <abs> [--search auto|off]
 ```
 
-The runner never accepts free-form Codex arguments and never passes `--add-dir`, `--full-auto`, or a
-sandbox-bypass flag. `--ignore-user-config` retains authentication while skipping user defaults;
-`--ignore-rules` skips user/project execpolicy rules. Session overrides outrank project config, so
-network, web search, inherited MCP servers, and lifecycle hooks stay disabled even when
-`.codex/config.toml` requests them. Repository instructions and other non-safety project settings
-remain trusted inputs.
+No free-form Codex flags are accepted; unrecognized arguments are a usage error. Model id is
+checked against a safe-character regex; effort against `none|minimal|low|medium|high|xhigh|max`;
+timeout is bounded 1–7200 seconds (default 600). `--preflight` never invokes model inference and
+always reports `quota_consumed: false`. Defaults per mode: build/fix `gpt-5.6-sol` / `high`;
+review/research `gpt-5.6-terra` / `high`; advise `gpt-5.6-sol` / `medium` — unchanged from the
+retired bash runner.
 
-The shell policy inherits Codex's reduced `core` environment and activates its default filtering of
-variable names containing `KEY`, `SECRET`, or `TOKEN`. Login-shell profile loading and Codex
-subagents are disabled. Both `/tmp` and the launcher's `$TMPDIR` are removed from writable sandbox
-roots. Tool commands instead receive a fresh `TMPDIR` under the ignored worktree
-`tmp/codex-runtime/`; the runner removes that exact directory on every exit.
+Exit codes (mirroring the old bash runner): `64` usage · `65` rejected (bad input) · `66` blocked
+(fail-closed precondition, e.g. missing sign-off) · `69` unavailable (`codex` missing, unauthenticated,
+or too old) · `70` failed (Codex/runtime error) · `74` safety violation (out-of-scope or protected
+change) · `124` timed out · `130` interrupted (`INT`/`TERM`/`HUP`) · `0` completed / ready /
+nothing-to-review.
 
-Codex receives an explicit ban on git-mutating commands. The runner independently snapshots tracked
-and non-ignored untracked content, derives `actual_files_changed`, compares it with Codex's claim,
-and rejects changes to PM artifacts or outside machine-readable `pm-meta.touches`. It also fingerprints
-HEAD, every ref, staged contents, local Git config, and worktree registrations. Any mismatch becomes
-a safety violation for the PM to inspect. The PM accumulates runner-derived paths across fix rounds,
-regenerates the diff, and re-runs deterministic gates; Codex's structured test report is not
-accepted as independent proof.
+### The five modes' exact Codex argument lists
 
-The default timeout is 600 seconds (bounded override: 1–7200). `INT`, `TERM`, `HUP`, and timeout
-terminate the Codex process tree on a best-effort macOS/Linux basis, preserve partial repository
-changes, and retain the scratch diagnostics. Completed runs embed their structured result and delete
-their scratch directory; failed, interrupted, timed-out, or safety-violating runs retain it.
+**`build` / `fix`** — exact behavioural port of the retired bash runner. Fail-closed on missing or
+unsigned `pm/pm-state.json`, an untracked story, or a fix mode without `--evidence`; parses the
+story's `pm-meta` for the allowed touch paths.
 
-Run `codex-builder-run.sh --preflight --worktree <root> [--story <story>]` to validate sign-off,
-authentication, required flags, ignored temp setup, bundled schema, and optional story metadata. It
-returns JSON with `quota_consumed: false` and does not invoke model inference. The opt-in
-`PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh` then exercises environment filtering, local
-TMPDIR, host-temp denial, bounded writes, structured output, and cleanup in a disposable repository.
+```
+codex exec --ignore-user-config --ignore-rules --strict-config -C "$WORKTREE" \
+  --sandbox workspace-write --ephemeral --color never \
+  -m "$MODEL" -c model_reasoning_effort="$EFFORT" \
+  -c allow_login_shell=false \
+  -c sandbox_workspace_write.network_access=false \
+  -c sandbox_workspace_write.exclude_slash_tmp=true \
+  -c sandbox_workspace_write.exclude_tmpdir_env_var=true \
+  -c shell_environment_policy.inherit="core" \
+  -c shell_environment_policy.ignore_default_excludes=false \
+  -c shell_environment_policy.experimental_use_profile=false \
+  -c shell_environment_policy.set.TMPDIR="<worktree>/tmp/codex-runtime/<run>" \
+  -c shell_environment_policy.set.TMP="<worktree>/tmp/codex-runtime/<run>" \
+  -c shell_environment_policy.set.TEMP="<worktree>/tmp/codex-runtime/<run>" \
+  -c agents.enabled=false -c web_search="disabled" -c mcp_servers={} -c features.hooks=false \
+  --output-schema "$RESULT_SCHEMA" -o "$SCRATCH/result.json" - < "$SCRATCH/prompt.md"
+```
+
+On `win32` the `--sandbox` value and the four `sandbox_workspace_write.*`/network config keys
+change — see Windows behaviour below; every other flag is identical on all platforms. The runner
+independently snapshots tracked and non-ignored untracked content before and after the run,
+derives `actual_files_changed`, cross-checks it against Codex's own claim, fingerprints HEAD,
+every ref, staged contents, local Git config, and worktree registrations, and turns any mismatch
+or out-of-scope/protected-path change into a safety violation (exit 74) rather than an accepted
+result — the worktree is preserved for inspection either way.
+
+**`review`** — one of three native scopes, or a whole-codebase read-only audit; an objective is
+expressed in the prompt (the CLI forbids a custom prompt alongside a native scope flag):
+
+```
+recent, no objective:     codex exec review --commit HEAD <tail>
+worktree, no objective:   codex exec review --uncommitted <tail>
+codebase, no objective:   codex exec --sandbox read-only --skip-git-repo-check --color never <tail> -
+recent/worktree, w/ obj.: codex exec review <tail> "Review the <recent|uncommitted> changes … <objective clause>"
+codebase, w/ objective:   codex exec --sandbox read-only --skip-git-repo-check --color never <tail> -
+  (stdin: "<codebase prompt> <objective clause>")
+
+tail = --ignore-user-config --strict-config --ephemeral -m "$MODEL" \
+       -c model_reasoning_effort="$EFFORT" -o "$REPORT"
+```
+
+`--sandbox`, `-C`, and `--color` are never passed to `codex exec review` (exit 2 otherwise). The
+report is written to a scratch directory outside the repo, then copied into `--out` (must be
+`<root>/untracked` or `<root>/codex`, holding no tracked files); the runner appends a
+root-anchored `/<dir>/` rule to `.gitignore` when run inside a git repo.
+
+**`advise` / `research`** — always read-only, on every platform:
+
+```
+codex exec --ignore-user-config --strict-config --sandbox read-only --ephemeral --color never \
+  -m "$MODEL" -c model_reasoning_effort="$EFFORT" [--search] [--skip-git-repo-check] \
+  -o "$SCRATCH/answer.md" - < "$PROMPT_FILE"
+```
+
+`--search` is added only for `research` mode, when `--search auto` (the default) and
+`codex exec --help` lists the flag on the installed CLI; `--skip-git-repo-check` is added only
+when the current directory is not a git repository.
+
+### Envelope fields per mode
+
+Every mode emits exactly one JSON envelope on stdout. Common to all: `runner_status`
+(`ready`|`completed`|`nothing-to-review`|`rejected`|`blocked`|`unavailable`|`failed`|
+`safety-violation`|`timed-out`|`interrupted`), `codex_version`, and — on failure — `reason` and
+`diagnostics_retained`.
+
+- **build/fix**: `model`, `effort`, `worktree`, `story`, `mode`, `timeout_seconds`, `sandbox`
+  (`workspace-write` or `none (win32)`), `actual_files_changed`, `git_status_short`, and the
+  builder's own `result` object (`status`, `summary`, `files_changed`, `tests`,
+  `out_of_scope_changes`, `risks`, `root_cause`). `--preflight` instead returns `codex_version`,
+  `worktree`, `story`, `story_builder`, `allowed_paths`, and `policy` (the platform's sandbox/
+  network/environment shape), with `quota_consumed: false`.
+- **review**: `scope`, `objective`, `report_path`, `model`, `effort`, `codex_exit`.
+  `--preflight` returns `scope` and `quota_consumed: false`; a clean worktree or no commit
+  returns `nothing-to-review` with a `reason` instead of running Codex.
+- **advise/research**: `mode`, `answer_path`, `stderr_path`, `scratch_dir`, `model`, `effort`,
+  `codex_exit`, `search_used`. `--preflight` returns `mode`, `search_available`, and
+  `quota_consumed: false`.
+
+### Windows behaviour
+
+- **Executable resolution**: on `win32` the runner walks `PATH` × `PATHEXT`, preferring
+  `codex.exe`. A `codex.cmd` npm shim is bypassed by invoking its JS entry point
+  (`node_modules/@openai/codex/bin/codex.js`) with `node` directly — no shell, no quoting. A bare
+  `.cmd` with no discoverable JS entry falls back to `cmd.exe /d /s /c`, built only from
+  runner-validated argv (never user-controlled text) with a strict character check
+  (`"`, `%`, CR, LF) that refuses to spawn rather than risk shell reinterpretation. The prompt
+  always arrives on stdin, never on the command line, on every platform.
+- **Process tree kill**: timeout and `INT`/`TERM`/`HUP` run `taskkill /T /F /PID <pid>` on
+  `win32`; POSIX signals the detached process group.
+- **`build`/`fix` sandbox**: Codex's Windows sandbox is off by default, and with it off
+  `codex exec` (approvals are always `never`) refuses most shell commands. Decision: do not
+  enable the Windows sandbox. `win32` build/fix pass `--sandbox danger-full-access` instead of
+  `workspace-write`, and the `sandbox_workspace_write.*`/network config keys that only apply
+  inside that sandbox are dropped. The envelope records `sandbox: "none (win32)"`. Everything
+  else the runner enforces is unchanged: fail-closed sign-off, tracked story, the touches
+  allowlist, before/after snapshots, the git metadata fingerprint, and out-of-scope detection —
+  still a safety violation (exit 74) with the worktree preserved for inspection. The difference
+  from POSIX is **prevention versus detection**: a POSIX sandbox blocks an out-of-scope write
+  during the run; Windows only catches it after the run completes.
+- **`review`/`advise`/`research` sandbox**: `--sandbox read-only` everywhere, including Windows —
+  a policy shape only, since these modes never write.
+- **Paths**: worktree containment and the exact-root check use native realpath resolution; the
+  worktree root compares case-insensitively on `win32`; git output is read tolerant of both path
+  separators.
+- **Runtime temp**: `TMPDIR`, `TMP`, and `TEMP` all point at the worktree-local
+  `tmp/codex-runtime/<run>` directory, which the runner deletes on every exit (build/fix only).
+- **Snapshots**: on `win32` the executable bit is ignored (git's index mode for tracked files,
+  `100644` for untracked), since Windows has no POSIX exec bit.
+- Bypass flags (`--yolo` / `--dangerously-bypass-approvals-and-sandbox`) are never passed on any
+  platform. The runner instead expresses the user's approved full access as
+  `--sandbox danger-full-access` on `win32` — equivalent under `codex exec`, since approvals are
+  already hard-set to `never` — while POSIX keeps `workspace-write` by default because it costs
+  nothing. Every agent and command prompt states this as: "wrappers never pass sandbox or
+  approval flags; the runner owns them per platform."
+- **Open live-check item**: confirm on a Windows machine that `--sandbox danger-full-access` runs
+  commands headlessly under `codex exec`.
+
+### Preflight and smoke test
+
+```
+node plugins/pm-skill/scripts/codex/run.mjs --mode build --preflight --worktree <root> [--story <story>]
+```
+
+validates sign-off, authentication, required CLI flags, the ignored `tmp/` setup, the bundled
+result schema, and optional story metadata; it returns JSON with `quota_consumed: false` and
+performs no model inference. The opt-in live smoke test,
+`PM_CODEX_LIVE=1 node plugins/pm-skill/scripts/codex/smoke-live.mjs` (also reachable as
+`PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh`, now a thin wrapper around the same script),
+exercises environment filtering, local `TMPDIR`, host-temp denial, bounded writes, structured
+output, and cleanup in a disposable repository.
 
 This remains an OS sandbox rather than a VM-level security boundary. Use the builder only with
 trusted repositories and stories.
