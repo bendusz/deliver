@@ -8,7 +8,7 @@ const hasControl = (s) => [...s].some((ch) => ch.charCodeAt(0) < 32 || ch.charCo
 const blocked = (reason) => new RunnerError('blocked', reason);
 
 // parseStory(root, storyRel) — the machine pm-meta scope of a story, cross-checked
-// against the visible Builder and Touches fields. Mirrors the bash runner exactly.
+// against the visible Builder and Touches fields. Mirrors the shell reference exactly.
 export function parseStory(root, storyRel) {
   const head = fs.readFileSync(path.join(root, storyRel), 'utf8').split(/\r?\n/).slice(0, 12);
   const metas = head.map((l) => l.match(/^\s*<!--\s*pm-meta:\s*(.*?)\s*-->\s*$/)).filter(Boolean).map((m) => m[1]).filter((m) => m !== '');
