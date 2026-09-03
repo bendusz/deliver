@@ -23,4 +23,6 @@ record it in `docs/plan.md` (Delivery mode) and `pm/pm-state.json` (`scale`). De
 
 ## Recording it
 - `docs/plan.md` → **Delivery mode**: scale, checkpoint policy, autonomy.
+- `docs/plan.md` → **Delivery mode** also carries `Instruction rules: none | pm-state`. Default
+  `none`; offer `pm-state` at `standard` scale and above (see `references/instruction-layers.md`).
 - `pm/pm-state.json` → `"scale": "standard"`.

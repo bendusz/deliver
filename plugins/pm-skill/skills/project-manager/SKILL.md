@@ -48,7 +48,8 @@ to continue at full speed. When scope changes mid-flight, `/pm-skill:correct-cou
 sanctioned path — it re-plans at the right altitude and re-runs sign-off if the change is material. **Right-size** the workflow with a
 **scale** (`tiny`→`regulated`, default `standard`) — see `references/scale-profiles.md`. For an
 optional read-only/sign-off **hardening** posture (Claude Code permissions/hooks), see
-`references/hardening.md`.
+`references/hardening.md`. Project instructions follow `references/instruction-layers.md`: facts
+in `AGENTS.md`, procedure here, constraints in hooks, persona in agent bodies.
 
 Read only the reference for the phase you are in. Do not preload them all.
 
@@ -98,7 +99,7 @@ roles are pinned to `claude-opus-5`; `expert-builder`, `security-auditor`, and `
 ## Bundled templates
 Project-file templates live in this plugin's `templates/` directory
 (`${CLAUDE_PLUGIN_ROOT}/templates/`): `spec.md.template`, `plan.md.template`, `story.md.template`,
-`constitution.md.template`, `CLAUDE.md.template`, `log.md.template`, `pm-state.json.template`,
+`constitution.md.template`, `AGENTS.md.template`, `CLAUDE.md.template`, `rules-pm-state.md.template`, `pm-AGENTS.md.template`, `log.md.template`, `pm-state.json.template`,
 `actor-state.json.template`,
 `HANDOFF.md.template`, `completion-report.md.template`, `verification-report.md.template`,
 `claude-settings-hardening.json.template`, and the quality checklists

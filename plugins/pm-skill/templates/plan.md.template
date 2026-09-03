@@ -12,6 +12,7 @@
 - Scale: <tiny | small | standard | large | regulated>  <!-- see references/scale-profiles.md -->
 - Checkpoint policy: <story-level | sprint-level | autonomous>
 - Autonomy: <approve each story | approve each sprint | fully autonomous>
+- Instruction rules: <none | pm-state>  <!-- pm-state writes .claude/rules/pm-state.md and pm/AGENTS.md at scaffold -->
 
 ## Goals
 - <goal>

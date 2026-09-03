@@ -64,8 +64,14 @@ can be disabled, so holding the line is still your responsibility.
 
 ## 3. Scaffold (only after sign-off) — observe Repository safety
 - If the project is **not** a git repo, offer to `git init` — **ask first**.
-- Generate a project `CLAUDE.md` from `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.template`. If one
-  **already exists**, do **not** overwrite it — show a diff and ask, or append a clearly-marked section.
+- Generate the project instructions file `AGENTS.md` from
+  `${CLAUDE_PLUGIN_ROOT}/templates/AGENTS.md.template` (facts only: commands, layout, non-default
+  conventions, gotchas; see `references/instruction-layers.md`), then `CLAUDE.md` from
+  `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.template` (a two-line `@AGENTS.md` bridge). Never
+  overwrite an existing file: if `CLAUDE.md` exists without `AGENTS.md`, propose the migration in
+  `instruction-layers.md`, show the diff, and ask. When the plan's Delivery mode says
+  `Instruction rules: pm-state`, also write `.claude/rules/pm-state.md` from
+  `rules-pm-state.md.template` and `pm/AGENTS.md` from `pm-AGENTS.md.template`.
 - Ensure `.gitignore` includes `tmp/` (append; don't clobber an existing `.gitignore`) — `tmp/` is
   ephemeral scratch and never enters git. The tracked `pm/` state files must **not** be ignored
   (`git check-ignore pm/pm-state.json pm/log.md pm/actors/<actor-id>.json` must fail), and
