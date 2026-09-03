@@ -134,7 +134,10 @@ test('pmRelpath resolves a symlink whose relative target traverses another symli
   fs.writeFileSync(path.join(p, 'pm', 'log.md'), '');
   if (!canSymlink(path.join(p, 'src'), path.join(p, 'docs', 'impl-link'))) return t.skip('symlinks unavailable');
   fs.symlinkSync('impl-link/../pm/log.md', path.join(p, 'docs', 'alias'));
-  assert.equal(pmRelpath(p, path.join(p, 'docs', 'alias')), 'pm/log.md');
+  // Win32 path normalisation collapses '..' lexically before the filesystem resolves
+  // 'impl-link', so the symlink target lands in docs/pm/log.md on Windows and pm/log.md on POSIX.
+  const expected = process.platform === 'win32' ? 'docs/pm/log.md' : 'pm/log.md';
+  assert.equal(pmRelpath(p, path.join(p, 'docs', 'alias')), expected);
 });
 
 test('pmActorId chomps only trailing newlines, matching bash command substitution', () => {

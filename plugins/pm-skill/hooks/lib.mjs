@@ -45,9 +45,11 @@ export function realpath(p) {
 // Order: $CLAUDE_PROJECT_DIR (absolute + a directory) → git top level → cwd.
 export function pmRoot(cwd) {
   const env = process.env.CLAUDE_PROJECT_DIR;
-  if (env && path.isAbsolute(env) && isDir(env)) return env;
+  if (env && path.isAbsolute(env) && isDir(env)) return path.resolve(env);
   const top = chomp(git(cwd, ['rev-parse', '--show-toplevel']) || '');
-  if (top) return top;
+  // git prints forward slashes on Windows (e.g. C:/Users/...); resolve to a
+  // native, normalised absolute path so it matches paths built with path.join.
+  if (top) return path.resolve(top);
   return cwd;
 }
 
