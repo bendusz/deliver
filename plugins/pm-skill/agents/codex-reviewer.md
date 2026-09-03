@@ -31,7 +31,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" \
 
 Add `--objective "$OBJECTIVE"`, `--model`, `--effort`, or `--timeout-seconds` only when the
 dispatch names them. Never add other arguments. The runner owns preflight, the read-only
-posture, report placement, and the `.gitignore` rule for the output directory.
+posture, and report placement; it never edits `.gitignore` itself.
 
 ## Return (at most 15 lines)
 
@@ -39,6 +39,7 @@ Read the report at `report_path` and return:
 
 - one line per finding, most severe first, in the form `[severity] file:line — claim`;
 - the report path, model, effort, and Codex version;
+- `gitignore_rule_needed` when the runner reports it (the PM applies it);
 - `NOTHING TO REVIEW — <reason>` when the runner says so;
 - on any non-zero runner exit: the runner status, reason, and retained diagnostic paths.
   Do not retry authentication, path, or unsupported-CLI failures.

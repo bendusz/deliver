@@ -1,7 +1,7 @@
 ---
 name: codex-advisor
 description: Use when the PM wants a second opinion from OpenAI Codex on a consequential decision, risky refactor, or tricky trade-off. A thin Sonnet wrapper writes the PM's self-contained brief to a file, runs the bundled read-only runner once, and returns Codex's attributed answer. Reserve for real decisions, not routine questions. <example>The PM runs /pm-skill:codex-help "should the cache live in the API layer or the worker?" and dispatches codex-advisor with the composed brief.</example>
-tools: Bash, Read
+tools: Bash, Read, Write
 model: sonnet
 effort: medium
 color: purple
@@ -21,8 +21,9 @@ Optional: `Model` (default `gpt-5.6-sol`), `Effort` (default `medium`), `Timeout
 
 ## Run
 
-1. Write the brief verbatim to a temp file outside the repository (for example under the
-   system temp directory) and note its absolute path as `$BRIEF`.
+1. Use the `Write` tool (not a Bash heredoc) to write the brief verbatim to a temp file outside
+   the repository (for example under the system temp directory) and note its absolute path as
+   `$BRIEF`.
 2. From the repository root, run once, in the foreground:
 
 ```bash
@@ -37,5 +38,7 @@ other arguments.
 
 Read `answer_path` and return Codex's recommendation and reasoning, attributed ("Codex
 (<model>) recommends …"), condensed, never pasted wholesale; then the answer path, model,
-effort, and Codex version. On a non-zero runner exit return the runner status, reason, and
+effort, and Codex version. After reading the answer file, remove the runner's `scratch_dir` with
+`rm -rf "$SCRATCH_DIR"` via Bash, using only the exact path the envelope returned, so temp
+directories do not accumulate. On a non-zero runner exit return the runner status, reason, and
 retained diagnostic paths without retrying.

@@ -129,6 +129,14 @@ test('build 1: missing CLI is a clean unavailable result', () => {
   assert.match(r.out.reason, /codex CLI not found/);
 });
 
+test('build: a missing git binary fails closed before the toplevel check', () => {
+  const p = newBuildProject(true);
+  const only = path.dirname(process.execPath);
+  const r = runRunner(['--mode', 'build'], { project: p, env: { PATH: only, Path: only } });
+  assert.equal(r.status, 69);
+  assert.match(r.out.reason, /git is required/);
+});
+
 test('build 2: failed auth stops before help or execution', () => {
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_LOGIN_EXIT: '1' } });
@@ -285,7 +293,7 @@ test('build 16: a structured blocked result with no edits completes', () => {
 
 test('build 17: timeout kills the process tree and preserves diagnostics', () => {
   const p = newBuildProject(true); const s = makeStub();
-  const r = runRunner(['--mode', 'build', '--timeout-seconds', '1'], { project: p, stub: s, env: { STUB_SLEEP: '1' } });
+  const r = runRunner(['--mode', 'build', '--timeout-seconds', '2'], { project: p, stub: s, env: { STUB_SLEEP: '1' } });
   assert.equal(r.status, 124, JSON.stringify(r.out));
   assert.equal(r.out.runner_status, 'timed-out');
   assert.equal(r.out.diagnostics_retained, true);
@@ -360,6 +368,7 @@ test('build: untracked story and unignored tmp/ are blocked', () => {
 test('review: recent scope with an objective goes through exec review with prompt-as-scope', () => {
   const p = newBuildProject(true); const s = makeStub();
   const out = path.join(p, 'untracked');
+  const gitignoreBefore = fs.readFileSync(path.join(p, '.gitignore'), 'utf8');
   const r = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', 'security', '--out', out], { stub: s, cwd: p });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
@@ -369,7 +378,8 @@ test('review: recent scope with an objective goes through exec review with promp
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /last commit \(HEAD\).*security/s);
   assert.ok(fs.existsSync(r.out.report_path));
   assert.match(path.basename(r.out.report_path), /^\d{8}-\d{6}-codex-review-recent-security\.md$/);
-  assert.match(fs.readFileSync(path.join(p, '.gitignore'), 'utf8'), /^\/untracked\/$/m);
+  assert.equal(r.out.gitignore_rule_needed, '/untracked/');
+  assert.equal(fs.readFileSync(path.join(p, '.gitignore'), 'utf8'), gitignoreBefore);
 });
 
 test('review: clean worktree is nothing-to-review; recent without objective uses --commit HEAD', () => {
@@ -412,6 +422,34 @@ test('review: out dir must be untracked/ or codex/ with no tracked files; failur
   assert.equal(failed.status, 70);
   assert.equal(failed.out.codex_exit, '3');
   assert.ok(fs.existsSync(failed.out.stderr_path));
+});
+
+test('review: colliding report names get a numeric suffix instead of overwriting', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const r1 = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', 'N+1 queries', '--out', out], { stub: s, cwd: p });
+  const r2 = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', 'n 1 queries', '--out', out], { stub: s, cwd: p });
+  assert.equal(r1.status, 0, r1.stdout + r1.stderr);
+  assert.equal(r2.status, 0, r2.stdout + r2.stderr);
+  assert.notEqual(r1.out.report_path, r2.out.report_path);
+  assert.ok(fs.existsSync(r1.out.report_path));
+  assert.ok(fs.existsSync(r2.out.report_path));
+});
+
+test('review: an objective that slugs to empty falls back to "custom"', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', '!!!', '--out', out], { stub: s, cwd: p });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(path.basename(r.out.report_path), /-custom\.md$/);
+});
+
+test('review: an objective of "index" cannot collide with the multi-report index file', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const r = runRunner(['--mode', 'review', '--scope', 'recent', '--objective', 'index', '--out', out], { stub: s, cwd: p });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(path.basename(r.out.report_path), /-index-objective\.md$/);
 });
 
 test('review: preflight reports readiness without running', () => {

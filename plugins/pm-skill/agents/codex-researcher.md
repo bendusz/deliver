@@ -43,7 +43,9 @@ the dispatch prompt gives values. The runner adds live web search when the insta
 supports it and reports `search_used`. On `runner_status: unavailable` return the
 UNAVAILABLE digest (below); on any other non-zero exit put the reason and the retained
 `stderr_path` in your digest. Retry at most once, and only for a `failed` status that looks
-transient.
+transient. After reading the answer file, remove the runner's `scratch_dir` with
+`rm -rf "$SCRATCH_DIR"` via Bash, using only the exact path the envelope returned, so temp
+directories do not accumulate.
 
 ## 4. Report — `docs/research/YYYY-MM-DD-<slug>-codex.md`
 - **Question** — plus model/effort used and whether web search was used (`search_used`).

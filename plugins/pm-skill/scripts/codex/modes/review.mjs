@@ -16,7 +16,12 @@ const PRESETS = {
 };
 const CODEBASE_PROMPT = 'Review this codebase as a senior engineer. Read the repository structure and the most important modules first. Report findings ordered by severity (block, major, minor, nit) with file paths and line references, then a short overall assessment.';
 const stamp = () => new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+const slug = (s) => {
+  const base = s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  if (base === '') return 'custom';
+  if (base === 'index') return 'index-objective';
+  return base;
+};
 
 function objectiveClause(objective) {
   if (!objective) return '';
@@ -77,14 +82,11 @@ export async function runReview(o) {
   }
 
   fs.mkdirSync(o.out, { recursive: true });
-  const name = `${stamp()}-codex-review-${o.scope}${o.objective ? `-${slug(o.objective)}` : ''}.md`;
-  const reportPath = path.join(o.out, name);
+  const nameBase = `${stamp()}-codex-review-${o.scope}${o.objective ? `-${slug(o.objective)}` : ''}`;
+  let reportPath = path.join(o.out, `${nameBase}.md`);
+  for (let n = 2; fs.existsSync(reportPath); n += 1) reportPath = path.join(o.out, `${nameBase}-${n}.md`);
   fs.copyFileSync(report, reportPath);
-  if (root && !checkIgnore(root, `${outName}/probe`)) {
-    const gi = path.join(root, '.gitignore');
-    const existing = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8') : '';
-    fs.writeFileSync(gi, `${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}/${outName}/\n`);
-  }
+  const gitignoreRuleNeeded = root && !checkIgnore(root, `${outName}/probe`) ? `/${outName}/` : null;
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
-  return { exit: 0, envelope: { runner_status: 'completed', mode: 'review', scope: o.scope, objective: o.objective, report_path: reportPath, codex_version: version, model: o.model, effort: o.effort, codex_exit: String(run.exit) } };
+  return { exit: 0, envelope: { runner_status: 'completed', mode: 'review', scope: o.scope, objective: o.objective, report_path: reportPath, codex_version: version, model: o.model, effort: o.effort, codex_exit: String(run.exit), gitignore_rule_needed: gitignoreRuleNeeded } };
 }

@@ -46,10 +46,11 @@ inner model or effort only in an explicit dispatch. Valid Sol efforts are
 safety-sensitive project settings so local defaults cannot silently change its sandbox, model,
 effort, network, web, MCP, or hook posture.
 
-**The PM never runs `codex`.** Every Codex invocation goes through a Sonnet wrapper agent
+**The PM never assembles a `codex` command line; it may call the bundled runner (for example the
+`--preflight` probe), and every model run goes through a Sonnet wrapper agent.** The wrappers
 (`codex-builder`, `codex-reviewer`, `codex-advisor`, `codex-researcher`) and the bundled Node
-runner `scripts/codex/run.mjs`. Wrappers pass only the runner's documented inputs; the runner
-owns preflight, sandboxing per platform, output placement, and exit codes. `scripts/validate.sh`
+runner `scripts/codex/run.mjs` pass only the runner's documented inputs; the runner owns
+preflight, sandboxing per platform, output placement, and exit codes. `scripts/validate.sh`
 fails on any direct `codex exec` in an agent or command prompt.
 
 ## Overriding

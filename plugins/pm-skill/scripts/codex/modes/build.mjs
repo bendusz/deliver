@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pmRelpath, realpath, readJson } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
-import { toplevel, isTracked, checkIgnore, gitOut } from '../lib/git.mjs';
+import { toplevel, isTracked, checkIgnore, gitOut, gitOk } from '../lib/git.mjs';
 import { parseStory } from '../lib/story.mjs';
 import { findCodex, codexVersion, loginOk, execHelp, requireFlags, BUILD_FLAGS } from '../lib/preflight.mjs';
 import { runCodex } from '../lib/spawn.mjs';
@@ -72,6 +72,7 @@ export async function runBuild(o) {
   if (!fs.existsSync(o.worktree) || !fs.statSync(o.worktree).isDirectory()) throw rejected('worktree does not exist');
   const worktree = realpath(o.worktree);
   if (!worktree) throw rejected('cannot resolve worktree');
+  if (!gitOk(process.cwd(), ['--version'])) throw unavailable('git is required');
   const top = toplevel(worktree);
   if (!top) throw rejected('worktree is not a git repository');
   const gitRoot = realpath(top);

@@ -14,8 +14,7 @@ Arguments: $ARGUMENTS
 ## 1. Parse arguments
 
 - **model=<id>** — default `gpt-5.6-sol` (judgment work gets the top tier).
-- **effort=<level>** — `minimal|low|medium|high|xhigh` (model-dependent `max`/`ultra`);
-  default `medium`.
+- **effort=<level>** — `none|minimal|low|medium|high|xhigh|max`; default `medium`.
 - Everything else is the **question**. If empty, ask the user what they want Codex's opinion on.
 
 ## 2. Compose the brief

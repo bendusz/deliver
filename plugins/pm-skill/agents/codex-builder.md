@@ -23,7 +23,7 @@ The dispatch must name:
 
 Optional dispatch overrides are `Model`, `Effort`, and `Timeout seconds`. Defaults are
 `gpt-5.6-sol`, `high`, and 600 seconds. Valid Sol effort values are
-`none|low|medium|high|xhigh|max`.
+`none|minimal|low|medium|high|xhigh|max`.
 
 ## Run
 

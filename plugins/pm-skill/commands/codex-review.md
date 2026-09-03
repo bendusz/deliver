@@ -16,22 +16,11 @@ All optional, any order, from `$ARGUMENTS`:
 - **scope** — `recent` | `worktree` | `codebase`. Default `worktree`.
 - **model=<id>** — Codex model id (e.g. `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`).
   Default `gpt-5.6-terra`.
-- **effort=<level>** — `minimal|low|medium|high|xhigh` (`max`/`ultra` only on models that
-  support them). Default `high`.
+- **effort=<level>** — `none|minimal|low|medium|high|xhigh|max`. Default `high`.
 - **timeout=<minutes>** — per-agent timeout. Default `10`.
 - **objectives** — every remaining token. Presets: `security`, `bugs`, `architecture`, `tests`,
   `performance`; `panel` expands to all five. Any other word or quoted phrase is a **free-form
-  objective**. Zero objectives → one general review.
-
-Preset focus lines (use verbatim in prompts):
-
-| Preset | Focus |
-|---|---|
-| security | authn/authz gaps, injection, secret handling, unsafe deserialization, dependency risk |
-| bugs | logic errors, edge cases, error handling, race conditions, silent failures |
-| architecture | module boundaries, coupling, abstraction fit, structural drift |
-| tests | coverage of changed behavior, missing edge cases, assertion quality, flakiness risk |
-| performance | algorithmic complexity, N+1 patterns, unnecessary allocation/IO, hot paths |
+  objective**. Zero objectives → one general review. The runner owns each preset's focus clause.
 
 ## 2. Preflight
 
@@ -46,8 +35,12 @@ CLI). Never run `codex` yourself.
 
 ## 3. Output directory
 
-`<root>/untracked` if it exists, else `<root>/codex`. The runner refuses a directory that
-holds tracked files and asks for another; in that case ask the user where reports should go.
+`<root>/untracked` if it exists, else `<root>/codex`. Announce the output directory when
+launching. The runner rejects (exit 65) a directory that holds tracked files; both `untracked/`
+and `codex/` unusable means the user must clear one of them first. After the run, if any digest
+reports `gitignore_rule_needed`, append that root-anchored rule to `.gitignore`; for a
+pre-existing non-ignored directory (an `untracked/` that may already hold user files), ask the
+user before editing `.gitignore`.
 
 ## 4. Dispatch
 
@@ -61,8 +54,9 @@ of 600 seconds then applies. Do not poll processes; the agents return when the r
 
 ## 5. Index
 
-When two or more reports exist, write `<STAMP>-codex-review-<scope>-index.md` in the output
-directory listing each report path and its top three findings, then relay the digests.
+When two or more reports exist, write `<scope>-index.md`, prefixed with the same
+`YYYYMMDD-HHMMSS` stamp the runner used for the reports, in the output directory listing each
+report path and its top three findings, then relay the digests.
 
 ## 6. Report and log
 

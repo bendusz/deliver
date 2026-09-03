@@ -68,7 +68,8 @@ review is not native at all: use `codex exec --sandbox read-only` with an audit 
 | `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex` | previous generations, still selectable (`5.4-mini` ≈ 30% of 5.4 quota cost) | — |
 
 - The [official GPT-5.6 Sol model page](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
-  lists `none | low | medium | high | xhigh | max` reasoning effort. The builder uses `high`.
+  lists `none | minimal | low | medium | high | xhigh | max` reasoning effort. The builder uses
+  `high`.
 - **No dedicated review model exists**; `review_model` in `~/.codex/config.toml` overrides the
   session model for `/review` — pm-skill never touches that file, passing `-m`/`-c` per call.
 - ChatGPT sign-in is quota-based (Free/Go: Terra only); API-key auth is per-token.
@@ -153,7 +154,7 @@ codex exec --ignore-user-config --ignore-rules --strict-config -C "$WORKTREE" \
   --output-schema "$RESULT_SCHEMA" -o "$SCRATCH/result.json" - < "$SCRATCH/prompt.md"
 ```
 
-On `win32` the `--sandbox` value and the four `sandbox_workspace_write.*`/network config keys
+On `win32` the `--sandbox` value and the three `sandbox_workspace_write.*`/network config keys
 change — see Windows behaviour below; every other flag is identical on all platforms. The runner
 independently snapshots tracked and non-ignored untracked content before and after the run,
 derives `actual_files_changed`, cross-checks it against Codex's own claim, fingerprints HEAD,
@@ -178,8 +179,11 @@ tail = --ignore-user-config --strict-config --ephemeral -m "$MODEL" \
 
 `--sandbox`, `-C`, and `--color` are never passed to `codex exec review` (exit 2 otherwise). The
 report is written to a scratch directory outside the repo, then copied into `--out` (must be
-`<root>/untracked` or `<root>/codex`, holding no tracked files); the runner appends a
-root-anchored `/<dir>/` rule to `.gitignore` when run inside a git repo.
+`<root>/untracked` or `<root>/codex`, holding no tracked files). The runner never edits
+`.gitignore` itself; when run inside a git repo and the output directory is not already ignored,
+it reports the root-anchored rule that is needed (`gitignore_rule_needed: '/<dir>/'`) so the PM
+can apply it, asking the user first for a pre-existing non-ignored directory that may already
+hold user files.
 
 **`advise` / `research`** — always read-only, on every platform:
 
@@ -207,8 +211,10 @@ Every mode emits exactly one JSON envelope on stdout. Common to all: `runner_sta
   `worktree`, `story`, `story_builder`, `story_scope_checked`, `allowed_paths`, and `policy` (the
   platform's sandbox/network/environment shape), with `quota_consumed: false`.
 - **review**: `mode` (always `'review'`), `scope`, `objective`, `report_path`, `model`, `effort`,
-  `codex_exit`. `--preflight` returns `scope` and `quota_consumed: false`; a clean worktree or no
-  commit returns `nothing-to-review` with a `reason` instead of running Codex.
+  `codex_exit`, `gitignore_rule_needed` (a root-anchored `/<dir>/` string, or `null` when the
+  output directory is already ignored). `--preflight` returns `scope` and `quota_consumed: false`;
+  a clean worktree or no commit returns `nothing-to-review` with a `reason` instead of running
+  Codex.
 - **advise/research**: `mode`, `answer_path`, `stderr_path`, `scratch_dir`, `model`, `effort`,
   `codex_exit`, `search_used`. `--preflight` returns `mode`, `search_available`, and
   `quota_consumed: false`.
@@ -221,7 +227,10 @@ Every mode emits exactly one JSON envelope on stdout. Common to all: `runner_sta
   `.cmd` with no discoverable JS entry falls back to `cmd.exe /d /s /c`, built only from
   runner-validated argv (never user-controlled text) with a strict character check
   (`"`, `%`, CR, LF) that refuses to spawn rather than risk shell reinterpretation. The prompt
-  always arrives on stdin, never on the command line, on every platform.
+  always arrives on stdin, never on the command line, on every platform. With a bare `codex.cmd`
+  and no npm `node_modules/@openai/codex/bin/codex.js` beside it, build and fix are rejected
+  (their argv contains quoted config values that the cmd.exe fallback refuses); install
+  `codex.exe` or the npm package.
 - **Process tree kill**: timeout and `INT`/`TERM`/`HUP` run `taskkill /T /F /PID <pid>` on
   `win32`; POSIX signals the detached process group.
 - **`build`/`fix` sandbox**: Codex's Windows sandbox is off by default, and with it off
@@ -237,8 +246,8 @@ Every mode emits exactly one JSON envelope on stdout. Common to all: `runner_sta
 - **`review`/`advise`/`research` sandbox**: `--sandbox read-only` everywhere, including Windows —
   a policy shape only, since these modes never write.
 - **Paths**: worktree containment and the exact-root check use native realpath resolution; the
-  worktree root compares case-insensitively on `win32`; git output is read tolerant of both path
-  separators.
+  worktree root compares the two native realpaths exactly; git output is read tolerant of both
+  path separators.
 - **Runtime temp**: `TMPDIR`, `TMP`, and `TEMP` all point at the worktree-local
   `tmp/codex-runtime/<run>` directory, which the runner deletes on every exit (build/fix only).
 - **Snapshots**: on `win32` the executable bit is ignored (git's index mode for tracked files,
