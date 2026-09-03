@@ -34,7 +34,7 @@ there.**
   In the clean integration checkout, claim the batch and persist each resolved choice in the
   corresponding `parallel_batch` entry, append the choices and reasons to `pm/log.md`, and commit
   the assignments, actor state, and log together. Never leave route decisions only in prose.
-- Run `codex-builder-run.sh --preflight` against every Codex worktree/story pair before concurrent
+- Run the runner's `--mode build --preflight` against every Codex worktree/story pair before concurrent
   dispatch. A failed preflight removes that story from the batch without consuming task quota.
 - Dispatch the batch's builders **together** (concurrent subagent calls in one step), giving each
   its resolved builder inputs: both builders get the story file path and absolute worktree root;
