@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## 0.17.0 - 2026-09-03
+
+Smaller dispatches with the same behaviour. The story header and every agent body now carry only
+what changes a worker's decision.
+
+- **Story contract v2.** `pm-meta` is the only home for a story's builder and touch paths. The
+  visible header is two lines (`Sprint · Priority · Covers · Depends on · Parallel-safe` and
+  `Risk · Review lenses`); security and architecture sensitivity are the presence of
+  `security-auditor` and `architecture-reviewer` in the lens list. Stories written before 0.17 keep
+  working: the runner treats their visible `Builder` and `Touches` fields as optional and still
+  blocks when one disagrees with `pm-meta`. See `references/migrations.md`.
+- **Agent bodies within budget.** All fourteen agent bodies were rewritten under a word budget with
+  every rule, input, and parsed token kept once. Reviewers return findings and a verdict; the
+  verifier returns `STATUS`, per-criterion and per-gate evidence, and an action only on `FAIL` or
+  `UNKNOWN`. `test-engineer` now states that it never changes git state.
+- **Runtime trims.** The Codex build prompt states its constraints in one sentence; the runner
+  enforces them. The session hook prints a `pm:` line, your `you:` line, the handoff state, and only
+  teammates holding a story.
+- **Hygiene.** No em dashes in runtime code; `scripts/validate.sh` checks it.
+
 ## 0.16.1 - 2026-09-03
 
 Documentation and prompt fixes from a three-agent Codex review, plus one runner refactor. The
