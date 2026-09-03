@@ -2,10 +2,10 @@
 // pm-skill SessionStart hook: inject a tiny resume pointer when the project is PM-managed.
 //
 // Fires on startup, resume, /clear, and post-compaction; stdout becomes context for the
-// new session. Prints a `pm: phase=...` line, YOUR actor position (identity from git
-// config), and active teammates (those with a current_story) as read-only one-liners.
-// Completely SILENT (exit 0, no output) in any project that is not PM-managed. Fail-open
-// throughout.
+// new session. Prints a `pm: phase=...` line, a `wiki: ...` line when docs/wiki/index.md
+// exists, YOUR actor position (identity from git config), and active teammates (those
+// with a current_story) as read-only one-liners. Completely SILENT (exit 0, no output)
+// in any project that is not PM-managed. Fail-open throughout.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -41,6 +41,13 @@ if (!isRecord(st)) {
 }
 
 say(`pm: phase=${v(st.phase, '?')} sprint=${v(st.current_sprint, '-')}/${v(st.total_sprints, '-')} signed_off=${st.signed_off === undefined || st.signed_off === null ? '?' : String(st.signed_off)}`);
+
+// One line for the project wiki when it exists: the index is one entry per line.
+const wikiIndex = path.join(cwd, 'docs', 'wiki', 'index.md');
+try {
+  const entries = fs.readFileSync(wikiIndex, 'utf8').split(/\r?\n/).filter((l) => l.startsWith('- ')).length;
+  say(`wiki: docs/wiki/index.md (${entries} entries)`);
+} catch { /* absent or unreadable: no line */ }
 
 const actorsDir = path.join(cwd, 'pm', 'actors');
 if (!isDir(actorsDir)) {

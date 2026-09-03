@@ -103,6 +103,16 @@ test('secrets: scans Edit.new_string and MultiEdit.edits[].new_string', () => {
   assert.equal(secrets({ cwd: g, tool_input: { file_path: log, edits: [{ new_string: 'Rotated the deploy token:' }, { new_string: 'ci-secrets-manager-2026' }] } }), 0);
 });
 
+test('secrets: docs/wiki/ is guarded like pm/, the rest of docs/ is not', () => {
+  const g = newProj(false);
+  fs.mkdirSync(path.join(g, 'docs', 'wiki'), { recursive: true });
+  const page = path.join(g, 'docs', 'wiki', 'sources', 'plan.md');
+  assert.equal(secrets(writeInput(g, page, 'API_KEY=abcdefghijklmno')), 2);
+  assert.equal(secrets(writeInput(g, page, 'the plan names the key by path only')), 0);
+  assert.equal(secrets(writeInput(g, path.join(g, 'docs', 'plan.md'), 'API_KEY=abcdefghijklmno')), 0);
+  assert.match(runHook('pm-secrets-guard.mjs', writeInput(g, page, 'API_KEY=abcdefghijklmno')).stderr, /blocked docs\/wiki\/sources\/plan\.md: tracked docs\/wiki\/ files cannot hold secret-shaped values/);
+});
+
 const actor = (input, env) => runHook('actor-guard.mjs', input, env).status;
 const ME = 'casey-example-com-589b8fa8ab93';
 
@@ -163,6 +173,19 @@ test('session: prints the pointer, project line, and your actor line', () => {
   assert.match(out, /pm: phase=implementation sprint=-\/- signed_off=false/);
   assert.match(out, new RegExp(`you \\(${ME}\\): story=S1-1 status=- builder=- branch=- next=\\?`));
   assert.match(out, /run \/pm-skill:resume/);
+});
+
+test('session: wiki line only when docs/wiki/index.md exists, with the entry count', () => {
+  const s = newProj(false);
+  assert.doesNotMatch(session({ cwd: s }), /^wiki:/m);
+  fs.mkdirSync(path.join(s, 'docs', 'wiki'), { recursive: true });
+  fs.writeFileSync(path.join(s, 'docs', 'wiki', 'index.md'), '# Wiki index\n\n- [Schema](schema.md): conventions.\n- [Store](concepts/store.md): the store.\n');
+  assert.match(session({ cwd: s }), /^wiki: docs\/wiki\/index\.md \(2 entries\)$/m);
+  fs.rmSync(path.join(s, 'docs', 'wiki', 'index.md'));
+  fs.mkdirSync(path.join(s, 'docs', 'wiki', 'index.md'));
+  const out = session({ cwd: s });
+  assert.doesNotMatch(out, /^wiki:/m);
+  assert.match(out, /pm: phase=/);
 });
 
 test('session: F1 subdirectory cwd finds the state (git fallback and CLAUDE_PROJECT_DIR)', () => {
