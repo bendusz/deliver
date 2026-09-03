@@ -26,7 +26,7 @@ tmp/                       # gitignored, disposable — never load-bearing for r
   output, diffs, CI dumps, `tmp/environment-check.md`, `tmp/worktrees/`. Nothing in `tmp/` may be
   load-bearing for resume.
 - **Never edit another actor's files.** You write your own `pm/actors/<you>.json` and
-  `<you>.HANDOFF.md` only (the bundled `actor-guard.sh` hook blocks accidents). Everyone writes
+  `<you>.HANDOFF.md` only (the bundled `actor-guard.mjs` hook blocks accidents). Everyone writes
   the shared files — but only at coordination moments (below).
 
 **Commit `pm/` with the work it describes.** Include state updates in the ship/log commit for each
@@ -35,7 +35,7 @@ current resume point.
 
 **No secrets — load-bearing rule.** `pm/` is tracked: never write secrets/credentials into any
 state file — reference secret *locations* ("`.env` on the box"), never values. The bundled
-`pm-secrets-guard.sh` hook is a mechanical backstop for high-confidence token shapes; the rule is
+`pm-secrets-guard.mjs` hook is a mechanical backstop for high-confidence token shapes; the rule is
 yours to hold.
 
 ## Actor identity (derived, never configured)
@@ -134,7 +134,7 @@ The `pm/` files track *where everyone is*, not *what was decided*.
 ## On resume
 
 Read the shared `pm/pm-state.json`, then **your** `pm/actors/<you>.json` and (if current) your
-HANDOFF (the `/pm-skill:resume` command does exactly this; the bundled `session-context.sh` hook
+HANDOFF (the `/pm-skill:resume` command does exactly this; the bundled `session-context.mjs` hook
 also injects a short pointer — yours plus teammate one-liners — into every new or freshly-compacted
 session). Then continue from your recorded `next`.
 
