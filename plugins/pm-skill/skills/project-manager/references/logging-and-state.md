@@ -133,12 +133,13 @@ The `pm/` files track *where everyone is*, not *what was decided*.
 
 ## On resume
 
-Read the shared `pm/pm-state.json`, then **your** `pm/actors/<you>.json` and, if it is current, your
-HANDOFF. The `/pm-skill:resume` command does exactly this, and the bundled `session-context.mjs` hook
+Pull or rebase first when a remote exists, because teammates' claims and ships become visible only
+after a fetch. Then read the shared `pm/pm-state.json`, followed by **your**
+`pm/actors/<you>.json` and, if it is current, your HANDOFF. The `/pm-skill:resume` command does exactly this, and the bundled `session-context.mjs` hook
 injects a short pointer, yours plus teammate one-liners, into every new or freshly-compacted session.
 Then continue from your recorded `next`, using the persisted `resolved_builder` and counters rather
 than re-deciding from memory. If you are a new actor on an existing project and have no
 `pm/actors/<you>.json` yet, create it from the template and commit it before continuing.
 
-If the state you find uses a pre-0.13, flat 0.8, or pre-0.8 layout, migrate it first per
-`migrations.md`.
+If the state you find uses a pre-0.10.1 actor id, a pre-0.13 actor file, a flat 0.8 layout, or a
+pre-0.8 `tmp/` layout, migrate it first per `migrations.md`.

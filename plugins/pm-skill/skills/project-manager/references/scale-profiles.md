@@ -22,7 +22,7 @@ The default is `standard`.
   lowering it mid-project needs the user's agreement.
 
 ## Recording it
-- `docs/plan.md`, Delivery mode: scale, checkpoint policy, autonomy.
+- `docs/plan.md`, Delivery mode: scale and checkpoint policy.
 - `docs/plan.md`, Delivery mode also carries `Instruction rules: none | pm-state`. The default is
   `none`; offer `pm-state` at `standard` scale and above, per `instruction-layers.md`.
 - `pm/pm-state.json`: `"scale": "standard"`.

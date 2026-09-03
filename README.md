@@ -172,24 +172,10 @@ under `tmp/`; the report directories sit at the repository root:
   write when `pm/pm-state.json`, or the legacy `tmp/pm-state.json`, has `signed_off: false`. It
   exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`,
   and `.gitattributes`, fails open on any uncertainty, and does not see writes made through `Bash`.
-- **Guarded Codex writes.** The `codex-builder` runner fails closed unless tracked PM state exists
-  and is signed off, requires the exact git worktree root, mechanically enforces the story's
-  `pm-meta.touches`. On macOS and Linux the builder runs Codex under `workspace-write` with host
-  temporary paths, network, web search, MCP servers, lifecycle hooks, subagents, login shells,
-  user config, and execution rules disabled; on Windows it runs with full access and the runner
-  audits the worktree afterwards. Tool shells
-  get a reduced secret-filtered environment and an ignored, worktree-local `TMPDIR` that is removed
-  on exit, best effort, since a Windows lock can leave it. A symlinked `tmp/` or `tmp/codex-runtime`
-  is refused outright with exit 66 rather than followed. Before and after snapshots of tracked,
-  untracked, and ignored files inside the worktree catch unreported, protected, and out-of-scope
-  repository edits. Ignored files inside the worktree are audited and reported as
-  `ignored_files_changed`; tracked and untracked non-ignored files are both enforced against the
-  story's `pm-meta.touches`.
-  Git checks cover HEAD, every ref, staged contents, index flags, hooks, `info/exclude`, local
-  config, and worktree registrations. `--timeout-seconds`, 10 minutes by default, bounds the model
-  process itself, not the preflight probes, which have their own 30-second limit; a run that exceeds
-  it retains partial changes plus diagnostics. `--preflight` checks readiness and story scope without
-  model inference or task quota. Codex may edit working files but never owns Git.
+- **Guarded Codex writes.** Codex builds require signed-off tracked state and bounded story touch
+  paths. POSIX runs use `workspace-write`. Windows runs with full host access and an after-run
+  worktree audit. See `docs/codex-cli-reference.md` for the exact flags, audited state, exit codes,
+  and platform limits.
 - Repository `AGENTS.md` and `CLAUDE.md`, and non-safety project configuration, remain trusted
   project inputs. Command-line overrides win for every safety-sensitive setting above. This is an OS
   sandbox, not a VM boundary.
@@ -219,8 +205,8 @@ prevented. Review, advice, and research modes are read-only on every platform.
 
 ## Optional enhancements (they work alongside and are not required)
 
-pm-skill is fully functional on its own. If your environment also has any of these, the PM may prefer
-them where useful, but nothing here is a dependency.
+pm-skill needs none of the optional tools below. If your environment has any of them, the PM may
+prefer them where useful.
 
 - The `poteto` companion plugin from this marketplace: design exploration before code with
   `architect` and `arena`, subsystem walkthroughs with `how` and `why`, multi-model adversarial

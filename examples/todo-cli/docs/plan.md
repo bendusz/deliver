@@ -11,7 +11,6 @@ demonstrate the pm-skill workflow end to end.
 ## Delivery mode
 - Scale: standard
 - Checkpoint policy: sprint-level
-- Autonomy: approve each sprint
 - Instruction rules: none
 
 ## Goals

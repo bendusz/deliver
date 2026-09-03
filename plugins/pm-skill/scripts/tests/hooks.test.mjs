@@ -67,32 +67,31 @@ test('signoff: block message names the gate', () => {
 });
 
 const secrets = (input, env) => runHook('pm-secrets-guard.mjs', input, env).status;
-const content = (cwd, f, c) => ({ cwd, tool_input: { file_path: f, content: c } });
 
 test('secrets: prose in pm/ is allowed, shaped values are blocked', () => {
   const g = newProj(false);
   const log = path.join(g, 'pm', 'log.md');
-  assert.equal(secrets(content(g, log, 'rotate the API key on the box')), 0);
-  assert.equal(secrets(content(g, log, 'api_key = "zq9x7c2v8b4n6m1k"')), 2);
-  assert.equal(secrets(content(g, log, 'API_KEY = "zq9x7c2v8b4n6m1k"')), 2);
-  assert.equal(secrets(content(g, log, 'API_KEY=abcdefghijklmno')), 2);
-  assert.equal(secrets(content(g, log, 'Password: hunter2hunter2')), 2);
-  assert.equal(secrets(content(g, log, 'TOKEN=$GITHUB_TOKEN and api_key = "$FROM_ENV_VAR"')), 0);
-  assert.equal(secrets(content(g, log, 'token = "<rotate-me-later>"')), 0);
-  assert.equal(secrets(content(g, log, 'key AKIAIOSFODNN7EXAMPLE ok')), 2);
-  assert.equal(secrets(content(g, log, 'ghp_abcdefghijklmnopqrstuvwxyz012345')), 2);
-  assert.equal(secrets(content(g, log, '-----BEGIN RSA PRIVATE KEY-----')), 2);
-  assert.equal(secrets(content(g, log, 'Password: "use a sentence here"')), 0);
-  assert.match(runHook('pm-secrets-guard.mjs', content(g, log, 'API_KEY=abcdefghijklmno')).stderr, /blocked a write to pm\/log\.md: the content contains a secret-shaped string/);
+  assert.equal(secrets(writeInput(g, log, 'rotate the API key on the box')), 0);
+  assert.equal(secrets(writeInput(g, log, 'api_key = "zq9x7c2v8b4n6m1k"')), 2);
+  assert.equal(secrets(writeInput(g, log, 'API_KEY = "zq9x7c2v8b4n6m1k"')), 2);
+  assert.equal(secrets(writeInput(g, log, 'API_KEY=abcdefghijklmno')), 2);
+  assert.equal(secrets(writeInput(g, log, 'Password: hunter2hunter2')), 2);
+  assert.equal(secrets(writeInput(g, log, 'TOKEN=$GITHUB_TOKEN and api_key = "$FROM_ENV_VAR"')), 0);
+  assert.equal(secrets(writeInput(g, log, 'token = "<rotate-me-later>"')), 0);
+  assert.equal(secrets(writeInput(g, log, 'key AKIAIOSFODNN7EXAMPLE ok')), 2);
+  assert.equal(secrets(writeInput(g, log, 'ghp_abcdefghijklmnopqrstuvwxyz012345')), 2);
+  assert.equal(secrets(writeInput(g, log, '-----BEGIN RSA PRIVATE KEY-----')), 2);
+  assert.equal(secrets(writeInput(g, log, 'Password: "use a sentence here"')), 0);
+  assert.match(runHook('pm-secrets-guard.mjs', writeInput(g, log, 'API_KEY=abcdefghijklmno')).stderr, /blocked a write to pm\/log\.md: the content contains a secret-shaped string/);
 });
 
 test('secrets: ignores writes outside pm/, guards traversal and symlinks into pm/', (t) => {
   const g = newProj(false);
-  assert.equal(secrets(content(g, path.join(g, 'src', 'config.py'), 'API_KEY=abcdefghijklmno')), 0);
-  assert.equal(secrets(content(g, path.join(g, 'docs', '..', 'pm', 'log.md'), 'API_KEY=abcdefghijklmno')), 2);
+  assert.equal(secrets(writeInput(g, path.join(g, 'src', 'config.py'), 'API_KEY=abcdefghijklmno')), 0);
+  assert.equal(secrets(writeInput(g, path.join(g, 'docs', '..', 'pm', 'log.md'), 'API_KEY=abcdefghijklmno')), 2);
   fs.writeFileSync(path.join(g, 'pm', 'log.md'), '');
   if (!canSymlink(path.join(g, 'pm', 'log.md'), path.join(g, 'docs', 'note.md'))) return t.skip('symlinks unavailable');
-  assert.equal(secrets(content(g, path.join(g, 'docs', 'note.md'), 'API_KEY=abcdefghijklmno')), 2);
+  assert.equal(secrets(writeInput(g, path.join(g, 'docs', 'note.md'), 'API_KEY=abcdefghijklmno')), 2);
 });
 
 test('secrets: scans Edit.new_string and MultiEdit.edits[].new_string', () => {

@@ -123,7 +123,7 @@ export function hookFile(input) {
   const file = input?.tool_input?.file_path;
   if (typeof file !== 'string' || file === '') return null;
   const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd();
-  return { file, cwd, root: pmRoot(cwd) };
+  return { file, root: pmRoot(cwd) };
 }
 
 export function readJson(file) {

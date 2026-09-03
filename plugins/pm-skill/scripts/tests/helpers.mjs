@@ -100,7 +100,7 @@ export function newBuildProject(signedOff = true) {
   return d;
 }
 
-export function makeStub({ layout = 'npm' } = {}) {
+export function makeStub() {
   const dir = tmpDir('pmstub-');
   const binDir = path.join(dir, 'bin');
   fs.mkdirSync(binDir, { recursive: true });
@@ -108,17 +108,11 @@ export function makeStub({ layout = 'npm' } = {}) {
   const launcher = fs.readFileSync(path.join(TESTS_DIR, 'stub-launcher.cjs'));
   const stub = fs.readFileSync(path.join(TESTS_DIR, 'stub-codex.mjs'));
   if (WIN) {
-    if (layout === 'npm') {
-      const pkg = path.join(binDir, 'node_modules', '@openai', 'codex', 'bin');
-      fs.mkdirSync(pkg, { recursive: true });
-      fs.writeFileSync(path.join(pkg, 'codex.js'), launcher);
-      fs.writeFileSync(path.join(pkg, 'stub-codex.mjs'), stub);
-      fs.writeFileSync(path.join(binDir, 'codex.cmd'), '@node "%~dp0node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n');
-    } else {
-      fs.writeFileSync(path.join(binDir, 'codex.js'), launcher);
-      fs.writeFileSync(path.join(binDir, 'stub-codex.mjs'), stub);
-      fs.writeFileSync(path.join(binDir, 'codex.cmd'), '@node "%~dp0codex.js" %*\r\n');
-    }
+    const pkg = path.join(binDir, 'node_modules', '@openai', 'codex', 'bin');
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(path.join(pkg, 'codex.js'), launcher);
+    fs.writeFileSync(path.join(pkg, 'stub-codex.mjs'), stub);
+    fs.writeFileSync(path.join(binDir, 'codex.cmd'), '@node "%~dp0node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n');
   } else {
     fs.writeFileSync(path.join(binDir, 'codex'), launcher, { mode: 0o755 });
     fs.writeFileSync(path.join(binDir, 'stub-codex.mjs'), stub);

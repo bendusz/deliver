@@ -40,7 +40,7 @@ first state write onward, per `logging-and-state.md`, and never write secrets in
 - **Overview.** What and why, in 2 to 3 sentences.
 - **Source spec.** Link `docs/spec.md`, or note "none, intent captured inline".
 - **Delivery mode.** The scale (`tiny` to `regulated`, see `scale-profiles.md`), the checkpoint
-  policy, the autonomy level, and `Instruction rules: none | pm-state`.
+  policy, and `Instruction rules: none | pm-state`.
 - **Goals** and **Target users**.
 - **Scope.** In and Out, being explicit about what you are *not* doing.
 - **Stories.** A table:
