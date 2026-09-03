@@ -1,8 +1,9 @@
+import fs from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { cksum, pmActorId } from '../../hooks/lib.mjs';
-import { newProj, gitIn } from './helpers.mjs';
+import { cksum, pmActorId, pmRoot, pmRelpath } from '../../hooks/lib.mjs';
+import { newProj, gitIn, canSymlink, tmpDir } from './helpers.mjs';
 
 test('cksum matches POSIX cksum vectors', () => {
   assert.equal(cksum('casey@example.com'), 1486589864);
@@ -39,4 +40,45 @@ test('pmActorId falls back to user.name and returns null without identity', () =
     if (saved.g === undefined) delete process.env.GIT_CONFIG_GLOBAL; else process.env.GIT_CONFIG_GLOBAL = saved.g;
     if (saved.s === undefined) delete process.env.GIT_CONFIG_SYSTEM; else process.env.GIT_CONFIG_SYSTEM = saved.s;
   }
+});
+
+test('pmRoot prefers CLAUDE_PROJECT_DIR, then git top level, then cwd', () => {
+  const p = newProj();
+  const sub = path.join(p, 'packages', 'foo');
+  const saved = process.env.CLAUDE_PROJECT_DIR;
+  try {
+    delete process.env.CLAUDE_PROJECT_DIR;
+    assert.equal(fs.realpathSync.native(pmRoot(sub)), p);
+    process.env.CLAUDE_PROJECT_DIR = p;
+    assert.equal(pmRoot(sub), p);
+    const plain = tmpDir('noroot-');
+    delete process.env.CLAUDE_PROJECT_DIR;
+    assert.equal(pmRoot(plain), plain);
+  } finally {
+    if (saved === undefined) delete process.env.CLAUDE_PROJECT_DIR; else process.env.CLAUDE_PROJECT_DIR = saved;
+  }
+});
+
+test('pmRelpath canonicalises traversal and rejects escapes', () => {
+  const p = newProj();
+  assert.equal(pmRelpath(p, path.join(p, 'src', 'app.py')), 'src/app.py');
+  assert.equal(pmRelpath(p, path.join(p, 'pm', '..', 'src', 'app.py')), 'src/app.py');
+  assert.equal(pmRelpath(p, 'src/new/deep/file.txt'), 'src/new/deep/file.txt');
+  assert.equal(pmRelpath(p, p), '.');
+  assert.equal(pmRelpath(p, path.join(path.dirname(p), 'elsewhere.txt')), null);
+  assert.equal(pmRelpath(p, ''), null);
+  assert.equal(pmRelpath(p, 'ghost/../../escape.txt'), null);
+});
+
+test('pmRelpath resolves a final file symlink to its real target', (t) => {
+  const p = newProj();
+  fs.writeFileSync(path.join(p, 'src', 'config.py'), '');
+  if (!canSymlink(path.join(p, 'src', 'config.py'), path.join(p, 'docs', 'config.md'))) return t.skip('symlinks unavailable');
+  assert.equal(pmRelpath(p, path.join(p, 'docs', 'config.md')), 'src/config.py');
+});
+
+test('pmRelpath resolves a directory symlink under docs/ pointing at src/', (t) => {
+  const p = newProj();
+  if (!canSymlink(path.join(p, 'src'), path.join(p, 'docs', 'impl-link'))) return t.skip('symlinks unavailable');
+  assert.equal(pmRelpath(p, path.join(p, 'docs', 'impl-link', 'app.py')), 'src/app.py');
 });
