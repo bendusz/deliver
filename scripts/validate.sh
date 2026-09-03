@@ -76,6 +76,7 @@ for h in plugins/pm-skill/hooks/*.sh; do
   err "bash hook found under plugins/pm-skill/hooks/ (runtime must be Node only): $h"
 done
 grep -lE '\bjq\b' plugins/pm-skill/hooks/*.mjs >/dev/null 2>&1 && err "jq referenced under plugins/pm-skill/hooks/"
+# shellcheck disable=SC2016  # the placeholder is matched as a literal string in hooks.json
 node -e '
 const fs=require("fs");
 const root="plugins/pm-skill";
