@@ -57,7 +57,8 @@ with a scale (`tiny` through `regulated`, default `standard`); see `references/s
 Project instructions follow `references/instruction-layers.md`: facts in `AGENTS.md`, procedure here,
 constraints in hooks, persona in agent bodies. If a state read finds an older layout,
 `references/migrations.md` has the migration. For optional mechanical enforcement using Claude Code
-permissions and hooks, see `references/hardening.md`.
+permissions and hooks, see `references/hardening.md`. On a `standard` or larger project,
+`references/knowledge.md` owns the wiki under `docs/wiki/` and the `librarian` that maintains it.
 
 Optional workflows have their own commands. Use agent descriptions to choose specialists. When a
 phase creates an artifact, read its matching template from `${CLAUDE_PLUGIN_ROOT}/templates/`. If

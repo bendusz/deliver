@@ -1,0 +1,21 @@
+<!-- Write to docs/wiki/<decisions|concepts|sources>/<slug>.md. Keep the header on two lines. -->
+# <title>
+Type: <decision|concept|source> · Status: <current|superseded by <slug>> · Sources: <repo-relative path[, path]>
+
+<!-- decision pages -->
+## Context
+<what was true and what forced a choice, citing sources>
+
+## Decision
+<what was decided, and what it rules out>
+
+<!-- concept pages -->
+## Summary
+<the durable explanation, citing sources>
+
+<!-- source pages -->
+## Summary
+<what the artifact says, in the artifact's own terms, citing its sections>
+
+## Related
+- [<title>](<relative path>)
