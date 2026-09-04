@@ -32,6 +32,10 @@ header. Three fields carry rules:
   names `architecture-reviewer`, `design-exploration.md` owns the optional design pass that may
   precede build-ready.
 
+With a skeleton, `Specs` names the `.sdd` files the story implements; `pm-meta.touches` are the
+paths those specs `Own`; Context names the specs instead of restating interfaces; each criterion
+cites the `Done when` line it satisfies where one exists. `skeleton.md` owns the phase.
+
 ## Ordering
 - Record each story's `Depends on` and order so dependencies come first.
 - Set `Parallel-safe: yes` on a story with no dependency on un-merged work, and record its

@@ -82,7 +82,8 @@ review panel (`code-integrity-reviewer`, `architecture-reviewer`, `security-audi
 `test-engineer` that writes tests only, a read-only `debugger` that returns a root cause and a fix
 plan, a read-only final `pm-verifier` returning an independent PASS, FAIL, or UNKNOWN before ship, a
 `technical-writer` for docs only, a `codebase-analyst` for brownfield work, a `librarian` that alone
-maintains the project wiki, a web-capable `researcher`, and three Codex-CLI-backed second-opinion
+maintains the project wiki, a `spec-architect` that writes SpecDD `.sdd` contracts before code when
+the plan asks for a skeleton, a web-capable `researcher`, and three Codex-CLI-backed second-opinion
 roles: `codex-researcher` for independent
 research, `codex-reviewer` for independent code review, and `codex-advisor` for an independent
 recommendation. `researcher` and `codex-researcher` write sourced reports under `docs/research/`,
@@ -129,6 +130,8 @@ At the project root:
   file. Existing files are never overwritten; the PM proposes a migration instead.
 - `.claude/rules/pm-state.md` and `pm/AGENTS.md`, optional path-scoped `pm/` discipline, enabled by
   `Instruction rules: pm-state` in the plan's Delivery mode.
+- `<root>.sdd`, `.specdd/bootstrap.md`, and `.sdd` files beside the code they describe: the SpecDD
+  skeleton, when the plan's Delivery mode says `Skeleton: specdd`. Optional.
 
 Committed under `docs/`, which is authoritative:
 

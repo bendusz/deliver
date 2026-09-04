@@ -4,7 +4,7 @@ Four layers carry what an agent needs. Keep each thing in exactly one of them.
 
 | Layer | Holds | Where it lives | Loaded |
 |---|---|---|---|
-| Facts | commands, layout, non-default conventions, gotchas | `AGENTS.md` (Claude Code reads it through the `@AGENTS.md` line in `CLAUDE.md`; Codex, Cursor, and Copilot read it natively) | every session, every custom subagent dispatch (Claude Code's built-in Explore and Plan agents skip it) |
+| Facts | commands, layout, non-default conventions, gotchas, and, with a skeleton, the SpecDD bootstrap pointer | `AGENTS.md` (Claude Code reads it through the `@AGENTS.md` line in `CLAUDE.md`; Codex, Cursor, and Copilot read it natively) | every session, every custom subagent dispatch (Claude Code's built-in Explore and Plan agents skip it) |
 | Procedure | phases, checklists, dispatch inputs (the loop reference and each agent's Inputs), review and verification rules | this skill's `SKILL.md` and `references/` | on demand, one reference per phase |
 | Constraints | sign-off, secrets, actor isolation, `pm-meta.touches` | the bundled hooks and the Codex runner | enforced mechanically |
 | Persona | role, tone, boundaries, stop conditions | each `agents/*.md` body; the runner prompt for Codex | per dispatch |

@@ -13,6 +13,7 @@
 - Scale: <tiny | small | standard | large | regulated>  <!-- see references/scale-profiles.md -->
 - Checkpoint policy: <story-level | sprint-level | autonomous>
 - Instruction rules: <none | pm-state>  <!-- pm-state writes .claude/rules/pm-state.md and pm/AGENTS.md at scaffold -->
+- Skeleton: <specdd | none>  <!-- specdd writes .sdd contracts per sprint before decomposition; default none below large -->
 
 ## Goals
 - <goal>

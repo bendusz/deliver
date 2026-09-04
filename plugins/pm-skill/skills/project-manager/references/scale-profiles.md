@@ -7,11 +7,11 @@ The default is `standard`.
 
 | Scale | Use for | Artifacts and gates |
 | --- | --- | --- |
-| `tiny` | a one-off fix or tiny script | Minimal `docs/plan.md` plus one story file; sign-off still recorded; gates if any; a separate reviewer and an inline verifier pass, with PASS still required; skip spec, analyze, checklists, and verification reports; no wiki. |
-| `small` | a small feature | Light `docs/spec.md`, `docs/plan.md`, and stories; gates and review; verifier PASS; no wiki. |
-| `standard` (default) | most projects | Spec, plan, `/pm-skill:analyze`, stories, a risk-selected review panel, verifier PASS, and the project wiki maintained by `librarian`. |
-| `large` | multi-sprint or multi-author | The above plus `docs/constitution.md`, quality checklists, durable verification reports, and a traceability table. |
-| `regulated` | compliance and high-assurance | All of the above mandatory, plus a required security review and full requirement to story to verification traceability, and a clean wiki lint before the completion report. Nothing is waived. |
+| `tiny` | a one-off fix or tiny script | Minimal `docs/plan.md` plus one story file; sign-off still recorded; gates if any; a separate reviewer and an inline verifier pass, with PASS still required; skip spec, analyze, checklists, and verification reports; no wiki; skeleton off unless the plan says `Skeleton: specdd`. |
+| `small` | a small feature | Light `docs/spec.md`, `docs/plan.md`, and stories; gates and review; verifier PASS; no wiki; skeleton off unless the plan says `Skeleton: specdd`. |
+| `standard` (default) | most projects | Spec, plan, `/pm-skill:analyze`, stories, a risk-selected review panel, verifier PASS, and the project wiki maintained by `librarian`; skeleton off unless the plan says `Skeleton: specdd`. |
+| `large` | multi-sprint or multi-author | The above plus `docs/constitution.md`, quality checklists, durable verification reports, and a traceability table, and the SpecDD skeleton (`Skeleton: specdd`). |
+| `regulated` | compliance and high-assurance | All of the above mandatory, plus a required security review and full requirement to story to verification traceability, and a clean wiki lint before the completion report, and the SpecDD skeleton (`Skeleton: specdd`). Nothing is waived. |
 
 ## Rules
 - Scaling **down** removes artifacts and ceremony, never the rules the skill and workflow already

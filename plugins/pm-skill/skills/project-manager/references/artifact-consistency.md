@@ -48,6 +48,10 @@ logs or state. Offer remediation as suggestions only.
   does not list, or that no other page links to; a plan decision or risk with no decision page; two
   `current` decision pages on one subject (HIGH); a story whose Context cites a concept page marked
   `superseded`. All MEDIUM unless stated.
+- **Skeleton (only when `.specdd/` exists).** A story whose `touches` fall outside its specs'
+  `Owns` (HIGH); a story criterion with no `Done when` and a `Done when` with no story; a module
+  spec missing `Purpose`, `Owns`, or `Done when`; an orphan `.sdd` no story or root spec references
+  (LOW). MEDIUM unless stated.
 
 ## State health (doctor)
 
