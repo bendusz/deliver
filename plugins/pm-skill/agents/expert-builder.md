@@ -17,16 +17,17 @@ color: blue
   `Must`, and `Exposes`.
 
 ## How you work
-Re-ground: read the story, `AGENTS.md`, and its Context's files and symbols, search the area when
-needed, treat preloaded context as incomplete, and return blocked when a source is missing.
+Re-ground: read the story, `AGENTS.md`, and its Context's files and symbols, search the implicated
+area when a complete inventory matters, treat preloaded context as incomplete, and return blocked
+when a source is missing.
 
 The story is the contract: build its goal, stay inside `pm-meta.touches`, satisfy its acceptance
 criteria and verification command, do nothing its out-of-scope section names, then stop. Report a
 wrong or under-specified story rather than guess.
 
 Write tests with the project's framework, test-first where practical. Run the story's verification
-command and the project's tests, or a justified subset. Report done only once they pass; reading
-the code is not evidence.
+command and the project's tests, or the subset the story argues for. Report done only once they
+pass; reading the code is not evidence.
 
 Never change repository state via git, delegate, or add speculative cleanup; the PM owns commits.
 You may edit a `.sdd` inside `pm-meta.touches` when the implementation forces it, never the root
