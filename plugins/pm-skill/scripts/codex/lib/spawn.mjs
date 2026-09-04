@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { RunnerError } from './result.mjs';
 import { CMD_FALLBACK_SUFFIX } from './preflight.mjs';
+import { FALLBACKS } from './args.mjs';
 
 const WIN = process.platform === 'win32';
 
@@ -72,4 +73,29 @@ export function runCodex(found, args, { stdinText, cwd, env, timeoutSeconds, std
     child.stdin.on('error', () => {});
     child.stdin.end(stdinText === undefined ? '' : stdinText);
   });
+}
+
+// The API refuses some models for some account types with a 400 on stdout or stderr.
+export const UNSUPPORTED_MODEL = /is not supported when using Codex/;
+
+function unsupportedModelLine(paths) {
+  for (const p of paths) {
+    let text = '';
+    try { text = fs.readFileSync(p, 'utf8'); } catch { continue; }
+    const line = text.split(/\r?\n/).find((l) => UNSUPPORTED_MODEL.test(l));
+    if (line) return line.slice(0, 300);
+  }
+  return null;
+}
+
+// runCodexWithFallback: run once with o.model; when the model was the mode default and the
+// API refused it, run once more on the mode's fallback. argsFor(model) builds the argv.
+export async function runCodexWithFallback(found, argsFor, o, opts) {
+  const run = await runCodex(found, argsFor(o.model), opts);
+  const to = FALLBACKS[o.mode];
+  if (run.exit === 0 || run.timedOut || run.interrupted || o.modelExplicit || !to || to === o.model) return { run, model: o.model, fallback: null };
+  const reason = unsupportedModelLine([opts.stderrPath, opts.stdoutPath]);
+  if (!reason) return { run, model: o.model, fallback: null };
+  const retry = await runCodex(found, argsFor(to), opts);
+  return { run: retry, model: to, fallback: { from: o.model, to, reason } };
 }

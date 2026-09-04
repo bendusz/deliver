@@ -6,7 +6,7 @@ import { RunnerError } from '../lib/result.mjs';
 import { toplevel, isTracked, checkIgnore, gitOut, gitOk } from '../lib/git.mjs';
 import { parseStory } from '../lib/story.mjs';
 import { requireCodex, BUILD_FLAGS } from '../lib/preflight.mjs';
-import { runCodex } from '../lib/spawn.mjs';
+import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch, runtimeTmp, assertRuntimeRootReal } from '../lib/scratch.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../lib/snapshot.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
@@ -141,15 +141,15 @@ export async function runBuild(o) {
 
   const sandboxArgs = WIN ? ['--sandbox', 'danger-full-access'] : ['--sandbox', 'workspace-write'];
   const sandboxConfig = WIN ? [] : ['-c', 'sandbox_workspace_write.network_access=false', '-c', 'sandbox_workspace_write.exclude_slash_tmp=true', '-c', 'sandbox_workspace_write.exclude_tmpdir_env_var=true'];
-  const args = ['exec', ...lockedExecArgs(o), '-C', worktree, ...sandboxArgs, '--color', 'never',
+  const argsFor = (model) => ['exec', ...lockedExecArgs({ ...o, model }), '-C', worktree, ...sandboxArgs, '--color', 'never',
     '-c', 'allow_login_shell=false', ...sandboxConfig,
     '-c', 'shell_environment_policy.inherit="core"', '-c', 'shell_environment_policy.ignore_default_excludes=false', '-c', 'shell_environment_policy.experimental_use_profile=false',
     '-c', `shell_environment_policy.set.TMPDIR=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TMP=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TEMP=${tomlString(rt)}`,
     '--output-schema', SCHEMA, '-o', files.result, '-'];
 
-  let run;
+  let run; let model; let fallback;
   try {
-    run = await runCodex(found, args, { stdinText: prompt, cwd: worktree, env: { ...process.env, TMPDIR: rt, TMP: rt, TEMP: rt }, timeoutSeconds: o.timeoutSeconds, stdoutPath: files.stdout, stderrPath: files.stderr });
+    ({ run, model, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText: prompt, cwd: worktree, env: { ...process.env, TMPDIR: rt, TMP: rt, TEMP: rt }, timeoutSeconds: o.timeoutSeconds, stdoutPath: files.stdout, stderrPath: files.stderr }));
   } catch (e) { cleanupRuntime(); throw new RunnerError('failed', `could not start codex: ${e.message}`, { scratch_dir: scratch, codex_version: version }); }
   cleanupRuntime();
 
@@ -191,7 +191,7 @@ export async function runBuild(o) {
   }
   if (JSON.stringify([...new Set(claimed)].sort()) !== JSON.stringify(actual)) throw safety('Codex files_changed does not match the authoritative before/after worktree delta');
 
-  const envelope = { runner_status: 'completed', codex_version: version, model: o.model, effort: o.effort, worktree, story: storyRel, mode: o.mode, timeout_seconds: o.timeoutSeconds, sandbox: WIN ? 'none (win32)' : 'workspace-write', diagnostics_retained: false, actual_files_changed: actual, ignored_files_changed: ignoredChanged, git_status_short: gitStatus, result };
+  const envelope = { runner_status: 'completed', codex_version: version, model, effort: o.effort, worktree, story: storyRel, mode: o.mode, timeout_seconds: o.timeoutSeconds, sandbox: WIN ? 'none (win32)' : 'workspace-write', diagnostics_retained: false, actual_files_changed: actual, ignored_files_changed: ignoredChanged, git_status_short: gitStatus, ...(fallback ? { model_fallback: fallback } : {}), result };
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
   return { exit: 0, envelope };
 }

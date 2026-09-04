@@ -4,13 +4,16 @@ export class UsageError extends Error {}
 const MODES = new Set(['build', 'fix', 'review', 'advise', 'research']);
 const EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 const SCOPES = new Set(['recent', 'worktree', 'codebase']);
+const DEFAULT_MODEL = 'gpt-6-astra';
 const DEFAULTS = {
-  build: { model: 'gpt-5.6-sol', effort: 'high' },
-  fix: { model: 'gpt-5.6-sol', effort: 'high' },
-  review: { model: 'gpt-5.6-terra', effort: 'high' },
-  research: { model: 'gpt-5.6-terra', effort: 'high' },
-  advise: { model: 'gpt-5.6-sol', effort: 'medium' },
+  build: { model: DEFAULT_MODEL, effort: 'high' },
+  fix: { model: DEFAULT_MODEL, effort: 'high' },
+  review: { model: DEFAULT_MODEL, effort: 'high' },
+  research: { model: DEFAULT_MODEL, effort: 'high' },
+  advise: { model: DEFAULT_MODEL, effort: 'medium' },
 };
+// When the default model is refused for this account, the runner retries once on these.
+export const FALLBACKS = { build: 'gpt-5.6-sol', fix: 'gpt-5.6-sol', advise: 'gpt-5.6-sol', review: 'gpt-5.6-terra', research: 'gpt-5.6-terra' };
 const VALUE_FLAGS = new Set(['--mode', '--worktree', '--story', '--evidence', '--model', '--effort', '--timeout-seconds', '--scope', '--objective', '--out', '--prompt-file', '--search']);
 
 export const USAGE = 'usage: run.mjs --mode build|fix|review|advise|research [--preflight] [--model <id>] [--effort <level>] [--timeout-seconds <n>] ' +
@@ -43,6 +46,7 @@ export function parseArgs(argv) {
     }
   }
   if (!MODES.has(o.mode)) throw new UsageError('mode must be build, fix, review, advise, or research');
+  o.modelExplicit = Boolean(o.model);
   if (!o.model) o.model = DEFAULTS[o.mode].model;
   if (!o.effort) o.effort = DEFAULTS[o.mode].effort;
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(o.model)) throw new UsageError('unsafe model id');

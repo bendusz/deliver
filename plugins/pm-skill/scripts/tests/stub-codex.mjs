@@ -31,7 +31,7 @@ if (argv[0] !== 'exec') { err('unexpected stub command\n'); process.exit(2); }
 const rest = argv.slice(1);
 const isReview = rest[0] === 'review';
 fs.writeFileSync(env.STUB_ARGS, '');
-let out = ''; let worktree = process.cwd(); let positional = [];
+let out = ''; let worktree = process.cwd(); let positional = []; let model = '';
 for (let i = 0; i < rest.length; i++) {
   const a = rest[i];
   append(env.STUB_ARGS, `${a}\n`);
@@ -39,6 +39,7 @@ for (let i = 0; i < rest.length; i++) {
     const v = rest[++i]; append(env.STUB_ARGS, `${v}\n`);
     if (a === '-o' || a === '--output-last-message') out = v;
     if (a === '-C' || a === '--cd') worktree = v;
+    if (a === '-m' || a === '--model') model = v;
   } else if (a === '-') {
     fs.writeFileSync(env.STUB_PROMPT, fs.readFileSync(0, 'utf8'));
   } else if (!a.startsWith('--') && a !== 'review') {
@@ -46,6 +47,11 @@ for (let i = 0; i < rest.length; i++) {
   }
 }
 if (positional.length) fs.writeFileSync(env.STUB_PROMPT, positional.join('\n'));
+
+if (env.STUB_UNSUPPORTED_MODEL && model === env.STUB_UNSUPPORTED_MODEL) {
+  err(`ERROR: {"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The '${model}' model is not supported when using Codex with a ChatGPT account."}}\n`);
+  process.exit(1);
+}
 
 if (isReview) {
   if (env.STUB_EXEC_EXIT && env.STUB_EXEC_EXIT !== '0') { err('stub review failure\n'); process.exit(Number(env.STUB_EXEC_EXIT)); }

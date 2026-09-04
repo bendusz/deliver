@@ -4,7 +4,7 @@ import { realpath } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel, gitOut, gitOk, checkIgnore } from '../lib/git.mjs';
 import { requireCodex, READONLY_FLAGS, REVIEW_FLAGS } from '../lib/preflight.mjs';
-import { runCodex } from '../lib/spawn.mjs';
+import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
 
@@ -74,20 +74,19 @@ export async function runReview(o) {
   const stdoutPath = path.join(scratch, 'stdout.log');
   // `codex exec review` rejects --sandbox, -C, and --color, so the tail carries only the
   // shared locked flags plus the report path. Review is read-only on every platform.
-  const tail = [...lockedExecArgs(o), '-o', report];
   const clause = objectiveClause(o.objective);
-  let args; let stdinText;
-  if (o.scope === 'codebase') {
-    args = ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', ...tail, '-'];
-    stdinText = `${CODEBASE_PROMPT}${clause}\n`;
-  } else if (o.objective) {
-    const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).' : 'Review the uncommitted changes: staged, unstaged, and untracked.';
-    args = ['exec', 'review', ...tail, `${scopeText}${clause}`];
-  } else {
-    args = ['exec', 'review', ...(o.scope === 'recent' ? ['--commit', 'HEAD'] : ['--uncommitted']), ...tail];
-  }
+  const argsFor = (model) => {
+    const tail = [...lockedExecArgs({ ...o, model }), '-o', report];
+    if (o.scope === 'codebase') return ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', ...tail, '-'];
+    if (o.objective) {
+      const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).' : 'Review the uncommitted changes: staged, unstaged, and untracked.';
+      return ['exec', 'review', ...tail, `${scopeText}${clause}`];
+    }
+    return ['exec', 'review', ...(o.scope === 'recent' ? ['--commit', 'HEAD'] : ['--uncommitted']), ...tail];
+  };
+  const stdinText = o.scope === 'codebase' ? `${CODEBASE_PROMPT}${clause}\n` : undefined;
 
-  const run = await runCodex(found, args, { stdinText, cwd: base, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
+  const { run, model, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText, cwd: base, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
   const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit };
   if (run.timedOut) throw new RunnerError('timed-out', `codex review exceeded the ${o.timeoutSeconds}s timeout`, { ...extra, stderr_path: stderrPath });
   if (run.interrupted) throw new RunnerError('interrupted', `codex review was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, { ...extra, stderr_path: stderrPath });
@@ -111,5 +110,5 @@ export async function runReview(o) {
   if (!copied) throw new RunnerError('failed', 'could not place the review report without overwriting an existing one', { ...extra, stderr_path: stderrPath });
   const gitignoreRuleNeeded = root && !checkIgnore(root, `${outName}/probe`) ? `/${outName}/` : null;
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
-  return { exit: 0, envelope: { runner_status: 'completed', mode: 'review', scope: o.scope, objective: o.objective, report_path: reportPath, codex_version: version, model: o.model, effort: o.effort, codex_exit: String(run.exit), gitignore_rule_needed: gitignoreRuleNeeded } };
+  return { exit: 0, envelope: { runner_status: 'completed', mode: 'review', scope: o.scope, objective: o.objective, report_path: reportPath, codex_version: version, model, effort: o.effort, codex_exit: String(run.exit), gitignore_rule_needed: gitignoreRuleNeeded, ...(fallback ? { model_fallback: fallback } : {}) } };
 }
