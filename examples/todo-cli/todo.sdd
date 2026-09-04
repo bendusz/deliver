@@ -1,0 +1,33 @@
+Spec: todo
+Purpose:
+  The CLI entry point and JSON-file store for todos: parses subcommands and reads or writes
+  `todos.json`.
+Owns:
+  - todo.py
+  - test_todo.py
+Exposes:
+  - `todo add "<text>"`
+  - `todo list`
+  - `load_store()`
+  - `save_store()`
+Accepts:
+  - `add`: the todo text to append.
+  - `load_store()`: no arguments; reads `todos.json` from the current directory.
+  - `save_store()`: the store data to write.
+Returns:
+  - `load_store()` returns `{"todos": []}` when `todos.json` is absent, otherwise the stored data.
+  - `list` prints each todo on its own line, 1-indexed, for example `1. buy milk`.
+  - No subcommand prints usage and exits 0.
+Must:
+  - Shape the store `{"todos": ["text", ...]}` in `todos.json` in the current directory.
+  - Use write-then-rename in `save_store()` so an interrupted write cannot corrupt the store.
+  - Print todos in insertion order, 1-indexed.
+Must not:
+  - Add editing, deletion, due dates, priorities, or sync.
+Depends on:
+  - todo-cli.sdd
+Done when:
+  - `python todo.py` runs and reads or creates an empty store. (FR-001)
+  - `python todo.py` with no subcommand exits 0 and prints usage. (AC-001)
+  - `todo add "<text>"` appends a todo and `todo list` prints them in insertion order. (FR-002)
+  - `todo list` prints `1. buy milk` for a store with one item. (AC-002)

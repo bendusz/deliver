@@ -12,6 +12,7 @@ demonstrate the pm-skill workflow end to end.
 - Scale: standard
 - Checkpoint policy: sprint-level
 - Instruction rules: none
+- Skeleton: specdd
 
 ## Goals
 - Add a todo from the command line.

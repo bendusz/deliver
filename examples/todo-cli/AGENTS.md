@@ -15,6 +15,7 @@ A minimal CLI to add and list todos, persisted to `todos.json`. Python 3.10+, st
 
 ## Conventions
 - Standard library only. Write-then-rename for any file write.
+- Before working here, read .specdd/bootstrap.md and treat .sdd files as source-adjacent contracts.
 
 ## Gotchas
 - Do not commit `todos.json` or `tmp/`.

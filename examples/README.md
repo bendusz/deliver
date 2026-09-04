@@ -17,6 +17,8 @@ project:
   terse, agent-to-agent, pointers over prose.
 - `todo-cli/docs/wiki/`, the project wiki the `librarian` maintains: an index, the schema, and
   three pages.
+- `todo-cli/todo-cli.sdd`, `todo-cli/todo.sdd`, and `todo-cli/.specdd/bootstrap.md`, the SpecDD
+  skeleton `spec-architect` writes: the root spec, the one module spec, and the bootstrap.
 
 In a real run these live in *your* project. `pm/` is git-tracked, the durable resume point committed
 alongside the work, while `tmp/` holds only ephemeral scratch and is gitignored.
