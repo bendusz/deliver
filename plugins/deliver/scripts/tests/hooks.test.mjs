@@ -33,7 +33,7 @@ test('signoff: allows outside-project write', () => {
 test('signoff: kill switch, malformed JSON, and missing file_path all allow', () => {
   const p = newProj(false);
   assert.equal(signoff(writeInput(p, path.join(p, 'src', 'app.py')), { DELIVER_NO_ENFORCE: '1' }), 0);
-  assert.equal(signoff(writeInput(p, path.join(p, 'src', 'app.py')), { PM_SKILL_NO_ENFORCE: '1' }), 0);
+  assert.equal(signoff(writeInput(p, path.join(p, 'src', 'app.py')), { PM_SKILL_NO_ENFORCE: '1' }), 2);
   assert.equal(signoff('not json {'), 0);
   assert.equal(signoff({ cwd: p, tool_input: { command: 'ls' } }), 0);
 });
@@ -85,11 +85,10 @@ test('secrets: prose in pm/ is allowed, shaped values are blocked', () => {
   assert.match(runHook('pm-secrets-guard.mjs', writeInput(g, log, 'API_KEY=abcdefghijklmno')).stderr, /^deliver blocked pm\/log\.md: tracked pm\/ files cannot hold secret-shaped values/);
 });
 
-test('secrets: both kill-switch names allow', () => {
+test('secrets: kill switch allows', () => {
   const g = newProj(false);
   const log = path.join(g, 'pm', 'log.md');
   assert.equal(secrets(writeInput(g, log, 'API_KEY=abcdefghijklmno'), { DELIVER_NO_ENFORCE: '1' }), 0);
-  assert.equal(secrets(writeInput(g, log, 'API_KEY=abcdefghijklmno'), { PM_SKILL_NO_ENFORCE: '1' }), 0);
 });
 
 test('secrets: ignores writes outside pm/, guards traversal and symlinks into pm/', (t) => {
@@ -155,7 +154,6 @@ test('actor: kill switch and no derivable identity allow', () => {
   const a = newProj(false);
   const other = path.join(a, 'pm', 'actors', 'jordan-example-com-000000000000.json');
   assert.equal(actor(writeInput(a, other), { DELIVER_NO_ENFORCE: '1' }), 0);
-  assert.equal(actor(writeInput(a, other), { PM_SKILL_NO_ENFORCE: '1' }), 0);
   const b = newProj(false);
   gitIn(b, ['config', '--unset', 'user.email']);
   gitIn(b, ['config', '--unset', 'user.name']);
@@ -207,7 +205,6 @@ test('session: silent outside PM projects and with the kill switch', () => {
   assert.equal(session({ cwd: n, source: 'startup' }), '');
   const s = newProj(false);
   assert.equal(session({ cwd: s, source: 'startup' }, { DELIVER_NO_ENFORCE: '1' }), '');
-  assert.equal(session({ cwd: s, source: 'startup' }, { PM_SKILL_NO_ENFORCE: '1' }), '');
 });
 
 test('session: handoff freshness, teammates, no actor file, legacy layouts', () => {
