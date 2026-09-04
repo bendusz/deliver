@@ -159,18 +159,18 @@ Review alone can return `nothing-to-review`, exiting 0 with `mode`, `scope`, `re
 inside its `scratch_dir`). Beyond a fallback's `model`, `effort`, and `model_fallback` it carries no
 mode context: no `worktree`, `story`, `mode`, `sandbox`, or output path.
 
-**Completed envelopes, per mode.**
+**Completed envelopes, per mode.** Only fields the wrapper agents relay; nothing echoes the run's
+inputs back.
 
-- **Build and fix.** `codex_version`, `model`, `effort`, `worktree`, `story`, `mode`,
-  `timeout_seconds`, `sandbox` (`workspace-write` or `none (win32)`), `diagnostics_retained: false`,
-  `actual_files_changed`, `ignored_files_changed`, `git_status_short`, and the builder's `result`
-  object: `status`, `summary` (one to five lines), `files_changed`, `tests`, and `root_cause`, where
-  a blocked run explains itself.
-- **Review.** `mode`, `scope`, `objective`, `report_path`, `model`, `effort`, `codex_version`,
-  `codex_exit`, and `gitignore_rule_needed` (a root-anchored `/<dir>/` string, or `null` when the
-  output directory is already ignored).
-- **Advice and research.** `mode`, `answer_path`, `stderr_path`, `scratch_dir`, `codex_version`,
-  `model`, `effort`, `codex_exit`, `search_used`.
+- **Build and fix.** `runner_status`, `codex_version`, `model`, `effort`, `model_fallback` (when the
+  fallback ran), `actual_files_changed`, `ignored_files_changed`, and the builder's `result` object:
+  `status`, `summary` (one to five lines), `files_changed`, `tests`, and `root_cause`, where a
+  blocked run explains itself.
+- **Review.** `runner_status`, `report_path`, `codex_version`, `model`, `effort`,
+  `gitignore_rule_needed` (a root-anchored `/<dir>/` string, or `null` when the output directory is
+  already ignored), `model_fallback` (when it ran).
+- **Advice and research.** `runner_status`, `answer_path`, `scratch_dir`, `codex_version`, `model`,
+  `effort`, `search_used`, `model_fallback` (when it ran).
 
 **Preflight envelopes** carry `runner_status: ready`, `preflight: true`, `codex_version`, and
 `quota_consumed: false`, never a Codex run's fields. Build adds `worktree`, `story`,
@@ -185,11 +185,11 @@ mode context: no `worktree`, `story`, `mode`, `sandbox`, or output path.
   modes **65**; install `codex.exe` or the npm package.
 - **Process tree kill**: `taskkill /T /F /PID <pid>`; POSIX signals the detached process group.
 - **`build`/`fix` sandbox**: the Windows sandbox stays off, because `codex exec` under it refuses
-  most shell commands. Build and fix pass `--sandbox danger-full-access` and record
-  `sandbox: "none (win32)"`. Every other guard holds, but the run has full host access and network
-  and the runner audits only the worktree, so writes elsewhere and network use are **not detectable
-  at all**. POSIX prevents an out-of-scope write; Windows only detects it afterwards. `review`,
-  `advise`, and `research` stay `--sandbox read-only` on every platform.
+  most shell commands. Build and fix pass `--sandbox danger-full-access`. Every other guard holds,
+  but the run has full host access and network and the runner audits only the worktree, so writes
+  elsewhere and network use are **not detectable at all**. POSIX prevents an out-of-scope write;
+  Windows only detects it afterwards. `review`, `advise`, and `research` stay `--sandbox read-only`
+  on every platform.
 - **Paths, snapshots, temp**: native realpath comparison, git output read tolerant of both
   separators, the executable bit ignored, and `TMPDIR`/`TMP`/`TEMP` pointed at the worktree-local
   `tmp/codex-runtime/<run>`, removed on exit. Cleanup is best effort: an antivirus lock

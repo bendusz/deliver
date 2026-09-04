@@ -35,5 +35,5 @@ export async function runAdvise(o) {
   if (run.interrupted) throw new RunnerError('interrupted', `codex exec was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, extra);
   if (run.exit !== 0) throw new RunnerError('failed', 'codex exec exited non-zero; inspect stderr.log', extra);
   if (!fs.existsSync(answer) || fs.statSync(answer).size === 0) throw new RunnerError('failed', 'codex exec returned no answer', extra);
-  return { exit: 0, envelope: { runner_status: 'completed', mode: o.mode, answer_path: answer, stderr_path: stderrPath, scratch_dir: scratch, codex_version: version, model, effort, codex_exit: String(run.exit), search_used: useSearch, ...(fallback ? { model_fallback: fallback } : {}) } };
+  return { exit: 0, envelope: { runner_status: 'completed', answer_path: answer, scratch_dir: scratch, codex_version: version, model, effort, search_used: useSearch, ...(fallback ? { model_fallback: fallback } : {}) } };
 }

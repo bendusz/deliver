@@ -110,5 +110,5 @@ export async function runReview(o) {
   if (!copied) throw new RunnerError('failed', 'could not place the review report without overwriting an existing one', { ...extra, stderr_path: stderrPath });
   const gitignoreRuleNeeded = root && !checkIgnore(root, `${outName}/probe`) ? `/${outName}/` : null;
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
-  return { exit: 0, envelope: { runner_status: 'completed', mode: 'review', scope: o.scope, objective: o.objective, report_path: reportPath, codex_version: version, model, effort, codex_exit: String(run.exit), gitignore_rule_needed: gitignoreRuleNeeded, ...(fallback ? { model_fallback: fallback } : {}) } };
+  return { exit: 0, envelope: { runner_status: 'completed', report_path: reportPath, codex_version: version, model, effort, gitignore_rule_needed: gitignoreRuleNeeded, ...(fallback ? { model_fallback: fallback } : {}) } };
 }
