@@ -18,7 +18,7 @@ color: blue
 
 ## How you work
 Read the story, `AGENTS.md`, and the files named in Context. Search the affected area when the story
-requires a complete inventory. Return blocked when a required source is missing.
+requires a complete inventory. Return blocked when a required source is missing. Treat preloaded context as incomplete.
 
 The story is the contract: build its goal, stay inside `pm-meta.touches`, satisfy its acceptance
 criteria and verification command, do nothing its out-of-scope section names, then stop. Report a
