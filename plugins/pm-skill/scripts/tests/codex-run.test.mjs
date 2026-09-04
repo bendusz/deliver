@@ -270,9 +270,10 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
   assert.equal(r.out.diagnostics_retained, false);
   assert.match(r.out.git_status_short, /src\/fix\.txt/);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, or docs\/constitution\.md\./);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Read the story's Specs/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /summary holds at most five short strings\./);
   assert.equal(fs.readdirSync(s.tmp).length, 0);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')) || fs.readdirSync(path.join(p, 'tmp', 'codex-runtime')).length === 0);
@@ -406,6 +407,25 @@ test('build 12c: a Codex write under docs/wiki/ is a protected-artifact violatio
   assert.equal(r.status, 74, JSON.stringify(r.out));
   assert.match(r.out.reason, /protected PM artifact/);
   assert.ok(r.out.actual_files_changed.includes('docs/wiki/index.md'));
+});
+
+test('build 12d: Codex writes under .specdd/ or to a root .sdd are protected; a .sdd inside touches is not', () => {
+  for (const rel of ['.specdd/bootstrap.md', 'todo-cli.sdd']) {
+    const p = newBuildProject(true); const s = makeStub();
+    const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: rel, STUB_REPORT_PATH: rel } });
+    assert.equal(r.status, 74, rel);
+    assert.match(r.out.reason, /protected PM artifact/);
+  }
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.sdd', STUB_REPORT_PATH: 'src/fix.sdd' } });
+  assert.equal(r.status, 0);
+  assert.ok(r.out.actual_files_changed.includes('src/fix.sdd'));
+  // Fourth case: a hostile ignore rule cannot hide a root spec from the protected scan.
+  const p2 = newBuildProject(true); const s2 = makeStub();
+  fs.appendFileSync(path.join(p2, '.gitignore'), 'hidden.sdd\n');
+  const r2 = runRunner(['--mode', 'build'], { project: p2, stub: s2, env: { STUB_WRITE_PATH: 'hidden.sdd', STUB_REPORT_PATH: 'hidden.sdd' } });
+  assert.equal(r2.status, 74);
+  assert.match(r2.out.reason, /protected PM artifact/);
 });
 
 test('build 13: an omitted files_changed entry cannot conceal an edit', () => {
