@@ -40,6 +40,7 @@ STATUS: done | blocked
 REASON: <root cause or N/A>
 CHANGED: <actual_files_changed>
 IGNORED: <ignored_files_changed or none>
+SPECS CHANGED: <the .sdd entries of actual_files_changed, or none>
 ```
 
 On a failure envelope, report its `runner_status`, `reason`, and `scratch_dir` verbatim. Invent no
