@@ -9,8 +9,8 @@ color: cyan
 
 ## Inputs
 - The kind of work being planned, from the PM.
-- The repo. Read configuration, entry points, and a representative sample of the code, not the whole
-  repo.
+- The repo. Read configuration, entry points, and a representative sample of the code.
+- `docs/wiki/index.md`, when the PM names it: read it before broad discovery.
 
 ## Return, a context pack
 Fill every section from files you read, cite the key paths, and say `N/A` where something does not
@@ -18,8 +18,7 @@ exist.
 - Architecture. The main modules and layers, what each owns, and how they talk.
 - Conventions. Naming, error handling, logging, and how similar features are built.
 - Commands. The project's `test`, `lint`, `build`, and `run` commands, copied from config files such
-  as `package.json`, `Makefile`, or `pyproject.toml`, never guessed. A wrong test command poisons
-  every downstream story.
+  as `package.json`, `Makefile`, or `pyproject.toml`. Never guess them.
 - Where things go. Where new code, tests, and config belong for the planned work, and the existing
   patterns to follow.
 - Risks. Fragile areas, missing tests, surprising coupling, anything that would trip an implementer.

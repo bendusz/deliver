@@ -102,7 +102,6 @@ export function pmRelpath(root, target) {
   return rel.split(path.sep).join('/');
 }
 
-// isRecord(x): true for a non-null, non-array object (a JSON "object", not an array).
 export const isRecord = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 
 // readHookInput(): the hook JSON from stdin, or null on empty/invalid input.
@@ -204,7 +203,6 @@ export function pmSecretScan(text) {
   return null;
 }
 
-// CLI mode.
 const invoked = process.argv[1] ? realpath(process.argv[1]) : null;
 if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
   const cmd = process.argv[2];

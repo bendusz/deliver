@@ -7,9 +7,8 @@ const BUILDERS = new Set(['expert-builder', 'codex-builder', 'auto']);
 const hasControl = (s) => [...s].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
 const blocked = (reason) => new RunnerError('blocked', reason);
 
-// parseStory(root, storyRel): the machine pm-meta scope of a story. pm-meta is authoritative.
-// Stories written before 0.17 also carry visible Builder and Touches fields; when present they
-// must still agree, so a stale header cannot mislead a reader.
+// pm-meta is authoritative. Stories written before 0.17 also carry visible Builder and Touches
+// fields; when present they must still agree, so a stale header cannot mislead a reader.
 export function parseStory(root, storyRel) {
   const head = fs.readFileSync(path.join(root, storyRel), 'utf8').split(/\r?\n/).slice(0, 12);
   const metas = head.map((l) => l.match(/^\s*<!--\s*pm-meta:\s*(.*?)\s*-->\s*$/)).filter(Boolean).map((m) => m[1]).filter((m) => m !== '');
@@ -33,7 +32,10 @@ export function parseStory(root, storyRel) {
     if (scope === '.') throw blocked('story pm-meta touches may not grant the whole worktree');
     scopes.push(scope);
   }
+  // `src` and `src/` are distinct raw strings but one scope, so uniqueness has to be
+  // rechecked after normalisation or a story can smuggle a duplicate past the raw check.
   const machine = [...new Set(scopes)].sort();
+  if (machine.length !== meta.touches.length) throw blocked('story pm-meta must contain only a valid builder and non-empty unique touches array');
 
   const builderLine = head.map((l) => l.match(/^Builder:\s*(.*?)\s*$/)).find(Boolean);
   if (builderLine && builderLine[1] !== meta.builder) throw blocked('story pm-meta builder does not match the visible Builder field');

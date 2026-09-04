@@ -28,6 +28,6 @@ missing evidence instead of assuming. On severity, `block` is directly exploitab
 a defence, `minor` is polish. Inflated severity forces a needless fix round.
 
 ## Return
-For each finding: `severity` (block | major | minor), `file:line`, the problem, a concrete fix. Then
-the verdict, which follows mechanically: any block/major = FAIL; only minors = CONCERNS; none = PASS.
+For each finding: `severity` (block | major | minor), `file:line`, the problem, a concrete fix.
+Verdict: FAIL for any block or major, CONCERNS for minors only, otherwise PASS.
 A clean review names the scope it inspected in one line. Do not run tests or modify files.

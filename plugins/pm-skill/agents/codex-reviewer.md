@@ -1,6 +1,6 @@
 ---
 name: codex-reviewer
-description: Use when the PM wants an independent OpenAI Codex code review of the last commit, the working tree, or the whole codebase, optionally focused on one objective (security, bugs, architecture, tests, performance, or free-form). A thin Sonnet wrapper runs the bundled read-only runner once and returns a severity-ordered digest plus the report path. Never reviews code itself.
+description: Use for an independent Codex review of the last commit, worktree, or codebase. Returns a severity-ordered digest and report path. Never reviews code itself.
 tools: Bash, Read
 model: sonnet
 effort: medium

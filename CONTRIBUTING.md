@@ -16,8 +16,8 @@ so the rules below are about what you may not add.
 ## Before opening a PR
 - Run `bash scripts/validate.sh`, and `claude plugin validate ./plugins/pm-skill` if you have the
   CLI. Node.js 20 or newer is required to run the tests and the validator.
-- Run `node --test plugins/pm-skill/scripts/tests/`. Validate runs the hook and library subset of
-  it, so run the whole suite yourself.
+- `scripts/validate.sh` runs the whole test suite. Run `node --test
+  plugins/pm-skill/scripts/tests/` directly when you want one suite or a focused test.
 - Update `CHANGELOG.md`.
 
 ## How it is built

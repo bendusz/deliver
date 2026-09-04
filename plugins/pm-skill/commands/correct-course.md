@@ -36,7 +36,7 @@ Do this, in order:
    Unaffected stories keep their state.
 5. **Log and commit.** Record the correct-course outcome, what changed, at which level, and whether
    re-sign-off happened, in `pm/log.md`, update `pm/pm-state.json`, and commit the `docs/` and `pm/`
-   changes together.
+   changes together. With a wiki, dispatch `librarian ingest` over the revised artifacts per
+   `references/knowledge.md`.
 
-Run `/pm-skill:analyze` after a spec-level or plan-level change. Coverage and traceability are
-exactly what a mid-flight edit tends to break.
+After a spec or plan change, run `/pm-skill:analyze` to check coverage and traceability.

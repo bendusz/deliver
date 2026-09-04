@@ -14,8 +14,9 @@ external process. The optional allowlist example does need `jq`.
   `.gitattributes`. It fails open on any uncertainty: a missing or unparseable state file, a target
   outside the project tree, or the kill switch `PM_SKILL_NO_ENFORCE=1`. Writes made through `Bash`
   are not covered.
-- **No secrets in `pm/`.** The bundled `PreToolUse` hook `hooks/pm-secrets-guard.mjs` blocks writes
-  into the git-tracked `pm/` directory whose content matches high-confidence secret shapes: AWS,
+- **No secrets in `pm/` or `docs/wiki/`.** The bundled `PreToolUse` hook
+  `hooks/pm-secrets-guard.mjs` blocks writes into the git-tracked `pm/` and `docs/wiki/`
+  directories whose content matches high-confidence secret shapes: AWS,
   GitHub, Slack, and API tokens, PEM private keys, JWTs, and quoted credential assignments. It is a
   tripwire for accidents, not a scanner, so prose about secrets never trips it. Same fail-open design
   and kill switch.

@@ -84,7 +84,7 @@ Fields: `actor`, `current_story`, `current_story_status`, `current_story_verific
 
 ## `pm/log.md` (shared, append-only)
 
-One file, one chronological project narrative. Entry shape:
+One file. Each line records one project event. Entry shape:
 
 ```
 - <YYYY-MM-DD HH:MM> <actor-id>: <2 to 3 sentence summary for a colleague with zero context>
@@ -102,13 +102,12 @@ One file, one chronological project narrative. Entry shape:
 `/pm-skill:handoff` writes it from `${CLAUDE_PLUGIN_ROOT}/templates/HANDOFF.md.template`:
 agent-to-agent, token-efficient, pointers over prose. **Overwrite** it each handoff, since it
 captures one moment in time and history is the log plus git. The command records the write time in
-your actor file's `handoff_written`. On resume, if your `updated` is newer than `handoff_written`,
-the handoff is stale, so trust state and log instead.
+your actor file's `handoff_written`, which `resume-procedure.md` uses to detect a stale handoff.
 
 ## Claim and sync discipline (team of any size)
 
 `implementation-loop.md` owns the per-story claim commit, the pull-or-rebase points, and the release
-in the ship commit. What holds beyond one story:
+in the post-merge PM update commit. What holds beyond one story:
 
 - An assignment without the matching actor position reads as a stale claim. Until the claim commit is
   pushed it is visible only locally, so say so.
@@ -126,13 +125,4 @@ The `pm/` files track *where everyone is*, not *what was decided*.
 
 ## On resume
 
-Pull or rebase first when a remote exists, because teammates' claims and ships become visible only
-after a fetch. Then read the shared `pm/pm-state.json`, followed by **your**
-`pm/actors/<you>.json` and, if it is current, your HANDOFF. The `/pm-skill:resume` command does exactly this, and the bundled `session-context.mjs` hook
-injects a short pointer, yours plus teammate one-liners, into every new or freshly-compacted session.
-Then continue from your recorded `next`, using the persisted `resolved_builder` and counters rather
-than re-deciding from memory. If you are a new actor on an existing project and have no
-`pm/actors/<you>.json` yet, create it from the template and commit it before continuing.
-
-If the state you find uses a pre-0.10.1 actor id, a pre-0.13 actor file, a flat 0.8 layout, or a
-pre-0.8 `tmp/` layout, migrate it first per `migrations.md`.
+`resume-procedure.md` owns the read order, the continuation point, and the migration trigger.

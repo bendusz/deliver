@@ -2,10 +2,10 @@
 // pm-skill SessionStart hook: inject a tiny resume pointer when the project is PM-managed.
 //
 // Fires on startup, resume, /clear, and post-compaction; stdout becomes context for the
-// new session. Prints a `pm: phase=...` line, YOUR actor position (identity from git
-// config), and active teammates (those with a current_story) as read-only one-liners.
-// Completely SILENT (exit 0, no output) in any project that is not PM-managed. Fail-open
-// throughout.
+// new session. Prints a `pm: phase=...` line, a `wiki: ...` line when docs/wiki/index.md
+// exists, YOUR actor position (identity from git config), and active teammates (those
+// with a current_story) as read-only one-liners. Completely SILENT (exit 0, no output)
+// in any project that is not PM-managed. Fail-open throughout.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -42,6 +42,13 @@ if (!isRecord(st)) {
 
 say(`pm: phase=${v(st.phase, '?')} sprint=${v(st.current_sprint, '-')}/${v(st.total_sprints, '-')} signed_off=${st.signed_off === undefined || st.signed_off === null ? '?' : String(st.signed_off)}`);
 
+// One line for the project wiki when it exists: the index is one entry per line.
+const wikiIndex = path.join(cwd, 'docs', 'wiki', 'index.md');
+try {
+  const entries = fs.readFileSync(wikiIndex, 'utf8').split(/\r?\n/).filter((l) => l.startsWith('- ')).length;
+  say(`wiki: docs/wiki/index.md (${entries} entries)`);
+} catch { /* absent or unreadable: no line */ }
+
 const actorsDir = path.join(cwd, 'pm', 'actors');
 if (!isDir(actorsDir)) {
   say(`you: story=${v(st.current_story, '-')} status=${v(st.current_story_status, '-')} builder=${v(st.resolved_builder, '-')} next=${v(st.next, '?')}`);
@@ -59,8 +66,8 @@ if (isRecord(my)) {
   const hw = typeof my.handoff_written === 'string' ? my.handoff_written : '';
   const up = typeof my.updated === 'string' ? my.updated : '';
   if (fs.existsSync(path.join(actorsDir, `${me}.HANDOFF.md`)) && hw) {
-    if (up && up > hw) say(`Your pm/actors/${me}.HANDOFF.md is STALE (state moved on): trust the state files + log.`);
-    else say(`A current pm/actors/${me}.HANDOFF.md briefing exists: read it first; it replaces re-discovery.`);
+    if (up && up > hw) say(`Your pm/actors/${me}.HANDOFF.md is STALE because state moved on. Trust the state files and log.`);
+    else say(`A current pm/actors/${me}.HANDOFF.md briefing exists. Read it first because it replaces re-discovery.`);
   }
 } else {
   say(`No actor file for you (${me}) yet; /pm-skill:resume creates pm/actors/${me}.json.`);

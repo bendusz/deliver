@@ -40,7 +40,6 @@ export function emit(obj) {
   fs.writeSync(1, `${JSON.stringify(obj)}\n`);
 }
 
-// fail(err): print an envelope and exit with the matching code. Never returns.
 export function fail(err) {
   if (err instanceof RunnerError) {
     emit(envelope(err.status, err.message, err.extra));

@@ -53,9 +53,9 @@ Exactly one of these, per clap's `conflicts_with_all` and verified live. Combini
 | `PROMPT` (or `-`) | custom-instructions review; the prompt IS the scope |
 | *(none)* | error: `Specify --uncommitted, --base, --commit, or provide custom review instructions` |
 
-Consequence for objective-focused reviews: you cannot attach "focus on security" to
-`--uncommitted`. Use prompt-as-scope instead: "Review the uncommitted changes, staged, unstaged, and
-untracked. Focus exclusively on ...". Native scope flags are still preferred whenever no custom
+An objective-focused review cannot combine a prompt with `--uncommitted`. Put the scope and
+objective in one prompt instead: "Review the uncommitted changes, staged, unstaged, and untracked.
+Focus exclusively on ...". Native scope flags are still preferred whenever no custom
 objective is needed, because diff selection stays deterministic and prompt-as-scope is a capability
 fallback. Whole-codebase review is not native at all: use `codex exec --sandbox read-only` with an
 audit prompt.

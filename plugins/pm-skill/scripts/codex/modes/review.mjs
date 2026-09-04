@@ -38,7 +38,8 @@ function objectiveClause(objective) {
 
 export async function runReview(o) {
   const cwd = process.cwd();
-  const root = toplevel(cwd) ? realpath(toplevel(cwd)) : null;
+  const top = toplevel(cwd);
+  const root = top ? realpath(top) : null;
   if (o.scope !== 'codebase' && !root) throw new RunnerError('rejected', `${o.scope} scope requires a git repository`);
   const base = root || realpath(cwd);
 
@@ -91,9 +92,7 @@ export async function runReview(o) {
   if (run.timedOut) throw new RunnerError('timed-out', `codex review exceeded the ${o.timeoutSeconds}s timeout`, { ...extra, stderr_path: stderrPath });
   if (run.interrupted) throw new RunnerError('interrupted', `codex review was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, { ...extra, stderr_path: stderrPath });
   if (run.exit !== 0 || !fs.existsSync(report) || fs.statSync(report).size === 0) {
-    const err = new RunnerError('failed', 'codex review exited non-zero or produced no report; inspect stderr.log', extra);
-    err.extra.stderr_path = stderrPath;
-    throw err;
+    throw new RunnerError('failed', 'codex review exited non-zero or produced no report; inspect stderr.log', { ...extra, stderr_path: stderrPath });
   }
 
   fs.mkdirSync(o.out, { recursive: true });

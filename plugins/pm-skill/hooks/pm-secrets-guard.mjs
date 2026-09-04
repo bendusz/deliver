@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// pm-skill PreToolUse hook: block secret-shaped content from being written into pm/.
+// pm-skill PreToolUse hook: block secret-shaped content from being written into pm/ or docs/wiki/.
 //
-// pm/ is git-tracked, so a leaked credential there enters history. This guard scans
-// Write.content, Edit.new_string, and MultiEdit.edits[].new_string targeting pm/ for
-// high-confidence secret shapes and blocks with exit 2. FAIL-OPEN like the other hooks:
-// kill switch, unparseable input, or a target outside pm/ all allow (exit 0).
+// pm/ and docs/wiki/ are git-tracked, so a leaked credential there enters history. This
+// guard scans Write.content, Edit.new_string, and MultiEdit.edits[].new_string targeting
+// those paths for high-confidence secret shapes and blocks with exit 2. FAIL-OPEN like the
+// other hooks: kill switch, unparseable input, or a target outside those paths all allow (exit 0).
 import fs from 'node:fs';
 
 if (process.env.PM_SKILL_NO_ENFORCE === '1') process.exit(0);
@@ -21,7 +21,8 @@ const { file, root } = target;
 const ti = input.tool_input;
 
 const rel = pmRelpath(root, file);
-if (rel === null || !rel.startsWith('pm/')) process.exit(0);
+const prefix = rel === null ? null : ['pm/', 'docs/wiki/'].find((p) => rel.startsWith(p));
+if (!prefix) process.exit(0);
 
 const parts = [];
 if (typeof ti.content === 'string' && ti.content) parts.push(ti.content);
@@ -34,7 +35,7 @@ if (!text) process.exit(0);
 
 if (pmSecretScan(text)) {
   // Synchronous write: a stream write immediately followed by process.exit() can be truncated.
-  fs.writeSync(2, `pm-skill blocked ${rel}: tracked pm/ files cannot hold secret-shaped values.
+  fs.writeSync(2, `pm-skill blocked ${rel}: tracked ${prefix} files cannot hold secret-shaped values.
 Store the value elsewhere, record only its path, and retry.
 (Set PM_SKILL_NO_ENFORCE=1 to disable this guard.)
 `);

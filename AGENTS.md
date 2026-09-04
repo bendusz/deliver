@@ -4,7 +4,8 @@ A Claude Code plugin marketplace: `plugins/pm-skill` (the Project Manager skill,
 Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 
 ## Commands
-- Test: `node --test plugins/pm-skill/scripts/tests/`
+- Test: `bash scripts/validate.sh` runs the whole suite. `node --test
+  plugins/pm-skill/scripts/tests/` is for focused test work.
 - Lint: `bash scripts/validate.sh` (needs bash, jq, node 20+, git; shellcheck in CI)
 - Build: `N/A`
 - Run: `N/A` (install the marketplace into Claude Code to try it)
@@ -12,7 +13,8 @@ Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 ## Layout
 - `plugins/pm-skill/skills/project-manager/`: `SKILL.md` plus one reference per phase.
 - `plugins/pm-skill/agents/`, `commands/`, `templates/`, `schemas/`: the orchestrated fleet and its artifacts.
-- `plugins/pm-skill/hooks/`: fail-open guardrails. `scripts/codex/`: the Codex runner. `scripts/tests/`: node:test suites.
+- `plugins/pm-skill/hooks/`: fail-open guardrails. `plugins/pm-skill/scripts/codex/`: the Codex
+  runner. `plugins/pm-skill/scripts/tests/`: node:test suites.
 - `docs/specs/`, `docs/plans/`: this repo's own design history, named `YYYY-MM-DD-vX.Y-topic.md`.
 
 ## Conventions

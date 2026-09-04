@@ -20,11 +20,12 @@ jobs:
       - name: Shellcheck maintainer scripts
         run: shellcheck scripts/*.sh
 
+  # validate.sh already runs the whole suite on Linux; this matrix covers the other two.
   node-tests:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

@@ -66,5 +66,5 @@ dispatch the builder on an unready story.
 `${CLAUDE_PLUGIN_ROOT}/templates/checklist-story-readiness.md.template` is the full checklist.
 
 ## Hand to the user
-Show the sprint and story map so the user can see the shape. This is visible but not a hard gate,
-since sign-off already covered the plan. Log it, then load `implementation-loop.md`.
+Show the sprint-to-story map, log it, then load `implementation-loop.md`. This is not a second
+sign-off gate.

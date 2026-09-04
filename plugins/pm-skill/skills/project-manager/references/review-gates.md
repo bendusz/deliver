@@ -43,12 +43,11 @@ they override you.
 accepted findings or the failing command, the relevant output, the implicated paths, the exclusions,
 and the story's verification command. `implementation-loop.md` names its path and dispatches it.
 
-Filtering rules. A finding two lenses raised independently is high signal. A hypothetical, "what if
-this is null", counts only if the call path can actually produce it, so trace it. "I would have done
+Filtering rules. Verify every finding against the code, even when two lenses report it. A
+hypothetical, "what if this is null", counts only if the call path can produce it, so trace it. "I would have done
 it differently" is not a finding. A reviewer flagging code the story did not touch, or a pattern
 consistent with the rest of the codebase, is missing context. Be slower to dismiss security and
-correctness findings than style ones. The buckets and rules are adapted from the `interrogate` skill
-in pstack.
+correctness findings than style ones.
 
 Optional lens: for a small diff into shared code, a blast-radius skill such as `poteto:blast-radius`
 finds what the change breaks beyond the diff and proves, by running code, the one fact it is safe

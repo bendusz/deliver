@@ -11,8 +11,8 @@ logs or state. Offer remediation as suggestions only.
 
 ## Inputs (whichever exist)
 
-`docs/constitution.md`, `docs/spec.md`, `docs/plan.md`, `docs/stories/*.md`, `pm/pm-state.json`,
-`pm/actors/*.json`, `pm/log.md`. Note in the report any that are absent.
+`docs/constitution.md`, `docs/spec.md`, `docs/plan.md`, `docs/stories/*.md`, `docs/wiki/**`,
+`pm/pm-state.json`, `pm/actors/*.json`, `pm/log.md`. Note in the report any that are absent.
 
 ## What to detect
 
@@ -38,32 +38,20 @@ logs or state. Offer remediation as suggestions only.
 - **Terminology drift.** The same concept named differently across spec, plan, and stories.
 - **State sanity.** Stale or contradictory `pm/pm-state.json` and `pm/log.md` against the `docs/`
   artifacts; `pm/` state files matched by `.gitignore` or left uncommitted while `docs/` moved on.
-- **Team checks.** A *claim conflict*: an actor file whose `current_story` names a story that
-  `assignments` maps to a different actor, or two actor files sharing one non-null `current_story`
-  (idle and new actors all carry `current_story: null`, so never flag those). `assignments` is a
-  story-to-actor map and can only ever show one claimant, so the race surfaces in the actor files;
-  compare them against the map. Also a *stale or half-made claim*: an assignment whose actor's own
-  file is not on that story (`current_story` null or different). Also an assignment pointing at a
-  nonexistent story or actor file; in-flight stories of different actors whose `pm-meta.touches`
-  overlap (serialize or re-scope them); an in-flight sequential story without `resolved_builder`, or
-  an active parallel entry without `builder`.
+- **Claim conflicts.** Report two actors on one story, or an actor whose story differs from
+  `assignments`. A null `current_story` means idle, never a conflict.
+- **Stale claims.** Report assignments without a matching actor position, story, or actor file.
+- **Active work.** Report overlapping `pm-meta.touches` between in-flight stories of different
+  actors, an in-flight sequential story without `resolved_builder`, and an active parallel entry
+  without `builder`.
+- **Wiki (only when `docs/wiki/` exists).** An index entry that does not resolve; a page the index
+  does not list, or that no other page links to; a plan decision or risk with no decision page; two
+  `current` decision pages on one subject (HIGH); a story whose Context cites a concept page marked
+  `superseded`. All MEDIUM unless stated.
 
 ## State health (doctor)
 
-`/pm-skill:doctor` runs these against `pm/` when it exists, reporting `OK` or `DRIFT` per check.
-
-- `pm/pm-state.json` parses as JSON.
-- `git check-ignore pm/pm-state.json pm/log.md pm/actors/<you>.json` fails, `tmp/` **is** ignored,
-  `pm/` has no uncommitted changes older than the last work commit, and `.gitattributes` carries
-  `pm/log.md merge=union`.
-- Team health: the claim-conflict and stale-claim checks above; every `pm/actors/*.json` parses and
-  matches a recent git author (flag orphans from a changed git identity); every in-flight sequential
-  story has a valid `resolved_builder` and every active parallel entry a valid `builder`; your own
-  actor id is derivable, meaning git `user.email` or `user.name` is set.
-- `docs/plan.md`'s Sign-off line agrees with `signed_off` in `pm/pm-state.json`. The v0.9 log is
-  append-only and has no Current State block to cross-check.
-- `handoff_written` against `updated` in `pm/actors/<you>.json`: flag a stale
-  `pm/actors/<you>.HANDOFF.md` (updated is newer) so resume does not trust an outdated briefing.
+`state-health.md` owns the `OK` or `DRIFT` checks `/pm-skill:doctor` runs against `pm/`.
 
 ## Severities
 

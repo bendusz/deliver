@@ -81,8 +81,9 @@ and an optional Codex-CLI-backed precision builder (`codex-builder`), a risk-sel
 review panel (`code-integrity-reviewer`, `architecture-reviewer`, `security-auditor`), a
 `test-engineer` that writes tests only, a read-only `debugger` that returns a root cause and a fix
 plan, a read-only final `pm-verifier` returning an independent PASS, FAIL, or UNKNOWN before ship, a
-`technical-writer` for docs only, a `codebase-analyst` for brownfield work, a web-capable
-`researcher`, and three Codex-CLI-backed second-opinion roles: `codex-researcher` for independent
+`technical-writer` for docs only, a `codebase-analyst` for brownfield work, a `librarian` that alone
+maintains the project wiki, a web-capable `researcher`, and three Codex-CLI-backed second-opinion
+roles: `codex-researcher` for independent
 research, `codex-reviewer` for independent code review, and `codex-advisor` for an independent
 recommendation. `researcher` and `codex-researcher` write sourced reports under `docs/research/`,
 `codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`, and `codex-advisor`
@@ -141,6 +142,8 @@ Committed under `docs/`, which is authoritative:
 - `docs/verification/*.md`, per-story verification reports. Optional, and recommended for
   non-trivial work.
 - `docs/completion-report.md`, the end-of-project summary `technical-writer` produces. Optional.
+- `docs/wiki/`, the project wiki: an index, a schema, and decision, concept, and source pages the
+  `librarian` maintains. On at `standard` scale and above.
 
 Committed under `pm/`, the tracked session state and the project's resume point. Solo is a team of
 one.
@@ -180,7 +183,8 @@ under `tmp/`; the report directories sit at the repository root:
   project inputs. Command-line overrides win for every safety-sensitive setting above. This is an OS
   sandbox, not a VM boundary.
 - **No secrets in tracked state.** A bundled hook blocks secret-shaped content, meaning key tokens,
-  PEM blocks, and credential assignments, from being written into the git-tracked `pm/` directory.
+  PEM blocks, and credential assignments, from being written into the git-tracked `pm/` and
+  `docs/wiki/` directories.
 - **Actor isolation.** A bundled hook blocks writes to another person's `pm/actors/` state files.
 - **The companion plugin is inert.** The optional `poteto` plugin ships skills only, with no hooks,
   agents, or commands, so it cannot change any guardrail above.
