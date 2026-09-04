@@ -22,7 +22,7 @@ const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stori
 const allowed = (rel, scopes) => scopes.some((s) => rel === s || rel.startsWith(`${s}/`));
 const tomlString = (s) => JSON.stringify(s);
 
-export function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
+function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
   const lines = [
     'You are the implementation worker for one build-ready PM story.',
     `Worktree root: ${worktree}`,
@@ -46,7 +46,7 @@ export function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
   return `${lines.join('\n')}\n`;
 }
 
-export function validateBuilderResult(r) {
+function validateBuilderResult(r) {
   const noCtl = (s) => typeof s === 'string' && !/[\x00-\x1f\x7f]/.test(s);
   if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
   if (JSON.stringify(Object.keys(r).sort()) !== '["files_changed","root_cause","status","summary","tests"]') return false;

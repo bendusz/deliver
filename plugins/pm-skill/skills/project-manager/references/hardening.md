@@ -7,28 +7,25 @@ enforcement. It is opt-in and lives in the project's own config, not in the plug
 external process. The optional allowlist example does need `jq`.
 
 ## What is already enforced
-- **Sign-off.** The bundled `PreToolUse` hook `hooks/require-signoff.mjs` matches `Write`, `Edit`,
-  and `MultiEdit` only. It blocks a write when `pm/pm-state.json`, or the legacy
-  `tmp/pm-state.json`, has `signed_off: false`. It exempts everything under `docs/`, `pm/`, `tmp/`,
-  `.git/`, `.claude/rules/`, and `.specdd/`, every `.sdd` file anywhere in the tree, and the root
-  files `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and `.gitattributes`. It fails open on any
-  uncertainty: a missing or unparseable state file, a target
-  outside the project tree, or the kill switch `PM_SKILL_NO_ENFORCE=1`. Writes made through `Bash`
-  are not covered.
-- **No secrets in `pm/` or `docs/wiki/`.** The bundled `PreToolUse` hook
-  `hooks/pm-secrets-guard.mjs` blocks writes into the git-tracked `pm/` and `docs/wiki/`
-  directories whose content matches high-confidence secret shapes: AWS,
-  GitHub, Slack, and API tokens, PEM private keys, JWTs, and quoted credential assignments. It is a
-  tripwire for accidents, not a scanner, so prose about secrets never trips it. Same fail-open design
-  and kill switch.
-- **Actor isolation.** The bundled `PreToolUse` hook `hooks/actor-guard.mjs` blocks a write to
-  another actor's `pm/actors/<id>.json` or `<id>.HANDOFF.md`. Same fail-open design and kill switch.
-- **Session re-grounding.** The bundled `SessionStart` hook `hooks/session-context.mjs` reads `pm/`
-  and injects a short position pointer into new and freshly-compacted sessions. It only reads.
-- **Read-only review and verify agents.** `code-integrity-reviewer`, `architecture-reviewer`,
-  `security-auditor`, `debugger`, and `codebase-analyst` carry only `Read`, `Grep`, and `Glob`, so
-  the allowed-tool list blocks writes. `pm-verifier` also has `Bash`, because it runs the gates; see
-  below.
+Three bundled `PreToolUse` hooks guard writes. Each matches `Write`, `Edit`, and `MultiEdit` only,
+fails open on any uncertainty (a missing or unparseable state file, a target outside the project
+tree, or the kill switch `PM_SKILL_NO_ENFORCE=1`), and never sees a write made through `Bash`.
+
+- **Sign-off.** `require-signoff.mjs` blocks a write while `pm/pm-state.json`, or the legacy
+  `tmp/pm-state.json`, has `signed_off: false`. `logging-and-state.md` lists the exempt planning,
+  state, and spec paths.
+- **No secrets in tracked state.** `pm-secrets-guard.mjs` blocks a write into `pm/` or `docs/wiki/`
+  whose content matches a high-confidence secret shape. It is a tripwire for accidents, not a
+  scanner, so prose about secrets never trips it.
+- **Actor isolation.** `actor-guard.mjs` blocks a write to another actor's `pm/actors/<id>.json` or
+  `<id>.HANDOFF.md`.
+
+**Session context.** `session-context.mjs` reads `pm/` and adds the current position to new and
+compacted sessions. It is a `SessionStart` hook and only reads.
+
+**Read-only review and verify agents.** `code-integrity-reviewer`, `architecture-reviewer`,
+`security-auditor`, `debugger`, and `codebase-analyst` carry only `Read`, `Grep`, and `Glob`, so the
+allowed-tool list blocks writes. `pm-verifier` also has `Bash`, because it runs the gates; see below.
 
 ## The Bash gap
 A subagent's `tools:` list is all-or-nothing for `Bash`: granting it allows any shell command, so

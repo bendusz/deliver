@@ -1,6 +1,6 @@
 ---
 name: codebase-analyst
-description: Use PROACTIVELY before planning any work in an existing or unfamiliar codebase. It maps architecture, conventions, the real test/lint/build commands, and where new code should go, into a concise context pack for plans and self-contained stories. Read-only.
+description: Use before planning any work in an existing or unfamiliar codebase. It maps architecture, conventions, the real test/lint/build commands, and where new code should go, into a concise context pack for plans and self-contained stories. Read-only.
 tools: Read, Grep, Glob
 model: sonnet
 effort: medium

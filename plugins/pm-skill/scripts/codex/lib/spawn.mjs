@@ -74,7 +74,7 @@ export function runCodex(found, args, { stdinText, cwd, env, timeoutSeconds, std
 }
 
 // The API refuses some models for some account types with a 400 on stdout or stderr.
-export const UNSUPPORTED_MODEL = 'is not supported when using Codex';
+const UNSUPPORTED_MODEL = 'is not supported when using Codex';
 
 // Matches only a line that names the refused model, so a stray line about a different
 // model (e.g. echoed elsewhere in the log) cannot trigger a fallback.

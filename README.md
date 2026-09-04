@@ -1,8 +1,7 @@
 # pm-skill, a Project/Product Manager skill for Claude Code
 
-Turn Claude into a disciplined Project and Product Manager that discovers, specifies, plans, gets
-your sign-off, decomposes work into stories, and orchestrates the build through specialist subagents,
-covering gate, review, fix, verify, ship, and log, **without writing the code itself**.
+Claude acts as the project manager. It agrees requirements and a plan with you, waits for sign-off,
+then delegates implementation and review to specialist agents. It never writes code.
 
 One repeatable way of working:
 
@@ -77,21 +76,27 @@ anything.
 | Review and verification | A separate read-only reviewer, the project's real test, lint, and build gates, and a final read-only `pm-verifier` PASS, with bounded fix loops. |
 | Logging | A shared author-prefixed `pm/log.md` and per-actor state under `pm/actors/`, so concurrent PM sessions never overwrite each other and any lost session can resume. |
 
-Bundled specialist agents do the work. They include a broad-context Opus builder (`expert-builder`)
-and an optional Codex-CLI-backed precision builder (`codex-builder`), a risk-selected read-only
-review panel (`code-integrity-reviewer`, `architecture-reviewer`, `security-auditor`), a
-`test-engineer` that writes tests only, a read-only `debugger` that returns a root cause and a fix
-plan, a read-only final `pm-verifier` returning an independent PASS, FAIL, or UNKNOWN before ship, a
-`technical-writer` for docs only, a `codebase-analyst` for brownfield work, a `librarian` that alone
-maintains the project wiki, a `spec-architect` that writes SpecDD `.sdd` contracts before code when
-the plan asks for a skeleton, a web-capable `researcher`, and three Codex-CLI-backed second-opinion
-roles: `codex-researcher` for independent
-research, `codex-reviewer` for independent code review, and `codex-advisor` for an independent
-recommendation. `researcher` and `codex-researcher` write sourced reports under `docs/research/`,
+Bundled specialist agents do the work:
+
+| Role | Agent |
+|------|-------|
+| Build with broad repo context | `expert-builder` (Opus) |
+| Build one bounded outcome | `codex-builder` (Codex CLI, optional) |
+| Risk-selected read-only review panel | `code-integrity-reviewer`, `architecture-reviewer`, `security-auditor` |
+| Write tests, nothing else | `test-engineer` |
+| Root cause and a fix plan, read-only | `debugger` |
+| Independent PASS, FAIL, or UNKNOWN before ship | `pm-verifier` |
+| Docs only | `technical-writer` |
+| Map a brownfield codebase | `codebase-analyst` |
+| Maintain the project wiki, its only writer | `librarian` |
+| Write SpecDD `.sdd` contracts before code | `spec-architect` |
+| External research, reports under `docs/research/` | `researcher` (web), `codex-researcher` |
+| Second opinion on code and on decisions | `codex-reviewer`, `codex-advisor` |
+
 `codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`, and `codex-advisor`
-relays its answer directly in chat. Every Codex invocation goes through one of these thin Sonnet
-wrappers and the bundled Node runner; the PM never runs `codex` itself. The PM stays an orchestrator
-and protects its own context by handing each agent only what it needs.
+relays its answer in chat. Every Codex invocation goes through one of these thin Sonnet wrappers and
+the bundled Node runner; the PM never runs `codex` itself. The PM stays an orchestrator and protects
+its own context by handing each agent only what it needs.
 
 Each story carries a one-line `pm-meta` JSON comment naming its builder (`expert-builder`,
 `codex-builder`, or `auto`) and its machine-readable touch paths. Opus remains the default for broad
@@ -218,13 +223,8 @@ prevented. Review, advice, and research modes are read-only on every platform.
 pm-skill needs none of the optional tools below. If your environment has any of them, the PM may
 prefer them where useful.
 
-- The `poteto` companion plugin from this marketplace: design exploration before code with
-  `architect` and `arena`, subsystem walkthroughs with `how` and `why`, multi-model adversarial
-  review with lead-reviewer triage in `interrogate`, change-impact proofs with `blast-radius`, a
-  generator for a project skill that drives the real app in `create-verification-skill`, a
-  technical-writing standard, `unslop`, and 21 named engineering principles. Skills only, no hooks.
-  MIT, copyright Lauren Tan. The PM's references name these as optional examples, and nothing breaks
-  without them.
+- The `poteto` companion plugin from this marketplace. [Install](#install) step 3 lists its skills.
+  The PM's references name them as optional examples, and nothing breaks without them.
 - A dedicated planning or TDD skill suite for richer discovery and planning.
 - An external code-review tool, an OpenAI Codex-based reviewer or another model's CLI for example,
   for the optional independent review step.

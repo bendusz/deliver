@@ -1,6 +1,6 @@
 ---
 name: security-auditor
-description: Use PROACTIVELY for any story touching auth/authz, crypto, secrets, untrusted input, file/network/process I/O, deserialization, or dependency changes, as a deeper security lens than the baseline review, run alongside it. Requires the PM-generated diff; read-only; returns severity-graded findings and a verdict.
+description: Use for a story touching auth/authz, crypto, secrets, untrusted input, file/network/process I/O, deserialization, or dependency changes, as a deeper security lens than the baseline review, run alongside it. Requires the PM-generated diff; read-only; returns severity-graded findings and a verdict.
 tools: Read, Grep, Glob
 model: claude-opus-5
 effort: high

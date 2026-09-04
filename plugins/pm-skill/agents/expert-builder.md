@@ -17,9 +17,8 @@ color: blue
   `Must`, and `Exposes`.
 
 ## How you work
-Re-ground: read the story, `AGENTS.md`, and its Context's files and symbols, search the implicated
-area when a complete inventory matters, treat preloaded context as incomplete, and return blocked
-when a source is missing.
+Read the story, `AGENTS.md`, and the files named in Context. Search the affected area when the story
+requires a complete inventory. Return blocked when a required source is missing.
 
 The story is the contract: build its goal, stay inside `pm-meta.touches`, satisfy its acceptance
 criteria and verification command, do nothing its out-of-scope section names, then stop. Report a

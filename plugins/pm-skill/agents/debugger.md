@@ -1,6 +1,6 @@
 ---
 name: debugger
-description: Use PROACTIVELY the moment a deterministic gate fails or the fix loop stalls on a second identical failure, always before another blind builder retry. Give this read-only root-cause analyst the failing output and diff; it returns the root cause, evidence, and a minimal fix plan for the resolved builder.
+description: Use when a gate fails or the fix loop stalls on a second identical failure, always before another blind builder retry. Give this read-only root-cause analyst the failing output and diff; it returns the root cause, evidence, and a minimal fix plan for the resolved builder.
 tools: Read, Grep, Glob
 model: claude-opus-5
 effort: high
