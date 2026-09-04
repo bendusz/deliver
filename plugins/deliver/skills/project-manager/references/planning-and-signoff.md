@@ -34,9 +34,9 @@ its `merge=union` rule. The sequence:
 
 Then create `docs/plan.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.template`, whose comments
 define each section. Three rules the template cannot hold: the Stories table's `covers` column names
-the spec IDs each story satisfies and its criteria must be testable; Traceability maps every spec
-requirement to at least one story and flags any that is not; Commands are the project's real `test`,
-`lint`, `build`, and `run`, discovered now, with `N/A` where one does not exist.
+the spec IDs each story satisfies; Traceability maps every spec requirement to at least one story and
+flags any that is not; Commands are the project's real `test`, `lint`, `build`, and `run`, discovered
+now, with `N/A` where one does not exist.
 
 Present it and iterate with the user until they are happy. When the scale requires analysis, run
 `/deliver:analyze` before decomposition, optionally on the drafted plan before you record sign-off,

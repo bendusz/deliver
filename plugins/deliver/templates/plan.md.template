@@ -15,6 +15,7 @@
 - Instruction rules: <none | pm-state>  <!-- pm-state writes .claude/rules/pm-state.md and pm/AGENTS.md at scaffold -->
 - Skeleton: <specdd | none>  <!-- specdd writes .sdd contracts per sprint before decomposition; default none below large -->
 
+<!-- Omit Goals and Target users when docs/spec.md exists; the spec owns them. -->
 ## Goals
 - <goal>
 
@@ -30,9 +31,9 @@
 - <item>
 
 ## Stories
-| id | title | priority | covers | acceptance criteria | depends-on | [P] |
-|------|---------|----------|--------|----------------------|------------|-----|
-| S1-1 | <title> | high | FR-001, AC-001 | <testable criteria> | none | no |
+| id | title | priority | covers | depends-on | [P] |
+|------|---------|----------|--------|------------|-----|
+| S1-1 | <title> | high | FR-001, AC-001 | none | no |
 
 ## Architecture
 <!-- stack, key decisions, patterns -->
