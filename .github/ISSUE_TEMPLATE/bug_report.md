@@ -12,5 +12,5 @@ labels: bug
 
 **Environment**
 - Claude Code version:
-- pm-skill version:
+- deliver version:
 - OS:

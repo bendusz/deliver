@@ -1,4 +1,4 @@
-# pm-skill, a Project/Product Manager skill for Claude Code
+# deliver, a Project/Product Manager skill for Claude Code
 
 Claude acts as the project manager. It agrees requirements and a plan with you, waits for sign-off,
 then delegates implementation and review to specialist agents. It never writes code.
@@ -21,13 +21,13 @@ CLI is optional and only needed for the `codex-*` agents and commands.
 **1. Add the marketplace**
 
 ```
-/plugin marketplace add https://github.com/bendusz/pm-skill
+/plugin marketplace add https://github.com/bendusz/deliver
 ```
 
 **2. Install the plugin**
 
 ```
-/plugin install pm-skill@pm-skill
+/plugin install deliver@deliver
 ```
 
 Use the full `https://` URL above. The `owner/repo` shorthand resolves to SSH, which fails on
@@ -38,14 +38,30 @@ If it does not appear right away, restart your Claude Code session.
 **3. Optional: install the `poteto` companion**
 
 ```
-/plugin install poteto@pm-skill
+/plugin install poteto@deliver
 ```
 
 Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack) engineering skills
 (`how`, `why`, `architect`, `arena`, `interrogate`, `blast-radius`, `unslop`, a technical-writing
 standard, verification-skill generators, and 21 principles), ported to Claude Code under her MIT
-license. pm-skill uses them when present and works without them. See
+license. The deliver plugin uses them when present and works without them. See
 [`plugins/poteto/README.md`](plugins/poteto/README.md).
+
+## Upgrade from pm-skill
+
+The plugin was called `pm-skill` through 0.20. Remove the old marketplace, add the new one, and
+install under the new name:
+
+```
+/plugin marketplace remove pm-skill
+/plugin marketplace add https://github.com/bendusz/deliver
+/plugin install deliver@deliver
+```
+
+Nothing in your project needs to change. The `pm/` state directory, the `AGENTS.md` pointer, and
+`.claude/rules/pm-state.md` are read exactly as before, and `/deliver:resume` continues from them.
+`DELIVER_NO_ENFORCE=1` is the documented kill switch now, and the old `PM_SKILL_NO_ENFORCE=1` keeps
+working until 0.22.
 
 ## Use
 
@@ -54,7 +70,7 @@ license. pm-skill uses them when present and works without them. See
 - Or run the command explicitly:
 
 ```
-/pm-skill:pm build a CLI todo app
+/deliver:pm build a CLI todo app
 ```
 
 The PM runs discovery with you, writes a plan, and waits for your explicit sign-off before building
@@ -112,20 +128,20 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 
 | Command | What it does |
 |---------|--------------|
-| `/pm-skill:pm` | Act as the PM end to end: discover, plan, get sign-off, orchestrate delivery. |
-| `/pm-skill:specify` | Capture or refine `docs/spec.md`, the product spec of what and why. |
-| `/pm-skill:clarify` | Resolve open `[NEEDS CLARIFICATION]` in the spec, one question at a time, 5 at most. |
-| `/pm-skill:constitution` | Create or update `docs/constitution.md`, the project-specific governing rules. |
-| `/pm-skill:skeleton` | Write or extend the SpecDD `.sdd` skeleton for a sprint, after sign-off and before decomposition. |
-| `/pm-skill:analyze` | Read-only consistency and quality report across all artifacts. Never edits. |
-| `/pm-skill:checklist` | Generate or evaluate a spec, plan, story, or verification quality checklist under `docs/checklists/`. |
-| `/pm-skill:doctor` | Check environment readiness (toolchain, deps, gates run) and PM-state health before building. |
-| `/pm-skill:benchmark-builders` | Run Opus and Codex on the same story in isolated worktrees, score the measured results, and merge neither. |
-| `/pm-skill:correct-course` | Handle a mid-flight scope change: re-plan at the right level, re-sign-off if material. |
-| `/pm-skill:handoff` | End a session cleanly by writing a token-efficient `pm/actors/<id>.HANDOFF.md` briefing for the next agent. |
-| `/pm-skill:resume` | Read saved state, handoff, and logbook, then continue where you left off. |
-| `/pm-skill:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
-| `/pm-skill:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-6-astra` at `medium` with a one-time fallback to `gpt-5.6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
+| `/deliver:pm` | Act as the PM end to end: discover, plan, get sign-off, orchestrate delivery. |
+| `/deliver:specify` | Capture or refine `docs/spec.md`, the product spec of what and why. |
+| `/deliver:clarify` | Resolve open `[NEEDS CLARIFICATION]` in the spec, one question at a time, 5 at most. |
+| `/deliver:constitution` | Create or update `docs/constitution.md`, the project-specific governing rules. |
+| `/deliver:skeleton` | Write or extend the SpecDD `.sdd` skeleton for a sprint, after sign-off and before decomposition. |
+| `/deliver:analyze` | Read-only consistency and quality report across all artifacts. Never edits. |
+| `/deliver:checklist` | Generate or evaluate a spec, plan, story, or verification quality checklist under `docs/checklists/`. |
+| `/deliver:doctor` | Check environment readiness (toolchain, deps, gates run) and PM-state health before building. |
+| `/deliver:benchmark-builders` | Run Opus and Codex on the same story in isolated worktrees, score the measured results, and merge neither. |
+| `/deliver:correct-course` | Handle a mid-flight scope change: re-plan at the right level, re-sign-off if material. |
+| `/deliver:handoff` | End a session cleanly by writing a token-efficient `pm/actors/<id>.HANDOFF.md` briefing for the next agent. |
+| `/deliver:resume` | Read saved state, handoff, and logbook, then continue where you left off. |
+| `/deliver:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
+| `/deliver:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-6-astra` at `medium` with a one-time fallback to `gpt-5.6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
 
 ## Artifacts
 
@@ -168,13 +184,13 @@ one.
 Gitignored scratch and reports, disposable and never load-bearing for resume. The first four live
 under `tmp/`; the report directories sit at the repository root:
 
-- `tmp/environment-check.md`, `/pm-skill:doctor`'s readiness report.
+- `tmp/environment-check.md`, `/deliver:doctor`'s readiness report.
 - `tmp/codex-builder/*.md`, focused fix briefs passed to `codex-builder`. Never authoritative and
   safe to discard after the story.
 - `tmp/codex-runtime/*`, per-run tool temp directories, ignored and removed on exit. Best effort: an
   antivirus or indexer lock on Windows can leave them.
 - `tmp/builder-benchmark/*`, opt-in two-builder evaluations. Never part of delivery or resume state.
-- `untracked/` or `codex/`, gitignored, holding `/pm-skill:codex-review` reports named
+- `untracked/` or `codex/`, gitignored, holding `/deliver:codex-review` reports named
   `<stamp>-codex-review-<scope>[-<objective>].md`, plus an index file for multi-objective runs.
 - Worktrees, prompts, raw agent output, and other ephemera.
 
@@ -209,7 +225,7 @@ under `tmp/`; the report directories sit at the repository root:
 Three of the four bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
 tools; the fourth runs at session start and only reads `pm/`. None is a security boundary. Bash
 coverage is the optional hardening allowlist described in
-`plugins/pm-skill/skills/project-manager/references/hardening.md`.
+`plugins/deliver/skills/project-manager/references/hardening.md`.
 
 **Windows.** Hooks and the Codex runner run under `node` directly, with no Git Bash needed. There is
 no platform sandbox on Windows: build and fix run with full host access and network. The runner
@@ -220,7 +236,7 @@ prevented. Review, advice, and research modes are read-only on every platform.
 
 ## Optional tools
 
-pm-skill needs none of the optional tools below. If your environment has any of them, the PM may
+The deliver plugin needs none of the optional tools below. If your environment has any of them, the PM may
 prefer them where useful.
 
 - The `poteto` companion plugin from this marketplace. [Install](#install) step 3 lists its skills.
@@ -233,16 +249,16 @@ prefer them where useful.
   Codex is unavailable; a story that explicitly requires `codex-builder` waits for `codex login`
   rather than switching workers silently.
 - To exercise the real write path after an install or a Codex upgrade, run
-  `PM_CODEX_LIVE=1 node plugins/pm-skill/scripts/codex/smoke-live.mjs`, or the equivalent
+  `PM_CODEX_LIVE=1 node plugins/deliver/scripts/codex/smoke-live.mjs`, or the equivalent
   `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh` wrapper. In PowerShell, use
-  `$env:PM_CODEX_LIVE='1'; node plugins/pm-skill/scripts/codex/smoke-live.mjs`. It runs one
+  `$env:PM_CODEX_LIVE='1'; node plugins/deliver/scripts/codex/smoke-live.mjs`. It runs one
   low-effort Codex task in a disposable signed-off repository, which is removed afterwards unless you
   set `PM_CODEX_KEEP=1`, and it is deliberately excluded from default validation.
 - `gh` plus a GitHub remote for real pull requests. Otherwise the PM uses local merges.
 
 The spec, clarify, analyze, and constitution steps add spec-driven rigor, inspired by spec-driven
 development tools, and `pm-verifier` adds an independent final check. All of them are built in and
-self-contained. pm-skill does not depend on `spec-kit`, and there is no external verifier process in
+self-contained. The deliver plugin does not depend on `spec-kit`, and there is no external verifier process in
 this workflow: `pm-verifier` is an ordinary read-only Claude Code subagent the PM dispatches.
 
 ## License

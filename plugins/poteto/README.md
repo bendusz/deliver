@@ -8,30 +8,30 @@ fast, go deep first.*
 
 Every skill in this directory is hers. The words, the structure, the opinions, the 21 principles,
 and the habit of proving work on the real artifact instead of a summary are her work, published
-under the MIT license. What we did is small. We copied the skills that complement pm-skill, swapped
+under the MIT license. What we did is small. We copied the skills that complement deliver, swapped
 Cursor's model names, subagent parameters, and file paths for Claude Code's, and put them next to
-pm-skill so a PM-orchestrated build can think the way she does.
+the deliver plugin so a PM-orchestrated build can think the way she does.
 
 Thank you, Lauren. Fork it, improve it, and send her the good parts.
 
 ## License
 
 MIT. Copyright (c) 2026 Lauren Tan. The full text is in [`LICENSE`](LICENSE), unchanged from
-upstream. This plugin is distributed inside the pm-skill repository, which is GPL-3.0-or-later. The
+upstream. This plugin is distributed inside the deliver repository, which is GPL-3.0-or-later. The
 MIT terms continue to govern every file under `plugins/poteto/`.
 
 ## Install
 
-Add the marketplace once (skip if you already have pm-skill), then install the plugin:
+Add the marketplace once (skip if you already have deliver), then install the plugin:
 
 ```
-/plugin marketplace add https://github.com/bendusz/pm-skill
-/plugin install poteto@pm-skill
+/plugin marketplace add https://github.com/bendusz/deliver
+/plugin install poteto@deliver
 ```
 
-Skills register as `poteto:<name>`. pm-skill's references name them as optional examples, so pm-skill
-works with or without this plugin. If you kept a hand-copied port in `~/.claude/skills/`, delete
-those directories after installing, or every skill shows up twice.
+Skills register as `poteto:<name>`. The deliver plugin's references name them as optional
+examples, so it works with or without this plugin. If you kept a hand-copied port in
+`~/.claude/skills/`, delete those directories after installing, or every skill shows up twice.
 
 ## What is here
 
@@ -58,22 +58,23 @@ invoke them by slash command and the model does not reach for them on its own. `
 
 Twenty-one principle skills, one rule each, named `principle-<slug>`. You do not invoke them. You
 steer with their names ("use subtract before you add", "apply prove it works"), and `architect`,
-`arena`, `blast-radius`, and `interrogate` cite them. pm-skill's constitution template offers them
+`arena`, `blast-radius`, and `interrogate` cite them. The deliver constitution template offers them
 as a menu a project can adopt.
 
 ## What was left out, and why
 
 - `poteto-mode`, its 22 playbooks, and `poteto-agent`. They are an orchestration entry point built
-  on "never block on the human". pm-skill's entry point is built on "no implementation before
+  on "never block on the human". The deliver entry point is built on "no implementation before
   sign-off". Two entry points with opposite rules in one session would fight.
-- `swarm`, `figure-it-out`, `show-me-your-work`, `recall`, `tdd`. Each duplicates something pm-skill
-  (`parallel-execution`, the spec-plan-stories pipeline, `pm/log.md`, `/resume`) or the Claude Code
-  harness already provides, or would need a rewrite for a non-Cursor host.
+- `swarm`, `figure-it-out`, `show-me-your-work`, `recall`, `tdd`. Each duplicates something the
+  deliver plugin already provides (`parallel-execution`, the spec-plan-stories pipeline,
+  `pm/log.md`, `/resume`), or the Claude Code harness does, or would need a rewrite for a
+  non-Cursor host.
 - `no-comments` and the Comment Sicko agent. A matter of taste, and it wants an agent file.
 - `automate-me`, `setup-pstack`, and the Benny automations. Cursor-specific mechanisms.
 
-Read them upstream. Several are worth borrowing ideas from even where they are not worth porting;
-pm-skill's PR body format and its handoff log audit came from there.
+Read them upstream. Several are worth borrowing ideas from even where they are not worth porting.
+The deliver PR body format and its handoff log audit came from there.
 
 ## What changed for Claude Code
 

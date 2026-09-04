@@ -39,7 +39,7 @@ Pinned agents do not follow the session model. Changing the session tier changes
 the specialists.
 
 Claude Code can override these files through `CLAUDE_CODE_SUBAGENT_MODEL`, an invocation-specific
-model, or an organization model allowlist. `/pm-skill:doctor` records the configured agent values and
+model, or an organization model allowlist. `/deliver:doctor` records the configured agent values and
 the Claude Code version, and flags host-level model or effort overrides. A model name the agent
 guessed is not evidence.
 

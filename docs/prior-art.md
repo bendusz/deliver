@@ -1,6 +1,6 @@
 # Prior art and references
 
-The design of pm-skill was validated against the work below. See the design spec
+The design of deliver was validated against the work below. See the design spec
 (`docs/specs/2026-06-02-project-manager-skill-design.md`) for how each influenced decisions.
 
 ## Foundations (Anthropic)

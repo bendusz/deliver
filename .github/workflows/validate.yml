@@ -35,4 +35,4 @@ jobs:
       - name: Set default branch for fixture repos
         run: git config --global init.defaultBranch main
       - name: Node tests
-        run: node --test plugins/pm-skill/scripts/tests/
+        run: node --test plugins/deliver/scripts/tests/

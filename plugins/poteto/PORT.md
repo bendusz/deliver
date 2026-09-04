@@ -42,19 +42,19 @@ differs. Keep it current.
 | `interrogate` | `SKILL.md` | 1, 2, 3 | Reviewer table `fable` / `opus` / `sonnet` / Codex CLI; params; the slug-fallback paragraph shortened to one sentence. |
 | `reflect` | `SKILL.md`, `references/synthesizer.md`, `references/judgment-reviewer.md`, `references/tooling-reviewer.md`, `references/divergent-reviewer.md` | 1, 2, 4, 5, 6 | Transcript lookup; reviewer and synthesizer params and models; `create-skill` routing; skill paths in the three reviewer prompts; `/poteto:reflect`. |
 | `technical-writing` | `SKILL.md` | 6 | Description only. |
-| `principle-prove-it-works` | `SKILL.md` | prose | The `show-me-your-work` mention now says the skill is upstream-only and names `pm/log.md` as pm-skill's trail. |
+| `principle-prove-it-works` | `SKILL.md` | prose | The `show-me-your-work` mention now says the skill is upstream-only and names `pm/log.md` as deliver's trail. |
 | `unslop`, `blast-radius`, `teach`, `typescript-best-practices`, `bro`, the other 20 `principle-*` | none | none | Byte-identical to upstream. |
 
 ## Excluded upstream skills
 
 | Skill | Reason |
 |---|---|
-| `poteto-mode`, playbooks, `poteto-agent` | Orchestration entry point built on "never block on the human"; conflicts with pm-skill's sign-off gate. Also depends on `cursor-team-kit`, Graphite, Bugbot, `/goal`, and `mode: true` frontmatter. |
-| `swarm` | Built on Cursor cloud workers (`environment: "cloud"`); pm-skill's `parallel-execution.md` and the Claude Code harness cover the shape. |
-| `figure-it-out` | pm-skill's spec, plan, and stories pipeline is the same role; depends on `poteto-mode` and `show-me-your-work`. |
-| `show-me-your-work` | A second decision trail next to `pm/log.md`; its log-audit idea moved into `/pm-skill:handoff`. |
-| `recall` | `/pm-skill:resume` and `/pm-skill:handoff` cover PM-managed work; needs the transcript-path patch for anything else. |
-| `tdd` | Conflicts in name and default with the superpowers TDD skill; pm-skill's `test-engineer` covers TDD-red. |
+| `poteto-mode`, playbooks, `poteto-agent` | Orchestration entry point built on "never block on the human"; conflicts with deliver's sign-off gate. Also depends on `cursor-team-kit`, Graphite, Bugbot, `/goal`, and `mode: true` frontmatter. |
+| `swarm` | Built on Cursor cloud workers (`environment: "cloud"`); deliver's `parallel-execution.md` and the Claude Code harness cover the shape. |
+| `figure-it-out` | deliver's spec, plan, and stories pipeline is the same role; depends on `poteto-mode` and `show-me-your-work`. |
+| `show-me-your-work` | A second decision trail next to `pm/log.md`; its log-audit idea moved into `/deliver:handoff`. |
+| `recall` | `/deliver:resume` and `/deliver:handoff` cover PM-managed work; needs the transcript-path patch for anything else. |
+| `tdd` | Conflicts in name and default with the superpowers TDD skill; deliver's `test-engineer` covers TDD-red. |
 | `no-comments`, Comment Sicko | Taste; needs an agent file. |
 | `automate-me`, `setup-pstack` | Cursor `create-skill` and `pstack-models.mdc` mechanisms. |
 | Benny automations | Cursor automations; a Claude Code equivalent would be a rewrite. |

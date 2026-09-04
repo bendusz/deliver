@@ -1,4 +1,4 @@
-# Codex CLI reference (for pm-skill's codex commands)
+# Codex CLI reference (for deliver's codex commands)
 
 CLI facts verified 2026-08-23 against **codex-cli 0.149.0**, the
 [official command reference](https://learn.chatgpt.com/docs/developer-commands), and local help
@@ -18,7 +18,7 @@ major-bumps.
 
 | Group | Flags |
 |---|---|
-| Both subcommands | `-m/--model`, `-c/--config` (TOML value, else literal), `-o/--output-last-message` (final message → file, which is the review report), `--json`, `--output-schema`, `--ephemeral`, `--ignore-user-config` (skips `$CODEX_HOME/config.toml`; auth still uses `CODEX_HOME`), `--ignore-rules`, `--strict-config`, `--skip-git-repo-check`, `--dangerously-bypass-approvals-and-sandbox` (never passed by pm-skill) |
+| Both subcommands | `-m/--model`, `-c/--config` (TOML value, else literal), `-o/--output-last-message` (final message → file, which is the review report), `--json`, `--output-schema`, `--ephemeral`, `--ignore-user-config` (skips `$CODEX_HOME/config.toml`; auth still uses `CODEX_HOME`), `--ignore-rules`, `--strict-config`, `--skip-git-repo-check`, `--dangerously-bypass-approvals-and-sandbox` (never passed by deliver) |
 | `exec` only, **exit 2** on review | `-s/--sandbox` (`exec` defaults to `read-only`), `-C/--cd` (for review, `cd` to the repo root first), `--color` (cost us a 5-agent run) |
 | `exec` only, no error | `-i/--image` |
 | Neither | a reasoning-effort flag; use `-c model_reasoning_effort="<level>"` |
@@ -46,7 +46,7 @@ Whole-codebase review is not native at all: it is `codex exec --sandbox read-onl
 
 | Model | Position | API price /1M in/out |
 |---|---|---|
-| `gpt-6-astra` | current flagship; pm-skill's default everywhere | not recorded here |
+| `gpt-6-astra` | current flagship; deliver's default everywhere | not recorded here |
 | `gpt-5.6-sol` | previous flagship; strongest 5.6 coding judgment | $4 / $20 |
 | `gpt-5.6-terra` | balanced everyday workhorse | $2.50 / $15 |
 | `gpt-5.6-luna` | fast/cheap, high volume | $1 / $6 |
@@ -54,7 +54,7 @@ Whole-codebase review is not native at all: it is `codex exec --sandbox read-onl
 
 Reasoning effort is `none | minimal | low | medium | high | xhigh | max`. No review-specific model
 exists; `review_model` in `~/.codex/config.toml` overrides the session model for `/review`, and
-pm-skill never touches that file. ChatGPT sign-in is quota-based (Free/Go: Terra only); API-key auth
+deliver never touches that file. ChatGPT sign-in is quota-based (Free/Go: Terra only); API-key auth
 is per-token.
 
 ### The one-time model fallback
@@ -70,14 +70,14 @@ ran plus `model_fallback: {from, to, reason}`, where `from` and `to` are `{model
 and `reason` is the refusal line cut to 300 characters.
 `--timeout-seconds` bounds each attempt, so a fallback run can take twice that.
 
-## pm-skill's chosen defaults (models 2026-09-04, efforts 2026-07-16)
+## deliver's chosen defaults (models 2026-09-04, efforts 2026-07-16)
 
 Every caller falls back to `gpt-5.6-sol` at `medium`.
 
 | Caller | Model | Effort |
 |---|---|---|
-| `/pm-skill:codex-review` | `gpt-6-astra` | `high` |
-| `/pm-skill:codex-help` | `gpt-6-astra` | `medium` |
+| `/deliver:codex-review` | `gpt-6-astra` | `high` |
+| `/deliver:codex-help` | `gpt-6-astra` | `medium` |
 | `codex-researcher` | `gpt-6-astra` | `high` |
 | `codex-builder` (build and fix) | `gpt-6-astra` | `high` |
 
@@ -96,8 +96,8 @@ A caller wanting another tier passes `model=` and `effort=`, which reach the run
 
 ## Runner (Node, against codex-cli 0.149.0, since v0.16)
 
-No pm-skill agent or command assembles a Codex command line or shells out to `codex`. Every
-invocation goes through `plugins/pm-skill/scripts/codex/run.mjs`, called by a thin Sonnet wrapper
+No deliver agent or command assembles a Codex command line or shells out to `codex`. Every
+invocation goes through `plugins/deliver/scripts/codex/run.mjs`, called by a thin Sonnet wrapper
 agent (`codex-builder`, `codex-reviewer`, `codex-advisor`, `codex-researcher`), and
 `scripts/validate.sh` fails the build on a direct `codex exec` string in any of them.
 
@@ -200,7 +200,7 @@ mode context: no `worktree`, `story`, `mode`, `sandbox`, or output path.
 ### Preflight and smoke test
 
 ```
-node plugins/pm-skill/scripts/codex/run.mjs --mode build --preflight --worktree <root> [--story <story>]
+node plugins/deliver/scripts/codex/run.mjs --mode build --preflight --worktree <root> [--story <story>]
 ```
 
 `--preflight` never invokes model inference and always reports `quota_consumed: false`. It validates
@@ -209,7 +209,7 @@ and optional story metadata. For `recent` and `worktree` it also checks that `co
 offers the flags in `preflight.mjs`'s `REVIEW_FLAGS`; `codebase` uses plain `exec` and skips that
 check.
 
-The opt-in live smoke test, `PM_CODEX_LIVE=1 node plugins/pm-skill/scripts/codex/smoke-live.mjs`
+The opt-in live smoke test, `PM_CODEX_LIVE=1 node plugins/deliver/scripts/codex/smoke-live.mjs`
 (also `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh`), checks two things in a disposable
 repository it then removes unless `PM_CODEX_KEEP=1`: that the two expected result files are written
 with their exact content, and that a secret-shaped environment variable was filtered out of the tool

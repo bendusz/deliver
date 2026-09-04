@@ -3,8 +3,8 @@
 set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
-SCORER="$ROOT/plugins/pm-skill/scripts/score-builder-benchmark.mjs"
-CASES="$ROOT/plugins/pm-skill/benchmarks/codex-builder-routing-cases.json"
+SCORER="$ROOT/plugins/deliver/scripts/score-builder-benchmark.mjs"
+CASES="$ROOT/plugins/deliver/benchmarks/codex-builder-routing-cases.json"
 tmp="$(mktemp -d)"
 tmp="$(cd "$tmp" && pwd -P)"
 trap 'case "$tmp" in /tmp/*|/private/tmp/*|/private/var/*) rm -rf -- "$tmp" ;; esac' EXIT

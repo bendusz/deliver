@@ -1,10 +1,10 @@
-# Contributing to pm-skill
+# Contributing to deliver
 
-`pm-skill` is a generic, self-contained Claude Code plugin. It must keep working on a bare install,
+`deliver` is a generic, self-contained Claude Code plugin. It must keep working on a bare install,
 so the rules below are about what you may not add.
 
 ## Ground rules
-- **Keep it generic.** Nothing under `plugins/pm-skill/` may depend on a specific third-party plugin
+- **Keep it generic.** Nothing under `plugins/deliver/` may depend on a specific third-party plugin
   or a particular environment. Name external tools only as optional examples in `README.md` and
   `docs/`.
 - **Keep `SKILL.md` lean**, under 500 lines, and put detail in `references/`, one level deep.
@@ -14,10 +14,10 @@ so the rules below are about what you may not add.
   bundled runner.
 
 ## Before opening a PR
-- Run `bash scripts/validate.sh`, and `claude plugin validate ./plugins/pm-skill` if you have the
+- Run `bash scripts/validate.sh`, and `claude plugin validate ./plugins/deliver` if you have the
   CLI. Node.js 20 or newer is required to run the tests and the validator.
 - `scripts/validate.sh` runs the whole test suite. Run `node --test
-  plugins/pm-skill/scripts/tests/` directly when you want one suite or a focused test.
+  plugins/deliver/scripts/tests/` directly when you want one suite or a focused test.
 - Update `CHANGELOG.md`.
 
 ## How it is built

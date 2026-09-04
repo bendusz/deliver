@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## 0.21.0 - 2026-09-04
+
+The plugin is now called deliver.
+
+- **Rename.** Marketplace, plugin, directory, and command namespace: `pm-skill` is `deliver`,
+  `/pm-skill:<command>` is `/deliver:<command>`, and the repository is `bendusz/deliver` (the old
+  URL redirects). Hook messages say `deliver`. The kill switch is `DELIVER_NO_ENFORCE`;
+  `PM_SKILL_NO_ENFORCE` keeps working until 0.22.
+- **Nothing to migrate in projects.** `pm/` state, `pm-meta`, actor ids, and generated `AGENTS.md`
+  files are unchanged; `/deliver:resume` reads them as before.
+- **Upgrade.** `claude plugin marketplace remove pm-skill`, then
+  `/plugin marketplace add https://github.com/bendusz/deliver` and
+  `/plugin install deliver@deliver`.
+
 ## 0.20.0 - 2026-09-04
 
 Contracts before code.
