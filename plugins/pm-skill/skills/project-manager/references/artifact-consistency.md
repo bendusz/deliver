@@ -38,15 +38,12 @@ logs or state. Offer remediation as suggestions only.
 - **Terminology drift.** The same concept named differently across spec, plan, and stories.
 - **State sanity.** Stale or contradictory `pm/pm-state.json` and `pm/log.md` against the `docs/`
   artifacts; `pm/` state files matched by `.gitignore` or left uncommitted while `docs/` moved on.
-- **Team checks.** A *claim conflict*: an actor file whose `current_story` names a story that
-  `assignments` maps to a different actor, or two actor files sharing one non-null `current_story`
-  (idle and new actors all carry `current_story: null`, so never flag those). `assignments` is a
-  story-to-actor map and can only ever show one claimant, so the race surfaces in the actor files;
-  compare them against the map. Also a *stale or half-made claim*: an assignment whose actor's own
-  file is not on that story (`current_story` null or different). Also an assignment pointing at a
-  nonexistent story or actor file; in-flight stories of different actors whose `pm-meta.touches`
-  overlap (serialize or re-scope them); an in-flight sequential story without `resolved_builder`, or
-  an active parallel entry without `builder`.
+- **Claim conflicts.** Report two actors on one story, or an actor whose story differs from
+  `assignments`. A null `current_story` means idle, never a conflict.
+- **Stale claims.** Report assignments without a matching actor position, story, or actor file.
+- **Active work.** Report overlapping `pm-meta.touches` between in-flight stories of different
+  actors, an in-flight sequential story without `resolved_builder`, and an active parallel entry
+  without `builder`.
 - **Wiki (only when `docs/wiki/` exists).** An index entry that does not resolve; a page the index
   does not list, or that no other page links to; a plan decision or risk with no decision page; two
   `current` decision pages on one subject (HIGH); a story whose Context cites a concept page marked

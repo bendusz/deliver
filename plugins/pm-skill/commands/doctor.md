@@ -46,5 +46,4 @@ Write the findings to `tmp/environment-check.md` (runtime-only): each check as `
 `UNKNOWN` with the evidence, then a one-line verdict (ready, or the blockers and what is missing).
 Append a one-line entry to `pm/log.md`.
 
-Run this before the implementation loop on an unfamiliar or freshly-cloned project. Environment and
-dependency gaps are a common cause of mid-build failure.
+Run this before the implementation loop on a fresh or unfamiliar clone.

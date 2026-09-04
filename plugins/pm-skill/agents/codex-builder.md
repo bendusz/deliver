@@ -1,6 +1,6 @@
 ---
 name: codex-builder
-description: Use for precise, bounded implementation and evidence-rich fix work when a build-ready story names codex-builder, or whose `auto` builder routes to codex-builder, or for a localized review or gate fix with a prepared evidence file. A thin Sonnet wrapper delegates the actual work to local Codex in a workspace-write sandbox on macOS and Linux (full access on Windows) and returns its structured result. Not for broad architectural work or multi-story changes.
+description: Use for a build-ready story or focused fix with bounded touch paths and concrete evidence. Delegates writes to Codex through the bundled runner. Not for broad architectural work or multi-story changes.
 tools: Bash
 model: sonnet
 effort: medium

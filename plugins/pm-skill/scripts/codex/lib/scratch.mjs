@@ -17,7 +17,6 @@ function notSymlink(p) {
   try { return !fs.lstatSync(p).isSymbolicLink(); } catch { return true; }
 }
 
-// makeScratch(worktree, prefix): a private temp dir OUTSIDE the worktree.
 export function makeScratch(worktree, prefix) {
   let base = realpath(os.tmpdir());
   if (!base) throw new RunnerError('failed', 'temporary directory is unavailable');

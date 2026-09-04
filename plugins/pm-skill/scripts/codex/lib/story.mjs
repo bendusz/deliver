@@ -7,9 +7,8 @@ const BUILDERS = new Set(['expert-builder', 'codex-builder', 'auto']);
 const hasControl = (s) => [...s].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
 const blocked = (reason) => new RunnerError('blocked', reason);
 
-// parseStory(root, storyRel): the machine pm-meta scope of a story. pm-meta is authoritative.
-// Stories written before 0.17 also carry visible Builder and Touches fields; when present they
-// must still agree, so a stale header cannot mislead a reader.
+// pm-meta is authoritative. Stories written before 0.17 also carry visible Builder and Touches
+// fields; when present they must still agree, so a stale header cannot mislead a reader.
 export function parseStory(root, storyRel) {
   const head = fs.readFileSync(path.join(root, storyRel), 'utf8').split(/\r?\n/).slice(0, 12);
   const metas = head.map((l) => l.match(/^\s*<!--\s*pm-meta:\s*(.*?)\s*-->\s*$/)).filter(Boolean).map((m) => m[1]).filter((m) => m !== '');

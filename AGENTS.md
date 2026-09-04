@@ -4,7 +4,8 @@ A Claude Code plugin marketplace: `plugins/pm-skill` (the Project Manager skill,
 Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 
 ## Commands
-- Test: `node --test plugins/pm-skill/scripts/tests/`
+- Test: `bash scripts/validate.sh` runs the whole suite. `node --test
+  plugins/pm-skill/scripts/tests/` is for focused test work.
 - Lint: `bash scripts/validate.sh` (needs bash, jq, node 20+, git; shellcheck in CI)
 - Build: `N/A`
 - Run: `N/A` (install the marketplace into Claude Code to try it)
