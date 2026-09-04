@@ -255,7 +255,7 @@ failed build instead retains `stderr.log` inside the `scratch_dir` it reports an
   `story`, `mode`, `timeout_seconds`, `sandbox` (`workspace-write` or `none (win32)`),
   `diagnostics_retained: false`, `actual_files_changed`, `ignored_files_changed`,
   `git_status_short`, and the builder's own `result` object (`status`, `summary`, `files_changed`,
-  `tests`, `out_of_scope_changes`, `risks`, `root_cause`).
+  `tests`, `root_cause`; a blocked run explains itself in `root_cause`).
 - **review**: `runner_status: completed`, `mode` (always `'review'`), `scope`, `objective`,
   `report_path`, `model`, `effort`, `codex_version`, `codex_exit`, `gitignore_rule_needed` (a
   root-anchored `/<dir>/` string, or `null` when the output directory is already ignored). A clean

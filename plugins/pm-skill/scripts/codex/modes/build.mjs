@@ -47,14 +47,12 @@ export function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
 export function validateBuilderResult(r) {
   const noCtl = (s) => typeof s === 'string' && !/[\x00-\x1f\x7f]/.test(s);
   if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
-  if (JSON.stringify(Object.keys(r).sort()) !== '["files_changed","out_of_scope_changes","risks","root_cause","status","summary","tests"]') return false;
+  if (JSON.stringify(Object.keys(r).sort()) !== '["files_changed","root_cause","status","summary","tests"]') return false;
   if (r.status !== 'done' && r.status !== 'blocked') return false;
   if (!(typeof r.root_cause === 'string' || r.root_cause === null)) return false;
   if (!Array.isArray(r.files_changed) || new Set(r.files_changed).size !== r.files_changed.length || !r.files_changed.every(noCtl)) return false;
-  if (!Array.isArray(r.summary) || r.summary.length === 0 || !r.summary.every((s) => typeof s === 'string')) return false;
+  if (!Array.isArray(r.summary) || r.summary.length === 0 || r.summary.length > 5 || !r.summary.every((s) => typeof s === 'string')) return false;
   if (!Array.isArray(r.tests) || r.tests.length === 0 || !r.tests.every((t) => t && typeof t === 'object' && typeof t.command === 'string' && ['passed', 'failed', 'not-run'].includes(t.status) && typeof t.summary === 'string')) return false;
-  if (!Array.isArray(r.out_of_scope_changes) || !r.out_of_scope_changes.every((s) => typeof s === 'string')) return false;
-  if (!Array.isArray(r.risks) || !r.risks.every((s) => typeof s === 'string')) return false;
   if (r.status === 'done' && !r.tests.every((t) => t.status === 'passed')) return false;
   return true;
 }

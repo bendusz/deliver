@@ -285,6 +285,7 @@ test('model fallback: an unsupported default model retries once on the mode fall
   assert.deepEqual([r.out.model_fallback.from, r.out.model_fallback.to], ['gpt-6-astra', 'gpt-5.6-sol']);
   assert.match(r.out.model_fallback.reason, /not supported when using Codex/);
   assert.equal((stubActions(s).match(/^exec(?! --help)/gm) || []).length, 2);
+  assert.ok(has(stubArgs(s), 'gpt-5.6-sol'));
 });
 
 test('model fallback: an explicit --model never falls back; other failures never fall back; success carries no field', () => {
@@ -565,6 +566,20 @@ test('build 23: preflight checks readiness without a model task', () => {
   assert.equal(r.out.policy.login_shell, false);
   assert.doesNotMatch(stubActions(s), /^exec --ignore-user-config/m);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')));
+});
+
+test('build 31: a legacy result key outside the contract fails closed', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt', STUB_EXTRA_RESULT_KEY: '1' } });
+  assert.equal(r.status, 70, JSON.stringify(r.out));
+  assert.match(r.out.reason, /builder result contract/);
+});
+
+test('build 32: a summary over five items fails closed', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt', STUB_LONG_SUMMARY: '1' } });
+  assert.equal(r.status, 70, JSON.stringify(r.out));
+  assert.match(r.out.reason, /builder result contract/);
 });
 
 test('build 26: duplicate reported paths are rejected', () => {

@@ -8,9 +8,7 @@
     "root_cause",
     "files_changed",
     "summary",
-    "tests",
-    "out_of_scope_changes",
-    "risks"
+    "tests"
   ],
   "properties": {
     "status": {
@@ -27,7 +25,8 @@
     "summary": {
       "type": "array",
       "items": { "type": "string" },
-      "minItems": 1
+      "minItems": 1,
+      "maxItems": 5
     },
     "tests": {
       "type": "array",
@@ -45,14 +44,6 @@
           "summary": { "type": "string" }
         }
       }
-    },
-    "out_of_scope_changes": {
-      "type": "array",
-      "items": { "type": "string" }
-    },
-    "risks": {
-      "type": "array",
-      "items": { "type": "string" }
     }
   }
 }

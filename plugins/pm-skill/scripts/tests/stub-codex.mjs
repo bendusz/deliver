@@ -94,11 +94,14 @@ if (env.STUB_ANSWER === '1') { fs.writeFileSync(out, 'stub answer\n'); process.e
 if (env.STUB_BAD_RESULT === '1') {
   fs.writeFileSync(out, '{"status":"done"}\n');
 } else if (env.STUB_BLOCKED_RESULT === '1') {
-  fs.writeFileSync(out, JSON.stringify({ status: 'blocked', root_cause: 'The bounded fix could not be completed.', files_changed: [], summary: ['Stopped without changing files.'], tests: [{ command: 'true', status: 'not-run', summary: 'blocked before verification' }], out_of_scope_changes: [], risks: [] }));
+  fs.writeFileSync(out, JSON.stringify({ status: 'blocked', root_cause: 'The bounded fix could not be completed.', files_changed: [], summary: ['Stopped without changing files.'], tests: [{ command: 'true', status: 'not-run', summary: 'blocked before verification' }] }));
 } else {
   const reportPath = env.STUB_OMIT_REPORT === '1' ? '' : (env.STUB_REPORT_PATH || writePath);
   let files = reportPath ? [reportPath] : [];
   if (env.STUB_DUPLICATE_REPORT === '1' && reportPath) files = [reportPath, reportPath];
-  fs.writeFileSync(out, JSON.stringify({ status: 'done', root_cause: null, files_changed: files, summary: ['Applied the focused fix.'], tests: [{ command: 'true', status: 'passed', summary: 'verification passed' }], out_of_scope_changes: [], risks: [] }));
+  const summary = env.STUB_LONG_SUMMARY === '1' ? ['a', 'b', 'c', 'd', 'e', 'f'] : ['Applied the focused fix.'];
+  const result = { status: 'done', root_cause: null, files_changed: files, summary, tests: [{ command: 'true', status: 'passed', summary: 'verification passed' }] };
+  if (env.STUB_EXTRA_RESULT_KEY === '1') { result.out_of_scope_changes = []; result.risks = []; }
+  fs.writeFileSync(out, JSON.stringify(result));
 }
 say('stub complete\n');
