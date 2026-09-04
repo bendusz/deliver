@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## 0.22.0 - 2026-09-04
+
+The parked backlog, closed.
+
+- **Kill switch.** `DELIVER_NO_ENFORCE=1` is the only name that disables the hooks;
+  `PM_SKILL_NO_ENFORCE` stopped working.
+- **Plan template.** The Stories table drops its acceptance criteria column (story files own
+  criteria); Goals and Target users are omitted when `docs/spec.md` exists.
+- **Runner envelopes.** Completed build, review, and advise envelopes carry only the fields a
+  wrapper relays: status, version, model and effort (plus `model_fallback` when it ran), changed
+  and ignored paths, the report or answer path, and the builder's result. Echoed inputs such as
+  `worktree`, `story`, `mode`, `timeout_seconds`, `sandbox`, and `git_status_short` are gone from
+  success envelopes; failure and preflight envelopes are unchanged.
+
 ## 0.21.0 - 2026-09-04
 
 The plugin is now called deliver.
