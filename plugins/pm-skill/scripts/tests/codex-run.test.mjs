@@ -15,11 +15,11 @@ import { PLUGIN_ROOT, tmpDir, gitIn, canSymlink, newBuildProject, makeStub, runR
 
 test('args: defaults per mode and validation', () => {
   const b = parseArgs(['--mode', 'build', '--worktree', '/w', '--story', 'docs/stories/S1-1.md']);
-  assert.deepEqual([b.model, b.effort, b.timeoutSeconds], ['gpt-5.6-sol', 'high', 600]);
+  assert.deepEqual([b.model, b.effort, b.timeoutSeconds], ['gpt-6-astra', 'high', 600]);
   const r = parseArgs(['--mode', 'review', '--scope', 'recent', '--out', '/w/untracked']);
-  assert.deepEqual([r.model, r.effort], ['gpt-5.6-terra', 'high']);
+  assert.deepEqual([r.model, r.effort], ['gpt-6-astra', 'high']);
   const a = parseArgs(['--mode', 'advise', '--prompt-file', '/p.md']);
-  assert.deepEqual([a.model, a.effort], ['gpt-5.6-sol', 'medium']);
+  assert.deepEqual([a.model, a.effort], ['gpt-6-astra', 'medium']);
   const s = parseArgs(['--mode', 'research', '--prompt-file', '/p.md', '--search', 'off']);
   assert.equal(s.search, 'off');
   assert.throws(() => parseArgs(['--mode', 'build', '--worktree', '/w']), UsageError);
@@ -44,10 +44,10 @@ test('args: defaults per mode and validation', () => {
 });
 
 test('argv: lockedExecArgs is the one shared flag set every mode passes', () => {
-  const o = { model: 'gpt-5.6-terra', effort: 'high' };
+  const o = { model: 'gpt-5.6-luna', effort: 'high' };
   const a = lockedExecArgs(o);
   for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral',
-    'gpt-5.6-terra', 'model_reasoning_effort=high', 'mcp_servers={}', 'features.hooks=false',
+    'gpt-5.6-luna', 'model_reasoning_effort=high', 'mcp_servers={}', 'features.hooks=false',
     'agents.enabled=false', 'web_search="disabled"']) assert.ok(a.includes(x), x);
   // `codex exec review` rejects these, so no mode may inherit them from the shared set.
   for (const x of ['--sandbox', '-C', '--color', '--skip-git-repo-check', '-o', '--output-schema']) {
@@ -253,7 +253,7 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
-  const common = ['--ignore-user-config', '--ignore-rules', '--strict-config', '--sandbox', '--ephemeral', '--color', 'never', '-C', p, 'gpt-5.6-sol', 'model_reasoning_effort=high', 'allow_login_shell=false', 'agents.enabled=false', 'web_search="disabled"', 'mcp_servers={}', 'features.hooks=false', '--output-schema', '-o', '-'];
+  const common = ['--ignore-user-config', '--ignore-rules', '--strict-config', '--sandbox', '--ephemeral', '--color', 'never', '-C', p, 'gpt-6-astra', 'model_reasoning_effort=high', 'allow_login_shell=false', 'agents.enabled=false', 'web_search="disabled"', 'mcp_servers={}', 'features.hooks=false', '--output-schema', '-o', '-'];
   for (const x of common) assert.ok(has(a, x), `missing ${x}`);
   if (WIN) {
     assert.ok(has(a, 'danger-full-access'));
@@ -273,8 +273,57 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, or docs\/constitution\.md\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /summary holds at most five short strings\./);
   assert.equal(fs.readdirSync(s.tmp).length, 0);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')) || fs.readdirSync(path.join(p, 'tmp', 'codex-runtime')).length === 0);
+});
+
+test('model fallback: an unsupported default model retries once on the mode fallback and records it', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_WRITE_PATH: 'src/fix.txt' } });
+  assert.equal(r.status, 0);
+  assert.deepEqual([r.out.model, r.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.deepEqual(r.out.model_fallback.from, { model: 'gpt-6-astra', effort: 'high' });
+  assert.deepEqual(r.out.model_fallback.to, { model: 'gpt-5.6-sol', effort: 'medium' });
+  assert.match(r.out.model_fallback.reason, /not supported when using Codex/);
+  assert.equal((stubActions(s).match(/^exec(?! --help)/gm) || []).length, 2);
+  assert.ok(has(stubArgs(s), 'gpt-5.6-sol'));
+  assert.ok(has(stubArgs(s), 'model_reasoning_effort=medium'));
+});
+
+test('model fallback: an explicit --model never falls back; other failures never fall back; success carries no field', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const explicit = runRunner(['--mode', 'build', '--model', 'gpt-6-astra'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra' } });
+  assert.equal(explicit.status, 70); assert.equal(explicit.out.model_fallback, undefined);
+  assert.equal((stubActions(s).match(/^exec(?! --help)/gm) || []).length, 1);
+  const s2 = makeStub();
+  const other = runRunner(['--mode', 'build'], { project: p, stub: s2, env: { STUB_EXEC_EXIT: '5' } });
+  assert.equal(other.status, 70); assert.equal(other.out.model_fallback, undefined);
+  assert.equal((stubActions(s2).match(/^exec(?! --help)/gm) || []).length, 1);
+  const s3 = makeStub();
+  const ok = runRunner(['--mode', 'build'], { project: p, stub: s3, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+  assert.equal(ok.status, 0); assert.equal(ok.out.model, 'gpt-6-astra'); assert.equal('model_fallback' in ok.out, false);
+});
+
+test('model fallback: review and advise take the same gpt-5.6-sol fallback at medium', () => {
+  const p = newBuildProject(true);
+  const s = makeStub();
+  const rv = runRunner(['--mode', 'review', '--scope', 'codebase', '--out', path.join(p, 'untracked')], { stub: s, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra' } });
+  assert.equal(rv.status, 0); assert.deepEqual([rv.out.model, rv.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.equal(rv.out.model_fallback.to.model, 'gpt-5.6-sol');
+  const brief = path.join(s.dir, 'brief.md'); fs.writeFileSync(brief, 'Should we use X or Y?\n');
+  const s2 = makeStub();
+  const ad = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s2, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_ANSWER: '1' } });
+  assert.equal(ad.status, 0); assert.deepEqual([ad.out.model, ad.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.equal(ad.out.model_fallback.to.model, 'gpt-5.6-sol');
+});
+
+test('model fallback: a failure after the fallback names the model that ran', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_EXEC_EXIT: '5' } });
+  assert.equal(r.status, 70, JSON.stringify(r.out));
+  assert.deepEqual([r.out.model, r.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.equal(r.out.model_fallback.to.model, 'gpt-5.6-sol');
 });
 
 test('build 6: fix mode passes the evidence brief', () => {
@@ -532,6 +581,20 @@ test('build 23: preflight checks readiness without a model task', () => {
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')));
 });
 
+test('build 31: a legacy result key outside the contract fails closed', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt', STUB_EXTRA_RESULT_KEY: '1' } });
+  assert.equal(r.status, 70, JSON.stringify(r.out));
+  assert.match(r.out.reason, /builder result contract/);
+});
+
+test('build 32: a summary over five items fails closed', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt', STUB_LONG_SUMMARY: '1' } });
+  assert.equal(r.status, 70, JSON.stringify(r.out));
+  assert.match(r.out.reason, /builder result contract/);
+});
+
 test('build 26: duplicate reported paths are rejected', () => {
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt', STUB_DUPLICATE_REPORT: '1' } });
@@ -558,7 +621,7 @@ test('review: recent scope with an objective goes through exec review with promp
   const a = stubArgs(s);
   assert.equal(a[0], 'review');
   for (const x of ['--sandbox', '-C', '--cd', '--color', '--commit']) assert.ok(!has(a, x), `must not pass ${x}`);
-  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral', 'gpt-5.6-terra', 'model_reasoning_effort=high', '-o']) assert.ok(has(a, x), x);
+  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral', 'gpt-6-astra', 'model_reasoning_effort=high', '-o']) assert.ok(has(a, x), x);
   // A trusted repository's .codex/config.toml must not be able to start MCP processes,
   // hooks, or agents, or turn web search back on, in a read-only mode.
   for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false', 'web_search="disabled"']) assert.ok(has(a, x), x);
@@ -715,7 +778,7 @@ test('advise: read-only exec with the prompt on stdin, answer retained', () => {
   const r = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_ANSWER: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
-  for (const x of ['--sandbox', 'read-only', '--ephemeral', '--color', 'never', '--ignore-user-config', '--ignore-rules', '--strict-config', 'gpt-5.6-sol', 'model_reasoning_effort=medium', '-o', '-']) assert.ok(has(a, x), x);
+  for (const x of ['--sandbox', 'read-only', '--ephemeral', '--color', 'never', '--ignore-user-config', '--ignore-rules', '--strict-config', 'gpt-6-astra', 'model_reasoning_effort=medium', '-o', '-']) assert.ok(has(a, x), x);
   for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false', 'web_search="disabled"']) assert.ok(has(a, x), x);
   assert.ok(!has(a, '--search') && !has(a, '--skip-git-repo-check'));
   assert.equal(fs.readFileSync(s.promptFile, 'utf8'), 'Should we use X or Y?\n');
@@ -735,7 +798,7 @@ test('research: adds --search when available and --skip-git-repo-check outside a
   assert.ok(!has(stubArgs(s), 'web_search="disabled"'));
   for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false']) assert.ok(has(stubArgs(s), x), x);
   assert.equal(withSearch.out.search_used, true);
-  assert.ok(has(stubArgs(s), 'gpt-5.6-terra'));
+  assert.ok(has(stubArgs(s), 'gpt-6-astra'));
   const off = runRunner(['--mode', 'research', '--prompt-file', brief, '--search', 'off'], { stub: s, cwd: noRepo, env: { STUB_ANSWER: '1', STUB_HAS_SEARCH: '1' } });
   assert.ok(!has(stubArgs(s), '--search'));
   assert.ok(has(stubArgs(s), 'web_search="disabled"'));

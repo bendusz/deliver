@@ -4,7 +4,7 @@ Control cost and quality by giving heavier work a stronger model and routine wor
 This file is repository documentation. The agents do not load it; each one pins its own model and
 effort in its frontmatter.
 
-## Shipped defaults (v0.18)
+## Shipped defaults (v0.19)
 
 Every agent declares a model and effort level. Opus roles use `claude-opus-5` instead of the moving
 `opus` alias, so a future Opus release cannot change the gate-bearing fleet without an explicit
@@ -14,7 +14,7 @@ silent change carries less delivery risk.
 | Agent | Model | Effort | Why |
 | --- | --- | --- | --- |
 | `expert-builder` | `claude-opus-5` | `high` | broad implementation at the deepest shipped Opus effort |
-| `codex-builder` | `sonnet` | `medium` | thin wrapper; local Codex implements at `gpt-5.6-sol` / `high` |
+| `codex-builder` | `sonnet` | `medium` | thin wrapper; local Codex implements at `gpt-6-astra` / `high`, falling back to `gpt-5.6-sol` / `medium` when the account refuses it |
 | `security-auditor` | `claude-opus-5` | `high` | adversarial security reasoning rewards extra thinking depth |
 | `debugger` | `claude-opus-5` | `high` | root-cause analysis is the workflow's hardest read-only task |
 | `code-integrity-reviewer` | `claude-opus-5` | `medium` | judgement-heavy review at standard depth |
@@ -43,8 +43,9 @@ the Claude Code version, and flags host-level model or effort overrides. A model
 guessed is not evidence.
 
 `codex-builder` has two model settings. Its Claude wrapper stays on `sonnet` / `medium`; the bundled
-runner defaults the implementation run to `gpt-5.6-sol` / `high`. Override the inner model or effort
-only in an explicit dispatch. Valid Sol efforts are `none|minimal|low|medium|high|xhigh|max`. The
+runner defaults the implementation run to `gpt-6-astra` / `high`, with a one-time
+fallback to `gpt-5.6-sol` / `medium` when the account refuses it. Override the inner model or effort only in an
+explicit dispatch. Valid efforts are `none|minimal|low|medium|high|xhigh|max`. The
 runner ignores Codex user config and overrides safety-sensitive project settings, so local defaults
 cannot silently change its sandbox, model, effort, network, web, MCP, or hook posture.
 

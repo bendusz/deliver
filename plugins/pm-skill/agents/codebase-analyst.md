@@ -23,4 +23,4 @@ exist.
   patterns to follow.
 - Risks. Fragile areas, missing tests, surprising coupling, anything that would trip an implementer.
 
-Investigate and report. Do not change anything, and do not dump file contents.
+Do not change anything, and do not dump file contents.

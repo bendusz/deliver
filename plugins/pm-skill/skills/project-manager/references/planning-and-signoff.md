@@ -12,14 +12,8 @@ unfamiliar SDK, dispatch `researcher`, and `codex-researcher` alongside it for a
 contested call when the codex CLI is installed. Then cite the `docs/research/` reports in the plan's
 decisions. With a wiki, ingest each report per `knowledge.md`.
 
-Design exploration, optional: if a design-exploration skill is installed, for example
-`poteto:architect`, which sketches types, signatures, and module boundaries across several competing
-candidates before any code, run it for the plan's Architecture section on greenfield work and for any
-decision with more than one viable shape. Design only: invoke it with a checkpoint
-(`/poteto:architect with checkpoint`) and stop at the synthesized sketch. Its implementation phases
-never run before sign-off, per hard rule 3, and the PM never runs them at all, because code is the
-story builder's job. Fold the sketch and its rationale into Architecture and list the rejected
-alternatives under Risks.
+When the Architecture section has more than one viable shape, `design-exploration.md` owns the
+optional design pass that settles it before sign-off.
 
 ## 1. Write `docs/plan.md`
 If `docs/spec.md` exists, the plan derives from it: turn its requirements into delivery work and
@@ -35,25 +29,12 @@ pm/actors/<actor-id>.json` must fail. Check the files, not the directory, since 
 the files while a directory check passes; fix the rule if anything matches. Append
 `pm/log.md merge=union` to `.gitattributes`, creating it if it is missing and without clobbering
 other rules, so concurrent log appends merge cleanly. **Commit** `pm/` and `.gitattributes` from the
-first state write onward, per `logging-and-state.md`, and never write secrets into `pm/`. Then create
-`docs/plan.md` with these sections:
-- **Overview.** What and why, in 2 to 3 sentences.
-- **Source spec.** Link `docs/spec.md`, or note "none, intent captured inline".
-- **Delivery mode.** The scale (`tiny` to `regulated`, see `scale-profiles.md`), the checkpoint
-  policy, and `Instruction rules: none | pm-state`.
-- **Goals** and **Target users**.
-- **Scope.** In and Out, being explicit about what you are *not* doing.
-- **Stories.** A table:
-  `| id | title | priority | covers | acceptance criteria | depends-on | [P] |`. Acceptance criteria
-  must be testable, and `covers` lists the spec IDs (`FR-` and `AC-`) each story satisfies.
-- **Architecture.** Stack, key decisions, patterns.
-- **Traceability.** Every spec requirement maps to at least one story; flag any that do not.
-- **Non-functional requirements.** Performance, security, and the like.
-- **Commands.** The project's real `test`, `lint`, `build`, and `run` commands. If one does not
-  exist, write `N/A`, which you will honour in the gates later. Discover these now.
-- **Risks** and any open questions.
-- **Clarifications.** Must be empty before sign-off, here and in `docs/spec.md`.
-- **Sign-off.** A line to be filled: `Approved by <name> on YYYY-MM-DD`.
+first state write onward, per `logging-and-state.md`, and never write secrets into `pm/`. Then
+create `docs/plan.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.template`, whose comments define
+each section. Three rules the template cannot hold: the Stories table's `covers` column names the
+spec IDs each story satisfies and its criteria must be testable; Traceability maps every spec
+requirement to at least one story and flags any that is not; Commands are the project's real `test`,
+`lint`, `build`, and `run`, discovered now, with `N/A` where one does not exist.
 
 Present it and iterate with the user until they are happy. For a larger project, run
 `/pm-skill:analyze` before decomposition, optionally on the drafted plan before you record sign-off,

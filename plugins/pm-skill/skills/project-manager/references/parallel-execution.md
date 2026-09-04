@@ -83,14 +83,5 @@ Track the batch in **your** `pm/actors/<you>.json` `parallel_batch`, each entry
 caps survive a session loss. The batch is per-actor; cross-actor coordination happens through
 `assignments`, never through another actor's batch.
 
-On resume, from the main checkout:
-- Continue each story with its persisted `builder`. Never resolve `auto` after a session loss.
-- Reconcile `parallel_batch` against `git worktree list`. **Log** any worktree that vanished
-  externally rather than moving on silently. Only work committed to the story branch survived, so
-  check it before assuming the story is intact.
-- A `building`, `built`, or `in-review` worktree with uncommitted changes is the expected state
-  before the tail commits. Re-run the scope check, then re-enter the tail at step 1.
-- For a `blocked` story, present the blocker to the user and re-enter the continuation its
-  `pm/log.md` note calls for, resolving the tip-merge conflict from step 3 or re-running loop state
-  4, before continuing the remaining unmerged stories.
-- Then `git worktree prune` true orphans and continue the integration tail.
+After an interruption, `resume-procedure.md`'s Parallel batches section owns the reconciliation and
+where each story re-enters.

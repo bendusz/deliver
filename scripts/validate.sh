@@ -184,18 +184,20 @@ for md in plugins/pm-skill/agents/*.md; do
 done
 
 # 15) behavioral tests (quota-free; needs jq + git, both required above)
-if ! node --test plugins/pm-skill/scripts/tests/lib.test.mjs plugins/pm-skill/scripts/tests/hooks.test.mjs >/dev/null 2>&1; then
-  node --test plugins/pm-skill/scripts/tests/lib.test.mjs plugins/pm-skill/scripts/tests/hooks.test.mjs || true
-  err "hook behavioral tests failed (node --test plugins/pm-skill/scripts/tests)"
-fi
-if ! node --test plugins/pm-skill/scripts/tests/codex-run.test.mjs >/dev/null 2>&1; then
-  node --test plugins/pm-skill/scripts/tests/codex-run.test.mjs || true
-  err "Codex runner tests failed (node --test plugins/pm-skill/scripts/tests/codex-run.test.mjs)"
-fi
-if ! bash "$(dirname "$0")/test-builder-benchmark.sh" >/dev/null 2>&1; then
-  bash "$(dirname "$0")/test-builder-benchmark.sh" || true
-  err "builder benchmark tests failed (scripts/test-builder-benchmark.sh)"
-fi
+# Each suite runs once. Its output is captured and printed only when it fails, so a flaky
+# second run cannot change the diagnostics.
+suite(){
+  label="$1"; shift
+  log="$(mktemp)"
+  if ! "$@" >"$log" 2>&1; then cat "$log"; err "$label"; fi
+  rm -f "$log"
+}
+suite "hook behavioral tests failed (node --test plugins/pm-skill/scripts/tests)" \
+  node --test plugins/pm-skill/scripts/tests/lib.test.mjs plugins/pm-skill/scripts/tests/hooks.test.mjs
+suite "Codex runner tests failed (node --test plugins/pm-skill/scripts/tests/codex-run.test.mjs)" \
+  node --test plugins/pm-skill/scripts/tests/codex-run.test.mjs
+suite "builder benchmark tests failed (scripts/test-builder-benchmark.sh)" \
+  bash "$(dirname "$0")/test-builder-benchmark.sh"
 
 # 16) poteto companion plugin (plugins/poteto): manifest, attribution, skills, no Cursor residue
 pp=plugins/poteto

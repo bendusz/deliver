@@ -6,7 +6,7 @@ import { RunnerError } from '../lib/result.mjs';
 import { toplevel, isTracked, checkIgnore, gitOut, gitOk } from '../lib/git.mjs';
 import { parseStory } from '../lib/story.mjs';
 import { requireCodex, BUILD_FLAGS } from '../lib/preflight.mjs';
-import { runCodex } from '../lib/spawn.mjs';
+import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch, runtimeTmp, assertRuntimeRootReal } from '../lib/scratch.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../lib/snapshot.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
@@ -40,21 +40,19 @@ export function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
     'Run the story verification command and the relevant project tests before reporting done.',
     'Stay inside the allowed implementation paths. Do not use the network, change git state, or edit pm/, stories, docs/wiki/, docs/spec.md, docs/plan.md, or docs/constitution.md.',
     'Your shell environment is reduced and secret-like variables are removed. TMPDIR is an isolated directory inside this worktree.',
-    'Return only JSON matching the supplied schema. List every changed path in files_changed. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
+    'Return only JSON matching the supplied schema. List every changed path in files_changed. summary holds at most five short strings. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
   return `${lines.join('\n')}\n`;
 }
 
 export function validateBuilderResult(r) {
   const noCtl = (s) => typeof s === 'string' && !/[\x00-\x1f\x7f]/.test(s);
   if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
-  if (JSON.stringify(Object.keys(r).sort()) !== '["files_changed","out_of_scope_changes","risks","root_cause","status","summary","tests"]') return false;
+  if (JSON.stringify(Object.keys(r).sort()) !== '["files_changed","root_cause","status","summary","tests"]') return false;
   if (r.status !== 'done' && r.status !== 'blocked') return false;
   if (!(typeof r.root_cause === 'string' || r.root_cause === null)) return false;
   if (!Array.isArray(r.files_changed) || new Set(r.files_changed).size !== r.files_changed.length || !r.files_changed.every(noCtl)) return false;
-  if (!Array.isArray(r.summary) || r.summary.length === 0 || !r.summary.every((s) => typeof s === 'string')) return false;
+  if (!Array.isArray(r.summary) || r.summary.length === 0 || r.summary.length > 5 || !r.summary.every((s) => typeof s === 'string')) return false;
   if (!Array.isArray(r.tests) || r.tests.length === 0 || !r.tests.every((t) => t && typeof t === 'object' && typeof t.command === 'string' && ['passed', 'failed', 'not-run'].includes(t.status) && typeof t.summary === 'string')) return false;
-  if (!Array.isArray(r.out_of_scope_changes) || !r.out_of_scope_changes.every((s) => typeof s === 'string')) return false;
-  if (!Array.isArray(r.risks) || !r.risks.every((s) => typeof s === 'string')) return false;
   if (r.status === 'done' && !r.tests.every((t) => t.status === 'passed')) return false;
   return true;
 }
@@ -130,7 +128,8 @@ export async function runBuild(o) {
     } catch { /* best effort */ }
   };
   const files = { prompt: path.join(scratch, 'prompt.md'), result: path.join(scratch, 'result.json'), stdout: path.join(scratch, 'stdout.log'), stderr: path.join(scratch, 'stderr.log') };
-  const diag = (codexExit, actual, ignoredChanged) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, actual_files_changed: actual, ignored_files_changed: ignoredChanged });
+  // The model pair and model_fallback appear only after a fallback, so a failure names what ran.
+  const diag = (codexExit, actual, ignoredChanged) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, ...(fallback ? { model, effort, model_fallback: fallback } : {}), actual_files_changed: actual, ignored_files_changed: ignoredChanged });
 
   const prompt = buildPrompt({ worktree, storyRel, scopes, mode: o.mode, evidenceRel });
   try { fs.writeFileSync(files.prompt, prompt); } catch { cleanupRuntime(); throw new RunnerError('failed', 'could not write the prompt', { scratch_dir: scratch, codex_version: version }); }
@@ -141,15 +140,15 @@ export async function runBuild(o) {
 
   const sandboxArgs = WIN ? ['--sandbox', 'danger-full-access'] : ['--sandbox', 'workspace-write'];
   const sandboxConfig = WIN ? [] : ['-c', 'sandbox_workspace_write.network_access=false', '-c', 'sandbox_workspace_write.exclude_slash_tmp=true', '-c', 'sandbox_workspace_write.exclude_tmpdir_env_var=true'];
-  const args = ['exec', ...lockedExecArgs(o), '-C', worktree, ...sandboxArgs, '--color', 'never',
+  const argsFor = ({ model, effort }) => ['exec', ...lockedExecArgs({ ...o, model, effort }), '-C', worktree, ...sandboxArgs, '--color', 'never',
     '-c', 'allow_login_shell=false', ...sandboxConfig,
     '-c', 'shell_environment_policy.inherit="core"', '-c', 'shell_environment_policy.ignore_default_excludes=false', '-c', 'shell_environment_policy.experimental_use_profile=false',
     '-c', `shell_environment_policy.set.TMPDIR=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TMP=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TEMP=${tomlString(rt)}`,
     '--output-schema', SCHEMA, '-o', files.result, '-'];
 
-  let run;
+  let run; let model; let effort; let fallback;
   try {
-    run = await runCodex(found, args, { stdinText: prompt, cwd: worktree, env: { ...process.env, TMPDIR: rt, TMP: rt, TEMP: rt }, timeoutSeconds: o.timeoutSeconds, stdoutPath: files.stdout, stderrPath: files.stderr });
+    ({ run, model, effort, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText: prompt, cwd: worktree, env: { ...process.env, TMPDIR: rt, TMP: rt, TEMP: rt }, timeoutSeconds: o.timeoutSeconds, stdoutPath: files.stdout, stderrPath: files.stderr }));
   } catch (e) { cleanupRuntime(); throw new RunnerError('failed', `could not start codex: ${e.message}`, { scratch_dir: scratch, codex_version: version }); }
   cleanupRuntime();
 
@@ -191,7 +190,7 @@ export async function runBuild(o) {
   }
   if (JSON.stringify([...new Set(claimed)].sort()) !== JSON.stringify(actual)) throw safety('Codex files_changed does not match the authoritative before/after worktree delta');
 
-  const envelope = { runner_status: 'completed', codex_version: version, model: o.model, effort: o.effort, worktree, story: storyRel, mode: o.mode, timeout_seconds: o.timeoutSeconds, sandbox: WIN ? 'none (win32)' : 'workspace-write', diagnostics_retained: false, actual_files_changed: actual, ignored_files_changed: ignoredChanged, git_status_short: gitStatus, result };
+  const envelope = { runner_status: 'completed', codex_version: version, model, effort, worktree, story: storyRel, mode: o.mode, timeout_seconds: o.timeoutSeconds, sandbox: WIN ? 'none (win32)' : 'workspace-write', diagnostics_retained: false, actual_files_changed: actual, ignored_files_changed: ignoredChanged, git_status_short: gitStatus, ...(fallback ? { model_fallback: fallback } : {}), result };
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
   return { exit: 0, envelope };
 }

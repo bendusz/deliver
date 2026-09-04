@@ -20,6 +20,10 @@ export function envelope(status, reason, extra = {}) {
     scratch_dir,
     codex_version,
     codex_exit: codex_exit === '' || codex_exit === null || codex_exit === undefined ? '' : String(codex_exit),
+    // Present only after a model fallback, so a failure envelope names the pair that ran.
+    ...(extra.model ? { model: extra.model } : {}),
+    ...(extra.effort ? { effort: extra.effort } : {}),
+    ...(extra.model_fallback ? { model_fallback: extra.model_fallback } : {}),
     diagnostics_retained: scratch_dir !== '',
   };
   if (Array.isArray(actual_files_changed)) {

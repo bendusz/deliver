@@ -31,7 +31,7 @@ if (argv[0] !== 'exec') { err('unexpected stub command\n'); process.exit(2); }
 const rest = argv.slice(1);
 const isReview = rest[0] === 'review';
 fs.writeFileSync(env.STUB_ARGS, '');
-let out = ''; let worktree = process.cwd(); let positional = [];
+let out = ''; let worktree = process.cwd(); let positional = []; let model = '';
 for (let i = 0; i < rest.length; i++) {
   const a = rest[i];
   append(env.STUB_ARGS, `${a}\n`);
@@ -39,6 +39,7 @@ for (let i = 0; i < rest.length; i++) {
     const v = rest[++i]; append(env.STUB_ARGS, `${v}\n`);
     if (a === '-o' || a === '--output-last-message') out = v;
     if (a === '-C' || a === '--cd') worktree = v;
+    if (a === '-m' || a === '--model') model = v;
   } else if (a === '-') {
     fs.writeFileSync(env.STUB_PROMPT, fs.readFileSync(0, 'utf8'));
   } else if (!a.startsWith('--') && a !== 'review') {
@@ -46,6 +47,11 @@ for (let i = 0; i < rest.length; i++) {
   }
 }
 if (positional.length) fs.writeFileSync(env.STUB_PROMPT, positional.join('\n'));
+
+if (env.STUB_UNSUPPORTED_MODEL && model === env.STUB_UNSUPPORTED_MODEL) {
+  err(`ERROR: {"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The '${model}' model is not supported when using Codex with a ChatGPT account."}}\n`);
+  process.exit(1);
+}
 
 if (isReview) {
   if (env.STUB_EXEC_EXIT && env.STUB_EXEC_EXIT !== '0') { err('stub review failure\n'); process.exit(Number(env.STUB_EXEC_EXIT)); }
@@ -88,11 +94,14 @@ if (env.STUB_ANSWER === '1') { fs.writeFileSync(out, 'stub answer\n'); process.e
 if (env.STUB_BAD_RESULT === '1') {
   fs.writeFileSync(out, '{"status":"done"}\n');
 } else if (env.STUB_BLOCKED_RESULT === '1') {
-  fs.writeFileSync(out, JSON.stringify({ status: 'blocked', root_cause: 'The bounded fix could not be completed.', files_changed: [], summary: ['Stopped without changing files.'], tests: [{ command: 'true', status: 'not-run', summary: 'blocked before verification' }], out_of_scope_changes: [], risks: [] }));
+  fs.writeFileSync(out, JSON.stringify({ status: 'blocked', root_cause: 'The bounded fix could not be completed.', files_changed: [], summary: ['Stopped without changing files.'], tests: [{ command: 'true', status: 'not-run', summary: 'blocked before verification' }] }));
 } else {
   const reportPath = env.STUB_OMIT_REPORT === '1' ? '' : (env.STUB_REPORT_PATH || writePath);
   let files = reportPath ? [reportPath] : [];
   if (env.STUB_DUPLICATE_REPORT === '1' && reportPath) files = [reportPath, reportPath];
-  fs.writeFileSync(out, JSON.stringify({ status: 'done', root_cause: null, files_changed: files, summary: ['Applied the focused fix.'], tests: [{ command: 'true', status: 'passed', summary: 'verification passed' }], out_of_scope_changes: [], risks: [] }));
+  const summary = env.STUB_LONG_SUMMARY === '1' ? ['a', 'b', 'c', 'd', 'e', 'f'] : ['Applied the focused fix.'];
+  const result = { status: 'done', root_cause: null, files_changed: files, summary, tests: [{ command: 'true', status: 'passed', summary: 'verification passed' }] };
+  if (env.STUB_EXTRA_RESULT_KEY === '1') { result.out_of_scope_changes = []; result.risks = []; }
+  fs.writeFileSync(out, JSON.stringify(result));
 }
 say('stub complete\n');

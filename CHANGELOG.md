@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## 0.19.0 - 2026-09-04
+
+Less to load, one place per rule, and a new Codex default.
+
+- **`gpt-6-astra` by default.** Every Codex mode defaults to `gpt-6-astra`. When the API refuses
+  the model for the account in use, the runner retries once on `gpt-5.6-sol` at `medium` and reports
+  `model_fallback` in the envelope. An explicit `--model` never falls back.
+- **Clean-path implementation loop.** Fix rounds, triage, the debugger rule, and the round cap moved
+  to `references/fix-loop.md`, loaded only when a gate fails or a finding is open. Lens selection
+  stays in `review-gates.md`; the merge message grammar sits at the ship state.
+- **Templates own fields.** `planning-and-signoff.md`, `decomposition.md`, and the handoff command
+  point at their templates and keep only the rules a template cannot hold.
+- **Codex contract in one place.** `docs/codex-cli-reference.md` documents the runner's flags, exit
+  codes, and envelope fields, and points at the runtime code for exact argument lists;
+  `codex-review` stops repeating the runner's preflight checks.
+- **Builder result schema.** `out_of_scope_changes` and `risks` removed; `summary` capped at five
+  items.
+- **Cleanups.** One process-tree kill path in the runner; hook secret-scanner tests deduplicated
+  against the library tests; the verification template's verifier section no longer repeats the
+  gate and review rows; `technical-writer`'s description matches its bounded inputs.
+
 ## 0.18.0 - 2026-09-04
 
 A project wiki with one writer.

@@ -11,7 +11,8 @@ color: green
 - The story file: goal, `Covers:` IDs, acceptance criteria, verification command.
 - The covered `FR-` and `AC-` entries from `docs/spec.md`, and the Commands section of
   `docs/plan.md`. Read neither whole.
-- The diff text, the reviewer findings, and the PM's gate results.
+- The diff, open `block` or `major` findings, and, only for a check you cannot safely rerun, that
+  check's command, status, and evidence path.
 - The artifact paths the PM captured from the running app.
 
 ## Safe commands

@@ -11,21 +11,22 @@ Codex forms the opinion, not you. Never run `codex` outside the bundled runner.
 
 ## Inputs
 - `Brief`: the PM's self-contained question.
-- Optional `Model`, `Effort`, and `Timeout seconds`, defaulting to `gpt-5.6-sol`, `medium`, and 600.
+- Optional `Model`, `Effort`, and `Timeout seconds`, defaulting to `gpt-6-astra`, `medium`, and 600.
+  The runner's fallback is `gpt-5.6-sol` at `medium`.
 
 ## Run
-Write the brief verbatim with the `Write` tool, not a Bash heredoc, to a temp file outside the
-repository as `$BRIEF`. Then run once, in the foreground, from the repository root.
+Write the brief verbatim with the `Write` tool, not a Bash heredoc, to `$BRIEF`, a temp file outside
+the repository. Then run once, in the foreground, from the repository root.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" \
   --mode advise --prompt-file "$BRIEF"
 ```
 
-Add `--model`, `--effort`, or `--timeout-seconds` only when the dispatch names them. Nothing else.
+Add `--model`, `--effort`, or `--timeout-seconds` only when the dispatch names them, nothing else.
 
-## Return (at most 20 lines)
+## Return, 20 lines or fewer
 Read `answer_path` and condense it, attributed as "Codex (<model>) recommends ...", then
-`codex_version`, the model, and the effort. Never return `answer_path`, and delete exactly the
-scratch directory the envelope named, with `rm -rf`, or `Remove-Item -Recurse -Force` on Windows. On
-a non-zero exit, return the runner status, reason, and retained diagnostics, without retrying.
+`codex_version`, model, and effort. Never return `answer_path`, and delete exactly the
+scratch directory the envelope named (`rm -rf`, or `Remove-Item -Recurse -Force` on Windows). On a
+non-zero exit, return the runner status, reason, and retained diagnostics, without retrying.

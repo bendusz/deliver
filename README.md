@@ -98,8 +98,8 @@ implementation, failing tests, and localized fixes with concrete evidence. Both 
 deterministic gates, independent review panel, and final verifier.
 
 Default check-in is sprint-level, so you review at each sprint boundary, and it is configurable to
-story-level or fully autonomous. Pick a scale, `tiny` through `regulated`, to right-size the
-workflow: tiny work stays lightweight, and regulated work makes every gate mandatory.
+story-level or `autonomous`. Choose a scale from `tiny` through `regulated` to right-size the
+workflow. Tiny work stays lightweight, and regulated work makes every gate mandatory.
 
 ## Commands
 
@@ -117,7 +117,7 @@ workflow: tiny work stays lightweight, and regulated work makes every gate manda
 | `/pm-skill:handoff` | End a session cleanly by writing a token-efficient `pm/actors/<id>.HANDOFF.md` briefing for the next agent. |
 | `/pm-skill:resume` | Read saved state, handoff, and logbook, then continue where you left off. |
 | `/pm-skill:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
-| `/pm-skill:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-5.6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
+| `/pm-skill:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-6-astra` at `medium` with a one-time fallback to `gpt-5.6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
 
 ## Artifacts
 
@@ -177,7 +177,7 @@ under `tmp/`; the report directories sit at the repository root:
   and `.gitattributes`, fails open on any uncertainty, and does not see writes made through `Bash`.
 - **Guarded Codex writes.** Codex builds require signed-off tracked state and bounded story touch
   paths. POSIX runs use `workspace-write`. Windows runs with full host access and an after-run
-  worktree audit. See `docs/codex-cli-reference.md` for the exact flags, audited state, exit codes,
+  worktree audit. See `docs/codex-cli-reference.md` for the flag matrix, audited state, exit codes,
   and platform limits.
 - Repository `AGENTS.md` and `CLAUDE.md`, and non-safety project configuration, remain trusted
   project inputs. Command-line overrides win for every safety-sensitive setting above. This is an OS
@@ -192,8 +192,8 @@ under `tmp/`; the report directories sit at the repository root:
   created for the current story, runs `git init` only after asking, and never pushes without an
   explicit request.
 - **Optional hardening.** For mechanical enforcement of a read-only Bash posture and sign-off, the
-  bundled hardening guide uses plain Claude Code permissions and hooks, with no external process or
-  dependency.
+  bundled hardening guide uses Claude Code permissions and hooks. Its verifier Bash allowlist
+  requires `jq`.
 
 Three of the four bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
 tools; the fourth runs at session start and only reads `pm/`. None is a security boundary. Bash
@@ -207,7 +207,7 @@ writes elsewhere on the machine and any network use are not detectable, and out-
 the worktree are reported after the fact, as a safety violation with changes preserved, rather than
 prevented. Review, advice, and research modes are read-only on every platform.
 
-## Optional enhancements (they work alongside and are not required)
+## Optional tools
 
 pm-skill needs none of the optional tools below. If your environment has any of them, the PM may
 prefer them where useful.

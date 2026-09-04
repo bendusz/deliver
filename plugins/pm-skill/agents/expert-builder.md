@@ -15,9 +15,9 @@ color: blue
 - The project `AGENTS.md`, for stack, commands, conventions.
 
 ## How you work
-Re-ground before editing. Read the story, `AGENTS.md`, and the files and symbols its Context names.
-Search the implicated area when the story needs a complete inventory. Treat preloaded context as
-incomplete. Return blocked before editing if a named source is missing.
+Re-ground before editing: read the story, `AGENTS.md`, and the files and symbols its Context names,
+search the implicated area when a complete inventory matters, treat preloaded context as incomplete,
+and return blocked when a named source is missing.
 
 The story is the contract. Build its goal, stay inside `pm-meta.touches`, satisfy its acceptance
 criteria and verification command, and do nothing its out-of-scope section names. Then stop.

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { RunnerError } from './result.mjs';
 import { CMD_FALLBACK_SUFFIX } from './preflight.mjs';
+import { FALLBACK } from './args.mjs';
 
 const WIN = process.platform === 'win32';
 
@@ -12,9 +13,11 @@ function cmdSafe(args) {
   return args.map((a) => (/[\s&|<>^()]/.test(a) ? `"${a}"` : a));
 }
 
-function killTree(pid, signal) {
+// groupOnly skips the single-PID fallback. Use it once the child is already reaped, where
+// that fallback could only signal a dead or recycled PID.
+function killTree(pid, signal, { groupOnly = false } = {}) {
   if (WIN) { try { spawnSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true }); } catch { /* gone */ } return; }
-  try { process.kill(-pid, signal); } catch { try { process.kill(pid, signal); } catch { /* gone */ } }
+  try { process.kill(-pid, signal); } catch { if (groupOnly) return; try { process.kill(pid, signal); } catch { /* gone */ } }
 }
 
 // runCodex: spawn codex with the prompt on stdin, stdout/stderr to files, a hard
@@ -56,15 +59,11 @@ export function runCodex(found, args, { stdinText, cwd, env, timeoutSeconds, std
       try { fs.closeSync(outFd); } catch {}
       try { fs.closeSync(errFd); } catch {}
     };
-    // reapDescendants kills descendants that stayed in the process group; a grandchild
-    // that called setsid() is out of reach. Best effort, never fatal.
-    const reapDescendants = () => {
-      if (WIN) { try { spawnSync('taskkill', ['/T', '/F', '/PID', String(child.pid)], { stdio: 'ignore', windowsHide: true }); } catch { /* gone */ } return; }
-      try { process.kill(-child.pid, 'SIGKILL'); } catch { /* no surviving group */ }
-    };
     child.on('error', (e) => { cleanup(); reject(e); });
     child.on('exit', (code, signal) => {
-      reapDescendants();
+      // Kills descendants that stayed in the process group; a grandchild that called
+      // setsid() is out of reach. Best effort, never fatal.
+      killTree(child.pid, 'SIGKILL', { groupOnly: true });
       cleanup();
       const exit = code === null ? 128 + (signal === 'SIGKILL' ? 9 : 15) : code;
       resolve({ exit, timedOut, interrupted });
@@ -72,4 +71,35 @@ export function runCodex(found, args, { stdinText, cwd, env, timeoutSeconds, std
     child.stdin.on('error', () => {});
     child.stdin.end(stdinText === undefined ? '' : stdinText);
   });
+}
+
+// The API refuses some models for some account types with a 400 on stdout or stderr.
+export const UNSUPPORTED_MODEL = 'is not supported when using Codex';
+
+// Matches only a line that names the refused model, so a stray line about a different
+// model (e.g. echoed elsewhere in the log) cannot trigger a fallback.
+function unsupportedModelLine(paths, model) {
+  const escaped = model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`${escaped}.*${UNSUPPORTED_MODEL}`);
+  for (const p of paths) {
+    let text = '';
+    try { text = fs.readFileSync(p, 'utf8'); } catch { continue; }
+    const line = text.split(/\r?\n/).find((l) => pattern.test(l));
+    if (line) return line.slice(0, 300);
+  }
+  return null;
+}
+
+// runCodexWithFallback: run once with o.model at o.effort; when the model was the mode
+// default and the API refused it, run once more on FALLBACK. argsFor({model, effort})
+// builds the argv. The returned model and effort are the pair that produced the run.
+export async function runCodexWithFallback(found, argsFor, o, opts) {
+  const from = { model: o.model, effort: o.effort };
+  const run = await runCodex(found, argsFor(from), opts);
+  const same = FALLBACK.model === o.model && FALLBACK.effort === o.effort;
+  if (run.exit === 0 || run.timedOut || run.interrupted || o.modelExplicit || same) return { run, ...from, fallback: null };
+  const reason = unsupportedModelLine([opts.stderrPath, opts.stdoutPath], o.model);
+  if (!reason) return { run, ...from, fallback: null };
+  const retry = await runCodex(found, argsFor(FALLBACK), opts);
+  return { run: retry, ...FALLBACK, fallback: { from, to: { ...FALLBACK }, reason } };
 }

@@ -1,6 +1,6 @@
 ---
 name: technical-writer
-description: Use at sprint or project boundaries, once work has shipped, to update user-facing docs (README sections, usage docs, CHANGELOG entries, and the completion report) from the plan, pm/log.md, and story files. Writes documentation only, never source, tests, or config.
+description: Use at sprint or project boundaries, once work has shipped, to update user-facing docs (README sections, usage docs, CHANGELOG entries, and the completion report) from the paths the PM names. Writes documentation only, never source, tests, or config.
 tools: Read, Write, Edit
 model: sonnet
 effort: medium
