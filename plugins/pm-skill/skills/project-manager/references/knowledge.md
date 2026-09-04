@@ -1,7 +1,8 @@
 # Knowledge (the project wiki)
 
 On a `standard` or larger project, `docs/wiki/` holds the durable knowledge: an index, a schema,
-and decision, concept, and source pages. The `librarian` agent is its only writer. Raw artifacts
+and decision, concept, and source pages. The `librarian` agent is its only writer,
+except for the PM's one-time scaffold of `schema.md` and `index.md`. Raw artifacts
 under `docs/` stay authoritative; `pm/` state and `pm/log.md` are not wiki content.
 
 ## Ownership
@@ -12,7 +13,7 @@ under `docs/` stay authoritative; `pm/` state and `pm/log.md` are not wiki conte
 - Scale: no wiki at `tiny` or `small`; on at `standard` and above; at `regulated` a clean `lint` is
   required before the completion report.
 
-## Hand-off points
+## Handoff points
 | When | Dispatch |
 |---|---|
 | Scaffold, after sign-off | write `docs/wiki/schema.md` and `docs/wiki/index.md` from `wiki-schema.md.template` and `wiki-index.md.template` |

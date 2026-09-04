@@ -183,7 +183,8 @@ under `tmp/`; the report directories sit at the repository root:
   project inputs. Command-line overrides win for every safety-sensitive setting above. This is an OS
   sandbox, not a VM boundary.
 - **No secrets in tracked state.** A bundled hook blocks secret-shaped content, meaning key tokens,
-  PEM blocks, and credential assignments, from being written into the git-tracked `pm/` directory.
+  PEM blocks, and credential assignments, from being written into the git-tracked `pm/` and
+  `docs/wiki/` directories.
 - **Actor isolation.** A bundled hook blocks writes to another person's `pm/actors/` state files.
 - **The companion plugin is inert.** The optional `poteto` plugin ships skills only, with no hooks,
   agents, or commands, so it cannot change any guardrail above.

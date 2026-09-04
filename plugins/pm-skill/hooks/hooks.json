@@ -1,5 +1,5 @@
 {
-  "description": "pm-skill guardrails (all fail-open, kill switch PM_SKILL_NO_ENFORCE=1): block implementation writes until the plan is signed off, block secret-shaped content from entering the git-tracked pm/ state directory, re-ground new/compacted sessions from pm/ state, and block edits to another actor's pm/actors/ state files. Node.js 20+ is the only runtime dependency.",
+  "description": "Fail-open Node 20+ guards for sign-off, secret-shaped content under pm/ and docs/wiki/, session context, and actor state. Set PM_SKILL_NO_ENFORCE=1 to disable them.",
   "hooks": {
     "SessionStart": [
       {

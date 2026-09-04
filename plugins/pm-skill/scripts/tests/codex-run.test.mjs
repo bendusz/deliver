@@ -84,6 +84,7 @@ test('story: pm-meta is authoritative; legacy visible fields are optional but mu
   expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["../x"]'), /traversal|outside/);
   expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["src/*"]'), /globs/);
   expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["."]'), /traversal|whole worktree/);
+  expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["src","src/"]'), /unique touches/);
   fs.writeFileSync(story, STORY_LEGACY);
   assert.deepEqual(parseStory(p, rel), { builder: 'codex-builder', scopes: ['src'] });
   expectBlocked(STORY_LEGACY.replace('Builder: codex-builder', 'Builder: expert-builder'), /does not match/);
@@ -269,7 +270,7 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
   assert.equal(r.out.diagnostics_retained, false);
   assert.match(r.out.git_status_short, /src\/fix\.txt/);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/spec\.md, docs\/plan\.md, or docs\/constitution\.md\./);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, or docs\/constitution\.md\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
   assert.equal(fs.readdirSync(s.tmp).length, 0);
@@ -347,6 +348,15 @@ test('build 12, 14, 22: protected artifact, outside-touches, and ignored-protect
     assert.match(r.out.reason, re);
     assert.ok(r.out.actual_files_changed.includes(changed));
   }
+});
+
+test('build 12c: a Codex write under docs/wiki/ is a protected-artifact violation', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const env = { STUB_WRITE_PATH: 'docs/wiki/index.md', STUB_REPORT_PATH: 'docs/wiki/index.md' };
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env });
+  assert.equal(r.status, 74, JSON.stringify(r.out));
+  assert.match(r.out.reason, /protected PM artifact/);
+  assert.ok(r.out.actual_files_changed.includes('docs/wiki/index.md'));
 });
 
 test('build 13: an omitted files_changed entry cannot conceal an edit', () => {

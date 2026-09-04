@@ -66,8 +66,8 @@ if (isRecord(my)) {
   const hw = typeof my.handoff_written === 'string' ? my.handoff_written : '';
   const up = typeof my.updated === 'string' ? my.updated : '';
   if (fs.existsSync(path.join(actorsDir, `${me}.HANDOFF.md`)) && hw) {
-    if (up && up > hw) say(`Your pm/actors/${me}.HANDOFF.md is STALE (state moved on): trust the state files + log.`);
-    else say(`A current pm/actors/${me}.HANDOFF.md briefing exists: read it first; it replaces re-discovery.`);
+    if (up && up > hw) say(`Your pm/actors/${me}.HANDOFF.md is STALE because state moved on. Trust the state files and log.`);
+    else say(`A current pm/actors/${me}.HANDOFF.md briefing exists. Read it first because it replaces re-discovery.`);
   }
 } else {
   say(`No actor file for you (${me}) yet; /pm-skill:resume creates pm/actors/${me}.json.`);

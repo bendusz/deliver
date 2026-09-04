@@ -33,7 +33,10 @@ export function parseStory(root, storyRel) {
     if (scope === '.') throw blocked('story pm-meta touches may not grant the whole worktree');
     scopes.push(scope);
   }
+  // `src` and `src/` are distinct raw strings but one scope, so uniqueness has to be
+  // rechecked after normalisation or a story can smuggle a duplicate past the raw check.
   const machine = [...new Set(scopes)].sort();
+  if (machine.length !== meta.touches.length) throw blocked('story pm-meta must contain only a valid builder and non-empty unique touches array');
 
   const builderLine = head.map((l) => l.match(/^Builder:\s*(.*?)\s*$/)).find(Boolean);
   if (builderLine && builderLine[1] !== meta.builder) throw blocked('story pm-meta builder does not match the visible Builder field');

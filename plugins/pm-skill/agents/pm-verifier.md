@@ -15,11 +15,10 @@ color: green
 - The artifact paths the PM captured from the running app.
 
 ## Safe commands
-Bash runs only these: `git status`, `git diff`, `git diff --name-only`, `grep`, the project's `test`,
-`lint`, and `build` from `docs/plan.md` and `AGENTS.md`, and the story's verification command once
-the PM has classified it non-mutating. No network, no deploys, and nothing that changes tracked
-files (formatters, codegen, installs) or starts a service. Cite the PM's evidence for anything you cannot run or an allowlist rejects, and
-return UNKNOWN when it is insufficient.
+Bash may run read-only git inspection, `grep`, the non-mutating gates from `docs/plan.md` and
+`AGENTS.md`, and the story's verification command once the PM has classified it non-mutating. It
+must not use the network, deploy, install, generate code, format files, or start services. Use the
+PM's evidence for blocked checks; return UNKNOWN when it is insufficient.
 
 ## PASS requires
 - The story's verification command passed, from your run or from the PM's artifacts when it would

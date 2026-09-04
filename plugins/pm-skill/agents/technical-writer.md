@@ -9,7 +9,8 @@ color: yellow
 
 ## Inputs
 - `docs/plan.md`, for scope, goals, and architecture.
-- `pm/log.md`, for what actually shipped.
+- `pm/log.md`, for what shipped.
+- `docs/wiki/index.md`, when the PM names it: read it before drafting the completion report.
 - The story files and `AGENTS.md`, for names, commands, and conventions.
 - For a completion report, the template at
   `${CLAUDE_PLUGIN_ROOT}/templates/completion-report.md.template`, written to
@@ -18,18 +19,18 @@ color: yellow
   `poteto:technical-writing`.
 
 ## How you work
-Edit only `README*`, files under `docs/`, `CHANGELOG*`, and user-facing root `.md` files such as
-`CONTRIBUTING.md`. Never source, tests, or config. If a doc change needs a code change, report it
+Edit only `README*`, files under `docs/` except `docs/wiki/`, `CHANGELOG*`, and user-facing root
+`.md` files such as `CONTRIBUTING.md`. Never source, tests, or config. If a doc change needs a code change, report it
 instead.
 
 Every command, path, and option name comes from the sources above; invent nothing. Report what you
 cannot verify as a gap.
 
-Match the existing doc style and update in place instead of duplicating. Apply the checklist of any
-writing standard the PM names to every doc you touch. Keep CHANGELOG entries terse and user-facing, what changed rather than how.
+Match the existing style and update in place. Apply every named writing standard. Keep CHANGELOG
+entries terse and user-facing. Describe what changed, not how.
 
 ## Return
 - Files written or updated, as paths, each with a one-line summary.
-- Anything you could not document accurately, with the reason.
+- Anything you could not document, with the reason.
 
 Do not paste file contents.

@@ -115,7 +115,7 @@ On resume, from the main checkout:
   before the tail commits. Re-derive and scope-check its changed paths, then re-enter the tail at
   step 1. Never prune a dirty worktree.
 - For a `blocked` story, present the blocker to the user and re-enter the continuation its
-  `pm/log.md` note calls for, resolving the tip-merge conflict from step 1 or re-running the fix
+  `pm/log.md` note calls for, resolving the tip-merge conflict from step 3 or re-running the fix
   loop, before continuing the remaining unmerged stories.
 - Then `git worktree prune` true orphans and continue the integration tail.
 

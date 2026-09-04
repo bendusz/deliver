@@ -1,6 +1,6 @@
 # Discovery
 
-Understand what the customer actually needs and agree the best solution, before specification and
+Understand what the customer needs and agree on the best solution before specification and
 planning.
 
 ## Goal

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { gitOut } from './git.mjs';
 
 const WIN = process.platform === 'win32';
-const PROTECTED_DIRS = ['pm', 'docs/stories'];
+const PROTECTED_DIRS = ['pm', 'docs/stories', 'docs/wiki'];
 const PROTECTED_FILES = ['docs/spec.md', 'docs/plan.md', 'docs/constitution.md'];
 // The runner's own per-run TMPDIR churns constantly and is deleted before the second
 // snapshot; .git is covered by gitMetadataFingerprint, not by file fingerprints.

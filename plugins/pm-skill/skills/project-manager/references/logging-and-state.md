@@ -108,7 +108,7 @@ the handoff is stale, so trust state and log instead.
 ## Claim and sync discipline (team of any size)
 
 `implementation-loop.md` owns the per-story claim commit, the pull-or-rebase points, and the release
-in the ship commit. What holds beyond one story:
+in the post-merge PM update commit. What holds beyond one story:
 
 - An assignment without the matching actor position reads as a stale claim. Until the claim commit is
   pushed it is visible only locally, so say so.

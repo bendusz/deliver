@@ -12,7 +12,8 @@ Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 ## Layout
 - `plugins/pm-skill/skills/project-manager/`: `SKILL.md` plus one reference per phase.
 - `plugins/pm-skill/agents/`, `commands/`, `templates/`, `schemas/`: the orchestrated fleet and its artifacts.
-- `plugins/pm-skill/hooks/`: fail-open guardrails. `scripts/codex/`: the Codex runner. `scripts/tests/`: node:test suites.
+- `plugins/pm-skill/hooks/`: fail-open guardrails. `plugins/pm-skill/scripts/codex/`: the Codex
+  runner. `plugins/pm-skill/scripts/tests/`: node:test suites.
 - `docs/specs/`, `docs/plans/`: this repo's own design history, named `YYYY-MM-DD-vX.Y-topic.md`.
 
 ## Conventions

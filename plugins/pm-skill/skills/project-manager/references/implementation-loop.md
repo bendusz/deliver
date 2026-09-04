@@ -27,9 +27,9 @@ and check out `pm/S<sprint>-<n>-<slug>`.
 ### 1. Build, then gate
 Optionally dispatch `test-engineer` first for TDD-red acceptance tests, then tell the builder they
 exist: make them pass, add only *further* coverage, never rewrite. Dispatch the persisted
-`resolved_builder` with the inputs its agent file lists, adding the absolute worktree root whenever
-it works outside the main checkout, and run Codex's quota-free `--preflight` first when readiness is
-not established. Builders edit the working tree; you own every git command.
+`resolved_builder` with the inputs its agent file lists. Every `codex-builder` dispatch carries the
+absolute repository or worktree root; `expert-builder` carries it only outside the main checkout.
+Run Codex's quota-free `--preflight` first when readiness is not established. Builders edit the working tree; you own every git command.
 
 **Scope check, after every writer run.** Derive the cumulative changed paths from the repository,
 never the summary: `git diff --name-only --diff-filter=ACDMRTUXB HEAD --` plus
