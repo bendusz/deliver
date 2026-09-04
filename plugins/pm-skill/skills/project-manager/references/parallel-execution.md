@@ -2,9 +2,9 @@
 
 A delta on `implementation-loop.md`. Build several independent stories at once in isolated git
 worktrees, then integrate them one at a time. The loop still owns routing, path scope checks, retry
-and fix bounds, gates, review, verification, ship, and logging; only the differences below are
-new. Parallel is never required: when worktrees are unsupported, setup fails, or a story
-misbehaves mid-flight, finish that story sequentially.
+and fix bounds, gates, review, verification, ship, and logging; only the differences below are new.
+Parallel is never required: when worktrees are unsupported, setup fails, or a story misbehaves,
+finish it sequentially.
 
 Builders edit separate worktrees without committing. You run all git operations serially from the
 main checkout.
@@ -49,8 +49,8 @@ git refuses to check the integration branch out twice.
 
 1. Run loop states 2 to 5 in the worktree, in order, against the still-uncommitted changes. Set
    status `in-review`. The diff exists only while the changes are uncommitted, so do not commit
-   before `PASS`. If the worktree lacks runtime deps such as `node_modules` or `.env`, bootstrap
-   them first, installing only and **never** committing those artifacts.
+   before `PASS`. If the worktree lacks runtime deps such as `node_modules` or `.env`, install them
+   first, **never** committing those artifacts.
 2. On `pm-verifier` `PASS`, **commit** the checked path set to the story branch, scoped to those
    paths and **never** with `git add -A`. Record the commit in `parallel_batch`. Do not touch
    another worktree until this commit lands.
@@ -59,7 +59,8 @@ git refuses to check the integration branch out twice.
    story branch before you move on. If the merge conflicts and you cannot resolve it cleanly,
    **stop** rather than forcing it: escalate to the user with the story and the conflicting paths,
    mark the story `blocked`, and move to the next.
-4. Ship from the main checkout per loop state 6. Set status `merged`.
+4. Ship from the main checkout per loop state 6. Set status `merged`, then run loop state 7: log,
+   update your actor file, and release the claim.
 5. Remove the now-clean, merged worktree with `git worktree remove`.
 
 A partial batch still checkpoints at the sprint boundary.
@@ -71,9 +72,9 @@ A partial batch still checkpoints at the sprint boundary.
   `git -C <wt> status --porcelain` first, then preserve and report.
 - A dirty or blocked worktree **stays** until the user resolves it, then must go. Name any worktree
   you hold in `pm/log.md`; an unnamed one is an orphan.
-- Give every worktree its own branch, and do not run `git gc` while worktrees are active.
-- The sign-off hook is satisfied inside a worktree, because `pm/pm-state.json` is tracked and the
-  worktree's checkout carries it.
+- Give every worktree its own branch, and never run `git gc` while worktrees are active.
+- The sign-off hook is satisfied inside a worktree: `pm/pm-state.json` is tracked, so the checkout
+  carries it.
 
 ## State and resume
 Track the batch in **your** `pm/actors/<you>.json` `parallel_batch`, each entry
@@ -83,10 +84,10 @@ caps survive a session loss. The batch is per-actor; cross-actor coordination ha
 `assignments`, never through another actor's batch.
 
 On resume, from the main checkout:
-- Continue each story with its persisted `builder`. Do not resolve `auto` again after a session loss.
+- Continue each story with its persisted `builder`. Never resolve `auto` after a session loss.
 - Reconcile `parallel_batch` against `git worktree list`. **Log** any worktree that vanished
-  externally rather than moving on silently. Only work already committed to the story branch
-  survived, so check that branch before assuming the story is intact.
+  externally rather than moving on silently. Only work committed to the story branch survived, so
+  check it before assuming the story is intact.
 - A `building`, `built`, or `in-review` worktree with uncommitted changes is the expected state
   before the tail commits. Re-run the scope check, then re-enter the tail at step 1.
 - For a `blocked` story, present the blocker to the user and re-enter the continuation its

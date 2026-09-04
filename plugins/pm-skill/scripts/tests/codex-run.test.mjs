@@ -460,6 +460,15 @@ test('build 28d: an ignored file Codex honestly reports in files_changed still m
   assert.deepEqual(r.out.actual_files_changed, []);
 });
 
+test('build 28e: an ignored file under docs/wiki/ is still a protected-artifact violation', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.appendFileSync(path.join(p, '.gitignore'), 'docs/wiki/hidden.md\n');
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'docs/wiki/hidden.md', STUB_OMIT_REPORT: '1' } });
+  assert.equal(r.status, 74, JSON.stringify(r.out));
+  assert.match(r.out.reason, /protected PM artifact: docs\/wiki\/hidden\.md/);
+  assert.ok(Array.isArray(r.out.ignored_files_changed), JSON.stringify(r.out));
+});
+
 test('build 29: a skip-worktree index flag is a protected-git-state violation', () => {
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_SKIP_WORKTREE: '1' } });
