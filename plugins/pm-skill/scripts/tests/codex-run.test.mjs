@@ -180,6 +180,17 @@ test('snapshot: ignored files are fingerprinted cheaply and the runtime dir is s
   assert.deepEqual(changedPaths(before, snapshotWorktree(p)), ['.env']);
 });
 
+test('snapshot: a root .sdd is scanned as a protected file even when ignored; a directory named *.sdd is not', () => {
+  const p = newBuildProject(true);
+  fs.appendFileSync(path.join(p, '.gitignore'), 'hidden.sdd\n');
+  fs.writeFileSync(path.join(p, 'hidden.sdd'), 'spec\n');
+  fs.mkdirSync(path.join(p, 'dir.sdd'));
+  fs.writeFileSync(path.join(p, 'dir.sdd', 'inside.txt'), 'x\n');
+  const snap = snapshotWorktree(p);
+  assert.match(snap.get('hidden.sdd'), /^file:100644:/, 'a hidden root spec is scanned by path, not by the ignored-files pass, so it fingerprints as content, not as ignored:');
+  assert.ok(!snap.has('dir.sdd'), 'a directory named like a root spec must not be added by the *.sdd scan');
+});
+
 test('snapshot: index flags, git hooks, and info/exclude are protected git state', () => {
   const p = newBuildProject(true);
   const base = gitMetadataFingerprint(p);
