@@ -3,7 +3,7 @@ Type: source · Status: current · Sources: docs/plan.md
 
 ## Summary
 `docs/plan.md` Overview describes a tiny command-line tool that adds todos and lists them,
-persisted to a local JSON file, built to demonstrate the pm-skill workflow end to end. Scope is
+persisted to a local JSON file, built to demonstrate the deliver workflow end to end. Scope is
 `todo add "<text>"` and `todo list` with JSON-file persistence in the working directory; due
 dates, priorities, editing, deletion, and sync are out.
 

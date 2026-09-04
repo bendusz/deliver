@@ -40,7 +40,7 @@ Launch all reviewers in a single message using the Task tool, one reviewer per r
 | Reviewer A | `fable` |
 | Reviewer B | `opus` |
 | Reviewer C | `sonnet` |
-| Reviewer D | the OpenAI Codex CLI, when installed (for example `/pm-skill:codex-review` with the same intent and diff), for a cross-family opinion. Skip this row when it is absent. |
+| Reviewer D | the OpenAI Codex CLI, when installed (for example `/deliver:codex-review` with the same intent and diff), for a cross-family opinion. Skip this row when it is absent. |
 
 For each Claude reviewer:
 - `subagent_type`: `Explore` (read-only search agent)

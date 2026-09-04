@@ -1,0 +1,22 @@
+{
+  "description": "Fail-open Node 20+ guards for sign-off, secret-shaped content under pm/ and docs/wiki/, session context, and actor state. Set DELIVER_NO_ENFORCE=1 to disable them.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/session-context.mjs"] }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/require-signoff.mjs"] },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/pm-secrets-guard.mjs"] },
+          { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/actor-guard.mjs"] }
+        ]
+      }
+    ]
+  }
+}

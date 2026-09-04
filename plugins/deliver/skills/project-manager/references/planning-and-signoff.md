@@ -1,0 +1,88 @@
+# Planning and sign-off
+
+Turn the agreed direction into a written plan, get explicit human sign-off, then scaffold.
+
+## 0. Analyze existing code (brownfield, optional)
+If you are working in an existing codebase, dispatch `codebase-analyst` first. Fold its context pack
+into the plan's Architecture and Commands sections, and keep it to embed into story files later. Skip
+this for a greenfield project.
+
+Greenfield or brownfield: if the plan hinges on an external unknown, a library choice or an
+unfamiliar SDK, dispatch `researcher`, and `codex-researcher` alongside it for a consequential or
+contested call when the codex CLI is installed. Then cite the `docs/research/` reports in the plan's
+decisions. With a wiki, ingest each report per `knowledge.md`.
+
+When the Architecture section has more than one viable shape, `design-exploration.md` owns the
+optional design pass that settles it before sign-off.
+
+## 1. Write `docs/plan.md`
+If `docs/spec.md` exists, the plan derives from it: turn its requirements into delivery work and
+trace each story back to the spec's IDs. If there is no spec yet, run `/deliver:specify` first for
+non-trivial work, or fold the intent straight into the plan for something small.
+
+Initialise the state if it does not exist yet. `logging-and-state.md` owns the schemas, the actor
+id, the commit discipline, and the no-secrets rule; `discovery.md` already created `pm/log.md` and
+its `merge=union` rule. The sequence:
+1. Create `pm/pm-state.json` from `${CLAUDE_PLUGIN_ROOT}/templates/pm-state.json.template` with
+   `signed_off: false`.
+2. Derive your actor id with the documented `actor-id` command, then create
+   `pm/actors/<actor-id>.json` from `${CLAUDE_PLUGIN_ROOT}/templates/actor-state.json.template`.
+3. Confirm `git check-ignore pm/pm-state.json pm/log.md pm/actors/<actor-id>.json` fails. Check the
+   files, not the directory, since a `pm/*` rule ignores the files while a directory check passes;
+   fix the rule if anything matches.
+4. **Commit** `pm/` and `.gitattributes`.
+
+Then create `docs/plan.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.template`, whose comments
+define each section. Three rules the template cannot hold: the Stories table's `covers` column names
+the spec IDs each story satisfies and its criteria must be testable; Traceability maps every spec
+requirement to at least one story and flags any that is not; Commands are the project's real `test`,
+`lint`, `build`, and `run`, discovered now, with `N/A` where one does not exist.
+
+Present it and iterate with the user until they are happy. When the scale requires analysis, run
+`/deliver:analyze` before decomposition, optionally on the drafted plan before you record sign-off,
+for a read-only consistency and coverage check; the Stories table carries the `covers` mapping.
+Resolve any CRITICAL or HIGH findings first.
+
+## 2. Sign-off gate
+Sign-off requires all three: no blocking `[NEEDS CLARIFICATION]` in `docs/spec.md` or the plan,
+`docs/plan.md` present, and an unambiguous human "approved". Record the approver and date in the
+plan's Sign-off line and in `pm/log.md`, and set `signed_off: true`, with `approver` and
+`approved_date`, in `pm/pm-state.json`. **Do not** decompose or write any code before this. The
+bundled sign-off hook enforces it by blocking implementation writes while `signed_off` is `false`,
+but it is fail-open and can be disabled, so holding the line is still your responsibility.
+
+## 3. Scaffold (only after sign-off), observing Repository safety
+- If the project is not a git repo, offer to `git init`, and **ask** first.
+- Generate the project instructions file `AGENTS.md` from
+  `${CLAUDE_PLUGIN_ROOT}/templates/AGENTS.md.template`, facts only: commands, layout, non-default
+  conventions, gotchas, per `instruction-layers.md`. Then generate `CLAUDE.md` from
+  `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.template`, a two-line `@AGENTS.md` bridge. **Never**
+  overwrite an existing file. If `CLAUDE.md` exists without `AGENTS.md`, propose the migration in
+  `instruction-layers.md`, show the diff, and ask. If both files exist and `CLAUDE.md` is
+  not an `@AGENTS.md` bridge, leave both and log a WARN; `/deliver:doctor` reports it. When the
+  plan's Delivery mode says `Instruction rules: pm-state`, also write `.claude/rules/pm-state.md`
+  from `rules-pm-state.md.template` and `pm/AGENTS.md` from `pm-AGENTS.md.template`.
+- At `standard` scale and above, scaffold `docs/wiki/` from the wiki templates per `knowledge.md`.
+- With `Skeleton: specdd`, append the SpecDD line held in `AGENTS.md.template`'s comment,
+  uncommented, to the project `AGENTS.md` Conventions.
+- Ensure `.gitignore` includes `tmp/`, appending rather than clobbering an existing `.gitignore`.
+  `tmp/` is ephemeral scratch and never enters git.
+- **Commit** only the files you created or changed. No `git add -A` over the user's other work.
+- If git has no `user.name` or `user.email`, ask before committing.
+- The branch the scaffold commit lands on, `main` by default, is the integration branch: the base you
+  cut every story branch from and merge each story back into.
+
+Log the scaffold step. With a wiki, dispatch the first `librarian ingest` per `knowledge.md` and log
+its receipt. With `Skeleton: specdd`, load `skeleton.md` next; otherwise load `decomposition.md`.
+
+## Checkpoint policy (recorded in Delivery mode, applied during the loop)
+- Default sprint-level: run all the sprint's stories, then pause for the user's review at the sprint
+  boundary. A project may set story-level, pausing before each merge, or fully autonomous.
+- Whatever the mode, **escalate** immediately before a high-risk merge or one that changes several
+  dependent components.
+- Offer `/deliver:handoff` at natural stops: a sprint checkpoint, a long pause, or a session whose
+  context is running long. A committed `pm/actors/<id>.HANDOFF.md` is what lets the next session skip
+  re-discovery, and the bundled SessionStart hook re-grounds new and compacted sessions from `pm/`.
+- Checkpoint before compaction. When compaction is imminent, write and commit the actor handoff
+  first. After resume, check its base commit, branch, changed paths, last gate results, and next
+  action against repository state before dispatching another writer.

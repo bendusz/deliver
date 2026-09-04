@@ -106,7 +106,7 @@ Run the full explain flow above (Steps 1-4). You must understand the architectur
 
 ### Step 2. Spawn Critics
 
-After the explanation is complete, spawn one architectural critic per model on `opus`, `fable`, and `sonnet`, all in a single message. For a fourth, cross-family critic, send the same prompt through the OpenAI Codex CLI (see `pm-skill:codex-help`).
+After the explanation is complete, spawn one architectural critic per model on `opus`, `fable`, and `sonnet`, all in a single message. For a fourth, cross-family critic, send the same prompt through the OpenAI Codex CLI (see `deliver:codex-help`).
 
 For each critic:
 - `subagent_type`: `Explore` (read-only search agent)

@@ -2,7 +2,7 @@
 
 ## Overview
 A tiny command-line tool to add todos and list them, persisted to a local JSON file. Built to
-demonstrate the pm-skill workflow end to end.
+demonstrate the deliver workflow end to end.
 
 ## Source spec
 - none. `standard` scale normally requires `docs/spec.md`, and the user asked to skip it for a
