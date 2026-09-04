@@ -5,21 +5,20 @@ description: Ask the OpenAI Codex CLI for a second opinion on the current work, 
 Ask Codex, OpenAI's coding agent CLI, a specific question and relay its answer, via the
 `codex-advisor` wrapper agent and the bundled Node runner. Dispatch it only for consequential design
 decisions, risky refactors, or tradeoffs, never for a routine question you can answer yourself.
-Wrappers never pass sandbox or approval flags; the runner owns them and runs Codex read-only on
-every platform.
 
 Arguments: $ARGUMENTS
 
 ## 1. Parse arguments
 
-- **model=<id>**, default `gpt-5.6-sol`, because judgment work gets the top tier.
+- **model=<id>**, default `gpt-6-astra`, with a one-time runner fallback to `gpt-5.6-sol` if the
+  account is refused it.
 - **effort=<level>**: `none|minimal|low|medium|high|xhigh|max`, default `medium`.
 - Everything else is the question. If it is empty, ask the user what they want Codex's opinion on.
 
 ## 2. Compose the brief
 
-Codex can read the repo but knows nothing about this conversation. Write a self-contained brief: the
-question, the relevant file paths, the options being weighed with their trade-offs, and any
+Write a self-contained brief, since Codex reads the repo but knows nothing about this conversation:
+the question, the relevant file paths, the options being weighed with their trade-offs, and any
 constraints. End with: `Give a concrete recommendation and your reasoning. Read the referenced files
 before answering.`
 
