@@ -13,9 +13,11 @@ function cmdSafe(args) {
   return args.map((a) => (/[\s&|<>^()]/.test(a) ? `"${a}"` : a));
 }
 
-function killTree(pid, signal) {
+// groupOnly skips the single-PID fallback. Use it once the child is already reaped, where
+// that fallback could only signal a dead or recycled PID.
+function killTree(pid, signal, { groupOnly = false } = {}) {
   if (WIN) { try { spawnSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true }); } catch { /* gone */ } return; }
-  try { process.kill(-pid, signal); } catch { try { process.kill(pid, signal); } catch { /* gone */ } }
+  try { process.kill(-pid, signal); } catch { if (groupOnly) return; try { process.kill(pid, signal); } catch { /* gone */ } }
 }
 
 // runCodex: spawn codex with the prompt on stdin, stdout/stderr to files, a hard
@@ -61,7 +63,7 @@ export function runCodex(found, args, { stdinText, cwd, env, timeoutSeconds, std
     child.on('exit', (code, signal) => {
       // Kills descendants that stayed in the process group; a grandchild that called
       // setsid() is out of reach. Best effort, never fatal.
-      killTree(child.pid, 'SIGKILL');
+      killTree(child.pid, 'SIGKILL', { groupOnly: true });
       cleanup();
       const exit = code === null ? 128 + (signal === 'SIGKILL' ? 9 : 15) : code;
       resolve({ exit, timedOut, interrupted });

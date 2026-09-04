@@ -40,7 +40,7 @@ export function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
     'Run the story verification command and the relevant project tests before reporting done.',
     'Stay inside the allowed implementation paths. Do not use the network, change git state, or edit pm/, stories, docs/wiki/, docs/spec.md, docs/plan.md, or docs/constitution.md.',
     'Your shell environment is reduced and secret-like variables are removed. TMPDIR is an isolated directory inside this worktree.',
-    'Return only JSON matching the supplied schema. List every changed path in files_changed. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
+    'Return only JSON matching the supplied schema. List every changed path in files_changed. summary holds at most five short strings. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
   return `${lines.join('\n')}\n`;
 }
 
@@ -128,7 +128,8 @@ export async function runBuild(o) {
     } catch { /* best effort */ }
   };
   const files = { prompt: path.join(scratch, 'prompt.md'), result: path.join(scratch, 'result.json'), stdout: path.join(scratch, 'stdout.log'), stderr: path.join(scratch, 'stderr.log') };
-  const diag = (codexExit, actual, ignoredChanged) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, actual_files_changed: actual, ignored_files_changed: ignoredChanged });
+  // model and model_fallback appear only after a fallback, so a failure names the model that ran.
+  const diag = (codexExit, actual, ignoredChanged) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, ...(fallback ? { model, model_fallback: fallback } : {}), actual_files_changed: actual, ignored_files_changed: ignoredChanged });
 
   const prompt = buildPrompt({ worktree, storyRel, scopes, mode: o.mode, evidenceRel });
   try { fs.writeFileSync(files.prompt, prompt); } catch { cleanupRuntime(); throw new RunnerError('failed', 'could not write the prompt', { scratch_dir: scratch, codex_version: version }); }

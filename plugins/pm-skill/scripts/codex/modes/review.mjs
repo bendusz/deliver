@@ -87,7 +87,7 @@ export async function runReview(o) {
   const stdinText = o.scope === 'codebase' ? `${CODEBASE_PROMPT}${clause}\n` : undefined;
 
   const { run, model, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText, cwd: base, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
-  const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit };
+  const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, ...(fallback ? { model, model_fallback: fallback } : {}) };
   if (run.timedOut) throw new RunnerError('timed-out', `codex review exceeded the ${o.timeoutSeconds}s timeout`, { ...extra, stderr_path: stderrPath });
   if (run.interrupted) throw new RunnerError('interrupted', `codex review was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, { ...extra, stderr_path: stderrPath });
   if (run.exit !== 0 || !fs.existsSync(report) || fs.statSync(report).size === 0) {

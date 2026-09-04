@@ -273,6 +273,7 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, or docs\/constitution\.md\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /summary holds at most five short strings\./);
   assert.equal(fs.readdirSync(s.tmp).length, 0);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')) || fs.readdirSync(path.join(p, 'tmp', 'codex-runtime')).length === 0);
 });
@@ -311,6 +312,14 @@ test('model fallback: review and advise fall back to gpt-5.6-terra and gpt-5.6-s
   const s2 = makeStub();
   const ad = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s2, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_ANSWER: '1' } });
   assert.equal(ad.status, 0); assert.equal(ad.out.model, 'gpt-5.6-sol'); assert.equal(ad.out.model_fallback.to, 'gpt-5.6-sol');
+});
+
+test('model fallback: a failure after the fallback names the model that ran', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_EXEC_EXIT: '5' } });
+  assert.equal(r.status, 70, JSON.stringify(r.out));
+  assert.equal(r.out.model, 'gpt-5.6-sol');
+  assert.equal(r.out.model_fallback.to, 'gpt-5.6-sol');
 });
 
 test('build 6: fix mode passes the evidence brief', () => {

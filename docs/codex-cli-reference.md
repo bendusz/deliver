@@ -66,8 +66,8 @@ When the model came from the mode default, never from an explicit `--model`, and
 non-zero with that refusal naming that model on stdout or stderr, the runner retries the command
 once on the mode's fallback: `gpt-5.6-sol` for build, fix, and advise, `gpt-5.6-terra` for review
 and research. Timeouts, interrupts, and other non-zero exits are returned as they are. The completed
-envelope reports `model` as the model that produced the result plus
-`model_fallback: {from, to, reason}`, `reason` being the refusal line cut to 300 characters.
+envelope reports `model` as the model that ran plus `model_fallback: {from, to, reason}`, `reason`
+being the refusal line cut to 300 characters.
 `--timeout-seconds` bounds each attempt, so a fallback run can take twice that.
 
 ## pm-skill's chosen defaults (models 2026-09-04, efforts 2026-07-16)
@@ -139,7 +139,9 @@ fix without `--evidence`, then snapshot the worktree and git metadata around the
 out-of-scope change, a protected-path change, or a `files_changed` claim that disagrees with the
 snapshot delta is a safety violation, worktree preserved, while changed ignored files are reported
 rather than blocked. `review` writes only into `<root>/untracked` or `<root>/codex`, which must hold
-no tracked files. `advise` and `research` are read-only, and only research adds `--search`.
+no tracked files; one `lstat` rejects a symlink or a path resolving elsewhere, and `COPYFILE_EXCL`
+keeps the copy from overwriting an existing report. `advise` and `research` are read-only, and only
+research adds `--search`.
 
 ### Envelope fields per mode
 
@@ -152,10 +154,10 @@ Review alone can return `nothing-to-review`, exiting 0 with `mode`, `scope`, `re
 `reason`, `scratch_dir`, `codex_version`, `codex_exit`, `diagnostics_retained`, plus
 `actual_files_changed` and `ignored_files_changed` once the worktree was snapshotted, plus
 `stderr_path` when a stderr log was retained outside a build (a failed build keeps `stderr.log`
-inside its `scratch_dir`). It carries no mode context at all: no `model`, `model_fallback`,
-`effort`, `worktree`, `story`, `mode`, `sandbox`, or output path.
+inside its `scratch_dir`). Beyond a fallback's `model` and `model_fallback` it carries no mode
+context: no `effort`, `worktree`, `story`, `mode`, `sandbox`, or output path.
 
-**Completed envelopes, per mode.** Each carries `model_fallback` only when the fallback ran.
+**Completed envelopes, per mode.**
 
 - **build/fix**: `codex_version`, `model`, `effort`, `worktree`, `story`, `mode`, `timeout_seconds`,
   `sandbox` (`workspace-write` or `none (win32)`), `diagnostics_retained: false`,
@@ -202,8 +204,8 @@ node plugins/pm-skill/scripts/codex/run.mjs --mode build --preflight --worktree 
 `--preflight` never invokes model inference and always reports `quota_consumed: false`. It validates
 sign-off, authentication, required CLI flags, the ignored `tmp/` setup, the bundled result schema,
 and optional story metadata. For `recent` and `worktree` it also checks that `codex exec review`
-offers `--commit`, `--uncommitted`, `--ignore-rules`, `--ephemeral`, `--strict-config`, and
-`--ignore-user-config`; `codebase` uses plain `exec` and skips that check.
+offers the flags in `preflight.mjs`'s `REVIEW_FLAGS`; `codebase` uses plain `exec` and skips that
+check.
 
 The opt-in live smoke test, `PM_CODEX_LIVE=1 node plugins/pm-skill/scripts/codex/smoke-live.mjs`
 (also `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh`), checks two things in a disposable
@@ -216,5 +218,5 @@ repositories and stories.
 
 Neither `codex exec --help` nor `codex exec review --help` accepts `--search` as of codex-cli
 0.145.0. The runner probes `codex exec --help` at research runtime and adds the flag when present,
-so research gets live sources where it is supported and falls back to model knowledge and repo
-reading where it is not.
+so research uses live sources where supported and model knowledge plus repo reading where it is
+not.

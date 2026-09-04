@@ -30,7 +30,7 @@ export async function runAdvise(o) {
   const argsFor = (model) => ['exec', ...lockedExecArgs({ ...o, model }, { search: useSearch }), '--sandbox', 'read-only', '--color', 'never',
     ...(root ? [] : ['--skip-git-repo-check']), '-o', answer, '-'];
   const { run, model, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText: prompt, cwd, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
-  const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, stderr_path: stderrPath };
+  const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, ...(fallback ? { model, model_fallback: fallback } : {}), stderr_path: stderrPath };
   if (run.timedOut) throw new RunnerError('timed-out', `codex exec exceeded the ${o.timeoutSeconds}s timeout`, extra);
   if (run.interrupted) throw new RunnerError('interrupted', `codex exec was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, extra);
   if (run.exit !== 0) throw new RunnerError('failed', 'codex exec exited non-zero; inspect stderr.log', extra);

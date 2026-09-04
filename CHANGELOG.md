@@ -15,9 +15,9 @@ Less to load, one place per rule, and a new Codex default.
   stays in `review-gates.md`; the merge message grammar sits at the ship state.
 - **Templates own fields.** `planning-and-signoff.md`, `decomposition.md`, and the handoff command
   point at their templates and keep only the rules a template cannot hold.
-- **Codex contract in one place.** `docs/codex-cli-reference.md` documents the public surface and
-  points at the runtime code for exact argument lists; `codex-review` stops repeating the runner's
-  preflight checks.
+- **Codex contract in one place.** `docs/codex-cli-reference.md` documents the runner's flags, exit
+  codes, and envelope fields, and points at the runtime code for exact argument lists;
+  `codex-review` stops repeating the runner's preflight checks.
 - **Builder result schema.** `out_of_scope_changes` and `risks` removed; `summary` capped at five
   items.
 - **Cleanups.** One process-tree kill path in the runner; hook secret-scanner tests deduplicated
