@@ -62,9 +62,9 @@ loads `fix-loop.md`.
 ### 5. Verify, then ship or fix
 External review is optional; `/pm-skill:codex-review` owns it. **Log** a skip. With the gates green
 and no `block` or `major` open, dispatch the read-only `pm-verifier` with the inputs its agent file
-lists and its `Specs`. `PASS` alone permits shipping. `FAIL` loads `fix-loop.md`, then re-verify. `UNKNOWN` means you
-obtain the evidence it named and re-verify, or escalate. Load `verification.md` only when a criterion
-needs the running app or the story needs a durable report.
+lists and its `Specs`. `PASS` alone permits shipping. `FAIL` loads `fix-loop.md`, then re-verify.
+`UNKNOWN` means you obtain the evidence it named and re-verify, or escalate. Load `verification.md`
+only when a criterion needs the running app or the story needs a durable report.
 
 ### 6. Ship, then log
 Commit **only** the story's cumulative authoritative paths to its branch. Pull or rebase the

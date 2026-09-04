@@ -182,12 +182,14 @@ test('snapshot: ignored files are fingerprinted cheaply and the runtime dir is s
 
 test('snapshot: a root .sdd is scanned as a protected file even when ignored; a directory named *.sdd is not', () => {
   const p = newBuildProject(true);
-  fs.appendFileSync(path.join(p, '.gitignore'), 'hidden.sdd\n');
+  fs.appendFileSync(path.join(p, '.gitignore'), 'hidden.sdd\nSHOUTED.SDD\n');
   fs.writeFileSync(path.join(p, 'hidden.sdd'), 'spec\n');
+  fs.writeFileSync(path.join(p, 'SHOUTED.SDD'), 'spec\n');
   fs.mkdirSync(path.join(p, 'dir.sdd'));
   fs.writeFileSync(path.join(p, 'dir.sdd', 'inside.txt'), 'x\n');
   const snap = snapshotWorktree(p);
   assert.match(snap.get('hidden.sdd'), /^file:100644:/, 'a hidden root spec is scanned by path, not by the ignored-files pass, so it fingerprints as content, not as ignored:');
+  assert.match(snap.get('SHOUTED.SDD'), /^file:100644:/, 'the root-spec scan is case-insensitive, so an uppercase extension cannot hide a spec:');
   assert.ok(!snap.has('dir.sdd'), 'a directory named like a root spec must not be added by the *.sdd scan');
 });
 
@@ -421,7 +423,7 @@ test('build 12c: a Codex write under docs/wiki/ is a protected-artifact violatio
 });
 
 test('build 12d: Codex writes under .specdd/ or to a root .sdd are protected; a .sdd inside touches is not', () => {
-  for (const rel of ['.specdd/bootstrap.md', 'todo-cli.sdd']) {
+  for (const rel of ['.specdd/bootstrap.md', 'todo-cli.sdd', 'ROOT.SDD']) {
     const p = newBuildProject(true); const s = makeStub();
     const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: rel, STUB_REPORT_PATH: rel } });
     assert.equal(r.status, 74, rel);

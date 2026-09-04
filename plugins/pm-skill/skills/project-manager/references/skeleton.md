@@ -9,11 +9,11 @@ after the scaffold, before that sprint's decomposition. Sprint 1 also gets the r
 `.specdd/bootstrap.md`; later sprints extend the tree.
 
 ## Bootstrap and the CLI probe
-Probe once per project with `npx --yes specdd@1 --version`. It needs network access, so skip it
-offline and treat that as a failure. When it succeeds, run `npx --yes specdd@1 init` at the
-repository root for the bootstrap and `npx --yes specdd@1 inspect` for the checkpoint. Otherwise
+Probe once per project with `npx --yes specdd@1.1.1 --version`. It needs network access, so skip it
+offline and treat that as a failure. When it succeeds, run `npx --yes specdd@1.1.1 init` at the
+repository root for the bootstrap and `npx --yes specdd@1.1.1 inspect` for the checkpoint. Otherwise
 pass `Bootstrap: template` in the dispatch and list the tree yourself with
-`find . -name '*.sdd' -o -path './.specdd/*'`.
+`git ls-files -- '*.sdd' '.specdd/*'`.
 
 ## Dispatch
 Give `spec-architect`:
@@ -31,7 +31,8 @@ you commit the scaffold, and append one entry to `pm/log.md`, for example
 
 ## What the rest of the pipeline does with it
 - A builder may edit a `.sdd` inside its own touches when the implementation forces it and must
-  report the path in its return; a reviewer treats an unreported `.sdd` change as `major`.
+  report the path in its return; a reviewer treats a `.sdd` change the story's `Specs` does not
+  cover as `major`.
 - Stories carry a `Specs:` field, take their touches from each spec's `Owns`, and cite the
   `Done when` lines their criteria satisfy; `decomposition.md` owns that detail.
 - The scaffold appends one line to the project `AGENTS.md` under Conventions: read

@@ -33,7 +33,7 @@ if (rel === null) process.exit(0);
 const ALLOWED_FILES = new Set(['CLAUDE.md', 'AGENTS.md', '.gitignore', '.gitattributes']);
 const ALLOWED_PREFIXES = ['docs/', 'pm/', 'tmp/', '.git/', '.claude/rules/', '.specdd/'];
 // SpecDD specs are planning artifacts: a skeleton may be written before code exists.
-const isSpec = rel.endsWith('.sdd');
+const isSpec = /\.sdd$/i.test(rel);
 if (ALLOWED_FILES.has(rel) || isSpec || ALLOWED_PREFIXES.some((prefix) => rel.startsWith(prefix))) process.exit(0);
 
 // Synchronous write: a stream write immediately followed by process.exit() can be truncated.

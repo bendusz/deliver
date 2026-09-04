@@ -17,7 +17,7 @@ const SCHEMA = path.join(PLUGIN_ROOT, 'schemas', 'codex-builder-result.schema.js
 const rejected = (r) => new RunnerError('rejected', r);
 const blocked = (r, extra) => new RunnerError('blocked', r, extra);
 const unavailable = (r, extra) => new RunnerError('unavailable', r, extra);
-const isRootSpec = (rel) => rel.endsWith('.sdd') && !rel.includes('/');
+const isRootSpec = (rel) => /\.sdd$/i.test(rel) && !rel.includes('/');
 const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stories/') || rel.startsWith('docs/wiki/') || rel.startsWith('.specdd/') || isRootSpec(rel) || ['docs/spec.md', 'docs/plan.md', 'docs/constitution.md'].includes(rel);
 const allowed = (rel, scopes) => scopes.some((s) => rel === s || rel.startsWith(`${s}/`));
 const tomlString = (s) => JSON.stringify(s);

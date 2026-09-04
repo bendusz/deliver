@@ -90,7 +90,7 @@ export function snapshotWorktree(root) {
   for (const r of gitOut(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0')) if (r) rels.add(r);
   for (const d of PROTECTED_DIRS) walk(root, d, rels);
   for (const f of PROTECTED_FILES) rels.add(f);
-  for (const e of safeReaddir(root)) if (!e.isDirectory() && e.name.endsWith('.sdd')) rels.add(e.name);
+  for (const e of safeReaddir(root)) if (!e.isDirectory() && /\.sdd$/i.test(e.name)) rels.add(e.name);
   const modes = indexModes(root);
   const out = new Map();
   const sorted = [...rels].map(toPosix).sort();

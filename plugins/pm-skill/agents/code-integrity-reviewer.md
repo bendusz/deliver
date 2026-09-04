@@ -19,8 +19,8 @@ color: red
 - Security basics. Injection, auth, secret handling, unsafe deserialization, path traversal.
 - Conventions. Error handling, naming, `AGENTS.md` adherence, dead or duplicated code, missing
   tests.
-- Specs. A `Must`, `Must not`, or `Exposes` the diff violates, or a `.sdd` changed without being
-  reported, is `major`.
+- Specs. Any `Must`, `Must not`, or `Exposes` violation, or a `.sdd` change the story's `Specs` does
+  not cover, is `major`.
 
 ## How to review
 Cover the diff and every contract it changes. Open adjacent code only to verify a named consequence.

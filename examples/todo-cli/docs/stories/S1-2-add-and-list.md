@@ -12,9 +12,10 @@ Implement the `add` and `list` subcommands on top of the S1-1 store.
 - `list` prints each todo on its own line, in insertion order, 1-indexed.
 
 ## Acceptance criteria (testable)
-- [ ] `todo add "buy milk"` appends "buy milk" to `todos.json`.
-- [ ] `todo list` prints `1. buy milk` for a store with one item.
+- [ ] `todo add "buy milk"` appends "buy milk" to `todos.json`. (todo.sdd: Done when 3)
+- [ ] `todo list` prints `1. buy milk` for a store with one item. (todo.sdd: Done when 4)
 - [ ] `add` uses write-then-rename so an interrupted write cannot corrupt the store.
+      (todo.sdd: Done when 3)
 
 ## Out of scope
 - Editing or deleting todos.

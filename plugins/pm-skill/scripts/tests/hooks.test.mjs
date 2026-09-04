@@ -14,7 +14,7 @@ test('signoff: blocks implementation write pre-sign-off', () => {
 
 test('signoff: allows planning and state writes', () => {
   const p = newProj(false);
-  for (const f of ['docs/plan.md', 'pm/log.md', 'CLAUDE.md', 'AGENTS.md', '.gitignore', '.gitattributes', '.claude/rules/pm-state.md', 'tmp/x.md', 'todo.sdd', 'src/trips/itinerary.sdd', '.specdd/bootstrap.md']) {
+  for (const f of ['docs/plan.md', 'pm/log.md', 'CLAUDE.md', 'AGENTS.md', '.gitignore', '.gitattributes', '.claude/rules/pm-state.md', 'tmp/x.md', 'todo.sdd', 'Todo.SDD', 'src/trips/itinerary.sdd', '.specdd/bootstrap.md']) {
     assert.equal(signoff(writeInput(p, path.join(p, f))), 0, f);
   }
 });
