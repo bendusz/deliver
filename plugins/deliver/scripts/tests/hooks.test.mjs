@@ -30,9 +30,10 @@ test('signoff: allows outside-project write', () => {
   assert.equal(signoff(writeInput(p, path.join(path.dirname(p), 'hosts'))), 0);
 });
 
-test('signoff: kill switch, malformed JSON, and missing file_path all allow', () => {
+test('signoff: the kill switch allows, the retired name does not, malformed JSON and missing file_path allow', () => {
   const p = newProj(false);
   assert.equal(signoff(writeInput(p, path.join(p, 'src', 'app.py')), { DELIVER_NO_ENFORCE: '1' }), 0);
+  // PM_SKILL_NO_ENFORCE was retired in 0.22; it no longer disables the hook.
   assert.equal(signoff(writeInput(p, path.join(p, 'src', 'app.py')), { PM_SKILL_NO_ENFORCE: '1' }), 2);
   assert.equal(signoff('not json {'), 0);
   assert.equal(signoff({ cwd: p, tool_input: { command: 'ls' } }), 0);

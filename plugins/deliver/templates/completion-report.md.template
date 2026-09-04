@@ -24,7 +24,7 @@ Per sprint and story, what landed and where.
 | FR-001 | S1-1 | |
 
 ## Acceptance criteria
-How the delivered work meets the plan's acceptance criteria. Note any criterion descoped or deferred,
+How the delivered work meets the spec's acceptance criteria, or the story files' when there is no spec. Note any criterion descoped or deferred,
 with the reason.
 
 ## Gates, review & verification
