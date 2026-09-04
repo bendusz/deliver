@@ -44,10 +44,11 @@ subagents. Never write implementation code.
    `/pm-skill:analyze`.
 5. **Decomposition.** `references/decomposition.md`. Sprints and self-contained story files.
 6. **Implementation loop.** `references/implementation-loop.md`. Per story: build, gate, review, fix,
-   verify, ship, log. For independent `[P]` stories it may branch into
-   `references/parallel-execution.md`, which builds in isolated worktrees and integrates serially.
-7. **Review and verification gates.** `references/review-gates.md` for lens selection and finding
-   triage, `references/verification.md` for running-app evidence and the durable report.
+   verify, ship, log. `references/fix-loop.md` owns the fix rounds. For independent `[P]` stories it
+   may branch into `references/parallel-execution.md`, which builds in isolated worktrees and
+   integrates serially.
+7. **Review and verification gates.** `references/review-gates.md` for lens selection,
+   `references/verification.md` for running-app evidence and the durable report.
 8. **Logging and state.** `references/logging-and-state.md`. The shared `pm/pm-state.json` and
    `pm/log.md`, your `pm/actors/<id>.json`, and the `docs/` artifacts.
    `references/resume-procedure.md` owns the resume read order and continuation point;
