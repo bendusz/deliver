@@ -6,6 +6,7 @@ under `docs/` stay authoritative; `pm/` state and `pm/log.md` are not wiki conte
 
 ## Ownership
 - The librarian writes only under `docs/wiki/`, supersedes instead of deleting, and never runs git.
+- Every new page follows `wiki-page.md.template`.
 - You log one line per librarian dispatch in `pm/log.md` from its receipt, and commit wiki changes
   together with the work they describe.
 - Scale: no wiki at `tiny` or `small`; on at `standard` and above; at `regulated` a clean `lint` is

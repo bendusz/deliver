@@ -18,6 +18,7 @@ Line 1 is the title. Line 2 is
 - Cite a repo-relative source path on every claim.
 - Supersede, never delete. A superseded page keeps its content and names its replacement.
 - Every page is linked from the index and from at least one other page.
+- `index.md` and `schema.md` are not pages: no field line, and no back-link is required.
 - Split the index per directory at about 150 entries.
 - No secrets. `pm-secrets-guard.mjs` blocks secret-shaped values under `docs/wiki/`.
 - The librarian never commits. The PM commits wiki changes with the work they describe.

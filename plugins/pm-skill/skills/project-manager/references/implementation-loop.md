@@ -90,7 +90,7 @@ check it out and `--no-ff` merge the story branch. **Never** push without an exp
 Append the outcome to `pm/log.md` as an author-prefixed entry, update `pm/actors/<you>.json`, clear
 `resolved_builder`, and **release** the claim by removing the story from `assignments`. Commit that
 `pm/` update on the integration branch right after the merge. Never write secrets into `pm/`. With a
-wiki, dispatch `librarian ingest` and `lint` per `knowledge.md`.
+wiki, dispatch `librarian ingest` per `knowledge.md`, and `lint` at the sprint boundary.
 `documentation.md` covers user-facing docs at a sprint or project boundary, never per story.
 
 A story is done only with every criterion met, no open `block` or `major`, green gates, a

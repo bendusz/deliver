@@ -47,9 +47,9 @@ logs or state. Offer remediation as suggestions only.
   nonexistent story or actor file; in-flight stories of different actors whose `pm-meta.touches`
   overlap (serialize or re-scope them); an in-flight sequential story without `resolved_builder`, or
   an active parallel entry without `builder`.
-- **Wiki (only when `docs/wiki/` exists).** An index entry that does not resolve; a page no other
-  page or the index links to; a plan decision or risk with no decision page; two `current`
-  decision pages on one subject (HIGH); a story whose Context cites a concept page marked
+- **Wiki (only when `docs/wiki/` exists).** An index entry that does not resolve; a page the index
+  does not list, or that no other page links to; a plan decision or risk with no decision page; two
+  `current` decision pages on one subject (HIGH); a story whose Context cites a concept page marked
   `superseded`. All MEDIUM unless stated.
 
 ## State health (doctor)

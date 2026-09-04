@@ -4,7 +4,7 @@ Control cost and quality by giving heavier work a stronger model and routine wor
 This file is repository documentation. The agents do not load it; each one pins its own model and
 effort in its frontmatter.
 
-## Shipped defaults (v0.17)
+## Shipped defaults (v0.18)
 
 Every agent declares a model and effort level. Opus roles use `claude-opus-5` instead of the moving
 `opus` alias, so a future Opus release cannot change the gate-bearing fleet without an explicit
@@ -24,6 +24,7 @@ silent change carries less delivery risk.
 | `codebase-analyst` | `sonnet` | `medium` | reads and summarises; breadth over depth |
 | `technical-writer` | `sonnet` | `medium` | documents already-shipped facts |
 | `researcher` | `sonnet` | `medium` | web research; breadth and sourcing over depth |
+| `librarian` | `sonnet` | `medium` | summarises shipped artifacts into wiki pages |
 | `codex-researcher` | `sonnet` | `medium` | thin wrapper; the thinking happens inside Codex |
 | `codex-reviewer` | `sonnet` | `medium` | thin wrapper; the review happens inside Codex |
 | `codex-advisor` | `sonnet` | `medium` | thin wrapper; the opinion happens inside Codex |
