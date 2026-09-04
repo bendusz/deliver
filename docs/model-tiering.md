@@ -4,7 +4,7 @@ Control cost and quality by giving heavier work a stronger model and routine wor
 This file is repository documentation. The agents do not load it; each one pins its own model and
 effort in its frontmatter.
 
-## Shipped defaults (v0.18)
+## Shipped defaults (v0.19)
 
 Every agent declares a model and effort level. Opus roles use `claude-opus-5` instead of the moving
 `opus` alias, so a future Opus release cannot change the gate-bearing fleet without an explicit

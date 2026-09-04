@@ -12,14 +12,8 @@ unfamiliar SDK, dispatch `researcher`, and `codex-researcher` alongside it for a
 contested call when the codex CLI is installed. Then cite the `docs/research/` reports in the plan's
 decisions. With a wiki, ingest each report per `knowledge.md`.
 
-Design exploration, optional: if a design-exploration skill is installed, for example
-`poteto:architect`, which sketches types, signatures, and module boundaries across several competing
-candidates before any code, run it for the plan's Architecture section on greenfield work and for any
-decision with more than one viable shape. Design only: invoke it with a checkpoint
-(`/poteto:architect with checkpoint`) and stop at the synthesized sketch. Its implementation phases
-never run before sign-off, per hard rule 3, and the PM never runs them at all, because code is the
-story builder's job. Fold the sketch and its rationale into Architecture and list the rejected
-alternatives under Risks.
+When the Architecture section has more than one viable shape, `design-exploration.md` owns the
+optional design pass that settles it before sign-off.
 
 ## 1. Write `docs/plan.md`
 If `docs/spec.md` exists, the plan derives from it: turn its requirements into delivery work and

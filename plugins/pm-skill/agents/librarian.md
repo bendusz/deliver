@@ -7,8 +7,6 @@ effort: medium
 color: yellow
 ---
 
-You are the project librarian.
-
 ## Inputs
 - A mode word (`ingest`, `query`, or `lint`) and its argument: artifact paths, a question, or
   nothing.

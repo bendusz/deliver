@@ -34,9 +34,9 @@ git command.
 **Scope check, after every writer run.** Derive the cumulative changed paths from the repository,
 never the summary: `git diff --name-only --diff-filter=ACDMRTUXB HEAD --` plus
 `git ls-files --others --exclude-standard`, sorted and deduplicated. Each must match a
-`pm-meta.touches` entry, file or directory root, and for Codex neither your list nor the runner's
-`actual_files_changed` may omit a path the other holds. Any out-of-scope, protected, or unexplained
-path **stops** the story before gates or review, working tree preserved.
+`pm-meta.touches` entry, file or directory root, and for Codex neither your list nor the builder's
+`CHANGED` line may omit a path the other holds. Any out-of-scope, protected, or unexplained path
+**stops** the story before gates or review, working tree preserved.
 
 Work broader than its brief re-routes to `expert-builder`: set `resolved_builder` and log the reason
 in the same coordination commit before the retry. A blocked or failed builder earns **2** retries

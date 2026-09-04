@@ -29,11 +29,8 @@ header. Three fields carry rules:
   `code-integrity-reviewer` always; add `architecture-reviewer` for structural change and
   `security-auditor` for security-sensitive work. The lens list is the story's sensitivity
   declaration, which lets `/pm-skill:analyze` check declared against actual. For a story that
-  names `architecture-reviewer`, when a design-exploration skill is installed such as
-  `poteto:architect`, you may run it before marking the story build-ready. Run it with a
-  checkpoint (`/poteto:architect with checkpoint`), stop at the synthesized sketch, never run its
-  implementation phases, and put the type and module sketch into the story's Context so the builder
-  implements against a settled shape.
+  names `architecture-reviewer`, `design-exploration.md` owns the optional design pass that may
+  precede build-ready.
 
 ## Ordering
 - Record each story's `Depends on` and order so dependencies come first.

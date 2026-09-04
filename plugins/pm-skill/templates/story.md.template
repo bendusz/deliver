@@ -7,9 +7,9 @@ Risk: <low|med|high> · Review lenses: <code-integrity-reviewer[, architecture-r
 <one paragraph>
 
 ## Context (self-contained)
-<story-specific facts a cold builder needs and AGENTS.md does not state: the canonical source files
-and symbols, interfaces, and conventions; when completeness matters, the exact search or inventory
-method that establishes the full set>
+<facts a cold builder needs that are absent from AGENTS.md>
+<name the source files, symbols, interfaces, and conventions. When a complete inventory matters,
+name the exact search that finds it.>
 
 ## Acceptance criteria (testable)
 - [ ] <criterion>

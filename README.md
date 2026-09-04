@@ -98,8 +98,8 @@ implementation, failing tests, and localized fixes with concrete evidence. Both 
 deterministic gates, independent review panel, and final verifier.
 
 Default check-in is sprint-level, so you review at each sprint boundary, and it is configurable to
-story-level or fully autonomous. Pick a scale, `tiny` through `regulated`, to right-size the
-workflow: tiny work stays lightweight, and regulated work makes every gate mandatory.
+story-level or `autonomous`. Choose a scale from `tiny` through `regulated` to right-size the
+workflow. Tiny work stays lightweight, and regulated work makes every gate mandatory.
 
 ## Commands
 
@@ -192,8 +192,8 @@ under `tmp/`; the report directories sit at the repository root:
   created for the current story, runs `git init` only after asking, and never pushes without an
   explicit request.
 - **Optional hardening.** For mechanical enforcement of a read-only Bash posture and sign-off, the
-  bundled hardening guide uses plain Claude Code permissions and hooks, with no external process or
-  dependency.
+  bundled hardening guide uses Claude Code permissions and hooks. Its verifier Bash allowlist
+  requires `jq`.
 
 Three of the four bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
 tools; the fourth runs at session start and only reads `pm/`. None is a security boundary. Bash
@@ -207,7 +207,7 @@ writes elsewhere on the machine and any network use are not detectable, and out-
 the worktree are reported after the fact, as a safety violation with changes preserved, rather than
 prevented. Review, advice, and research modes are read-only on every platform.
 
-## Optional enhancements (they work alongside and are not required)
+## Optional tools
 
 pm-skill needs none of the optional tools below. If your environment has any of them, the PM may
 prefer them where useful.

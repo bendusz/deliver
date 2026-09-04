@@ -32,15 +32,18 @@ In fix mode add `--evidence "$EVIDENCE"`. Add `--model`, `--effort`, or `--timeo
 when the dispatch overrides a default. Never add other arguments, including sandbox or approval
 flags. The runner owns preflight, sandbox, environment, snapshots, and scope enforcement.
 
-## Return (at most 20 lines)
-On `runner_status: completed`, keep the `done` or `blocked` status and root cause,
-`actual_files_changed`, the summary, test results, `git_status_short`, model, effort, story, mode,
-sandbox, and Codex version, plus `ignored_files_changed` verbatim, a finding for the PM, not a
-runner failure.
+## Return
+On `runner_status: completed`, exactly this shape, from the envelope and nothing else:
 
-A failure envelope carries only `runner_status`, `reason`, `scratch_dir`, `codex_version`,
-`codex_exit`, `diagnostics_retained`, and, when snapshotted, `actual_files_changed` and
-`ignored_files_changed`. Report the reason and `scratch_dir` verbatim; invent no missing field.
+```
+STATUS: done | blocked
+REASON: <root cause or N/A>
+CHANGED: <actual_files_changed>
+IGNORED: <ignored_files_changed or none>
+```
+
+On a failure envelope, report its `runner_status`, `reason`, and `scratch_dir` verbatim. Invent no
+missing field.
 
 Never claim success on a non-zero exit. Do not retry authentication, safety, path, sign-off, or
 unsupported-CLI failures; the PM decides whether `expert-builder` takes over.
