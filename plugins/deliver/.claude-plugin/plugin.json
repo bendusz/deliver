@@ -1,7 +1,7 @@
 {
   "name": "deliver",
   "description": "Claude manages software delivery through discovery, planning, sign-off, delegated implementation, review, verification, and shipping. It does not write implementation code.",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "author": { "name": "bendusz", "url": "https://github.com/bendusz" },
   "homepage": "https://github.com/bendusz/deliver",
   "repository": "https://github.com/bendusz/deliver",
