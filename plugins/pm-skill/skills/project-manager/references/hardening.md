@@ -10,8 +10,9 @@ external process. The optional allowlist example does need `jq`.
 - **Sign-off.** The bundled `PreToolUse` hook `hooks/require-signoff.mjs` matches `Write`, `Edit`,
   and `MultiEdit` only. It blocks a write when `pm/pm-state.json`, or the legacy
   `tmp/pm-state.json`, has `signed_off: false`. It exempts everything under `docs/`, `pm/`, `tmp/`,
-  `.git/`, and `.claude/rules/`, plus the root files `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and
-  `.gitattributes`. It fails open on any uncertainty: a missing or unparseable state file, a target
+  `.git/`, `.claude/rules/`, and `.specdd/`, every `.sdd` file anywhere in the tree, and the root
+  files `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and `.gitattributes`. It fails open on any
+  uncertainty: a missing or unparseable state file, a target
   outside the project tree, or the kill switch `PM_SKILL_NO_ENFORCE=1`. Writes made through `Bash`
   are not covered.
 - **No secrets in `pm/` or `docs/wiki/`.** The bundled `PreToolUse` hook

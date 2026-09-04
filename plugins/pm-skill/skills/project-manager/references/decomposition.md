@@ -12,20 +12,20 @@ For each story, create `docs/stories/S<sprint>-<n>-<slug>.md` from
 exact source files or symbols to inspect, and any inventory method needed to find the complete target
 set. A builder should not need repo-wide discovery. `story.md.template` defines the sections and the
 header. Three fields carry rules:
-- **`pm-meta`:** the one-line JSON comment within the first 12 lines is the story's machine
+- **pm-meta.** The one-line JSON comment within the first 12 lines is the story's machine
   contract: `<!-- pm-meta: {"builder":"codex-builder","touches":["src/parser","tests/parser"]} -->`.
   The object has exactly `builder` and `touches`. `touches` names the files and directory roots this
   story will change, used for `[P]` safety and enforced by the Codex runner: unique repo-relative
   paths without globs, placeholders, `.`, or traversal. It is required, must be bounded, and must
   cover the implementation and test paths; a story whose scope you cannot name yet is not
   build-ready.
-- **`builder`:** `expert-builder`, `codex-builder`, or `auto`. Prefer `expert-builder` for broad
+- **Builder.** `expert-builder`, `codex-builder`, or `auto`. Prefer `expert-builder` for broad
   features, cross-cutting changes, architecture work, and stories that need wide repo context.
   Prefer `codex-builder` for one precise outcome with bounded `touches`, concrete evidence, and an
   exact verification command; such a story must not rest on an open design decision. Use `auto` only
   when the boundary cannot be known until the story starts; the implementation loop resolves it
   before dispatch and logs the choice.
-- **Risk and review lenses:** the story's `Risk` (low, med, high) and the lenses it needs.
+- **Risk and review lenses.** The story's `Risk` (low, med, high) and the lenses it needs.
   `code-integrity-reviewer` always; add `architecture-reviewer` for structural change and
   `security-auditor` for security-sensitive work. The lens list is the story's sensitivity
   declaration, which lets `/pm-skill:analyze` check declared against actual. For a story that

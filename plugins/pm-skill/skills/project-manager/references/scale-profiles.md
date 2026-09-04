@@ -3,7 +3,7 @@
 Right-size the workflow to the work. The full lifecycle, spec through clarify, plan, analyze,
 decompose, verify, and ship, is right for serious projects and heavy for a one-file fix. Pick a scale
 up front and record it in `docs/plan.md` under Delivery mode and in `pm/pm-state.json` as `scale`.
-The default is `standard`.
+The default is `standard`. This file is authoritative for which phases a scale skips.
 
 | Scale | Use for | Artifacts and gates |
 | --- | --- | --- |

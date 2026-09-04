@@ -14,7 +14,8 @@ subagents. Never write implementation code.
 2. **Protect your context.** Give each subagent only the minimal context it needs: in the build loop,
    the story file, plus the absolute repository or worktree root for every `codex-builder` dispatch
    and for `expert-builder` only outside the main checkout. Take back only a structured summary,
-   never raw transcripts. Delegate heavy reading and research to read-only subagents.
+   never raw transcripts. Delegate heavy reading and research to bounded specialist subagents:
+   `codebase-analyst` is read-only, and the two researchers write only under `docs/research/`.
 3. **No implementation before explicit human sign-off** on the plan.
 4. **Always log.** Append an author-prefixed entry to `pm/log.md` after every meaningful step. `pm/`
    is git-tracked, so commit state updates with the work they describe, and **never** write secrets
@@ -56,6 +57,9 @@ subagents. Never write implementation code.
    `pm/log.md`, your `pm/actors/<id>.json`, and the `docs/` artifacts.
    `references/resume-procedure.md` owns the resume read order and continuation point;
    `references/state-health.md` owns the `/pm-skill:doctor` drift checks.
+
+Phases 1, 2, and 4 run as the chosen scale requires; `references/scale-profiles.md` is authoritative
+for what each scale skips.
 
 Load only the active reference. Load `references/scale-profiles.md`,
 `references/instruction-layers.md`, `references/migrations.md`, `references/hardening.md`,

@@ -26,9 +26,8 @@ Initialise the state if it does not exist yet: `pm/pm-state.json`, the shared fi
 the actor id derived per `logging-and-state.md`. `pm/` is git-tracked, so create both directories and
 verify the state files are not matched by `.gitignore`: `git check-ignore pm/pm-state.json pm/log.md
 pm/actors/<actor-id>.json` must fail. Check the files, not the directory, since a `pm/*` rule ignores
-the files while a directory check passes; fix the rule if anything matches. Append
-`pm/log.md merge=union` to `.gitattributes`, creating it if it is missing and without clobbering
-other rules, so concurrent log appends merge cleanly. **Commit** `pm/` and `.gitattributes` from the
+the files while a directory check passes; fix the rule if anything matches. `discovery.md` owns the
+first `pm/log.md` and its `.gitattributes` merge rule. **Commit** `pm/` and `.gitattributes` from the
 first state write onward, per `logging-and-state.md`, and never write secrets into `pm/`. Then
 create `docs/plan.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.template`, whose comments define
 each section. Three rules the template cannot hold: the Stories table's `covers` column names the
@@ -36,7 +35,7 @@ spec IDs each story satisfies and its criteria must be testable; Traceability ma
 requirement to at least one story and flags any that is not; Commands are the project's real `test`,
 `lint`, `build`, and `run`, discovered now, with `N/A` where one does not exist.
 
-Present it and iterate with the user until they are happy. For a larger project, run
+Present it and iterate with the user until they are happy. When the scale requires analysis, run
 `/pm-skill:analyze` before decomposition, optionally on the drafted plan before you record sign-off,
 for a read-only consistency and coverage check; the Stories table carries the `covers` mapping.
 Resolve any CRITICAL or HIGH findings first.

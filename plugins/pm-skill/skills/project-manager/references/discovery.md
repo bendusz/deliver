@@ -20,10 +20,10 @@ Reach a shared, explicit understanding with the user, the customer-facing manage
 
 ## Protect your context
 - You are the PM. Keep the conversation and the decisions in this thread.
-- For anything that needs heavy reading, dispatch a read-only subagent with a tight question and take
-  back a short summary: `researcher` for external questions such as libraries, prior art, and best
-  practices, which writes its findings under `docs/research/`, and `codebase-analyst` for the
-  existing code. Do not read large sources into your own context.
+- For anything that needs heavy reading, dispatch a bounded specialist subagent with a tight question
+  and take back a short summary: `researcher` for external questions such as libraries, prior art,
+  and best practices, which writes only under `docs/research/`, and the read-only `codebase-analyst`
+  for the existing code. Do not read large sources into your own context.
 
 ## Exit gate
 Move on once you and the user share the problem and the solution direction. You need not resolve
@@ -33,7 +33,9 @@ block even writing a spec.
 
 ## Output
 - A short, shared problem statement and the chosen solution direction.
-- A one-line entry appended to `pm/log.md`, creating it if missing, noting that discovery is done and
-  the direction agreed.
+- `pm/log.md`, created from `${CLAUDE_PLUGIN_ROOT}/templates/log.md.template` when it is missing.
+  Append `pm/log.md merge=union` to `.gitattributes` in the same step, creating that file if it is
+  missing and without clobbering other rules, so concurrent log appends merge cleanly.
+- A one-line entry appended to the log, noting that discovery is done and the direction agreed.
 
 Then load `specification.md`.

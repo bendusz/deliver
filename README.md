@@ -6,7 +6,7 @@ covering gate, review, fix, verify, ship, and log, **without writing the code it
 
 One repeatable way of working:
 
-> **discover → specify → clarify → plan → sign-off → analyze → decompose → build → gate → review → verify → ship → log**
+> **discover → specify → clarify → plan → sign-off → skeleton (optional) → analyze → decompose → build → gate → review → verify → ship → log**
 
 It works on a bare Claude Code install and can use optional tools when they are present.
 
@@ -69,6 +69,7 @@ anything.
 | Specification | A durable `docs/spec.md`: user stories, requirements, acceptance criteria, success metrics. What and why, not how. |
 | Clarification | Open `[NEEDS CLARIFICATION]` questions resolved one at a time before planning. |
 | Plan and sign-off | A written `docs/plan.md` that derives from the spec, with traceability. You approve it before any code. |
+| Skeleton (optional) | With `Skeleton: specdd` in the plan, `spec-architect` writes the sprint's `.sdd` contracts, the shape of the code, before any code exists. |
 | Analyze | A read-only cross-artifact consistency check for coverage, contradictions, and constitution, run after the plan and before decomposition, optionally before sign-off. |
 | Decomposition | Sprints, then self-contained story files under `docs/stories/`, each tracing to requirement IDs. |
 | Implementation loop | Per story: build, gate, review, fix, verify, ship, log, run by subagents. |
@@ -110,6 +111,7 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 | `/pm-skill:specify` | Capture or refine `docs/spec.md`, the product spec of what and why. |
 | `/pm-skill:clarify` | Resolve open `[NEEDS CLARIFICATION]` in the spec, one question at a time, 5 at most. |
 | `/pm-skill:constitution` | Create or update `docs/constitution.md`, the project-specific governing rules. |
+| `/pm-skill:skeleton` | Write or extend the SpecDD `.sdd` skeleton for a sprint, after sign-off and before decomposition. |
 | `/pm-skill:analyze` | Read-only consistency and quality report across all artifacts. Never edits. |
 | `/pm-skill:checklist` | Generate or evaluate a spec, plan, story, or verification quality checklist under `docs/checklists/`. |
 | `/pm-skill:doctor` | Check environment readiness (toolchain, deps, gates run) and PM-state health before building. |
@@ -176,8 +178,9 @@ under `tmp/`; the report directories sit at the repository root:
 - **No implementation before your sign-off.** A behavioural rule the PM holds, plus the bundled
   `require-signoff.mjs` hook. The hook runs on `Write`, `Edit`, and `MultiEdit` only, and blocks a
   write when `pm/pm-state.json`, or the legacy `tmp/pm-state.json`, has `signed_off: false`. It
-  exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`,
-  and `.gitattributes`, fails open on any uncertainty, and does not see writes made through `Bash`.
+  exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, every `.sdd` file,
+  `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and `.gitattributes`, fails open on any uncertainty, and
+  does not see writes made through `Bash`.
 - **Guarded Codex writes.** Codex builds require signed-off tracked state and bounded story touch
   paths. POSIX runs use `workspace-write`. Windows runs with full host access and an after-run
   worktree audit. See `docs/codex-cli-reference.md` for the flag matrix, audited state, exit codes,
