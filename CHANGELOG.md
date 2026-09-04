@@ -13,7 +13,8 @@ The plugin is now called deliver.
 - **Nothing to migrate in projects.** `pm/` state, `pm-meta`, actor ids, and generated `AGENTS.md`
   files are unchanged; `/deliver:resume` reads them as before.
 - **Upgrade.** `claude plugin marketplace remove pm-skill`, then
-  `claude plugin marketplace add bendusz/deliver` and `claude plugin install deliver@deliver`.
+  `/plugin marketplace add https://github.com/bendusz/deliver` and
+  `/plugin install deliver@deliver`.
 
 ## 0.20.0 - 2026-09-04
 

@@ -49,14 +49,14 @@ operations untouched.
    ```bash
    #!/usr/bin/env bash
    # Read-only Bash for the pm-verifier subagent only; other agents are unaffected. Requires jq.
-   command -v jq >/dev/null 2>&1 || { echo "deliver hardening: jq is required" >&2; exit 2; }
+   command -v jq >/dev/null 2>&1 || { echo "deliver: hardening guard, jq is required" >&2; exit 2; }
    input="$(cat)"
    [ "$(printf '%s' "$input" | jq -r '.agent_type // empty')" = "pm-verifier" ] || exit 0
    cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
    # Block chaining / redirection / substitution / output-writing options outright.
    case "$cmd" in
      *';'*|*'&'*|*'|'*|*'>'*|*'<'*|*'`'*|*'$('*|*$'\n'*|*' --output'*)
-       echo "deliver hardening: chained/redirected/output-writing commands are not allowed" >&2; exit 2 ;;
+       echo "deliver: hardening guard, chained/redirected/output-writing commands are not allowed" >&2; exit 2 ;;
    esac
    case "$cmd" in
      "git status"*|"git diff"*|"git log"*|"git show"*|"ls "*|"cat "*|"grep "*|"rg "*|"head "*|"tail "*|"wc "*) exit 0 ;;
@@ -64,7 +64,7 @@ operations untouched.
      "npm test"*|"npm run lint"*|"npm run build"*|"pytest"*|"ruff check"*|"make test"*) exit 0 ;;
      "node scripts/check.mjs"*) exit 0 ;;
    esac
-   echo "deliver hardening: pm-verifier may run only read-only inspection and the project gates" >&2
+   echo "deliver: hardening guard, pm-verifier may run only read-only inspection and the project gates" >&2
    exit 2
    ```
 

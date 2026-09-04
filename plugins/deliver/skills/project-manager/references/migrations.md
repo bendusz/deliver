@@ -5,7 +5,7 @@ migration on its own, then continue the phase you were in.
 
 ## Projects managed before 0.21 (the plugin was renamed)
 
-Nothing to migrate. The plugin renamed itself in 0.21; the state it writes did not change. `pm/`,
+Nothing to migrate. The plugin was renamed in 0.21; the state it writes did not change. `pm/`,
 `pm/pm-state.json`, `pm/actors/`, `pm/log.md`, the `AGENTS.md` pointer, and
 `.claude/rules/pm-state.md` keep their names and contents, and every actor id stays valid because
 the id salt deliberately kept the pre-0.21 name. `/deliver:resume` reads such a project exactly as
