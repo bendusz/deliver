@@ -180,6 +180,19 @@ test('snapshot: ignored files are fingerprinted cheaply and the runtime dir is s
   assert.deepEqual(changedPaths(before, snapshotWorktree(p)), ['.env']);
 });
 
+test('snapshot: a root .sdd is scanned as a protected file even when ignored; a directory named *.sdd is not', () => {
+  const p = newBuildProject(true);
+  fs.appendFileSync(path.join(p, '.gitignore'), 'hidden.sdd\nSHOUTED.SDD\n');
+  fs.writeFileSync(path.join(p, 'hidden.sdd'), 'spec\n');
+  fs.writeFileSync(path.join(p, 'SHOUTED.SDD'), 'spec\n');
+  fs.mkdirSync(path.join(p, 'dir.sdd'));
+  fs.writeFileSync(path.join(p, 'dir.sdd', 'inside.txt'), 'x\n');
+  const snap = snapshotWorktree(p);
+  assert.match(snap.get('hidden.sdd'), /^file:100644:/, 'a hidden root spec is scanned by path, not by the ignored-files pass, so it fingerprints as content, not as ignored:');
+  assert.match(snap.get('SHOUTED.SDD'), /^file:100644:/, 'the root-spec scan is case-insensitive, so an uppercase extension cannot hide a spec:');
+  assert.ok(!snap.has('dir.sdd'), 'a directory named like a root spec must not be added by the *.sdd scan');
+});
+
 test('snapshot: index flags, git hooks, and info/exclude are protected git state', () => {
   const p = newBuildProject(true);
   const base = gitMetadataFingerprint(p);
@@ -270,9 +283,10 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
   assert.equal(r.out.diagnostics_retained, false);
   assert.match(r.out.git_status_short, /src\/fix\.txt/);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, or docs\/constitution\.md\./);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Read the story's Specs/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /summary holds at most five short strings\./);
   assert.equal(fs.readdirSync(s.tmp).length, 0);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')) || fs.readdirSync(path.join(p, 'tmp', 'codex-runtime')).length === 0);
@@ -383,29 +397,37 @@ test('build 11: missing and symlinked PM state fail closed', (t) => {
   assert.equal(stubActions(s), '');
 });
 
-test('build 12, 14, 22: protected artifact, outside-touches, and ignored-protected edits are violations', () => {
+// One build run whose stub writes `rel` and reports it. `ignore` adds a .gitignore rule first, so a
+// case can prove that a hostile ignore rule cannot hide a protected path from the audit.
+function runBuildWriteCase(rel, { ignore } = {}) {
+  const p = newBuildProject(true); const s = makeStub();
+  if (ignore) fs.appendFileSync(path.join(p, '.gitignore'), `${ignore}\n`);
+  return runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: rel, STUB_REPORT_PATH: rel } });
+}
+
+test('build 12, 12c, 12d, 14, 22: protected, out-of-scope, ignored, wiki, .specdd, and root-spec writes are violations', () => {
   const cases = [
-    [{ STUB_WRITE_PATH: 'pm/pm-state.json', STUB_REPORT_PATH: 'pm/pm-state.json' }, /protected PM artifact/, 'pm/pm-state.json'],
-    [{ STUB_WRITE_PATH: 'README.md', STUB_REPORT_PATH: 'README.md' }, /outside the story/, 'README.md'],
-    [{ STUB_WRITE_PATH: 'pm/hidden.md', STUB_REPORT_PATH: 'pm/hidden.md' }, /protected PM artifact/, 'pm/hidden.md'],
+    ['pm/pm-state.json', /protected PM artifact/, null],
+    ['README.md', /outside the story/, null],
+    ['pm/hidden.md', /protected PM artifact/, 'pm/hidden.md'],
+    ['docs/wiki/index.md', /protected PM artifact/, null],
+    ['.specdd/bootstrap.md', /protected PM artifact/, null],
+    ['todo-cli.sdd', /protected PM artifact/, null],
+    ['ROOT.SDD', /protected PM artifact/, null],
+    ['hidden.sdd', /protected PM artifact/, 'hidden.sdd'],
   ];
-  for (const [env, re, changed] of cases) {
-    const p = newBuildProject(true); const s = makeStub();
-    if (changed === 'pm/hidden.md') fs.appendFileSync(path.join(p, '.gitignore'), 'pm/hidden.md\n');
-    const r = runRunner(['--mode', 'build'], { project: p, stub: s, env });
-    assert.equal(r.status, 74, JSON.stringify(r.out));
-    assert.match(r.out.reason, re);
-    assert.ok(r.out.actual_files_changed.includes(changed));
+  for (const [rel, re, ignore] of cases) {
+    const r = runBuildWriteCase(rel, { ignore });
+    assert.equal(r.status, 74, `${rel}: ${JSON.stringify(r.out)}`);
+    assert.match(r.out.reason, re, rel);
+    assert.ok(r.out.actual_files_changed.includes(rel), rel);
   }
 });
 
-test('build 12c: a Codex write under docs/wiki/ is a protected-artifact violation', () => {
-  const p = newBuildProject(true); const s = makeStub();
-  const env = { STUB_WRITE_PATH: 'docs/wiki/index.md', STUB_REPORT_PATH: 'docs/wiki/index.md' };
-  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env });
-  assert.equal(r.status, 74, JSON.stringify(r.out));
-  assert.match(r.out.reason, /protected PM artifact/);
-  assert.ok(r.out.actual_files_changed.includes('docs/wiki/index.md'));
+test('build 12d: a .sdd inside the story touches is not protected', () => {
+  const r = runBuildWriteCase('src/fix.sdd');
+  assert.equal(r.status, 0, JSON.stringify(r.out));
+  assert.ok(r.out.actual_files_changed.includes('src/fix.sdd'));
 });
 
 test('build 13: an omitted files_changed entry cannot conceal an edit', () => {

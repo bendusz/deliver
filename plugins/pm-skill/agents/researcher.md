@@ -1,6 +1,6 @@
 ---
 name: researcher
-description: Use PROACTIVELY during discovery, specification, and planning, and when a story is blocked on an unknown external dependency, to answer one tightly-scoped external research question (library or framework choice, SDK and API facts, prior art, best practices) with sourced findings and an explicit recommendation. Writes a report under docs/research/ and returns a short digest.
+description: Use when discovery or planning needs an external fact, or when a story is blocked on an unknown external dependency, to answer one tightly-scoped external research question (library or framework choice, SDK and API facts, prior art, best practices) with sourced findings and an explicit recommendation. Writes a report under docs/research/ and returns a short digest.
 tools: Read, Grep, Glob, WebSearch, WebFetch, Write
 model: sonnet
 effort: medium

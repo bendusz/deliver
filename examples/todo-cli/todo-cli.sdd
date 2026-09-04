@@ -1,0 +1,14 @@
+Spec: todo-cli
+Purpose:
+  A tiny command-line tool to add todos and list them, persisted to a local JSON file.
+Platform:
+  Python 3.10 or newer, standard library only.
+Structure:
+  todo.py: the CLI entry point and JSON-file store.
+  test_todo.py: tests for the CLI and store.
+Must:
+  - Use only the Python standard library; no third-party packages.
+Must not:
+  - Add due dates, priorities, editing, deletion, or sync.
+Depends on:
+  - None; no external dependencies.

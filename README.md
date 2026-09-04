@@ -1,12 +1,11 @@
 # pm-skill, a Project/Product Manager skill for Claude Code
 
-Turn Claude into a disciplined Project and Product Manager that discovers, specifies, plans, gets
-your sign-off, decomposes work into stories, and orchestrates the build through specialist subagents,
-covering gate, review, fix, verify, ship, and log, **without writing the code itself**.
+Claude acts as the project manager. It agrees requirements and a plan with you, waits for sign-off,
+then delegates implementation and review to specialist agents. It never writes code.
 
 One repeatable way of working:
 
-> **discover → specify → clarify → plan → sign-off → analyze → decompose → build → gate → review → verify → ship → log**
+> **discover → specify → clarify → plan → sign-off → skeleton (optional) → analyze → decompose → build → gate → review → verify → ship → log**
 
 It works on a bare Claude Code install and can use optional tools when they are present.
 
@@ -69,6 +68,7 @@ anything.
 | Specification | A durable `docs/spec.md`: user stories, requirements, acceptance criteria, success metrics. What and why, not how. |
 | Clarification | Open `[NEEDS CLARIFICATION]` questions resolved one at a time before planning. |
 | Plan and sign-off | A written `docs/plan.md` that derives from the spec, with traceability. You approve it before any code. |
+| Skeleton (optional) | With `Skeleton: specdd` in the plan, `spec-architect` writes the sprint's `.sdd` contracts, the shape of the code, before any code exists. |
 | Analyze | A read-only cross-artifact consistency check for coverage, contradictions, and constitution, run after the plan and before decomposition, optionally before sign-off. |
 | Decomposition | Sprints, then self-contained story files under `docs/stories/`, each tracing to requirement IDs. |
 | Implementation loop | Per story: build, gate, review, fix, verify, ship, log, run by subagents. |
@@ -76,20 +76,27 @@ anything.
 | Review and verification | A separate read-only reviewer, the project's real test, lint, and build gates, and a final read-only `pm-verifier` PASS, with bounded fix loops. |
 | Logging | A shared author-prefixed `pm/log.md` and per-actor state under `pm/actors/`, so concurrent PM sessions never overwrite each other and any lost session can resume. |
 
-Bundled specialist agents do the work. They include a broad-context Opus builder (`expert-builder`)
-and an optional Codex-CLI-backed precision builder (`codex-builder`), a risk-selected read-only
-review panel (`code-integrity-reviewer`, `architecture-reviewer`, `security-auditor`), a
-`test-engineer` that writes tests only, a read-only `debugger` that returns a root cause and a fix
-plan, a read-only final `pm-verifier` returning an independent PASS, FAIL, or UNKNOWN before ship, a
-`technical-writer` for docs only, a `codebase-analyst` for brownfield work, a `librarian` that alone
-maintains the project wiki, a web-capable `researcher`, and three Codex-CLI-backed second-opinion
-roles: `codex-researcher` for independent
-research, `codex-reviewer` for independent code review, and `codex-advisor` for an independent
-recommendation. `researcher` and `codex-researcher` write sourced reports under `docs/research/`,
+Bundled specialist agents do the work:
+
+| Role | Agent |
+|------|-------|
+| Build with broad repo context | `expert-builder` (Opus) |
+| Build one bounded outcome | `codex-builder` (Codex CLI, optional) |
+| Risk-selected read-only review panel | `code-integrity-reviewer`, `architecture-reviewer`, `security-auditor` |
+| Write tests, nothing else | `test-engineer` |
+| Root cause and a fix plan, read-only | `debugger` |
+| Independent PASS, FAIL, or UNKNOWN before ship | `pm-verifier` |
+| Docs only | `technical-writer` |
+| Map a brownfield codebase | `codebase-analyst` |
+| Maintain the project wiki, its only writer | `librarian` |
+| Write SpecDD `.sdd` contracts before code | `spec-architect` |
+| External research, reports under `docs/research/` | `researcher` (web), `codex-researcher` |
+| Second opinion on code and on decisions | `codex-reviewer`, `codex-advisor` |
+
 `codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`, and `codex-advisor`
-relays its answer directly in chat. Every Codex invocation goes through one of these thin Sonnet
-wrappers and the bundled Node runner; the PM never runs `codex` itself. The PM stays an orchestrator
-and protects its own context by handing each agent only what it needs.
+relays its answer in chat. Every Codex invocation goes through one of these thin Sonnet wrappers and
+the bundled Node runner; the PM never runs `codex` itself. The PM stays an orchestrator and protects
+its own context by handing each agent only what it needs.
 
 Each story carries a one-line `pm-meta` JSON comment naming its builder (`expert-builder`,
 `codex-builder`, or `auto`) and its machine-readable touch paths. Opus remains the default for broad
@@ -109,6 +116,7 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 | `/pm-skill:specify` | Capture or refine `docs/spec.md`, the product spec of what and why. |
 | `/pm-skill:clarify` | Resolve open `[NEEDS CLARIFICATION]` in the spec, one question at a time, 5 at most. |
 | `/pm-skill:constitution` | Create or update `docs/constitution.md`, the project-specific governing rules. |
+| `/pm-skill:skeleton` | Write or extend the SpecDD `.sdd` skeleton for a sprint, after sign-off and before decomposition. |
 | `/pm-skill:analyze` | Read-only consistency and quality report across all artifacts. Never edits. |
 | `/pm-skill:checklist` | Generate or evaluate a spec, plan, story, or verification quality checklist under `docs/checklists/`. |
 | `/pm-skill:doctor` | Check environment readiness (toolchain, deps, gates run) and PM-state health before building. |
@@ -129,6 +137,8 @@ At the project root:
   file. Existing files are never overwritten; the PM proposes a migration instead.
 - `.claude/rules/pm-state.md` and `pm/AGENTS.md`, optional path-scoped `pm/` discipline, enabled by
   `Instruction rules: pm-state` in the plan's Delivery mode.
+- `<root>.sdd`, `.specdd/bootstrap.md`, and `.sdd` files beside the code they describe: the SpecDD
+  skeleton, when the plan's Delivery mode says `Skeleton: specdd`. Optional.
 
 Committed under `docs/`, which is authoritative:
 
@@ -173,8 +183,9 @@ under `tmp/`; the report directories sit at the repository root:
 - **No implementation before your sign-off.** A behavioural rule the PM holds, plus the bundled
   `require-signoff.mjs` hook. The hook runs on `Write`, `Edit`, and `MultiEdit` only, and blocks a
   write when `pm/pm-state.json`, or the legacy `tmp/pm-state.json`, has `signed_off: false`. It
-  exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`,
-  and `.gitattributes`, fails open on any uncertainty, and does not see writes made through `Bash`.
+  exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, every `.sdd` file,
+  `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and `.gitattributes`, fails open on any uncertainty, and
+  does not see writes made through `Bash`.
 - **Guarded Codex writes.** Codex builds require signed-off tracked state and bounded story touch
   paths. POSIX runs use `workspace-write`. Windows runs with full host access and an after-run
   worktree audit. See `docs/codex-cli-reference.md` for the flag matrix, audited state, exit codes,
@@ -212,13 +223,8 @@ prevented. Review, advice, and research modes are read-only on every platform.
 pm-skill needs none of the optional tools below. If your environment has any of them, the PM may
 prefer them where useful.
 
-- The `poteto` companion plugin from this marketplace: design exploration before code with
-  `architect` and `arena`, subsystem walkthroughs with `how` and `why`, multi-model adversarial
-  review with lead-reviewer triage in `interrogate`, change-impact proofs with `blast-radius`, a
-  generator for a project skill that drives the real app in `create-verification-skill`, a
-  technical-writing standard, `unslop`, and 21 named engineering principles. Skills only, no hooks.
-  MIT, copyright Lauren Tan. The PM's references name these as optional examples, and nothing breaks
-  without them.
+- The `poteto` companion plugin from this marketplace. [Install](#install) step 3 lists its skills.
+  The PM's references name them as optional examples, and nothing breaks without them.
 - A dedicated planning or TDD skill suite for richer discovery and planning.
 - An external code-review tool, an OpenAI Codex-based reviewer or another model's CLI for example,
   for the optional independent review step.

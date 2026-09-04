@@ -4,7 +4,7 @@ Control cost and quality by giving heavier work a stronger model and routine wor
 This file is repository documentation. The agents do not load it; each one pins its own model and
 effort in its frontmatter.
 
-## Shipped defaults (v0.19)
+## Shipped defaults (v0.20)
 
 Every agent declares a model and effort level. Opus roles use `claude-opus-5` instead of the moving
 `opus` alias, so a future Opus release cannot change the gate-bearing fleet without an explicit
@@ -21,6 +21,7 @@ silent change carries less delivery risk.
 | `architecture-reviewer` | `claude-opus-5` | `medium` | design judgement at standard depth |
 | `pm-verifier` | `claude-opus-5` | `medium` | independent evidence-checking at standard depth |
 | `test-engineer` | `claude-opus-5` | `medium` | derives tests from written criteria |
+| `spec-architect` | `claude-opus-5` | `medium` | design judgement, turns plan decisions into contracts |
 | `codebase-analyst` | `sonnet` | `medium` | reads and summarises; breadth over depth |
 | `technical-writer` | `sonnet` | `medium` | documents already-shipped facts |
 | `researcher` | `sonnet` | `medium` | web research; breadth and sourcing over depth |

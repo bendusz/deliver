@@ -1,0 +1,16 @@
+<!-- Write to .specdd/bootstrap.md when the specdd CLI is not available. Project-specific rules go in bootstrap.project.md. -->
+# SpecDD bootstrap
+
+Specs are source-adjacent contracts, not documentation. A `.sdd` file beside a code file with the
+same basename is that file's spec; `<dir>/<dir>.sdd` or a parent-held `<dir>.sdd` governs a
+directory; the root spec `<root-dir-name>.sdd` governs the project. Parent context precedes local
+context; both apply.
+
+Before changing code: resolve the spec chain for the paths you will touch (root, parents, local),
+read it, and confirm the change stays inside the spec's `Owns` and honours `Must` and `Must not`.
+While changing: keep `Exposes`, `Accepts`, `Returns`, and `Raises` true. After changing: check
+each `Done when` line you affected, and report any spec you edited.
+
+Sections, used only when useful: `Spec`, `Purpose`, `Structure`, `Owns`, `Can modify`, `Can read`,
+`Must`, `Must not`, `Forbids`, `Depends on`, `Exposes`, `Accepts`, `Returns`, `Raises`, `Handles`,
+`Tasks`, `Done when`, `Scenario`, `Example`. A spec that is missing is not permission; ask.

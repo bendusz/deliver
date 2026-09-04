@@ -17,3 +17,4 @@
 - [ ] `Risk` is set and `Review lenses` lists `code-integrity-reviewer` plus `security-auditor`
       when the story touches auth, secrets, untrusted input, I/O, or dependencies, and
       `architecture-reviewer` when it changes structure or boundaries.
+- [ ] With a skeleton, every path in `Specs` exists and its `Owns` covers the story's `touches`.

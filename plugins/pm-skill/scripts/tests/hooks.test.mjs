@@ -14,9 +14,15 @@ test('signoff: blocks implementation write pre-sign-off', () => {
 
 test('signoff: allows planning and state writes', () => {
   const p = newProj(false);
-  for (const f of ['docs/plan.md', 'pm/log.md', 'CLAUDE.md', 'AGENTS.md', '.gitignore', '.gitattributes', '.claude/rules/pm-state.md', 'tmp/x.md']) {
+  for (const f of ['docs/plan.md', 'pm/log.md', 'CLAUDE.md', 'AGENTS.md', '.gitignore', '.gitattributes', '.claude/rules/pm-state.md', 'tmp/x.md', 'todo.sdd', 'Todo.SDD', 'src/trips/itinerary.sdd', '.specdd/bootstrap.md']) {
     assert.equal(signoff(writeInput(p, path.join(p, f))), 0, f);
   }
+});
+
+test('signoff: a .sdd beside a blocked source file is still allowed, the source is not', () => {
+  const p = newProj(false);
+  assert.equal(signoff(writeInput(p, path.join(p, 'src', 'app.sdd'))), 0);
+  assert.equal(signoff(writeInput(p, path.join(p, 'src', 'app.py'))), 2);
 });
 
 test('signoff: allows outside-project write', () => {

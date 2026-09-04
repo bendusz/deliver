@@ -57,8 +57,9 @@ Fields: `project`, `spec`, `constitution`, `scale`, `phase`, `signed_off` (bool)
 - `assignments` maps story id to actor id for active claims only. History lives in the log and the
   story files.
 - `signed_off` is load-bearing and global. While it is `false`, the `require-signoff.mjs` hook blocks
-  every actor's `Write`, `Edit`, and `MultiEdit` calls, except those targeting `docs/`, `pm/`, `tmp/`,
-  `.git/`, `.claude/rules/`, `CLAUDE.md`, `AGENTS.md`, `.gitignore`, or `.gitattributes`. It fails
+  every actor's `Write`, `Edit`, and `MultiEdit` calls, except those targeting `docs/`, `pm/`,
+  `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, any `.sdd` file, `CLAUDE.md`, `AGENTS.md`,
+  `.gitignore`, or `.gitattributes`. It fails
   open on any uncertainty, and it never sees writes made through `Bash`, so the behavioural rule
   still carries the gate. The legacy `tmp/pm-state.json` location is read when `pm/` has none. Set
   `signed_off` to `true`, with `approver` and `approved_date`, only at the sign-off gate;
@@ -93,7 +94,7 @@ One file. Each line records one project event. Entry shape:
 - **Append** only, with no mutable blocks. There is deliberately no "Current State" section, because
   anything mutable in a shared file conflicts under concurrent editing. Current position lives in the
   state JSONs, and resume renders it from there.
-- Concurrent appends merge cleanly because bootstrap sets `pm/log.md merge=union` in
+- Concurrent appends merge cleanly because discovery sets `pm/log.md merge=union` in
   `.gitattributes`. Union merge can interleave near-simultaneous entries out of timestamp order,
   which is harmless for an append-only log. Never "fix" old entries.
 

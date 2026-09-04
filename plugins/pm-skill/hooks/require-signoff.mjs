@@ -4,7 +4,8 @@
 // FAIL-OPEN by design. Exits 0 (allow) on any uncertainty: kill switch, no state file,
 // unparseable JSON, or a target outside the project tree. Exits 2 (block, reason on
 // stderr) only when a PM-managed project is certainly mid-flight and pre-sign-off and
-// the write targets a non-planning path. Inert for anyone not running the PM skill.
+// the write targets a non-planning, non-spec (.sdd, .specdd/) path. Inert for anyone not
+// running the PM skill.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -30,8 +31,10 @@ const rel = pmRelpath(root, file);
 if (rel === null) process.exit(0);
 
 const ALLOWED_FILES = new Set(['CLAUDE.md', 'AGENTS.md', '.gitignore', '.gitattributes']);
-const ALLOWED_PREFIXES = ['docs/', 'pm/', 'tmp/', '.git/', '.claude/rules/'];
-if (ALLOWED_FILES.has(rel) || ALLOWED_PREFIXES.some((prefix) => rel.startsWith(prefix))) process.exit(0);
+const ALLOWED_PREFIXES = ['docs/', 'pm/', 'tmp/', '.git/', '.claude/rules/', '.specdd/'];
+// SpecDD specs are planning artifacts: a skeleton may be written before code exists.
+const isSpec = /\.sdd$/i.test(rel);
+if (ALLOWED_FILES.has(rel) || isSpec || ALLOWED_PREFIXES.some((prefix) => rel.startsWith(prefix))) process.exit(0);
 
 // Synchronous write: a stream write immediately followed by process.exit() can be truncated.
 fs.writeSync(2, `pm-skill blocked ${rel}: the plan is not signed off (pm/pm-state.json signed_off=false).

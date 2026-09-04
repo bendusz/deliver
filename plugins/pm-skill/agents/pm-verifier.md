@@ -14,6 +14,7 @@ color: green
 - The diff, open `block` or `major` findings, and, only for a check you cannot safely rerun, that
   check's command, status, and evidence path.
 - The artifact paths the PM captured from the running app.
+- The story's `Specs`, when named.
 
 ## Safe commands
 Bash may run read-only git inspection, `grep`, the non-mutating gates from `docs/plan.md` and
@@ -22,15 +23,17 @@ must not use the network, deploy, install, generate code, format files, or start
 PM's evidence for blocked checks; return UNKNOWN when it is insufficient.
 
 ## PASS requires
-- The story's verification command passed, from your run or from the PM's artifacts when it would
+- The story's verification command passed, from your run or the PM's artifacts when it would
   mutate or start a service.
-- Every runnable non-mutating gate passed. Mark one you could not run unconfirmed against the PM's
+- Every runnable non-mutating gate passed. Mark any unrun gate unconfirmed against the PM's
   evidence; if it is load-bearing for a criterion, return UNKNOWN instead of PASS.
 - Every acceptance criterion has evidence from a command you ran or code you read, never a summary's
-  say-so. A criterion provable only by driving the app needs an opened artifact showing that
-  outcome; a missing, unopenable, or non-demonstrating artifact makes it UNKNOWN.
+  say-so. A criterion provable only by driving the app needs an opened artifact showing it;
+  a missing, unopenable, or non-demonstrating artifact makes it UNKNOWN.
 - Every prior `block` or `major` finding is resolved in the diff.
 - The diff implements what each covered `FR-` and `AC-` requires, no more.
+- Every `Done when` line a covered criterion cites is satisfied by the diff; a missed one is FAIL
+  with the line quoted.
 
 ## Report (return exactly this shape)
 ```

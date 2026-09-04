@@ -13,6 +13,7 @@
 
 ## Conventions
 <only rules that differ from the language or framework default>
+<!-- with Skeleton: specdd, add: Before working here, read .specdd/bootstrap.md and treat .sdd files as source-adjacent contracts. -->
 
 ## Gotchas
 <anything non-obvious a contributor must know>

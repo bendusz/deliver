@@ -161,15 +161,15 @@ mode context: no `worktree`, `story`, `mode`, `sandbox`, or output path.
 
 **Completed envelopes, per mode.**
 
-- **build/fix**: `codex_version`, `model`, `effort`, `worktree`, `story`, `mode`, `timeout_seconds`,
-  `sandbox` (`workspace-write` or `none (win32)`), `diagnostics_retained: false`,
+- **Build and fix.** `codex_version`, `model`, `effort`, `worktree`, `story`, `mode`,
+  `timeout_seconds`, `sandbox` (`workspace-write` or `none (win32)`), `diagnostics_retained: false`,
   `actual_files_changed`, `ignored_files_changed`, `git_status_short`, and the builder's `result`
   object: `status`, `summary` (one to five lines), `files_changed`, `tests`, and `root_cause`, where
   a blocked run explains itself.
-- **review**: `mode`, `scope`, `objective`, `report_path`, `model`, `effort`, `codex_version`,
+- **Review.** `mode`, `scope`, `objective`, `report_path`, `model`, `effort`, `codex_version`,
   `codex_exit`, and `gitignore_rule_needed` (a root-anchored `/<dir>/` string, or `null` when the
   output directory is already ignored).
-- **advise/research**: `mode`, `answer_path`, `stderr_path`, `scratch_dir`, `codex_version`,
+- **Advice and research.** `mode`, `answer_path`, `stderr_path`, `scratch_dir`, `codex_version`,
   `model`, `effort`, `codex_exit`, `search_used`.
 
 **Preflight envelopes** carry `runner_status: ready`, `preflight: true`, `codex_version`, and

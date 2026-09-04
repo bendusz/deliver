@@ -20,23 +20,25 @@ If `docs/spec.md` exists, the plan derives from it: turn its requirements into d
 trace each story back to the spec's IDs. If there is no spec yet, run `/pm-skill:specify` first for
 non-trivial work, or fold the intent straight into the plan for something small.
 
-Initialise the state if it does not exist yet: `pm/pm-state.json`, the shared file, from
-`${CLAUDE_PLUGIN_ROOT}/templates/pm-state.json.template` with `signed_off: false`, and your own
-`pm/actors/<actor-id>.json` from `${CLAUDE_PLUGIN_ROOT}/templates/actor-state.json.template`, with
-the actor id derived per `logging-and-state.md`. `pm/` is git-tracked, so create both directories and
-verify the state files are not matched by `.gitignore`: `git check-ignore pm/pm-state.json pm/log.md
-pm/actors/<actor-id>.json` must fail. Check the files, not the directory, since a `pm/*` rule ignores
-the files while a directory check passes; fix the rule if anything matches. Append
-`pm/log.md merge=union` to `.gitattributes`, creating it if it is missing and without clobbering
-other rules, so concurrent log appends merge cleanly. **Commit** `pm/` and `.gitattributes` from the
-first state write onward, per `logging-and-state.md`, and never write secrets into `pm/`. Then
-create `docs/plan.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.template`, whose comments define
-each section. Three rules the template cannot hold: the Stories table's `covers` column names the
-spec IDs each story satisfies and its criteria must be testable; Traceability maps every spec
+Initialise the state if it does not exist yet. `logging-and-state.md` owns the schemas, the actor
+id, the commit discipline, and the no-secrets rule; `discovery.md` already created `pm/log.md` and
+its `merge=union` rule. The sequence:
+1. Create `pm/pm-state.json` from `${CLAUDE_PLUGIN_ROOT}/templates/pm-state.json.template` with
+   `signed_off: false`.
+2. Derive your actor id with the documented `actor-id` command, then create
+   `pm/actors/<actor-id>.json` from `${CLAUDE_PLUGIN_ROOT}/templates/actor-state.json.template`.
+3. Confirm `git check-ignore pm/pm-state.json pm/log.md pm/actors/<actor-id>.json` fails. Check the
+   files, not the directory, since a `pm/*` rule ignores the files while a directory check passes;
+   fix the rule if anything matches.
+4. **Commit** `pm/` and `.gitattributes`.
+
+Then create `docs/plan.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.template`, whose comments
+define each section. Three rules the template cannot hold: the Stories table's `covers` column names
+the spec IDs each story satisfies and its criteria must be testable; Traceability maps every spec
 requirement to at least one story and flags any that is not; Commands are the project's real `test`,
 `lint`, `build`, and `run`, discovered now, with `N/A` where one does not exist.
 
-Present it and iterate with the user until they are happy. For a larger project, run
+Present it and iterate with the user until they are happy. When the scale requires analysis, run
 `/pm-skill:analyze` before decomposition, optionally on the drafted plan before you record sign-off,
 for a read-only consistency and coverage check; the Stories table carries the `covers` mapping.
 Resolve any CRITICAL or HIGH findings first.
@@ -61,16 +63,17 @@ but it is fail-open and can be disabled, so holding the line is still your respo
   plan's Delivery mode says `Instruction rules: pm-state`, also write `.claude/rules/pm-state.md`
   from `rules-pm-state.md.template` and `pm/AGENTS.md` from `pm-AGENTS.md.template`.
 - At `standard` scale and above, scaffold `docs/wiki/` from the wiki templates per `knowledge.md`.
+- With `Skeleton: specdd`, append the SpecDD line held in `AGENTS.md.template`'s comment,
+  uncommented, to the project `AGENTS.md` Conventions.
 - Ensure `.gitignore` includes `tmp/`, appending rather than clobbering an existing `.gitignore`.
-  `tmp/` is ephemeral scratch and never enters git. The tracked `pm/` state files must **not** be
-  ignored, and `.gitattributes` must carry `pm/log.md merge=union`.
+  `tmp/` is ephemeral scratch and never enters git.
 - **Commit** only the files you created or changed. No `git add -A` over the user's other work.
 - If git has no `user.name` or `user.email`, ask before committing.
 - The branch the scaffold commit lands on, `main` by default, is the integration branch: the base you
   cut every story branch from and merge each story back into.
 
 Log the scaffold step. With a wiki, dispatch the first `librarian ingest` per `knowledge.md` and log
-its receipt. Then load `decomposition.md`.
+its receipt. With `Skeleton: specdd`, load `skeleton.md` next; otherwise load `decomposition.md`.
 
 ## Checkpoint policy (recorded in Delivery mode, applied during the loop)
 - Default sprint-level: run all the sprint's stories, then pause for the user's review at the sprint

@@ -6,10 +6,10 @@ import { RunnerError } from './result.mjs';
 const WIN = process.platform === 'win32';
 // Every preflight probe is bounded: --timeout-seconds only covers the model process,
 // so a wedged shim, credential helper, or login check must not hang the runner forever.
-export const PROBE_TIMEOUT_MS = 30000;
+const PROBE_TIMEOUT_MS = 30000;
 // Sentinel returned by loginOk/helpFor when a probe hit PROBE_TIMEOUT_MS.
-export const PROBE_TIMEOUT = Object.freeze({ probeTimedOut: true });
-export const PROBE_TIMEOUT_REASON = 'codex did not respond within 30 s';
+const PROBE_TIMEOUT = Object.freeze({ probeTimedOut: true });
+const PROBE_TIMEOUT_REASON = 'codex did not respond within 30 s';
 
 function isExecutable(p) {
   try { fs.accessSync(p, fs.constants.X_OK); return fs.statSync(p).isFile(); } catch { return false; }
@@ -51,7 +51,7 @@ function shimEntry(dir) {
 // binary); a codex.cmd npm shim is bypassed by running its JS entry with node
 // directly (no cmd.exe, no quoting); a bare .cmd falls back to cmd.exe with strict
 // argument checks (see spawn.mjs).
-export function findCodex() {
+function findCodex() {
   const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
   if (!WIN) {
     for (const d of dirs) { const p = path.join(d, 'codex'); if (isExecutable(p)) return { file: p, prefix: [], verbatim: false, display: p }; }
@@ -83,23 +83,23 @@ function probe(found, args) {
   const timedOut = Boolean(r.error && r.error.code === 'ETIMEDOUT');
   return { status: timedOut ? null : r.status, stdout: r.stdout || '', timedOut };
 }
-export function codexVersion(found) {
+function codexVersion(found) {
   const r = probe(found, ['--version']);
   return r.status === 0 ? r.stdout.trim() : 'unknown';
 }
-export function loginOk(found) {
+function loginOk(found) {
   const r = probe(found, ['login', 'status']);
   if (r.timedOut) return PROBE_TIMEOUT;
   return r.status === 0;
 }
 // helpFor(found, subcommandArgs) returns the `--help` text of one codex subcommand, null
 // when it exited non-zero, or PROBE_TIMEOUT when it hung.
-export function helpFor(found, subcommandArgs) {
+function helpFor(found, subcommandArgs) {
   const r = probe(found, [...subcommandArgs, '--help']);
   if (r.timedOut) return PROBE_TIMEOUT;
   return r.status === 0 ? r.stdout : null;
 }
-export function requireFlags(help, flags) {
+function requireFlags(help, flags) {
   for (const f of flags) if (!help.includes(f)) return f;
   return null;
 }

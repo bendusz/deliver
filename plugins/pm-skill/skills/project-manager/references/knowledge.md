@@ -17,9 +17,9 @@ under `docs/` stay authoritative; `pm/` state and `pm/log.md` are not wiki conte
 | When | Dispatch |
 |---|---|
 | Scaffold, after sign-off | write `docs/wiki/schema.md` and `docs/wiki/index.md` from `wiki-schema.md.template` and `wiki-index.md.template` |
-| Right after scaffold | `librarian ingest docs/spec.md docs/plan.md` plus `docs/constitution.md` when present; plan decisions and risks become decision pages |
+| Right after scaffold | `librarian ingest docs/spec.md docs/plan.md` plus `docs/constitution.md` when present and the sprint's `.sdd` files when a skeleton exists; plan decisions and risks become decision pages |
 | After every research report | `librarian ingest docs/research/<file>` |
-| Loop state 7, after a story ships | `librarian ingest docs/stories/<story>.md` plus its `docs/verification/` report when one exists |
+| Loop state 7, after a story ships | `librarian ingest docs/stories/<story>.md` plus its `docs/verification/` report when one exists and any `.sdd` the story changed |
 | After `/pm-skill:correct-course` | `librarian ingest` over the revised artifacts; the librarian supersedes |
 | Sprint boundary, and before the completion report | `librarian lint`; `technical-writer` receives `docs/wiki/index.md` for the completion report |
 

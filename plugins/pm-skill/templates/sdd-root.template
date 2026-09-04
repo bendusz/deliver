@@ -1,0 +1,13 @@
+Spec: <project name>
+Purpose:
+  <why the project exists, one or two lines>
+Platform:
+  <stack>
+Structure:
+  <top-level directories and what each owns>
+Must:
+  - <project-wide rule>
+Must not:
+  - <project-wide boundary>
+Depends on:
+  - <external system or library the whole project relies on>

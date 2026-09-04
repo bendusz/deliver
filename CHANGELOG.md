@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## 0.20.0 - 2026-09-04
+
+Contracts before code.
+
+- **SpecDD skeleton phase.** With `Skeleton: specdd` in the plan's Delivery mode (default at
+  `large` and `regulated`), a new `spec-architect` agent writes the sprint's `.sdd` contracts, the
+  root spec, and `.specdd/bootstrap.md` after sign-off and before decomposition, once per sprint.
+  `references/skeleton.md` owns the phase; `/pm-skill:skeleton` reruns it. The `specdd` CLI is used
+  when `npx` can run it and a bundled bootstrap template otherwise.
+- **Stories point at specs.** A `Specs:` header field, `pm-meta.touches` from `Owns`, criteria
+  that cite `Done when` lines, and a readiness item. Builders read the specs first and may edit a
+  spec inside their touches if they report it; reviewers treat a violated `Must` or an unreported
+  spec change as `major`; the verifier fails a covered `Done when` the diff does not meet;
+  `/pm-skill:analyze` gains four skeleton detectors.
+- **Hooks and runner.** `.sdd` files and `.specdd/` count as planning artifacts for the sign-off
+  hook; the Codex runner protects `.specdd/` and the root spec and lets Codex edit a `.sdd` inside
+  the story's touches.
+- **Example.** `examples/todo-cli` carries a root spec, one module spec, and a bootstrap.
+
 ## 0.19.0 - 2026-09-04
 
 Less to load, one place per rule, and a new Codex default.

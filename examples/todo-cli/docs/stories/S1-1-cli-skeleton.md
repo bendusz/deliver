@@ -1,7 +1,7 @@
 # S1-1: CLI skeleton and store
 <!-- pm-meta: {"builder":"expert-builder","touches":["todo.py","test_todo.py"]} -->
 Sprint: 1 · Priority: high · Covers: FR-001, AC-001 · Depends on: none · Parallel-safe: no
-Risk: low · Review lenses: code-integrity-reviewer
+Risk: low · Review lenses: code-integrity-reviewer · Specs: todo.sdd
 
 ## Goal
 Stand up the `todo.py` entry point with an `argparse` CLI and a JSON store that reads an existing
@@ -15,9 +15,9 @@ Stand up the `todo.py` entry point with an `argparse` CLI and a JSON store that 
 - Tests in `test_todo.py` using `pytest`.
 
 ## Acceptance criteria (testable)
-- [ ] `python todo.py` exits 0 and prints usage when no subcommand is given.
-- [ ] `load_store()` returns `{"todos": []}` when `todos.json` is absent.
-- [ ] `save_store()` then `load_store()` round-trips data.
+- [ ] `python todo.py` exits 0 and prints usage when no subcommand is given. (todo.sdd: Done when 2)
+- [ ] `load_store()` returns `{"todos": []}` when `todos.json` is absent. (todo.sdd: Done when 1)
+- [ ] `save_store()` then `load_store()` round-trips data. (todo.sdd: Done when 1)
 
 ## Out of scope
 - The actual add and list behaviour, which is S1-2.

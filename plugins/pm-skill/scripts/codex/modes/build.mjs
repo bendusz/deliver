@@ -17,11 +17,12 @@ const SCHEMA = path.join(PLUGIN_ROOT, 'schemas', 'codex-builder-result.schema.js
 const rejected = (r) => new RunnerError('rejected', r);
 const blocked = (r, extra) => new RunnerError('blocked', r, extra);
 const unavailable = (r, extra) => new RunnerError('unavailable', r, extra);
-const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stories/') || rel.startsWith('docs/wiki/') || ['docs/spec.md', 'docs/plan.md', 'docs/constitution.md'].includes(rel);
+const isRootSpec = (rel) => /\.sdd$/i.test(rel) && !rel.includes('/');
+const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stories/') || rel.startsWith('docs/wiki/') || rel.startsWith('.specdd/') || isRootSpec(rel) || ['docs/spec.md', 'docs/plan.md', 'docs/constitution.md'].includes(rel);
 const allowed = (rel, scopes) => scopes.some((s) => rel === s || rel.startsWith(`${s}/`));
 const tomlString = (s) => JSON.stringify(s);
 
-export function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
+function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
   const lines = [
     'You are the implementation worker for one build-ready PM story.',
     `Worktree root: ${worktree}`,
@@ -33,18 +34,19 @@ export function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
   if (evidenceRel) lines.push(`Fix evidence: ${evidenceRel}`);
   lines.push('',
     'Read the story first, then read AGENTS.md, and CLAUDE.md when it is more than a pointer, when present. Implement only that story.',
+    "Read the story's Specs (.sdd files) before the sources when it names any. If you must change a .sdd inside the allowed paths, name it in summary. Never edit .specdd/ or a root .sdd.",
     mode === 'fix'
       ? 'Read the fix evidence and make the smallest change that resolves its accepted findings or failing gate.'
       : 'Prefer a focused implementation. If the story needs broad architectural work or lacks enough context, return blocked instead of widening scope.',
     "Follow the story's Out of scope, acceptance criteria, and verification sections.",
     'Run the story verification command and the relevant project tests before reporting done.',
-    'Stay inside the allowed implementation paths. Do not use the network, change git state, or edit pm/, stories, docs/wiki/, docs/spec.md, docs/plan.md, or docs/constitution.md.',
+    'Stay inside the allowed implementation paths. Do not use the network, change git state, or edit pm/, stories, docs/wiki/, docs/spec.md, docs/plan.md, docs/constitution.md, or .specdd/.',
     'Your shell environment is reduced and secret-like variables are removed. TMPDIR is an isolated directory inside this worktree.',
     'Return only JSON matching the supplied schema. List every changed path in files_changed. summary holds at most five short strings. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
   return `${lines.join('\n')}\n`;
 }
 
-export function validateBuilderResult(r) {
+function validateBuilderResult(r) {
   const noCtl = (s) => typeof s === 'string' && !/[\x00-\x1f\x7f]/.test(s);
   if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
   if (JSON.stringify(Object.keys(r).sort()) !== '["files_changed","root_cause","status","summary","tests"]') return false;

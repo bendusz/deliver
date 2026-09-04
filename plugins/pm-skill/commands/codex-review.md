@@ -12,12 +12,12 @@ Arguments: $ARGUMENTS
 
 All optional, in any order:
 
-- **scope**: `recent`, `worktree`, or `codebase`. Default `worktree`.
-- **model=<id>**: a Codex model id. Default `gpt-6-astra`, with a one-time runner
+- **Scope.** `recent`, `worktree`, or `codebase`. Default `worktree`.
+- **Model.** `model=<id>`, a Codex model id. Default `gpt-6-astra`, with a one-time runner
   fallback to `gpt-5.6-sol` at `medium` if the account is refused it.
-- **effort=<level>**: `none|minimal|low|medium|high|xhigh|max`. Default `high`.
-- **timeout=<minutes>**: the per-agent timeout. Default `10`.
-- **objectives**: every remaining token. Presets are `security`, `bugs`, `architecture`, `tests`,
+- **Effort.** `effort=<level>`, one of `none|minimal|low|medium|high|xhigh|max`. Default `high`.
+- **Timeout.** `timeout=<minutes>`, the per-agent timeout. Default `10`.
+- **Objectives.** Every remaining token. Presets are `security`, `bugs`, `architecture`, `tests`,
   `performance`; `panel` expands to all five; any other word or quoted phrase is free-form; none
   means one general review. The runner owns each preset's focus clause.
 
@@ -51,8 +51,8 @@ Stop with the runner's reason on any non-zero exit.
 
 Use `<root>/untracked` if it exists, else `<root>/codex`, and announce it when launching. If the
 runner rejects both, relay its reason and ask the user to clear one. After the run, append any
-`gitignore_rule_needed` rule a digest reports to `.gitignore`, asking first if that directory
-pre-existed and may hold the user's files.
+`gitignore_rule_needed` rule a digest reports to `.gitignore`. When that file already exists, show
+the diff and get the user's approval first, whether or not the report directory pre-existed.
 
 ## 5. Dispatch
 

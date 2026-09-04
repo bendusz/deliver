@@ -1,7 +1,7 @@
 # S<sprint>-<n>: <title>
 <!-- pm-meta: {"builder":"<expert-builder|codex-builder|auto>","touches":["<repo-relative file or directory root; no globs; required and bounded>"]} -->
 Sprint: <n> · Priority: <high|med|low> · Covers: <FR-…, AC-…> · Depends on: <ids|none> · Parallel-safe: <yes|no>
-Risk: <low|med|high> · Review lenses: <code-integrity-reviewer[, architecture-reviewer][, security-auditor]>
+Risk: <low|med|high> · Review lenses: <code-integrity-reviewer[, architecture-reviewer][, security-auditor]> · Specs: <.sdd paths|none>
 
 ## Goal
 <one paragraph>
