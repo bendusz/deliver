@@ -10,24 +10,8 @@ Foundations first; later sprints build on earlier ones.
 For each story, create `docs/stories/S<sprint>-<n>-<slug>.md` from
 `${CLAUDE_PLUGIN_ROOT}/templates/story.md.template`. Each story states the goal, the boundaries, the
 exact source files or symbols to inspect, and any inventory method needed to find the complete target
-set. A builder should not need repo-wide discovery. The template is canonical for the header. Use its
-labels and order exactly:
-
-```
-Sprint · Priority · Covers · Depends on · Parallel-safe
-Risk · Review lenses
-```
-
-What each part carries:
-- **Goal**, one paragraph.
-- **Covers:** the spec requirement IDs (`FR-` and `AC-`) this story satisfies, the traceability link
-  back to `docs/spec.md`.
-- **Context (self-contained):** the architecture, files, interfaces, and conventions relevant to this
-  story, summarised here so the worker's context stays small and focused. Name the canonical source
-  files or symbols the worker must read. When completeness matters, include the exact search or
-  inventory method that establishes the full target set.
-- **Acceptance criteria**, as testable checkboxes.
-- **Out of scope.**
+set. A builder should not need repo-wide discovery. `story.md.template` defines the sections and the
+header. Three fields carry rules:
 - **`pm-meta`:** the one-line JSON comment within the first 12 lines is the story's machine
   contract: `<!-- pm-meta: {"builder":"codex-builder","touches":["src/parser","tests/parser"]} -->`.
   The object has exactly `builder` and `touches`. `touches` names the files and directory roots this
@@ -50,7 +34,6 @@ What each part carries:
   checkpoint (`/poteto:architect with checkpoint`), stop at the synthesized sketch, never run its
   implementation phases, and put the type and module sketch into the story's Context so the builder
   implements against a settled shape.
-- **Verification:** the exact commands that prove the story is done.
 
 ## Ordering
 - Record each story's `Depends on` and order so dependencies come first.

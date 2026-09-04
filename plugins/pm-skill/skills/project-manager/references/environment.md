@@ -15,10 +15,10 @@ references are enough on their own.
   `create-verification-skill`, `technical-writing`). Absent, nothing changes.
 
 ## Remote PRs, opt-in
-The loop merges locally by default. Open a real PR only when the user has explicitly asked for pushes
-or PRs, `gh auth status` succeeds, and a GitHub remote exists. Then push the story branch, open the
-PR with the message format in `implementation-loop.md`, and merge it. Never push to a remote without an
-explicit request.
+The loop merges locally by default. Open a real PR only when the user has explicitly asked for
+pushes or PRs, `gh auth status` succeeds, and a GitHub remote exists. Then push the story branch,
+open the PR with the message format in `implementation-loop.md`, and merge it. Never push to a
+remote without an explicit request.
 
 ## Agents you orchestrate
 Run reviewers as a risk-selected **panel** (see `review-gates.md`), not always all of them.

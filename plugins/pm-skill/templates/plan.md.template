@@ -3,7 +3,8 @@
      and traces each story back to its FR-/AC- IDs. -->
 
 ## Overview
-<what and why, 2 to 3 sentences>
+<!-- 2 to 3 sentences -->
+<what and why>
 
 ## Source spec
 - docs/spec.md  <!-- or: none, intent captured inline -->
@@ -20,6 +21,7 @@
 - <user>
 
 ## Scope
+<!-- be explicit about what you are not doing -->
 **In:**
 - <item>
 
@@ -32,7 +34,8 @@
 | S1-1 | <title> | high | FR-001, AC-001 | <testable criteria> | none | no |
 
 ## Architecture
-<stack, key decisions, patterns>
+<!-- stack, key decisions, patterns -->
+<architecture>
 
 ## Traceability
 <!-- Every spec requirement maps to at least one story; flag any that do not. -->
@@ -44,12 +47,14 @@
 - <performance, security, accessibility, etc.>
 
 ## Commands
+<!-- real commands, discovered now; N/A where none exists -->
 - test: `<cmd or N/A>`
 - lint: `<cmd or N/A>`
 - build: `<cmd or N/A>`
 - run: `<cmd or N/A>`
 
 ## Risks
+<!-- and open questions -->
 - <risk + mitigation>
 
 ## Clarifications

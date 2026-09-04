@@ -50,10 +50,10 @@ subagent's word. A failing gate loads `fix-loop.md`.
 
 ### 3. Review, then fix or verify
 Re-derive and scope-check the paths, then produce the diff yourself, since reviewers have no Bash:
-`git add -N -- <paths> && git diff -- <paths>`, **never** `git add -A`. Dispatch the
-panel per `review-gates.md`: always `code-integrity-reviewer`, plus the lenses it selects, and
+`git add -N -- <paths> && git diff -- <paths>`, **never** `git add -A`. Dispatch the panel per
+`review-gates.md`: always `code-integrity-reviewer`, plus the lenses its risk triggers select, and
 `architecture-reviewer` also gets the plan's Architecture section. Every lens gets the story file and
-that diff text. Any open `block` or `major` loads `fix-loop.md`.
+that diff text. Aggregate the lenses' findings; any open `block` or `major` loads `fix-loop.md`.
 
 ### 4. Fix
 `fix-loop.md` owns this state.
