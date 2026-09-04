@@ -288,6 +288,21 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')) || fs.readdirSync(path.join(p, 'tmp', 'codex-runtime')).length === 0);
 });
 
+test('envelopes: completed shapes carry only consumed fields', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const b = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+  // build.mjs has no gitignore_rule_needed computation today (only review's --out dir has
+  // one); the key set below is what the trimmed envelope actually carries.
+  assert.deepEqual(Object.keys(b.out).sort(), ['actual_files_changed', 'codex_version', 'effort', 'ignored_files_changed', 'model', 'result', 'runner_status']);
+  const s2 = makeStub();
+  const rv = runRunner(['--mode', 'review', '--scope', 'codebase', '--out', path.join(p, 'untracked')], { stub: s2, cwd: p });
+  assert.deepEqual(Object.keys(rv.out).sort(), ['codex_version', 'effort', 'gitignore_rule_needed', 'model', 'report_path', 'runner_status']);
+  const brief = path.join(s2.dir, 'brief.md'); fs.writeFileSync(brief, 'Should we use X or Y?\n');
+  const s3 = makeStub();
+  const ad = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s3, cwd: p, env: { STUB_ANSWER: '1' } });
+  assert.deepEqual(Object.keys(ad.out).sort(), ['answer_path', 'codex_version', 'effort', 'model', 'runner_status', 'scratch_dir', 'search_used']);
+});
+
 test('model fallback: an unsupported default model retries once on the mode fallback and records it', () => {
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_WRITE_PATH: 'src/fix.txt' } });
