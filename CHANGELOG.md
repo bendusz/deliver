@@ -7,9 +7,8 @@ All notable changes to this project are documented here.
 Less to load, one place per rule, and a new Codex default.
 
 - **`gpt-6-astra` by default.** Every Codex mode defaults to `gpt-6-astra`. When the API refuses
-  the model for the account in use, the runner retries once on the previous default (`gpt-5.6-sol`
-  or `gpt-5.6-terra`) and reports `model_fallback` in the envelope. An explicit `--model` never
-  falls back.
+  the model for the account in use, the runner retries once on `gpt-5.6-sol` at `medium` and reports
+  `model_fallback` in the envelope. An explicit `--model` never falls back.
 - **Clean-path implementation loop.** Fix rounds, triage, the debugger rule, and the round cap moved
   to `references/fix-loop.md`, loaded only when a gate fails or a finding is open. Lens selection
   stays in `review-gates.md`; the merge message grammar sits at the ship state.

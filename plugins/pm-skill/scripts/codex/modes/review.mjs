@@ -75,8 +75,8 @@ export async function runReview(o) {
   // `codex exec review` rejects --sandbox, -C, and --color, so the tail carries only the
   // shared locked flags plus the report path. Review is read-only on every platform.
   const clause = objectiveClause(o.objective);
-  const argsFor = (model) => {
-    const tail = [...lockedExecArgs({ ...o, model }), '-o', report];
+  const argsFor = ({ model, effort }) => {
+    const tail = [...lockedExecArgs({ ...o, model, effort }), '-o', report];
     if (o.scope === 'codebase') return ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', ...tail, '-'];
     if (o.objective) {
       const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).' : 'Review the uncommitted changes: staged, unstaged, and untracked.';
@@ -86,8 +86,8 @@ export async function runReview(o) {
   };
   const stdinText = o.scope === 'codebase' ? `${CODEBASE_PROMPT}${clause}\n` : undefined;
 
-  const { run, model, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText, cwd: base, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
-  const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, ...(fallback ? { model, model_fallback: fallback } : {}) };
+  const { run, model, effort, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText, cwd: base, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
+  const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, ...(fallback ? { model, effort, model_fallback: fallback } : {}) };
   if (run.timedOut) throw new RunnerError('timed-out', `codex review exceeded the ${o.timeoutSeconds}s timeout`, { ...extra, stderr_path: stderrPath });
   if (run.interrupted) throw new RunnerError('interrupted', `codex review was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, { ...extra, stderr_path: stderrPath });
   if (run.exit !== 0 || !fs.existsSync(report) || fs.statSync(report).size === 0) {
@@ -110,5 +110,5 @@ export async function runReview(o) {
   if (!copied) throw new RunnerError('failed', 'could not place the review report without overwriting an existing one', { ...extra, stderr_path: stderrPath });
   const gitignoreRuleNeeded = root && !checkIgnore(root, `${outName}/probe`) ? `/${outName}/` : null;
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
-  return { exit: 0, envelope: { runner_status: 'completed', mode: 'review', scope: o.scope, objective: o.objective, report_path: reportPath, codex_version: version, model, effort: o.effort, codex_exit: String(run.exit), gitignore_rule_needed: gitignoreRuleNeeded, ...(fallback ? { model_fallback: fallback } : {}) } };
+  return { exit: 0, envelope: { runner_status: 'completed', mode: 'review', scope: o.scope, objective: o.objective, report_path: reportPath, codex_version: version, model, effort, codex_exit: String(run.exit), gitignore_rule_needed: gitignoreRuleNeeded, ...(fallback ? { model_fallback: fallback } : {}) } };
 }

@@ -12,7 +12,7 @@ Codex forms the opinion, not you. Never run `codex` outside the bundled runner.
 ## Inputs
 - `Brief`: the PM's self-contained question.
 - Optional `Model`, `Effort`, and `Timeout seconds`, defaulting to `gpt-6-astra`, `medium`, and 600.
-  The runner's fallback is `gpt-5.6-sol`.
+  The runner's fallback is `gpt-5.6-sol` at `medium`.
 
 ## Run
 Write the brief verbatim with the `Write` tool, not a Bash heredoc, to `$BRIEF`, a temp file outside

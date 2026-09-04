@@ -14,7 +14,7 @@ All optional, in any order:
 
 - **scope**: `recent`, `worktree`, or `codebase`. Default `worktree`.
 - **model=<id>**: a Codex model id. Default `gpt-6-astra`, with a one-time runner
-  fallback to `gpt-5.6-terra` if the account is refused it.
+  fallback to `gpt-5.6-sol` at `medium` if the account is refused it.
 - **effort=<level>**: `none|minimal|low|medium|high|xhigh|max`. Default `high`.
 - **timeout=<minutes>**: the per-agent timeout. Default `10`.
 - **objectives**: every remaining token. Presets are `security`, `bugs`, `architecture`, `tests`,

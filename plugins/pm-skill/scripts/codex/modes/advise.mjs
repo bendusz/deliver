@@ -27,13 +27,13 @@ export async function runAdvise(o) {
   const stdoutPath = path.join(scratch, 'stdout.log');
   // web_search is left to the CLI's own --search handling ONLY when research asked for
   // it; otherwise lockedExecArgs pins it off.
-  const argsFor = (model) => ['exec', ...lockedExecArgs({ ...o, model }, { search: useSearch }), '--sandbox', 'read-only', '--color', 'never',
+  const argsFor = ({ model, effort }) => ['exec', ...lockedExecArgs({ ...o, model, effort }, { search: useSearch }), '--sandbox', 'read-only', '--color', 'never',
     ...(root ? [] : ['--skip-git-repo-check']), '-o', answer, '-'];
-  const { run, model, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText: prompt, cwd, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
-  const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, ...(fallback ? { model, model_fallback: fallback } : {}), stderr_path: stderrPath };
+  const { run, model, effort, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText: prompt, cwd, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
+  const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, ...(fallback ? { model, effort, model_fallback: fallback } : {}), stderr_path: stderrPath };
   if (run.timedOut) throw new RunnerError('timed-out', `codex exec exceeded the ${o.timeoutSeconds}s timeout`, extra);
   if (run.interrupted) throw new RunnerError('interrupted', `codex exec was interrupted by ${run.interrupted.replace(/^SIG/, '')}`, extra);
   if (run.exit !== 0) throw new RunnerError('failed', 'codex exec exited non-zero; inspect stderr.log', extra);
   if (!fs.existsSync(answer) || fs.statSync(answer).size === 0) throw new RunnerError('failed', 'codex exec returned no answer', extra);
-  return { exit: 0, envelope: { runner_status: 'completed', mode: o.mode, answer_path: answer, stderr_path: stderrPath, scratch_dir: scratch, codex_version: version, model, effort: o.effort, codex_exit: String(run.exit), search_used: useSearch, ...(fallback ? { model_fallback: fallback } : {}) } };
+  return { exit: 0, envelope: { runner_status: 'completed', mode: o.mode, answer_path: answer, stderr_path: stderrPath, scratch_dir: scratch, codex_version: version, model, effort, codex_exit: String(run.exit), search_used: useSearch, ...(fallback ? { model_fallback: fallback } : {}) } };
 }

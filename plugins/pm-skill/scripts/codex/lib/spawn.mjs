@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { RunnerError } from './result.mjs';
 import { CMD_FALLBACK_SUFFIX } from './preflight.mjs';
-import { FALLBACKS } from './args.mjs';
+import { FALLBACK } from './args.mjs';
 
 const WIN = process.platform === 'win32';
 
@@ -90,14 +90,16 @@ function unsupportedModelLine(paths, model) {
   return null;
 }
 
-// runCodexWithFallback: run once with o.model; when the model was the mode default and the
-// API refused it, run once more on the mode's fallback. argsFor(model) builds the argv.
+// runCodexWithFallback: run once with o.model at o.effort; when the model was the mode
+// default and the API refused it, run once more on FALLBACK. argsFor({model, effort})
+// builds the argv. The returned model and effort are the pair that produced the run.
 export async function runCodexWithFallback(found, argsFor, o, opts) {
-  const run = await runCodex(found, argsFor(o.model), opts);
-  const to = FALLBACKS[o.mode];
-  if (run.exit === 0 || run.timedOut || run.interrupted || o.modelExplicit || !to || to === o.model) return { run, model: o.model, fallback: null };
+  const from = { model: o.model, effort: o.effort };
+  const run = await runCodex(found, argsFor(from), opts);
+  const same = FALLBACK.model === o.model && FALLBACK.effort === o.effort;
+  if (run.exit === 0 || run.timedOut || run.interrupted || o.modelExplicit || same) return { run, ...from, fallback: null };
   const reason = unsupportedModelLine([opts.stderrPath, opts.stdoutPath], o.model);
-  if (!reason) return { run, model: o.model, fallback: null };
-  const retry = await runCodex(found, argsFor(to), opts);
-  return { run: retry, model: to, fallback: { from: o.model, to, reason } };
+  if (!reason) return { run, ...from, fallback: null };
+  const retry = await runCodex(found, argsFor(FALLBACK), opts);
+  return { run: retry, ...FALLBACK, fallback: { from, to: { ...FALLBACK }, reason } };
 }

@@ -12,8 +12,8 @@ const DEFAULTS = {
   research: { model: DEFAULT_MODEL, effort: 'high' },
   advise: { model: DEFAULT_MODEL, effort: 'medium' },
 };
-// When the default model is refused for this account, the runner retries once on these.
-export const FALLBACKS = { build: 'gpt-5.6-sol', fix: 'gpt-5.6-sol', advise: 'gpt-5.6-sol', review: 'gpt-5.6-terra', research: 'gpt-5.6-terra' };
+// When the default model is refused for this account, every mode retries once on this pair.
+export const FALLBACK = { model: 'gpt-5.6-sol', effort: 'medium' };
 const VALUE_FLAGS = new Set(['--mode', '--worktree', '--story', '--evidence', '--model', '--effort', '--timeout-seconds', '--scope', '--objective', '--out', '--prompt-file', '--search']);
 
 export const USAGE = 'usage: run.mjs --mode build|fix|review|advise|research [--preflight] [--model <id>] [--effort <level>] [--timeout-seconds <n>] ' +

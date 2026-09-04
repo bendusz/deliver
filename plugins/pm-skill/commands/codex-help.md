@@ -10,8 +10,8 @@ Arguments: $ARGUMENTS
 
 ## 1. Parse arguments
 
-- **model=<id>**, default `gpt-6-astra`, with a one-time runner fallback to `gpt-5.6-sol` if the
-  account is refused it.
+- **model=<id>**, default `gpt-6-astra`, with a one-time runner fallback to `gpt-5.6-sol` at
+  `medium` if the account is refused it.
 - **effort=<level>**: `none|minimal|low|medium|high|xhigh|max`, default `medium`.
 - Everything else is the question. If it is empty, ask the user what they want Codex's opinion on.
 

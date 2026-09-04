@@ -44,10 +44,10 @@ test('args: defaults per mode and validation', () => {
 });
 
 test('argv: lockedExecArgs is the one shared flag set every mode passes', () => {
-  const o = { model: 'gpt-5.6-terra', effort: 'high' };
+  const o = { model: 'gpt-5.6-luna', effort: 'high' };
   const a = lockedExecArgs(o);
   for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral',
-    'gpt-5.6-terra', 'model_reasoning_effort=high', 'mcp_servers={}', 'features.hooks=false',
+    'gpt-5.6-luna', 'model_reasoning_effort=high', 'mcp_servers={}', 'features.hooks=false',
     'agents.enabled=false', 'web_search="disabled"']) assert.ok(a.includes(x), x);
   // `codex exec review` rejects these, so no mode may inherit them from the shared set.
   for (const x of ['--sandbox', '-C', '--color', '--skip-git-repo-check', '-o', '--output-schema']) {
@@ -282,11 +282,13 @@ test('model fallback: an unsupported default model retries once on the mode fall
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 0);
-  assert.equal(r.out.model, 'gpt-5.6-sol');
-  assert.deepEqual([r.out.model_fallback.from, r.out.model_fallback.to], ['gpt-6-astra', 'gpt-5.6-sol']);
+  assert.deepEqual([r.out.model, r.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.deepEqual(r.out.model_fallback.from, { model: 'gpt-6-astra', effort: 'high' });
+  assert.deepEqual(r.out.model_fallback.to, { model: 'gpt-5.6-sol', effort: 'medium' });
   assert.match(r.out.model_fallback.reason, /not supported when using Codex/);
   assert.equal((stubActions(s).match(/^exec(?! --help)/gm) || []).length, 2);
   assert.ok(has(stubArgs(s), 'gpt-5.6-sol'));
+  assert.ok(has(stubArgs(s), 'model_reasoning_effort=medium'));
 });
 
 test('model fallback: an explicit --model never falls back; other failures never fall back; success carries no field', () => {
@@ -303,23 +305,25 @@ test('model fallback: an explicit --model never falls back; other failures never
   assert.equal(ok.status, 0); assert.equal(ok.out.model, 'gpt-6-astra'); assert.equal('model_fallback' in ok.out, false);
 });
 
-test('model fallback: review and advise fall back to gpt-5.6-terra and gpt-5.6-sol', () => {
+test('model fallback: review and advise take the same gpt-5.6-sol fallback at medium', () => {
   const p = newBuildProject(true);
   const s = makeStub();
   const rv = runRunner(['--mode', 'review', '--scope', 'codebase', '--out', path.join(p, 'untracked')], { stub: s, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra' } });
-  assert.equal(rv.status, 0); assert.equal(rv.out.model, 'gpt-5.6-terra'); assert.equal(rv.out.model_fallback.to, 'gpt-5.6-terra');
+  assert.equal(rv.status, 0); assert.deepEqual([rv.out.model, rv.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.equal(rv.out.model_fallback.to.model, 'gpt-5.6-sol');
   const brief = path.join(s.dir, 'brief.md'); fs.writeFileSync(brief, 'Should we use X or Y?\n');
   const s2 = makeStub();
   const ad = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s2, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_ANSWER: '1' } });
-  assert.equal(ad.status, 0); assert.equal(ad.out.model, 'gpt-5.6-sol'); assert.equal(ad.out.model_fallback.to, 'gpt-5.6-sol');
+  assert.equal(ad.status, 0); assert.deepEqual([ad.out.model, ad.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.equal(ad.out.model_fallback.to.model, 'gpt-5.6-sol');
 });
 
 test('model fallback: a failure after the fallback names the model that ran', () => {
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_EXEC_EXIT: '5' } });
   assert.equal(r.status, 70, JSON.stringify(r.out));
-  assert.equal(r.out.model, 'gpt-5.6-sol');
-  assert.equal(r.out.model_fallback.to, 'gpt-5.6-sol');
+  assert.deepEqual([r.out.model, r.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.equal(r.out.model_fallback.to.model, 'gpt-5.6-sol');
 });
 
 test('build 6: fix mode passes the evidence brief', () => {

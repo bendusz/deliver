@@ -64,20 +64,22 @@ A ChatGPT-account login can be refused a model outright. Observed 2026-09-04:
 
 When the model came from the mode default, never from an explicit `--model`, and Codex exits
 non-zero with that refusal naming that model on stdout or stderr, the runner retries the command
-once on the mode's fallback: `gpt-5.6-sol` for build, fix, and advise, `gpt-5.6-terra` for review
-and research. Timeouts, interrupts, and other non-zero exits are returned as they are. The completed
-envelope reports `model` as the model that ran plus `model_fallback: {from, to, reason}`, `reason`
-being the refusal line cut to 300 characters.
+once on the one fallback for every mode, `gpt-5.6-sol` at `medium`. Timeouts, interrupts, and other
+non-zero exits are returned as they are. The envelope reports `model` and `effort` as the pair that
+ran plus `model_fallback: {from, to, reason}`, where `from` and `to` are `{model, effort}` objects
+and `reason` is the refusal line cut to 300 characters.
 `--timeout-seconds` bounds each attempt, so a fallback run can take twice that.
 
 ## pm-skill's chosen defaults (models 2026-09-04, efforts 2026-07-16)
 
-| Caller | Model | Fallback | Effort |
-|---|---|---|---|
-| `/pm-skill:codex-review` | `gpt-6-astra` | `gpt-5.6-terra` | `high` |
-| `/pm-skill:codex-help` | `gpt-6-astra` | `gpt-5.6-sol` | `medium` |
-| `codex-researcher` | `gpt-6-astra` | `gpt-5.6-terra` | `high` |
-| `codex-builder` (build and fix) | `gpt-6-astra` | `gpt-5.6-sol` | `high` |
+Every caller falls back to `gpt-5.6-sol` at `medium`.
+
+| Caller | Model | Effort |
+|---|---|---|
+| `/pm-skill:codex-review` | `gpt-6-astra` | `high` |
+| `/pm-skill:codex-help` | `gpt-6-astra` | `medium` |
+| `codex-researcher` | `gpt-6-astra` | `high` |
+| `codex-builder` (build and fix) | `gpt-6-astra` | `high` |
 
 A caller wanting another tier passes `model=` and `effort=`, which reach the runner as `--model` and
 `--effort`. Scope keywords: `recent` = last commit (`--commit HEAD`), `worktree` = `--uncommitted`
@@ -154,8 +156,8 @@ Review alone can return `nothing-to-review`, exiting 0 with `mode`, `scope`, `re
 `reason`, `scratch_dir`, `codex_version`, `codex_exit`, `diagnostics_retained`, plus
 `actual_files_changed` and `ignored_files_changed` once the worktree was snapshotted, plus
 `stderr_path` when a stderr log was retained outside a build (a failed build keeps `stderr.log`
-inside its `scratch_dir`). Beyond a fallback's `model` and `model_fallback` it carries no mode
-context: no `effort`, `worktree`, `story`, `mode`, `sandbox`, or output path.
+inside its `scratch_dir`). Beyond a fallback's `model`, `effort`, and `model_fallback` it carries no
+mode context: no `worktree`, `story`, `mode`, `sandbox`, or output path.
 
 **Completed envelopes, per mode.**
 
