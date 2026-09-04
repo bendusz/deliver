@@ -1,0 +1,19 @@
+Spec: <module name>
+Purpose:
+  <why this module exists>
+Owns:
+  - <repo-relative path or directory this spec is authoritative for>
+Exposes:
+  - <public function, type, command, or endpoint with its shape>
+Accepts:
+  - <inputs>
+Returns:
+  - <outputs>
+Must:
+  - <behaviour or rule the implementation must satisfy>
+Must not:
+  - <boundary>
+Depends on:
+  - <other spec or path>
+Done when:
+  - <testable outcome> (FR-…, AC-…)

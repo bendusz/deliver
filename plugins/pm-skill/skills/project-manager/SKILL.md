@@ -40,6 +40,9 @@ subagents. Never write implementation code.
    `/pm-skill:clarify`.
 3. **Plan and sign-off.** `references/planning-and-signoff.md`. Write `docs/plan.md`, traced to spec
    IDs, get approval, and scaffold.
+3a. **Skeleton (optional).** `references/skeleton.md`. With `Skeleton: specdd` in the plan,
+   `spec-architect` writes the sprint's `.sdd` contracts before decomposition; `/pm-skill:skeleton`
+   reruns it per sprint.
 4. **Analyze artifacts.** `references/artifact-consistency.md`. Read-only cross-artifact check via
    `/pm-skill:analyze`.
 5. **Decomposition.** `references/decomposition.md`. Sprints and self-contained story files.

@@ -171,6 +171,7 @@ check_agent_regime codebase-analyst sonnet medium
 check_agent_regime technical-writer sonnet medium
 check_agent_regime researcher sonnet medium
 check_agent_regime librarian sonnet medium
+check_agent_regime spec-architect claude-opus-5 medium
 
 for md in plugins/pm-skill/agents/*.md; do
   model="$(grep -m1 '^model:' "$md" 2>/dev/null | awk '{print $2}')"

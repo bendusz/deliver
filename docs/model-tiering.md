@@ -21,6 +21,7 @@ silent change carries less delivery risk.
 | `architecture-reviewer` | `claude-opus-5` | `medium` | design judgement at standard depth |
 | `pm-verifier` | `claude-opus-5` | `medium` | independent evidence-checking at standard depth |
 | `test-engineer` | `claude-opus-5` | `medium` | derives tests from written criteria |
+| `spec-architect` | `claude-opus-5` | `medium` | design judgement, turns plan decisions into contracts |
 | `codebase-analyst` | `sonnet` | `medium` | reads and summarises; breadth over depth |
 | `technical-writer` | `sonnet` | `medium` | documents already-shipped facts |
 | `researcher` | `sonnet` | `medium` | web research; breadth and sourcing over depth |
