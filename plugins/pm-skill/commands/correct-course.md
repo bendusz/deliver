@@ -39,5 +39,4 @@ Do this, in order:
    changes together. With a wiki, dispatch `librarian ingest` over the revised artifacts per
    `references/knowledge.md`.
 
-Run `/pm-skill:analyze` after a spec-level or plan-level change. Coverage and traceability are
-exactly what a mid-flight edit tends to break.
+After a spec or plan change, run `/pm-skill:analyze` to check coverage and traceability.

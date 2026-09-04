@@ -3,10 +3,9 @@ description: Resume a PM-managed project by reading the saved state and logbook,
 ---
 
 Use the `project-manager` skill to resume work on this project. Load
-`references/logging-and-state.md` and follow its "On resume" section, which owns the read order, the
-pull-or-rebase rule, handoff freshness, actor handling, and the continuation point. Load
-`references/migrations.md` only when that section finds an older layout, and commit that migration on
-its own.
+`references/resume-procedure.md` and follow it: it owns the read order, the pull-or-rebase rule,
+handoff freshness, actor handling, and the continuation point. Load `references/migrations.md` only
+when it finds an older layout.
 
 Summarise where things stand, including teammates' positions from the other `pm/actors/*.json` files
 (read-only) and any `assignments` conflict, then continue from your recorded `next` step.

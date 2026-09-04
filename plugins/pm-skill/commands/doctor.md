@@ -10,8 +10,8 @@ Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo
 Inspect (whichever apply):
 - **Toolchain and versions.** The language runtimes, the package manager, and their versions, and
   whether `node --version` reports 20 or newer, which the hooks and the Codex runner need.
-- **Claude execution regime.** Run `claude --version` when available and record the configured
-  `model` and `effort` frontmatter for every agent the active story may use. For an Opus 5 story,
+- **Claude version and agent settings.** Run `claude --version` when available and record the
+  configured `model` and `effort` frontmatter for every agent the active story may use. For an Opus 5 story,
   flag Claude Code older than `v2.1.219`, a moving `model: opus` alias, or a host-level
   `CLAUDE_CODE_SUBAGENT_MODEL` or `CLAUDE_CODE_EFFORT_LEVEL` override. Do not claim a delivered
   model ID unless the host exposes it.
@@ -35,8 +35,8 @@ Inspect (whichever apply):
   is under 200 lines and under 32 KiB, the Codex budget, and report both numbers; list any
   `AGENTS.md` lines that restate skill rules (sign-off before implementation, the PM writes no code,
   log after every step, verifier PASS before ship, traceability to FR and AC ids) as trim candidates.
-- **PM state health.** When `pm/` exists, run the checks under "State health (doctor)" in
-  `references/artifact-consistency.md` and report `OK` or `DRIFT` for each.
+- **PM state health.** When `pm/` exists, run the checks in `references/state-health.md` and report
+  `OK` or `DRIFT` for each.
 
 Run only non-mutating probes, and do **not** install or upgrade anything. The readiness report under
 `tmp/` and its one `pm/log.md` entry are the only permitted writes. Delegate heavy reading to a

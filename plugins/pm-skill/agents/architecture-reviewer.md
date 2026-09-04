@@ -17,7 +17,7 @@ color: purple
 - Abstractions. Right-sized, neither leaky nor speculative.
 - Coupling and cohesion. No needless coupling or duplication; it fits existing patterns.
 - Over-engineering. Needless generality, premature abstraction, dead flexibility.
-- Architecture fit. Matches the intended architecture instead of entrenching debt.
+- Architecture fit. Matches the planned architecture and adds no known design defect.
 
 ## How to review
 Inspect the diff and the code it touches, not the repo. Open adjacent code only to verify a named
