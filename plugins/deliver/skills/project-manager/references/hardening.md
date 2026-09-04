@@ -10,8 +10,7 @@ and needs no external process. The optional allowlist example does need `jq`.
 Three bundled `PreToolUse` hooks guard writes. Each matches `Write`, `Edit`, and `MultiEdit` only,
 fails open on any uncertainty (a missing or unparseable state file, a target outside the project
 tree, or the kill switch `DELIVER_NO_ENFORCE=1`), and never sees a write made through `Bash`.
-The pre-0.21 name `PM_SKILL_NO_ENFORCE=1` still disables every hook this release and stops working
-in 0.22.
+The pre-0.21 name `PM_SKILL_NO_ENFORCE` stopped working in 0.22.
 
 - **Sign-off.** `require-signoff.mjs` blocks a write while `pm/pm-state.json`, or the legacy
   `tmp/pm-state.json`, has `signed_off: false`. `logging-and-state.md` lists the exempt planning,

@@ -39,7 +39,6 @@ export function runHook(name, input, env = {}) {
   const e = { ...process.env };
   delete e.CLAUDE_PROJECT_DIR;
   delete e.DELIVER_NO_ENFORCE;
-  delete e.PM_SKILL_NO_ENFORCE;
   Object.assign(e, env);
   return spawnSync(process.execPath, [path.join(HOOKS_DIR, name)], {
     input: typeof input === 'string' ? input : JSON.stringify(input),

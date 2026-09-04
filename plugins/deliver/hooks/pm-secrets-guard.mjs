@@ -7,8 +7,8 @@
 // other hooks: kill switch, unparseable input, or a target outside those paths all allow (exit 0).
 import fs from 'node:fs';
 
-// DELIVER_NO_ENFORCE is the documented kill switch; the old name is honoured until 0.22.
-if (process.env.DELIVER_NO_ENFORCE === '1' || process.env.PM_SKILL_NO_ENFORCE === '1') process.exit(0);
+// DELIVER_NO_ENFORCE is the documented kill switch.
+if (process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
 
 // A damaged or missing lib.mjs must not block writes: fail open.
 let lib;

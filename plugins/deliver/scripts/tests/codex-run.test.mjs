@@ -270,10 +270,8 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   for (const x of common) assert.ok(has(a, x), `missing ${x}`);
   if (WIN) {
     assert.ok(has(a, 'danger-full-access'));
-    assert.equal(r.out.sandbox, 'none (win32)');
   } else {
     for (const x of ['workspace-write', 'sandbox_workspace_write.network_access=false', 'sandbox_workspace_write.exclude_slash_tmp=true', 'sandbox_workspace_write.exclude_tmpdir_env_var=true', 'shell_environment_policy.inherit="core"', 'shell_environment_policy.ignore_default_excludes=false', 'shell_environment_policy.experimental_use_profile=false']) assert.ok(has(a, x), `missing ${x}`);
-    assert.equal(r.out.sandbox, 'workspace-write');
   }
   for (const x of ['--dangerously-bypass-approvals-and-sandbox', '--full-auto', '--yolo', '--add-dir']) assert.ok(!has(a, x));
   assert.ok(a.some((x) => x.startsWith('shell_environment_policy.set.TMPDIR="') && /tmp[\\/]+codex-runtime[\\/]+/.test(x)));
@@ -281,8 +279,6 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.equal(r.out.runner_status, 'completed');
   assert.equal(r.out.result.status, 'done');
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
-  assert.equal(r.out.diagnostics_retained, false);
-  assert.match(r.out.git_status_short, /src\/fix\.txt/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
@@ -290,6 +286,21 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /summary holds at most five short strings\./);
   assert.equal(fs.readdirSync(s.tmp).length, 0);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')) || fs.readdirSync(path.join(p, 'tmp', 'codex-runtime')).length === 0);
+});
+
+test('envelopes: completed shapes carry only consumed fields', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const b = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+  // build.mjs has no gitignore_rule_needed computation today (only review's --out dir has
+  // one); the key set below is what the trimmed envelope actually carries.
+  assert.deepEqual(Object.keys(b.out).sort(), ['actual_files_changed', 'codex_version', 'effort', 'ignored_files_changed', 'model', 'result', 'runner_status']);
+  const s2 = makeStub();
+  const rv = runRunner(['--mode', 'review', '--scope', 'codebase', '--out', path.join(p, 'untracked')], { stub: s2, cwd: p });
+  assert.deepEqual(Object.keys(rv.out).sort(), ['codex_version', 'effort', 'gitignore_rule_needed', 'model', 'report_path', 'runner_status']);
+  const brief = path.join(s2.dir, 'brief.md'); fs.writeFileSync(brief, 'Should we use X or Y?\n');
+  const s3 = makeStub();
+  const ad = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s3, cwd: p, env: { STUB_ANSWER: '1' } });
+  assert.deepEqual(Object.keys(ad.out).sort(), ['answer_path', 'codex_version', 'effort', 'model', 'runner_status', 'scratch_dir', 'search_used']);
 });
 
 test('model fallback: an unsupported default model retries once on the mode fallback and records it', () => {
@@ -344,7 +355,7 @@ test('build 6: fix mode passes the evidence brief', () => {
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'fix', '--evidence', 'tmp/codex-builder/S1-1-round-1.md'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 0);
-  assert.equal(r.out.mode, 'fix');
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Mode: fix/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Fix evidence: tmp\/codex-builder\/S1-1-round-1\.md/);
 });
 
@@ -564,8 +575,10 @@ test('build 19: a dirty baseline is isolated from this run', () => {
   fs.writeFileSync(path.join(p, 'src', 'preexisting.txt'), 'user-owned dirty file\n');
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 0);
+  // The pre-existing dirty file is excluded from both delta lists; only the fix write is
+  // reported. That is the fact git_status_short used to carry.
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
-  assert.match(r.out.git_status_short, /src\/preexisting\.txt/);
+  assert.deepEqual(r.out.ignored_files_changed, []);
 });
 
 test('build 20, 24, 25: invalid effort, empty touches, and drifted fields fail before quota use', () => {
@@ -805,7 +818,7 @@ test('advise: read-only exec with the prompt on stdin, answer retained', () => {
   assert.ok(!has(a, '--search') && !has(a, '--skip-git-repo-check'));
   assert.equal(fs.readFileSync(s.promptFile, 'utf8'), 'Should we use X or Y?\n');
   assert.equal(fs.readFileSync(r.out.answer_path, 'utf8'), 'stub answer\n');
-  assert.equal(r.out.mode, 'advise');
+  assert.match(path.basename(r.out.scratch_dir), /^pm-codex-advise\./);
 });
 
 test('research: adds --search when available and --skip-git-repo-check outside a repo', () => {

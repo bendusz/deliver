@@ -30,10 +30,10 @@ demonstrate the deliver workflow end to end.
 - Due dates, priorities, editing, deletion, sync.
 
 ## Stories
-| id | title | priority | covers | acceptance criteria | depends-on | [P] |
-|------|----------------------|----------|----------------|--------------------------------------------|------------|-----|
-| S1-1 | CLI skeleton and store | high | FR-001, AC-001 | `todo` runs; an empty store is created and read | none | no |
-| S1-2 | add and list todos | high | FR-002, AC-002 | `add` appends; `list` prints them in order | S1-1 | no |
+| id | title | priority | covers | depends-on | [P] |
+|------|----------------------|----------|----------------|------------|-----|
+| S1-1 | CLI skeleton and store | high | FR-001, AC-001 | none | no |
+| S1-2 | add and list todos | high | FR-002, AC-002 | S1-1 | no |
 
 ## Architecture
 A single Python module `todo.py` with an `argparse` CLI and a small store helper that reads and

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pmRelpath, realpath, readJson } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
-import { toplevel, isTracked, checkIgnore, gitOut, gitOk } from '../lib/git.mjs';
+import { toplevel, isTracked, checkIgnore, gitOk } from '../lib/git.mjs';
 import { parseStory } from '../lib/story.mjs';
 import { requireCodex, BUILD_FLAGS } from '../lib/preflight.mjs';
 import { runCodexWithFallback } from '../lib/spawn.mjs';
@@ -165,8 +165,6 @@ export async function runBuild(o) {
   const ignoredChanged = delta.filter(isIgnored);
   const actual = delta.filter((rel) => !isIgnored(rel));
   const afterMeta = gitMetadataFingerprint(worktree);
-  let gitStatus = '';
-  try { gitStatus = gitOut(worktree, ['status', '--short', '--untracked-files=all']); } catch { gitStatus = ''; }
   const safety = (reason) => new RunnerError('safety-violation', reason, diag(run.exit, actual, ignoredChanged));
 
   if (beforeMeta !== afterMeta) throw safety('Codex changed protected git state (HEAD, refs, index contents and flags, local config, hooks, info/exclude, or worktree registrations); preserve the worktree and inspect it before continuing');
@@ -192,7 +190,7 @@ export async function runBuild(o) {
   }
   if (JSON.stringify([...new Set(claimed)].sort()) !== JSON.stringify(actual)) throw safety('Codex files_changed does not match the authoritative before/after worktree delta');
 
-  const envelope = { runner_status: 'completed', codex_version: version, model, effort, worktree, story: storyRel, mode: o.mode, timeout_seconds: o.timeoutSeconds, sandbox: WIN ? 'none (win32)' : 'workspace-write', diagnostics_retained: false, actual_files_changed: actual, ignored_files_changed: ignoredChanged, git_status_short: gitStatus, ...(fallback ? { model_fallback: fallback } : {}), result };
+  const envelope = { runner_status: 'completed', codex_version: version, model, effort, ...(fallback ? { model_fallback: fallback } : {}), actual_files_changed: actual, ignored_files_changed: ignoredChanged, result };
   try { fs.rmSync(scratch, { recursive: true, force: true }); } catch { /* best effort */ }
   return { exit: 0, envelope };
 }

@@ -60,8 +60,8 @@ install under the new name:
 
 Nothing in your project needs to change. The `pm/` state directory, the `AGENTS.md` pointer, and
 `.claude/rules/pm-state.md` are read exactly as before, and `/deliver:resume` continues from them.
-`DELIVER_NO_ENFORCE=1` is the documented kill switch now, and the old `PM_SKILL_NO_ENFORCE=1` keeps
-working until 0.22.
+`DELIVER_NO_ENFORCE=1` is the documented kill switch. The pre-0.21 name `PM_SKILL_NO_ENFORCE`
+stopped working in 0.22.
 
 ## Use
 
