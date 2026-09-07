@@ -2,7 +2,7 @@
 // deliver hooks: shared library (Node ESM, zero dependencies).
 // Also a tiny CLI:
 //   git diff <range> | node lib.mjs scan        # exit 1 if secret-shaped content found
-//   node lib.mjs actor-id [root]                # print this actor's id, exit 1 if none
+//   node lib.mjs actor-id [root]                # print this actor's id (names docs/handoff/<id>.md), exit 1 if none
 // Everything here is fail-open friendly: functions return null instead of throwing,
 // and callers treat null as "allow".
 import fs from 'node:fs';
@@ -125,6 +125,18 @@ export function hookFile(input) {
   return { file, root: pmRoot(cwd) };
 }
 
+// readText(file): the contents of a regular file, or null. Refuses symlinks, FIFOs, and
+// devices for the same reasons readJson does: a FIFO would hang a SessionStart hook.
+export function readText(file) {
+  try {
+    if (fs.lstatSync(file).isSymbolicLink()) return null;
+    if (!fs.statSync(file).isFile()) return null;
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 export function readJson(file) {
   try {
     // Refuse a symlink outright: PM state and actor files are in-repo artifacts, and a
@@ -173,8 +185,8 @@ export function pmActorId(root) {
   const slug = src.replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
   if (!slug) return null;
   const h1 = cksum(src).toString(16).padStart(8, '0');
-  // The ':pm-skill' salt keeps the plugin's historical name on purpose. It keys every
-  // existing pm/actors/ file, so the rename must not change the ids it derives.
+  // The ':pm-skill' salt keeps the plugin's historical name on purpose. It keyed every
+  // pre-0.24 pm/actors/ file and now names docs/handoff/<id>.md; keep the ids stable.
   const h2 = cksum(`${src}:pm-skill`).toString(16).padStart(8, '0');
   return `${slug}-${(h1 + h2).slice(0, 12)}`;
 }
@@ -221,5 +233,43 @@ if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
     if (!id) process.exit(1);
     fs.writeSync(1, `${id}\n`);
     process.exit(0);
+  }
+}
+
+// The approval marker: the one tracked file the sign-off gate reads. `status` is
+// pending, approved, or revoked. Everything else about a project's position is derived
+// from git and the story files (see references/state.md).
+export const APPROVAL_REL = 'docs/approval.json';
+
+// readApproval(root): the parsed marker when it is a JSON object with a string status,
+// else null. Callers that must tell "absent" from "unreadable" check the path first.
+export function readApproval(root) {
+  const a = readJson(path.join(root, 'docs', 'approval.json'));
+  return isRecord(a) && typeof a.status === 'string' ? a : null;
+}
+
+// legacyState(root): a pre-0.24 pm-state.json under pm/ or tmp/, as { file, state }
+// with state null when unreadable, or null when neither exists. Only the sign-off hook,
+// the session hook, and the runner's migration message still look at it.
+export function legacyState(root) {
+  for (const rel of ['pm/pm-state.json', 'tmp/pm-state.json']) {
+    const f = path.join(root, ...rel.split('/'));
+    if (!fs.existsSync(f)) continue;
+    const st = readJson(f);
+    return { file: rel, state: isRecord(st) ? st : null };
+  }
+  return null;
+}
+
+// parseExec(text): a story's `<!-- pm-exec: {...} -->` Execution block as an object, or
+// null when the story has none or it does not parse.
+export function parseExec(text) {
+  const m = String(text).match(/<!--\s*pm-exec:\s*(\{[^\n]*?\})\s*-->/);
+  if (!m) return null;
+  try {
+    const v = JSON.parse(m[1]);
+    return isRecord(v) ? v : null;
+  } catch {
+    return null;
   }
 }

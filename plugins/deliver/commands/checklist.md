@@ -16,7 +16,6 @@ Do this:
 - You **may** evaluate each item against the real artifact (`docs/spec.md`, `docs/plan.md`,
   `docs/stories/<id>*.md`, the diff/gate evidence) and tick `[x]` **only with evidence**. Never mark an
   item complete without checking the artifact; leave unverifiable items unchecked and note why.
-- Append a one-line entry to `pm/log.md`.
 
 If no target is given, list the four checklist types and ask which to generate. Checklists are an
 optional quality aid and do not replace `/deliver:analyze` or the review and verification gates.

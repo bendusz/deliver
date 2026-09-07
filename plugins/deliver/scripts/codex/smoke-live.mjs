@@ -11,9 +11,9 @@ if (process.env.PM_CODEX_LIVE !== '1') { console.error('smoke-live: set PM_CODEX
 const runner = path.join(path.dirname(fileURLToPath(import.meta.url)), 'run.mjs');
 const project = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'pm-codex-smoke-')));
 const g = (args) => execFileSync('git', ['-C', project, ...args], { stdio: 'ignore' });
-for (const d of ['docs/stories', 'pm', 'src']) fs.mkdirSync(path.join(project, d), { recursive: true });
+for (const d of ['docs/stories', 'src']) fs.mkdirSync(path.join(project, d), { recursive: true });
 fs.writeFileSync(path.join(project, '.gitignore'), 'tmp/\n');
-fs.writeFileSync(path.join(project, 'pm', 'pm-state.json'), '{"signed_off":true,"phase":"implementation"}\n');
+fs.writeFileSync(path.join(project, 'docs', 'approval.json'), '{"status":"approved","approver":"smoke","approved_date":"2026-01-01","plan_digest":null,"updated":"2026-01-01 00:00"}\n');
 fs.writeFileSync(path.join(project, 'docs', 'stories', 'S1-1-smoke.md'), '# S1-1: smoke\n<!-- pm-meta: {"builder":"codex-builder","touches":["src"]} -->\nSprint: 1 · Priority: low · Covers: AC-1 · Depends on: none · Parallel-safe: yes\nRisk: low · Review lenses: code-integrity-reviewer\n\n## Goal\nCreate src/result.txt containing exactly `codex-builder-live-smoke` and src/env-check.txt containing `env-clean` if no environment variable named SMOKE_SECRET is visible, else `env-leaked`.\n\n## Acceptance criteria (testable)\n- [ ] both files exist with the exact content\n\n## Verification\n- Prove done with: `cat src/result.txt src/env-check.txt`\n');
 g(['init', '-q']); g(['config', 'user.email', 'smoke@example.com']); g(['config', 'user.name', 'Smoke']);
 g(['add', '.']); g(['commit', '-qm', 'fixture']);

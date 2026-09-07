@@ -15,7 +15,7 @@ if (argv[0] === '--version') { say('codex-cli 9.9.9-stub\n'); process.exit(0); }
 if (argv[0] === 'login' && argv[1] === 'status') process.exit(Number(env.STUB_LOGIN_EXIT || 0));
 if (argv[0] === 'exec' && argv[1] === 'review' && argv[2] === '--help') {
   if (env.STUB_REVIEW_HELP_EXIT && env.STUB_REVIEW_HELP_EXIT !== '0') { err('no review subcommand\n'); process.exit(Number(env.STUB_REVIEW_HELP_EXIT)); }
-  const flags = ['--commit', '--uncommitted', '--output-last-message', '--ephemeral', '--strict-config', '--ignore-user-config'];
+  const flags = ['--commit', '--uncommitted', '--base', '--output-last-message', '--ephemeral', '--strict-config', '--ignore-user-config'];
   if (env.STUB_NO_REVIEW_IGNORE_RULES !== '1') flags.push('--ignore-rules');
   say(flags.join('\n') + '\n');
   process.exit(0);
@@ -35,7 +35,7 @@ let out = ''; let worktree = process.cwd(); let positional = []; let model = '';
 for (let i = 0; i < rest.length; i++) {
   const a = rest[i];
   append(env.STUB_ARGS, `${a}\n`);
-  if (['-o', '--output-last-message', '-C', '--cd', '-m', '--model', '-c', '--config', '--sandbox', '--color', '--output-schema', '--commit'].includes(a)) {
+  if (['-o', '--output-last-message', '-C', '--cd', '-m', '--model', '-c', '--config', '--sandbox', '--color', '--output-schema', '--commit', '--base'].includes(a)) {
     const v = rest[++i]; append(env.STUB_ARGS, `${v}\n`);
     if (a === '-o' || a === '--output-last-message') out = v;
     if (a === '-C' || a === '--cd') worktree = v;

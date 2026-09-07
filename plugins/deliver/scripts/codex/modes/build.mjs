@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pmRelpath, realpath, readJson } from '../../../hooks/lib.mjs';
+import { pmRelpath, realpath, readJson, legacyState } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel, isTracked, checkIgnore, gitOk } from '../lib/git.mjs';
 import { parseStory } from '../lib/story.mjs';
@@ -17,7 +17,7 @@ const rejected = (r) => new RunnerError('rejected', r);
 const blocked = (r, extra) => new RunnerError('blocked', r, extra);
 const unavailable = (r, extra) => new RunnerError('unavailable', r, extra);
 const isRootSpec = (rel) => /\.sdd$/i.test(rel) && !rel.includes('/');
-const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stories/') || rel.startsWith('docs/wiki/') || rel.startsWith('.specdd/') || isRootSpec(rel) || ['docs/spec.md', 'docs/plan.md', 'docs/constitution.md'].includes(rel);
+const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stories/') || rel.startsWith('docs/wiki/') || rel.startsWith('docs/handoff/') || rel.startsWith('.specdd/') || isRootSpec(rel) || ['docs/approval.json', 'docs/spec.md', 'docs/plan.md', 'docs/constitution.md'].includes(rel);
 const allowed = (rel, scopes) => scopes.some((s) => rel === s || rel.startsWith(`${s}/`));
 const tomlString = (s) => JSON.stringify(s);
 
@@ -39,7 +39,7 @@ function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
       : 'Prefer a focused implementation. If the story needs broad architectural work or lacks enough context, return blocked instead of widening scope.',
     "Follow the story's Out of scope, acceptance criteria, and verification sections.",
     'Run the story verification command and the relevant project tests before reporting done.',
-    'Stay inside the allowed implementation paths. Do not change git state or edit pm/, stories, docs/wiki/, docs/spec.md, docs/plan.md, docs/constitution.md, or .specdd/.',
+    'Stay inside the allowed implementation paths. Do not change git state or edit stories, docs/wiki/, docs/handoff/, docs/approval.json, docs/spec.md, docs/plan.md, docs/constitution.md, or .specdd/.',
     'Your shell environment is reduced and secret-like variables are removed. TMPDIR is an isolated directory inside this worktree.',
     'Return only JSON matching the supplied schema. List every changed path in files_changed. summary holds at most five short strings. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
   return `${lines.join('\n')}\n`;
@@ -92,17 +92,22 @@ export async function runBuild(o) {
     if (!fs.existsSync(path.join(worktree, evidenceRel)) || !fs.statSync(path.join(worktree, evidenceRel)).isFile()) throw rejected('fix evidence file does not exist');
   }
 
-  const state = path.join(worktree, 'pm', 'pm-state.json');
+  // The approval marker is the one tracked file the gate reads (references/state.md).
+  const marker = path.join(worktree, 'docs', 'approval.json');
   let lst = null;
-  try { lst = fs.lstatSync(state); } catch { lst = null; }
-  if (!lst) throw blocked('pm/pm-state.json is missing; refusing a write-capable run');
-  if (lst.isSymbolicLink()) throw blocked('pm/pm-state.json must not be a symlink');
-  if (pmRelpath(worktree, state) !== 'pm/pm-state.json') throw blocked('pm/pm-state.json must be a regular in-worktree state file');
-  if (!lst.isFile()) throw blocked('pm/pm-state.json is not a regular file');
-  if (!isTracked(worktree, 'pm/pm-state.json')) throw blocked('pm/pm-state.json must be tracked before codex-builder can write');
-  const st = readJson(state);
-  if (!st || typeof st !== 'object') throw blocked('pm/pm-state.json is malformed; refusing a write-capable run');
-  if (st.signed_off !== true) throw blocked('the PM plan is not signed off; codex-builder may not write implementation files');
+  try { lst = fs.lstatSync(marker); } catch { lst = null; }
+  if (!lst) {
+    const legacy = legacyState(worktree);
+    if (legacy) throw blocked(`docs/approval.json is missing but ${legacy.file} exists: pre-0.24 state; run /deliver:resume to migrate it before codex-builder can write`);
+    throw blocked('docs/approval.json is missing; refusing a write-capable run');
+  }
+  if (lst.isSymbolicLink()) throw blocked('docs/approval.json must not be a symlink');
+  if (pmRelpath(worktree, marker) !== 'docs/approval.json') throw blocked('docs/approval.json must be a regular in-worktree file');
+  if (!lst.isFile()) throw blocked('docs/approval.json is not a regular file');
+  if (!isTracked(worktree, 'docs/approval.json')) throw blocked('docs/approval.json must be tracked before codex-builder can write');
+  const approval = readJson(marker);
+  if (!approval || typeof approval !== 'object' || Array.isArray(approval)) throw blocked('docs/approval.json is malformed; refusing a write-capable run');
+  if (approval.status !== 'approved') throw blocked('the plan is not approved (docs/approval.json status is not "approved"); codex-builder may not write implementation files');
 
   const { found, version } = requireCodex(BUILD_FLAGS, { hint: ' or use expert-builder' });
   if (!fs.existsSync(SCHEMA)) throw new RunnerError('failed', 'bundled result schema is missing', { codex_version: version });

@@ -107,7 +107,7 @@ export const BUILD_FLAGS = ['--cd', '--ephemeral', '--ignore-rules', '--output-s
 export const EXEC_FLAGS = ['--ephemeral', '--ignore-rules', '--output-last-message'];
 // Every flag the runner passes to `codex exec review`, so a stale CLI is caught in
 // preflight rather than halfway through a review that has already spent quota.
-export const REVIEW_FLAGS = ['--commit', '--uncommitted', '--ignore-rules', '--ephemeral'];
+export const REVIEW_FLAGS = ['--commit', '--uncommitted', '--base', '--ignore-rules', '--ephemeral'];
 
 // requireCodex(flags, opts) is the one preflight every mode runs. It finds the CLI, reads
 // its version, checks the login, and confirms that `codex exec` carries every flag this

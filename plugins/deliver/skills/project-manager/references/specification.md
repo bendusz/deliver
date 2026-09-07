@@ -53,6 +53,6 @@ be carried as an explicit assumption or risk; decide that with the user.
 - `docs/spec.md`.
 - Optionally `docs/checklists/spec-quality.md` from
   `${CLAUDE_PLUGIN_ROOT}/templates/checklist-spec-quality.md.template`.
-- A one-line `pm/log.md` entry, and `spec` set in `pm/pm-state.json`.
+- Its commit, which is the record that specification happened.
 
 Then run `/deliver:clarify` if markers remain, otherwise load `planning-and-signoff.md`.

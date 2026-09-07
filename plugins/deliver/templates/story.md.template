@@ -21,3 +21,9 @@ name the exact search that finds it.>
 - Prove done with: `<command>`
 
 ## Verification evidence
+
+## Execution
+<!-- Never written at decomposition; the claim commit adds this section (references/state.md).
+     One JSON comment on its own line, then optional dated notes for events with no commit.
+     Shape: pm-exec: {"owner":"<actor-id>","builder":"<expert-builder|codex-builder>","branch":"pm/S<sprint>-<n>-<slug>","status":"<claimed|building|built|in-review|merged|blocked>","rounds":0,"retries":0,"updated":"<YYYY-MM-DD HH:MM>"}
+     Then lines such as: - <YYYY-MM-DD HH:MM> external review skipped: codex CLI absent. -->

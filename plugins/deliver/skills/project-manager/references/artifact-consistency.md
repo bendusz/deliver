@@ -12,7 +12,8 @@ logs or state. Offer remediation as suggestions only.
 ## Inputs (whichever exist)
 
 `docs/constitution.md`, `docs/spec.md`, `docs/plan.md`, `docs/stories/*.md`, `docs/wiki/**`,
-`pm/pm-state.json`, `pm/actors/*.json`, `pm/log.md`. Note in the report any that are absent.
+`docs/approval.json`, `docs/handoff/*.md`, and `git branch -a`. Note in the report any that are
+absent.
 
 ## What to detect
 
@@ -21,8 +22,8 @@ logs or state. Offer remediation as suggestions only.
 - **Story grounding.** Stories that cover no requirement, which is orphan scope.
 - **Testability.** Acceptance criteria that are not observable or testable as written.
 - **Verification.** Stories missing a concrete verification command; a plan missing real commands.
-- **Sign-off.** Missing or inconsistent sign-off across `docs/plan.md`, `pm/log.md`, and
-  `pm/pm-state.json`.
+- **Sign-off.** Missing or inconsistent sign-off between `docs/plan.md` and `docs/approval.json`,
+  or a `plan_digest` that no longer matches `git hash-object docs/plan.md`.
 - **Constitution alignment.** A plan or story that conflicts with a rule in `docs/constitution.md`.
 - **Story metadata.** Missing, malformed, duplicated, or extra-key `pm-meta`; unsafe paths in
   `pm-meta.touches`; in a pre-0.17 story, a visible `Builder` or `Touches` field that disagrees with
@@ -36,14 +37,14 @@ logs or state. Offer remediation as suggestions only.
   and likewise an architecture-changing story that omits `architecture-reviewer`. Flag any mismatch
   between the declared `Risk` and lenses and the real scope.
 - **Terminology drift.** The same concept named differently across spec, plan, and stories.
-- **State sanity.** Stale or contradictory `pm/pm-state.json` and `pm/log.md` against the `docs/`
-  artifacts; `pm/` state files matched by `.gitignore` or left uncommitted while `docs/` moved on.
-- **Claim conflicts.** Report two actors on one story, or an actor whose story differs from
-  `assignments`. A null `current_story` means idle, never a conflict.
-- **Stale claims.** Report assignments without a matching actor position, story, or actor file.
-- **Active work.** Report overlapping `pm-meta.touches` between in-flight stories of different
-  actors, an in-flight sequential story without `resolved_builder`, and an active parallel entry
-  without `builder`.
+- **State sanity.** `docs/approval.json` ignored, untracked, or uncommitted while `docs/` moved
+  on; a legacy `pm/` directory that the 0.24 migration has not removed.
+- **Claim conflicts.** Two stories' Execution blocks naming one branch, or a `pm/S<n>-<m>-*`
+  branch whose story has no Execution block or names no owner.
+- **Stale claims.** An unmerged Execution block whose branch does not exist locally or on the
+  remote, or whose branch has had no commit in 14 days.
+- **Active work.** Overlapping `pm-meta.touches` between unmerged stories with different owners,
+  and an unmerged Execution block whose `builder` is missing or `auto`.
 - **Wiki (only when `docs/wiki/` exists).** An index entry that does not resolve; a page the index
   does not list, or that no other page links to; a plan decision or risk with no decision page; two
   `current` decision pages on one subject (HIGH); a story whose Context cites a concept page marked

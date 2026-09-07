@@ -146,7 +146,7 @@ test('preflight: requireCodex appends the builder hint only where the caller ask
 });
 
 test('preflight: the review flag list covers every flag the runner passes to exec review', () => {
-  for (const f of ['--commit', '--uncommitted', '--ignore-rules', '--ephemeral']) {
+  for (const f of ['--commit', '--uncommitted', '--base', '--ignore-rules', '--ephemeral']) {
     assert.ok(REVIEW_FLAGS.includes(f), f);
   }
   assert.ok(EXEC_FLAGS.includes('--ignore-rules'));
@@ -155,7 +155,7 @@ test('preflight: the review flag list covers every flag the runner passes to exe
 test('snapshot: detects content, new, deleted, mode, and ignored-protected changes', () => {
   const p = newBuildProject(true);
   const before = snapshotWorktree(p);
-  assert.ok(before.has('src/script.sh') && before.has('docs/stories/S1-1-fix.md') && before.has('pm/pm-state.json'));
+  assert.ok(before.has('src/script.sh') && before.has('docs/stories/S1-1-fix.md') && before.has('docs/approval.json'));
   assert.equal(before.get('docs/spec.md'), 'missing');
   fs.writeFileSync(path.join(p, 'src', 'fix.txt'), 'new\n');
   fs.appendFileSync(path.join(p, '.gitignore'), 'pm/hidden.md\n');
@@ -250,7 +250,7 @@ test('build 3: sign-off false stops before Codex is invoked', () => {
   const p = newBuildProject(false); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s });
   assert.equal(r.status, 66);
-  assert.match(r.out.reason, /not signed off/);
+  assert.match(r.out.reason, /not approved/);
   assert.equal(stubActions(s), '');
 });
 
@@ -279,7 +279,7 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.equal(r.out.runner_status, 'completed');
   assert.equal(r.out.result.status, 'done');
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not change git state or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not change git state or edit stories, docs\/wiki\/, docs\/handoff\/, docs\/approval\.json, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Read the story's Specs/);
@@ -395,14 +395,20 @@ test('build 10 and 18: git metadata mutation is a safety violation', () => {
   }
 });
 
-test('build 11: missing and symlinked PM state fail closed', (t) => {
+test('build 11: missing, legacy-only, and symlinked approval markers fail closed', (t) => {
   const p = newBuildProject(true); const s = makeStub();
-  fs.rmSync(path.join(p, 'pm', 'pm-state.json'));
+  fs.rmSync(path.join(p, 'docs', 'approval.json'));
   const r1 = runRunner(['--mode', 'build'], { project: p, stub: s });
   assert.equal(r1.status, 66); assert.match(r1.out.reason, /missing/);
+  // A project managed before 0.24 has only pm/pm-state.json: the runner names the migration
+  // instead of trusting the old flag.
+  fs.writeFileSync(path.join(p, 'pm', 'pm-state.json'), '{"signed_off":true}\n');
+  const r1b = runRunner(['--mode', 'build'], { project: p, stub: s });
+  assert.equal(r1b.status, 66); assert.match(r1b.out.reason, /pre-0\.24 state; run \/deliver:resume/);
+  fs.rmSync(path.join(p, 'pm', 'pm-state.json'));
   const outside = tmpDir('state-');
-  fs.writeFileSync(path.join(outside, 'state.json'), '{"signed_off":true}\n');
-  try { fs.symlinkSync(path.join(outside, 'state.json'), path.join(p, 'pm', 'pm-state.json'), 'file'); } catch { return t.skip('symlinks unavailable'); }
+  fs.writeFileSync(path.join(outside, 'state.json'), '{"status":"approved"}\n');
+  try { fs.symlinkSync(path.join(outside, 'state.json'), path.join(p, 'docs', 'approval.json'), 'file'); } catch { return t.skip('symlinks unavailable'); }
   const r2 = runRunner(['--mode', 'build'], { project: p, stub: s });
   assert.equal(r2.status, 66); assert.match(r2.out.reason, /symlink/);
   assert.equal(stubActions(s), '');
@@ -418,7 +424,8 @@ function runBuildWriteCase(rel, { ignore } = {}) {
 
 test('build 12, 12c, 12d, 14, 22: protected, out-of-scope, ignored, wiki, .specdd, and root-spec writes are violations', () => {
   const cases = [
-    ['pm/pm-state.json', /protected PM artifact/, null],
+    ['docs/approval.json', /protected PM artifact/, null],
+    ['docs/handoff/casey.md', /protected PM artifact/, null],
     ['README.md', /outside the story/, null],
     ['pm/hidden.md', /protected PM artifact/, 'pm/hidden.md'],
     ['docs/wiki/index.md', /protected PM artifact/, null],
@@ -693,6 +700,40 @@ test('review: worktree scope uses --uncommitted; codebase uses plain exec', () =
   assert.ok(!has(a, '--sandbox') && has(a, 'sandbox_mode="danger-full-access"'));
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Focus exclusively on this objective: find dead code\./);
   assert.match(path.basename(cb.out.report_path), /codebase-find-dead-code\.md$/);
+});
+
+test('review: branch scope uses --base, needs commits ahead of it, and names the base in a prompted review', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const main = gitIn(p, ['branch', '--show-current']).trim();
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'branch', '--out', out], { stub: s, cwd: p }).status, 64);
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'branch', '--base', '--evil', '--out', out], { stub: s, cwd: p }).status, 64);
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'recent', '--base', main, '--out', out], { stub: s, cwd: p }).status, 64);
+  const none = runRunner(['--mode', 'review', '--scope', 'branch', '--base', main, '--out', out], { stub: s, cwd: p });
+  assert.equal(none.status, 0);
+  assert.equal(none.out.runner_status, 'nothing-to-review');
+  gitIn(p, ['checkout', '-qb', 'pm/S1-1-fix']);
+  fs.writeFileSync(path.join(p, 'src', 'fix.txt'), 'x\n');
+  gitIn(p, ['add', 'src/fix.txt']); gitIn(p, ['commit', '-qm', 'build(S1-1): fix']);
+  const r = runRunner(['--mode', 'review', '--scope', 'branch', '--base', main, '--out', out], { stub: s, cwd: p });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  let a = stubArgs(s);
+  assert.equal(a[0], 'review');
+  assert.ok(has(a, '--base') && has(a, main) && !has(a, '--commit') && !has(a, '--uncommitted'));
+  assert.match(path.basename(r.out.report_path), /codex-review-branch\.md$/);
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'branch', '--base', 'no-such-branch', '--out', out], { stub: s, cwd: p }).status, 65);
+  // An orphan branch shares no history with the base: rejected before any quota is spent.
+  gitIn(p, ['checkout', '-q', '--orphan', 'orphan']);
+  gitIn(p, ['commit', '-qm', 'orphan root']);
+  const orphan = runRunner(['--mode', 'review', '--scope', 'branch', '--base', main, '--out', out], { stub: s, cwd: p });
+  assert.equal(orphan.status, 65);
+  assert.match(orphan.out.reason, /no common history/);
+  gitIn(p, ['checkout', '-q', 'pm/S1-1-fix']);
+  const obj = runRunner(['--mode', 'review', '--scope', 'branch', '--base', main, '--objective', 'bugs', '--out', out], { stub: s, cwd: p });
+  assert.equal(obj.status, 0);
+  a = stubArgs(s);
+  assert.ok(!has(a, '--base'));
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), new RegExp(`relative to ${main} \\(git diff ${main}\\.\\.\\.HEAD\\)`));
 });
 
 test('review: out dir must be untracked/ or codex/ with no tracked files; failures keep stderr', () => {

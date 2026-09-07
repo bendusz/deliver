@@ -1,13 +1,14 @@
-<!-- pm/actors/<id>.HANDOFF.md, an agent-to-agent handoff. Terse by design: fragments over sentences,
-     pointers over prose. Overwrite on every handoff. Omit any empty section. NO SECRETS, because pm/
-     is tracked; reference locations, never values. -->
+<!-- docs/handoff/<actor-id>.md, an agent-to-agent handoff. Terse by design: fragments over sentences,
+     pointers over prose. Overwrite on every handoff. Omit any empty section. NO SECRETS, because
+     docs/ is tracked; reference locations, never values. Current only while HEAD is BASE_COMMIT. -->
 # HANDOFF <YYYY-MM-DD HH:MM>
 
 OBJECTIVE: <one line>
-PHASE: <phase> · SCALE: <scale> · SIGNED_OFF: <no | yes by <name> on <date>>
-POSITION: sprint <n>/<N> · story <id> "<title>" · status <status> · verification: <pending|PASS|FAIL|UNKNOWN>
+APPROVAL: <pending | approved by <name> on <date> | revoked> · SCALE: <scale>
+POSITION: sprint <n>/<N> · story <id> "<title>" · status <status> · rounds <n>/3 · retries <n>/2 · verification: <pending|PASS|FAIL|UNKNOWN>
 
-BRANCH: <current> · INTEGRATION: <branch> · UNCOMMITTED: <none | paths>
+BASE_COMMIT: <git rev-parse HEAD, the last commit of this session>
+BRANCH: <current> · INTEGRATION: <branch> · UNCOMMITTED: <none, always, since everything is committed before the handoff>
 GATES: test=`<cmd|N/A>` lint=`<cmd|N/A>` build=`<cmd|N/A>`
 LAST_GATE_RESULTS: <for example test PASS 2026-07-05 · lint N/A · build PASS>
 
@@ -18,7 +19,7 @@ DONE_THIS_RUN:
 - <story or step: outcome, merge commit or PR>
 
 IN_FLIGHT:
-- <story id: exactly where it stopped, built or not, which gate or review round, what remains>
+- <story id: exactly where it stopped, which gate or review round, what remains>
 
 OPEN_FINDINGS: <none | reviewer findings not yet fixed, severity + file>
 

@@ -24,3 +24,7 @@ Implement the `add` and `list` subcommands on top of the S1-1 store.
 - Prove done with: `python -m pytest -q test_todo.py`
 
 ## Verification evidence
+
+## Execution
+<!-- pm-exec: {"owner":"bendusz","builder":"expert-builder","branch":"pm/S1-2-add-and-list","status":"in-review","rounds":1,"retries":0,"updated":"2026-06-04 15:20"} -->
+- 2026-06-04 15:20 round 1: code-integrity-reviewer raised 1 major (unsafe write); fix not started.

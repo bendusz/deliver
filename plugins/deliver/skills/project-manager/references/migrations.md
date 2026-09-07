@@ -3,30 +3,50 @@
 Load this only when a state read or a story finds an older layout. Migrate first, commit the
 migration on its own, then continue the phase you were in.
 
-## Projects managed before 0.21 (the plugin was renamed)
+## Projects managed before 0.24 (tracked `pm/` state)
 
-Nothing to migrate. The plugin was renamed in 0.21; the state it writes did not change. `pm/`,
-`pm/pm-state.json`, `pm/actors/`, `pm/log.md`, the `AGENTS.md` pointer, and
-`.claude/rules/pm-state.md` keep their names and contents, and every actor id stays valid because
-the id salt deliberately kept the pre-0.21 name. `/deliver:resume` reads such a project exactly as
-the old command did. Only the marketplace, the plugin directory, and the command namespace moved,
-and the README's upgrade note covers that for the person installing it.
+Trigger: `pm/pm-state.json` or `tmp/pm-state.json` exists and `docs/approval.json` does not.
+Every older layout, the pre-0.8 `tmp/` files, the flat 0.8 file, the 0.9 actor files, and
+pre-0.10.1 actor ids, migrates in this one pass; read whichever files exist. Run it on the
+integration branch in the main checkout, never on a story branch, because the marker and the
+`pm/` removal must not enter a story's cumulative diff. The old loop updated actor files on the
+story branch mid-story, so for every unmerged `pm/<id>-*` branch read its copy of the state too
+(`git show <branch>:pm/actors/<id>.json`, or the flat file) and take whichever `updated` is
+newer, so an exhausted counter is never reset. Show the user what you found, then in one commit:
 
-## Pre-0.10.1 actor ids
+1. **Marker.** Write `docs/approval.json` from the template: `approved` with the old `approver`
+   and `approved_date` when `signed_off` was `true`, else `pending`. Leave `plan_digest` for
+   step 5, after the plan edit.
+2. **Execution blocks.** For every story an `assignments` entry, an actor file's `current_story`,
+   a `parallel_batch` entry, or the flat file's `current_story` names, append an `## Execution`
+   section per `state.md`: `owner` from the actor file's `actor`, or your id for a flat layout;
+   `builder` from `resolved_builder` or the batch entry, resolving `auto` now and saying so;
+   `branch`; `status`, mapping one to one and treating an empty status as `claimed`; `rounds` and
+   `retries` from the counters. `owner` is your current actor id when the old `actor` was yours,
+   which an id from before 0.10.1 (the bare email local part) or from before 0.21 never matches
+   by string; compare it with the slug prefix of `actor-id`'s output. A teammate's old id stays
+   as written, and they rewrite their own `owner` on their first resume.
+3. **Shipped stories.** A story the old state never mentions is done when its `pm/<id>-*` branch
+   is merged into the integration branch (`git branch --merged`, local or remote), or when its
+   Verification evidence records a PASS and the old log or history records its merge. Give each
+   such story a `merged` block with the merge commit in a note, so resume never restarts it.
+   A story with neither gets no block and is unclaimed.
+4. **Handoffs.** Read each `pm/actors/*.HANDOFF.md`, or `pm/HANDOFF.md`, once. Fold anything still
+   true into that story's Execution notes. Do not carry the file over; its position is stale by
+   definition.
+5. **Remove.** `git rm -r pm/`, and the `tmp/` pointer stubs when present; delete the
+   `pm/log.md merge=union` line from `.gitattributes`; `git rm` `.claude/rules/pm-state.md` and
+   `pm/AGENTS.md` when present; delete the `Instruction rules` line from the plan's Delivery mode
+   and add `Integration branch` when it is missing. Now set `plan_digest` from
+   `git hash-object docs/plan.md`, so the approved digest is the edited plan. The log stays in
+   history: `git log -p -- pm/log.md`.
+6. **Commit** as `chore: migrate PM state to 0.24` and report the resulting position.
+7. **Carry it into open work.** Merge the integration branch into every unmerged story branch and
+   worktree before any builder dispatch, so each checkout holds the marker the runner requires and
+   the three-dot scope diff stays clean. A delete/modify conflict on a `pm/` file resolves by
+   taking the deletion (`git rm`), because the Execution block already carries its fields.
 
-Ids before 0.10.1 used only the email local part, so `pm/actors/<local-part>.json` now shows up as
-an orphan. On the first resume after upgrading, `git mv` that file and its `.HANDOFF.md` to the new
-full-email id, update the `actor` field inside the JSON, and commit. The content format is
-unchanged. Never create a second actor file alongside the orphan.
-
-## Actor state created before 0.13 (no `resolved_builder`)
-
-If an in-flight actor file lacks `resolved_builder`, recover an already logged route choice first.
-If none exists and the story names an explicit builder, persist that value. If the story still says
-`auto`, resolve it once with the current routing rules and append the reason. Commit the actor state
-and the log together before another builder dispatch. Apply the same rule to any active
-`parallel_batch` entry that lacks `builder`. Idle actor files may simply add
-`resolved_builder: null` when they are next updated.
+The actor id derivation is unchanged, so an old id and the new one agree.
 
 ## Stories created before 0.13 (no `pm-meta`)
 
@@ -39,22 +59,3 @@ No migration is needed. `pm-meta` is authoritative; the runner still checks that
 or `Touches` field agrees with it and blocks on a mismatch. When you next edit such a story, you may
 drop the visible fields and fold `Security-sensitive` and `Architecture-sensitive` into
 `Review lenses`.
-
-## Flat 0.8 layout (personal fields in `pm-state.json`, no `pm/actors/`)
-
-On any state read:
-1. Derive your actor id; create `pm/actors/<you>.json` from the personal fields
-   (`current_story*`, `branch`, `resolved_builder`, `parallel_batch`, `next`, `handoff_written`) and
-   remove them from the shared file; add `assignments` (seed from `current_story` if one is in
-   flight).
-2. Move `pm/HANDOFF.md` to `pm/actors/<you>.HANDOFF.md` if present.
-3. Strip the log's Current State block, whose live content now lives in the state files. Keep every
-   existing log entry verbatim; only new entries carry the actor prefix.
-4. Append `pm/log.md merge=union` to `.gitattributes`.
-5. Verify the check-ignore file checks pass, log the migration, and commit.
-
-## Pre-0.8 layout (state still under `tmp/`)
-
-Move `tmp/pm-state.json`, `tmp/log.md`, and `tmp/HANDOFF.md` if present into `pm/`, leaving one-line
-pointer stubs in `tmp/` ("Moved to pm/<name>"). Update repo references to the old paths, apply the
-flat-0.8 migration above in the same pass, and commit once.

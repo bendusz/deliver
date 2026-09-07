@@ -7,22 +7,20 @@ want mechanical enforcement. It is opt-in and lives in the project's own config,
 and needs no external process. The optional allowlist example does need `jq`.
 
 ## What is already enforced
-Three bundled `PreToolUse` hooks guard writes. Each matches `Write`, `Edit`, and `MultiEdit` only,
+Two bundled `PreToolUse` hooks guard writes. Each matches `Write`, `Edit`, and `MultiEdit` only,
 fails open on any uncertainty (a missing or unparseable state file, a target outside the project
 tree, or the kill switch `DELIVER_NO_ENFORCE=1`), and never sees a write made through `Bash`.
 The pre-0.21 name `PM_SKILL_NO_ENFORCE` stopped working in 0.22.
 
-- **Sign-off.** `require-signoff.mjs` blocks a write while `pm/pm-state.json`, or the legacy
-  `tmp/pm-state.json`, has `signed_off: false`. `logging-and-state.md` lists the exempt planning,
-  state, and spec paths.
-- **No secrets in tracked state.** `pm-secrets-guard.mjs` blocks a write into `pm/` or `docs/wiki/`
-  whose content matches a high-confidence secret shape. It is a tripwire for accidents, not a
-  scanner, so prose about secrets never trips it.
-- **Actor isolation.** `actor-guard.mjs` blocks a write to another actor's `pm/actors/<id>.json` or
-  `<id>.HANDOFF.md`.
+- **Approval.** `require-signoff.mjs` blocks a write while `docs/approval.json` has any status but
+  `approved`, and honours a pre-0.24 `pm/pm-state.json` or `tmp/pm-state.json` `signed_off`
+  field until the migration runs. `state.md` lists the exempt planning, state, and spec paths.
+- **No secrets in tracked docs.** `pm-secrets-guard.mjs` blocks a write under `docs/`, or the
+  legacy `pm/`, whose content matches a high-confidence secret shape. It is a tripwire for
+  accidents, not a scanner, so prose about secrets never trips it.
 
-**Session context.** `session-context.mjs` reads `pm/` and adds the current position to new and
-compacted sessions. It is a `SessionStart` hook and only reads.
+**Session context.** `session-context.mjs` reads the marker, the story files, and git, and adds
+the current position to new and compacted sessions. It is a `SessionStart` hook and only reads.
 
 **Read-only review and verify agents.** `code-integrity-reviewer`, `architecture-reviewer`,
 `security-auditor`, `debugger`, and `codebase-analyst` carry only `Read`, `Grep`, and `Glob`, so the

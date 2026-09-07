@@ -41,5 +41,5 @@ into a blind retry. A builder applies it.
 
 ## The round cap
 Each round re-runs the gates and regenerates the cumulative diff for re-review, **up to 3 rounds**.
-Increment `current_story_rounds` as each starts; that **cap** counts earlier sessions' rounds. Still
-failing, **escalate** to the user.
+Increment `rounds` in the story's Execution block and commit it before the round's dispatch; that
+**cap** counts earlier sessions' rounds. Still failing, **escalate** to the user.

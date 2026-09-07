@@ -12,7 +12,9 @@ Arguments: $ARGUMENTS
 
 All optional, in any order:
 
-- **Scope.** `recent`, `worktree`, or `codebase`. Default `worktree`.
+- **Scope.** `recent`, `worktree`, `branch`, or `codebase`. Default `worktree`. `branch` reviews
+  every commit on the current branch against `base=<branch>`, defaulting to the plan's Integration
+  branch, and is the scope for a story whose work is already committed.
 - **Model.** `model=<id>`, a Codex model id. Default `gpt-6-astra`, with a one-time runner
   fallback to `gpt-5.6-sol` at `medium` if the account is refused it.
 - **Effort.** `effort=<level>`, one of `none|minimal|low|medium|high|xhigh|max`. Default `high`.
@@ -32,8 +34,8 @@ is no secret, and real credentials are often lowercase.
 Scan what the scope exposes, tracked and untracked non-ignored files alike, piping each command's
 output through the scanner:
 
-- `recent`, `worktree`: `git diff <range>`, then
-  `git ls-files --others --exclude-standard -z | xargs -0 cat`.
+- `recent`, `worktree`, `branch`: `git diff <range>` (`HEAD~1`, the working tree, or
+  `<base>...HEAD`), then `git ls-files --others --exclude-standard -z | xargs -0 cat`.
 - `codebase`: `git ls-files --cached --others --exclude-standard -z | xargs -0 cat`, or in
   PowerShell `git ls-files --cached --others --exclude-standard | ForEach-Object { Get-Content $_ -Raw }`.
 
@@ -61,7 +63,7 @@ the runner as `PM_CODEX_STAMP`, so the reports and the index sort together.
 
 Dispatch one `codex-reviewer` per objective, or one with no objective, all in a single message so
 they run in parallel, each with `Scope`, `Out dir`, `Stamp`, `Objective` (a preset name or phrase),
-and any `Model` or `Effort` override. `timeout=` is minutes and the agent's `Timeout seconds` is
+`Base` for the `branch` scope, and any `Model` or `Effort` override. `timeout=` is minutes and the agent's `Timeout seconds` is
 seconds, so `timeout=5` becomes `Timeout seconds: 300`; omit it when unset, and the runner's
 600-second default applies. Do not poll; agents return when the runner returns.
 
@@ -70,8 +72,6 @@ seconds, so `timeout=5` becomes `Timeout seconds: 300`; omit it when unset, and 
 With two or more reports, write `<stamp>-codex-review-<scope>-index.md` in the output directory,
 using that shared stamp, listing each report path with its top three findings.
 
-## 7. Report and log
+## 7. Report
 
-Relay the most severe findings across all reports, with report paths. If `pm/log.md` exists, append
-one line in the shared-log schema: `- <YYYY-MM-DD HH:MM> <actor-id>: codex-review <scope>
-[<objectives>], <n> reports, <top finding gist>.`
+Relay the most severe findings across all reports, with report paths.

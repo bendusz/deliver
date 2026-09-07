@@ -30,7 +30,4 @@ yourself. The agent returns Codex's attributed answer or the runner's failure re
 ## 4. Relay
 
 Present Codex's answer, clearly attributed as "Codex (gpt-...) recommends ...", followed by your own
-take: where you agree, where you differ, and why. You own the final recommendation. If `pm/log.md`
-exists, append one entry in the shared-log schema, with the actor id per
-`references/logging-and-state.md`: `- <YYYY-MM-DD HH:MM> <actor-id>: codex-help, <question gist>,
-<answer gist>.`
+take: where you agree, where you differ, and why. You own the final recommendation.

@@ -32,10 +32,8 @@ phase captures them and `/deliver:clarify` resolves them before planning. Settle
 block even writing a spec.
 
 ## Output
-- A short, shared problem statement and the chosen solution direction.
-- `pm/log.md`, created from `${CLAUDE_PLUGIN_ROOT}/templates/log.md.template` when it is missing.
-  Append `pm/log.md merge=union` to `.gitattributes` in the same step, creating that file if it is
-  missing and without clobbering other rules, so concurrent log appends merge cleanly.
-- A one-line entry appended to the log, noting that discovery is done and the direction agreed.
+- A short, shared problem statement and the chosen solution direction, carried into
+  `docs/spec.md` or the plan. Nothing else is written; the spec's first commit records that
+  discovery is done.
 
 Then load `specification.md`.
