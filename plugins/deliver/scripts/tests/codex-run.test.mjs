@@ -10,7 +10,7 @@ import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
 import { parseStory } from '../codex/lib/story.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
 import { runCodex } from '../codex/lib/spawn.mjs';
-import { cmdFallbackPrefix, CMD_FALLBACK_SUFFIX, requireCodex, BUILD_FLAGS, READONLY_FLAGS, REVIEW_FLAGS } from '../codex/lib/preflight.mjs';
+import { cmdFallbackPrefix, CMD_FALLBACK_SUFFIX, requireCodex, BUILD_FLAGS, EXEC_FLAGS, REVIEW_FLAGS } from '../codex/lib/preflight.mjs';
 import { PLUGIN_ROOT, tmpDir, gitIn, canSymlink, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath, STORY_V2, STORY_LEGACY } from './helpers.mjs';
 
 test('args: defaults per mode and validation', () => {
@@ -46,9 +46,10 @@ test('args: defaults per mode and validation', () => {
 test('argv: lockedExecArgs is the one shared flag set every mode passes', () => {
   const o = { model: 'gpt-5.6-luna', effort: 'high' };
   const a = lockedExecArgs(o);
-  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral',
-    'gpt-5.6-luna', 'model_reasoning_effort=high', 'mcp_servers={}', 'features.hooks=false',
-    'agents.enabled=false', 'web_search="disabled"']) assert.ok(a.includes(x), x);
+  for (const x of ['--ignore-rules', '--ephemeral', 'gpt-5.6-luna', 'model_reasoning_effort=high',
+    'sandbox_mode="danger-full-access"', 'features.hooks=false', 'agents.enabled=false']) assert.ok(a.includes(x), x);
+  // The user's config, MCP servers, and web search apply: nothing overrides them.
+  for (const x of ['--ignore-user-config', '--strict-config', 'mcp_servers={}', 'web_search="disabled"']) assert.ok(!a.includes(x), `shared args must not carry ${x}`);
   // `codex exec review` rejects these, so no mode may inherit them from the shared set.
   for (const x of ['--sandbox', '-C', '--color', '--skip-git-repo-check', '-o', '--output-schema']) {
     assert.ok(!a.includes(x), `shared args must not carry ${x}`);
@@ -56,6 +57,8 @@ test('argv: lockedExecArgs is the one shared flag set every mode passes', () => 
   const withSearch = lockedExecArgs(o, { search: true });
   assert.ok(withSearch.includes('--search'));
   assert.ok(!withSearch.includes('web_search="disabled"'));
+  const noSearch = lockedExecArgs(o, { searchOff: true });
+  assert.ok(noSearch.includes('web_search="disabled"') && !noSearch.includes('--search'));
 });
 
 test('args: a usage error from the real runner prints usage on stderr with exit 64', () => {
@@ -143,10 +146,10 @@ test('preflight: requireCodex appends the builder hint only where the caller ask
 });
 
 test('preflight: the review flag list covers every flag the runner passes to exec review', () => {
-  for (const f of ['--commit', '--uncommitted', '--ignore-rules', '--ephemeral', '--strict-config', '--ignore-user-config']) {
+  for (const f of ['--commit', '--uncommitted', '--ignore-rules', '--ephemeral']) {
     assert.ok(REVIEW_FLAGS.includes(f), f);
   }
-  assert.ok(READONLY_FLAGS.includes('--ignore-rules'));
+  assert.ok(EXEC_FLAGS.includes('--ignore-rules'));
 });
 
 test('snapshot: detects content, new, deleted, mode, and ignored-protected changes', () => {
@@ -266,20 +269,17 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
-  const common = ['--ignore-user-config', '--ignore-rules', '--strict-config', '--sandbox', '--ephemeral', '--color', 'never', '-C', p, 'gpt-6-astra', 'model_reasoning_effort=high', 'allow_login_shell=false', 'agents.enabled=false', 'web_search="disabled"', 'mcp_servers={}', 'features.hooks=false', '--output-schema', '-o', '-'];
+  const common = ['--ignore-rules', '--ephemeral', '--color', 'never', '-C', p, 'gpt-6-astra', 'model_reasoning_effort=high', 'sandbox_mode="danger-full-access"', 'allow_login_shell=false', 'agents.enabled=false', 'features.hooks=false', 'shell_environment_policy.inherit="core"', 'shell_environment_policy.ignore_default_excludes=false', 'shell_environment_policy.experimental_use_profile=false', '--output-schema', '-o', '-'];
   for (const x of common) assert.ok(has(a, x), `missing ${x}`);
-  if (WIN) {
-    assert.ok(has(a, 'danger-full-access'));
-  } else {
-    for (const x of ['workspace-write', 'sandbox_workspace_write.network_access=false', 'sandbox_workspace_write.exclude_slash_tmp=true', 'sandbox_workspace_write.exclude_tmpdir_env_var=true', 'shell_environment_policy.inherit="core"', 'shell_environment_policy.ignore_default_excludes=false', 'shell_environment_policy.experimental_use_profile=false']) assert.ok(has(a, x), `missing ${x}`);
-  }
+  // No OS sandbox on any platform, and no override of the user's config, MCP servers, or web search.
+  for (const x of ['--sandbox', 'workspace-write', 'read-only', '--ignore-user-config', '--strict-config', 'mcp_servers={}', 'web_search="disabled"', 'sandbox_workspace_write.network_access=false']) assert.ok(!has(a, x), `must not pass ${x}`);
   for (const x of ['--dangerously-bypass-approvals-and-sandbox', '--full-auto', '--yolo', '--add-dir']) assert.ok(!has(a, x));
   assert.ok(a.some((x) => x.startsWith('shell_environment_policy.set.TMPDIR="') && /tmp[\\/]+codex-runtime[\\/]+/.test(x)));
   a.forEach((x, i) => { if (x === '-c') assert.match(a[i + 1], /=/, `-c at ${i} not followed by a key=value pair`); });
   assert.equal(r.out.runner_status, 'completed');
   assert.equal(r.out.result.status, 'done');
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not use the network, change git state, or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not change git state or edit pm\/, stories, docs\/wiki\/, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Read the story's Specs/);
@@ -449,15 +449,15 @@ test('build 13: an omitted files_changed entry cannot conceal an edit', () => {
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
 });
 
-test('build 15: hostile project config is overridden', () => {
+test('build 15: project config is trusted; only hooks and subagents stay off', () => {
   const p = newBuildProject(true); const s = makeStub();
   fs.mkdirSync(path.join(p, '.codex'));
   fs.writeFileSync(path.join(p, '.codex', 'config.toml'), 'web_search = "live"\n[mcp_servers.hostile]\ncommand = "false"\n[features]\nhooks = true\n[sandbox_workspace_write]\nnetwork_access = true\n');
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 0);
   const a = stubArgs(s);
-  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', 'web_search="disabled"', 'mcp_servers={}', 'features.hooks=false']) assert.ok(has(a, x), x);
-  if (!WIN) assert.ok(has(a, 'sandbox_workspace_write.network_access=false'));
+  for (const x of ['--ignore-rules', 'features.hooks=false', 'agents.enabled=false', 'sandbox_mode="danger-full-access"']) assert.ok(has(a, x), x);
+  for (const x of ['--ignore-user-config', '--strict-config', 'web_search="disabled"', 'mcp_servers={}', 'sandbox_workspace_write.network_access=false']) assert.ok(!has(a, x), `must not pass ${x}`);
 });
 
 test('build 16: a structured blocked result with no edits completes', () => {
@@ -566,7 +566,7 @@ test('build 30: a symlinked tmp/codex-runtime is blocked before Codex runs', (t)
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 66, JSON.stringify(r.out));
   assert.match(r.out.reason, /tmp\/codex-runtime must be a real directory/);
-  assert.doesNotMatch(stubActions(s), /^exec --ignore-user-config/m);
+  assert.doesNotMatch(stubActions(s), /^exec --ignore-rules/m);
   assert.equal(fs.readdirSync(outside).length, 0);
 });
 
@@ -589,7 +589,7 @@ test('build 20, 24, 25: invalid effort, empty touches, and drifted fields fail b
     fs.writeFileSync(story, text);
     const r = runRunner(['--mode', 'build'], { project: p, stub: s });
     assert.equal(r.status, 66); assert.match(r.out.reason, re);
-    assert.doesNotMatch(stubActions(s), /^exec --ignore-user-config/m);
+    assert.doesNotMatch(stubActions(s), /^exec --ignore-rules/m);
   }
 });
 
@@ -610,9 +610,11 @@ test('build 23: preflight checks readiness without a model task', () => {
   assert.equal(r.out.story_scope_checked, true);
   assert.deepEqual(r.out.allowed_paths, ['src']);
   assert.equal(r.out.quota_consumed, false);
-  assert.equal(r.out.policy.host_tmp_writable, WIN);
+  assert.equal(r.out.policy.sandbox, 'danger-full-access');
+  assert.equal(r.out.policy.network_access, true);
+  assert.equal(r.out.policy.host_tmp_writable, true);
   assert.equal(r.out.policy.login_shell, false);
-  assert.doesNotMatch(stubActions(s), /^exec --ignore-user-config/m);
+  assert.doesNotMatch(stubActions(s), /^exec --ignore-rules/m);
   assert.ok(!fs.existsSync(path.join(p, 'tmp', 'codex-runtime')));
 });
 
@@ -656,10 +658,8 @@ test('review: recent scope with an objective goes through exec review with promp
   const a = stubArgs(s);
   assert.equal(a[0], 'review');
   for (const x of ['--sandbox', '-C', '--cd', '--color', '--commit']) assert.ok(!has(a, x), `must not pass ${x}`);
-  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', '--ephemeral', 'gpt-6-astra', 'model_reasoning_effort=high', '-o']) assert.ok(has(a, x), x);
-  // A trusted repository's .codex/config.toml must not be able to start MCP processes,
-  // hooks, or agents, or turn web search back on, in a read-only mode.
-  for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false', 'web_search="disabled"']) assert.ok(has(a, x), x);
+  for (const x of ['--ignore-rules', '--ephemeral', 'gpt-6-astra', 'model_reasoning_effort=high', 'sandbox_mode="danger-full-access"', 'features.hooks=false', 'agents.enabled=false', '-o']) assert.ok(has(a, x), x);
+  for (const x of ['--ignore-user-config', '--strict-config', 'mcp_servers={}', 'web_search="disabled"']) assert.ok(!has(a, x), `must not pass ${x}`);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /last commit \(HEAD\).*security/s);
   assert.ok(fs.existsSync(r.out.report_path));
   assert.match(path.basename(r.out.report_path), /^\d{8}-\d{6}-codex-review-recent-security\.md$/);
@@ -680,7 +680,7 @@ test('review: clean worktree is nothing-to-review; recent without objective uses
   assert.ok(has(a, '--commit') && has(a, 'HEAD'));
 });
 
-test('review: worktree scope uses --uncommitted; codebase uses exec read-only', () => {
+test('review: worktree scope uses --uncommitted; codebase uses plain exec', () => {
   const p = newBuildProject(true); const s = makeStub();
   fs.writeFileSync(path.join(p, 'src', 'dirty.txt'), 'x');
   const out = path.join(p, 'untracked');
@@ -690,7 +690,7 @@ test('review: worktree scope uses --uncommitted; codebase uses exec read-only', 
   assert.equal(cb.status, 0);
   const a = stubArgs(s);
   assert.notEqual(a[0], 'review');
-  assert.ok(has(a, '--sandbox') && has(a, 'read-only'));
+  assert.ok(!has(a, '--sandbox') && has(a, 'sandbox_mode="danger-full-access"'));
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Focus exclusively on this objective: find dead code\./);
   assert.match(path.basename(cb.out.report_path), /codebase-find-dead-code\.md$/);
 });
@@ -806,15 +806,15 @@ test('review: codebase scope is not gated on the review subcommand', () => {
   assert.match(worktree.out.reason, /codex exec review --help failed/);
 });
 
-test('advise: read-only exec with the prompt on stdin, answer retained', () => {
+test('advise: exec with the prompt on stdin, answer retained', () => {
   const p = newBuildProject(true); const s = makeStub();
   const brief = path.join(s.dir, 'brief.md');
   fs.writeFileSync(brief, 'Should we use X or Y?\n');
   const r = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_ANSWER: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
-  for (const x of ['--sandbox', 'read-only', '--ephemeral', '--color', 'never', '--ignore-user-config', '--ignore-rules', '--strict-config', 'gpt-6-astra', 'model_reasoning_effort=medium', '-o', '-']) assert.ok(has(a, x), x);
-  for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false', 'web_search="disabled"']) assert.ok(has(a, x), x);
+  for (const x of ['--ephemeral', '--color', 'never', '--ignore-rules', 'gpt-6-astra', 'model_reasoning_effort=medium', 'sandbox_mode="danger-full-access"', 'features.hooks=false', 'agents.enabled=false', '-o', '-']) assert.ok(has(a, x), x);
+  for (const x of ['--sandbox', 'read-only', '--ignore-user-config', '--strict-config', 'mcp_servers={}', 'web_search="disabled"']) assert.ok(!has(a, x), `must not pass ${x}`);
   assert.ok(!has(a, '--search') && !has(a, '--skip-git-repo-check'));
   assert.equal(fs.readFileSync(s.promptFile, 'utf8'), 'Should we use X or Y?\n');
   assert.equal(fs.readFileSync(r.out.answer_path, 'utf8'), 'stub answer\n');
@@ -829,9 +829,9 @@ test('research: adds --search when available and --skip-git-repo-check outside a
   const withSearch = runRunner(['--mode', 'research', '--prompt-file', brief], { stub: s, cwd: noRepo, env: { STUB_ANSWER: '1', STUB_HAS_SEARCH: '1' } });
   assert.equal(withSearch.status, 0);
   assert.ok(has(stubArgs(s), '--search') && has(stubArgs(s), '--skip-git-repo-check'));
-  // The only argv that omits the web_search override: search was explicitly requested.
   assert.ok(!has(stubArgs(s), 'web_search="disabled"'));
-  for (const x of ['mcp_servers={}', 'features.hooks=false', 'agents.enabled=false']) assert.ok(has(stubArgs(s), x), x);
+  for (const x of ['features.hooks=false', 'agents.enabled=false']) assert.ok(has(stubArgs(s), x), x);
+  assert.ok(!has(stubArgs(s), 'mcp_servers={}'));
   assert.equal(withSearch.out.search_used, true);
   assert.ok(has(stubArgs(s), 'gpt-6-astra'));
   const off = runRunner(['--mode', 'research', '--prompt-file', brief, '--search', 'off'], { stub: s, cwd: noRepo, env: { STUB_ANSWER: '1', STUB_HAS_SEARCH: '1' } });
@@ -840,7 +840,7 @@ test('research: adds --search when available and --skip-git-repo-check outside a
   assert.equal(off.out.search_used, false);
 });
 
-test('advise: hostile project config cannot re-enable MCP servers, hooks, agents, or search', () => {
+test('advise: project config applies; only hooks and subagents stay off', () => {
   const p = newBuildProject(true); const s = makeStub();
   fs.mkdirSync(path.join(p, '.codex'));
   fs.writeFileSync(path.join(p, '.codex', 'config.toml'), 'web_search = "live"\n[mcp_servers.hostile]\ncommand = "false"\n[features]\nhooks = true\n');
@@ -849,7 +849,8 @@ test('advise: hostile project config cannot re-enable MCP servers, hooks, agents
   const r = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_ANSWER: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
-  for (const x of ['--ignore-user-config', '--ignore-rules', '--strict-config', 'mcp_servers={}', 'features.hooks=false', 'agents.enabled=false', 'web_search="disabled"']) assert.ok(has(a, x), x);
+  for (const x of ['--ignore-rules', 'features.hooks=false', 'agents.enabled=false']) assert.ok(has(a, x), x);
+  for (const x of ['--ignore-user-config', '--strict-config', 'mcp_servers={}', 'web_search="disabled"']) assert.ok(!has(a, x), `must not pass ${x}`);
 });
 
 test('advise: missing prompt file, auth failure, and non-zero exit', () => {

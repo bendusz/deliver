@@ -40,7 +40,7 @@ Exactly one of these, per clap's `conflicts_with_all` and verified live. Any two
 
 Because a prompt cannot join `--uncommitted`, an objective-focused review puts scope and objective in
 one prompt; native scope flags are preferred otherwise, since diff selection stays deterministic.
-Whole-codebase review is not native at all: it is `codex exec --sandbox read-only` with a prompt.
+Whole-codebase review is not native at all: it is plain `codex exec` with a prompt.
 
 ## Model lineup (`gpt-6-astra` released 2026-09-03)
 
@@ -83,7 +83,7 @@ Every caller falls back to `gpt-5.6-sol` at `medium`.
 
 A caller wanting another tier passes `model=` and `effort=`, which reach the runner as `--model` and
 `--effort`. Scope keywords: `recent` = last commit (`--commit HEAD`), `worktree` = `--uncommitted`
-(default), `codebase` = read-only audit.
+(default), `codebase` = whole-repository audit.
 
 ## Auth, exit codes, output streams
 
@@ -132,9 +132,13 @@ nothing-to-review.
 
 ### What each mode enforces
 
-Every mode pins `mcp_servers`, `features.hooks`, `agents.enabled`, and `web_search` on the command
-line, because `--ignore-user-config` skips only `$CODEX_HOME/config.toml` and a repository
-`.codex/config.toml` could start MCP servers, which run outside the shell sandbox.
+No mode runs under an OS sandbox. Every mode sets `sandbox_mode="danger-full-access"` through `-c`,
+because `codex exec review` rejects `--sandbox`, and loads `$CODEX_HOME/config.toml` and the
+repository's `.codex/config.toml` as they are, so MCP servers and the `web_search` setting apply as
+configured. Only `features.hooks` and `agents.enabled` are pinned off, because Codex hooks and
+subagents would run outside the runner's timeout and audit. `--ignore-rules` and `--ephemeral` stay.
+Codex has full host access and network during every run, and the runner audits only the worktree
+afterwards, so writes elsewhere on the machine and network use are not detectable.
 
 `build` and `fix` fail closed on a missing or unsigned `pm/pm-state.json`, an untracked story, or a
 fix without `--evidence`, then snapshot the worktree and git metadata around the run: an
@@ -142,8 +146,8 @@ out-of-scope change, a protected-path change, or a `files_changed` claim that di
 snapshot delta is a safety violation, worktree preserved, while changed ignored files are reported
 rather than blocked. `review` writes only into `<root>/untracked` or `<root>/codex`, which must hold
 no tracked files; one `lstat` rejects a symlink or a path resolving elsewhere, and `COPYFILE_EXCL`
-keeps the copy from overwriting an existing report. `advise` and `research` are read-only, and only
-research adds `--search`.
+keeps the copy from overwriting an existing report. `advise` and `research` write nothing themselves,
+and only research adds `--search`, or pins `web_search` off for `--search off`.
 
 ### Envelope fields per mode
 
@@ -181,21 +185,16 @@ inputs back.
 
 - **Executable resolution**: `codex.exe` wins over any shim whatever `PATHEXT` says, and a
   `codex.cmd` npm shim runs through its JS entry under `node`. A bare `.cmd` with no JS entry falls
-  back to `cmd.exe`, which refuses unsafe arguments, so build and fix exit **70** and the read-only
+  back to `cmd.exe`, which refuses unsafe arguments, so build and fix exit **70** and the other
   modes **65**; install `codex.exe` or the npm package.
 - **Process tree kill**: `taskkill /T /F /PID <pid>`; POSIX signals the detached process group.
-- **`build`/`fix` sandbox**: the Windows sandbox stays off, because `codex exec` under it refuses
-  most shell commands. Build and fix pass `--sandbox danger-full-access`. Every other guard holds,
-  but the run has full host access and network and the runner audits only the worktree, so writes
-  elsewhere and network use are **not detectable at all**. POSIX prevents an out-of-scope write;
-  Windows only detects it afterwards. `review`, `advise`, and `research` stay `--sandbox read-only`
-  on every platform.
+- **Sandbox**: none, the same as every other platform since 0.23. Releases before 0.23 sandboxed
+  POSIX builds and left Windows open because `codex exec` under the Windows sandbox refuses most
+  shell commands.
 - **Paths, snapshots, temp**: native realpath comparison, git output read tolerant of both
   separators, the executable bit ignored, and `TMPDIR`/`TMP`/`TEMP` pointed at the worktree-local
   `tmp/codex-runtime/<run>`, removed on exit. Cleanup is best effort: an antivirus lock
   (`EBUSY`/`EPERM`) can leave a directory behind.
-- **Open live-check item**: confirm on Windows that `--sandbox danger-full-access` runs commands
-  headlessly under `codex exec`.
 
 ### Preflight and smoke test
 
@@ -213,8 +212,8 @@ The opt-in live smoke test, `PM_CODEX_LIVE=1 node plugins/deliver/scripts/codex/
 (also `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh`), checks two things in a disposable
 repository it then removes unless `PM_CODEX_KEEP=1`: that the two expected result files are written
 with their exact content, and that a secret-shaped environment variable was filtered out of the tool
-shell. This is an OS sandbox, not a VM-level security boundary: use the builder only with trusted
-repositories and stories.
+shell. There is no OS sandbox around the run: use the builder only with trusted repositories and
+stories.
 
 ## Web search (`--search`), noted 2026-08-02
 

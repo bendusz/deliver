@@ -3,7 +3,7 @@ import path from 'node:path';
 import { realpath } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel } from '../lib/git.mjs';
-import { requireCodex, READONLY_FLAGS } from '../lib/preflight.mjs';
+import { requireCodex, EXEC_FLAGS } from '../lib/preflight.mjs';
 import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
@@ -15,7 +15,7 @@ export async function runAdvise(o) {
     if (!path.isAbsolute(o.promptFile)) throw new RunnerError('rejected', '--prompt-file must be an absolute path');
     if (!fs.existsSync(o.promptFile) || !fs.statSync(o.promptFile).isFile()) throw new RunnerError('rejected', 'prompt file does not exist');
   }
-  const { found, version, help } = requireCodex(READONLY_FLAGS);
+  const { found, version, help } = requireCodex(EXEC_FLAGS);
   const searchAvailable = help.includes('--search');
   const useSearch = o.mode === 'research' && o.search === 'auto' && searchAvailable;
   if (o.preflight) return { exit: 0, envelope: { runner_status: 'ready', preflight: true, mode: o.mode, codex_version: version, search_available: searchAvailable, quota_consumed: false } };
@@ -25,9 +25,9 @@ export async function runAdvise(o) {
   const answer = path.join(scratch, 'answer.md');
   const stderrPath = path.join(scratch, 'stderr.log');
   const stdoutPath = path.join(scratch, 'stdout.log');
-  // web_search is left to the CLI's own --search handling ONLY when research asked for
-  // it; otherwise lockedExecArgs pins it off.
-  const argsFor = ({ model, effort }) => ['exec', ...lockedExecArgs({ ...o, model, effort }, { search: useSearch }), '--sandbox', 'read-only', '--color', 'never',
+  // --search only when research asked for it and the CLI has it; web_search pinned off only
+  // when research asked for --search off. Otherwise the user's own setting applies.
+  const argsFor = ({ model, effort }) => ['exec', ...lockedExecArgs({ ...o, model, effort }, { search: useSearch, searchOff: o.mode === 'research' && o.search === 'off' }), '--color', 'never',
     ...(root ? [] : ['--skip-git-repo-check']), '-o', answer, '-'];
   const { run, model, effort, fallback } = await runCodexWithFallback(found, argsFor, o, { stdinText: prompt, cwd, env: process.env, timeoutSeconds: o.timeoutSeconds, stdoutPath, stderrPath });
   const extra = { scratch_dir: scratch, codex_version: version, codex_exit: run.exit, ...(fallback ? { model, effort, model_fallback: fallback } : {}), stderr_path: stderrPath };
