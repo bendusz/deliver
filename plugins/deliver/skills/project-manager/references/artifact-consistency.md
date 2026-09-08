@@ -1,7 +1,8 @@
 # Artifact consistency (analyze)
 
 A read-only quality and consistency pass across the PM artifacts, run after the plan is drafted and
-before decomposition (optionally before sign-off, on larger projects). It finds gaps and
+before decomposition (optionally before sign-off, on larger projects), and again after
+decomposition, before the first claim, because the story detections below need story files. It finds gaps and
 contradictions and **never** fixes them. `/deliver:analyze` drives it.
 
 ## Read-only contract

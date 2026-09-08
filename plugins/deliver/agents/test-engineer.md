@@ -9,10 +9,10 @@ color: green
 
 ## Inputs
 - The story file. Its acceptance criteria are your spec.
-- The project `AGENTS.md`, for the test framework, commands, and conventions.
 
 ## How you work
-Read the story, `AGENTS.md`, the existing test conventions, and the public contract the story names.
+Read the story, the existing test conventions, and the public contract the story names;
+`AGENTS.md` is already in your context.
 Never infer behaviour from memory.
 
 Derive every test from an acceptance criterion, black-box, never internals, in the project's

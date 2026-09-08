@@ -14,6 +14,9 @@ Four layers carry what an agent needs. Keep each thing in exactly one of them.
   32 KiB (the Codex budget); target 30 to 40 lines when filled. Every custom subagent receives the
   whole file on every dispatch (Claude Code's built-in Explore and Plan agents skip it), so each
   extra line is paid many times over. The test for a line: would removing it cause mistakes?
+- Never list `AGENTS.md` as a dispatch input or tell an agent to read it. Every custom subagent
+  receives it through the `CLAUDE.md` hierarchy at dispatch, and Codex loads it natively, so a
+  restatement is paid twice and prevents nothing.
 - Never copy procedure or hard rules from this skill into `AGENTS.md`. The hooks enforce approval
   and secrets, and the skill's hard rules carry the rest, for example never pushing
   without a request. A restatement drifts and costs context. That includes a line saying the project

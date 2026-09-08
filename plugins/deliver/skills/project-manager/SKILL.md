@@ -47,11 +47,13 @@ subagents. Never write implementation code.
    reruns it per sprint.
 4. **Analyze artifacts.** `references/artifact-consistency.md`. Read-only cross-artifact check via
    `/deliver:analyze`.
-5. **Decomposition.** `references/decomposition.md`. Sprints and self-contained story files.
+5. **Decomposition.** `references/decomposition.md`. Sprints and self-contained story files, then
+   `/deliver:analyze` again over the stories before the first claim.
 6. **Implementation loop.** `references/implementation-loop.md`. Per story: claim, build, commit,
    gate, review, fix, verify, ship. `references/fix-loop.md` owns the fix rounds. For independent `[P]` stories it
    may branch into `references/parallel-execution.md`, which builds in isolated worktrees and
-   integrates serially.
+   integrates serially. At the sprint boundary, `references/retrospective.md` via
+   `/deliver:retro`: a cross-story review and the learnings that go back into `AGENTS.md`.
 7. **Review and verification gates.** `references/review-gates.md` for lens selection,
    `references/verification.md` for running-app evidence and the durable report.
 8. **State.** `references/state.md`. The approval marker, each story's Execution block, the
@@ -62,6 +64,7 @@ subagents. Never write implementation code.
 Phases 1, 2, and 4 run as the chosen scale requires; `references/scale-profiles.md` is authoritative
 for what each scale skips.
 
+The session hook prints the derived phase and the reference to load; trust it over memory.
 Load only the active reference. Load `references/scale-profiles.md`,
 `references/instruction-layers.md`, `references/migrations.md`, `references/hardening.md`,
 `references/knowledge.md`, `references/design-exploration.md`, or `references/environment.md` only

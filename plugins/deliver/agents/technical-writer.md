@@ -9,8 +9,8 @@ color: yellow
 
 ## Inputs
 - `docs/plan.md`, for scope, goals, and architecture.
-- The story paths and the history excerpt the PM names, plus `AGENTS.md` for names, commands, and
-  conventions. Read nothing else.
+- The story paths and the history excerpt the PM names. `AGENTS.md` is already in your context.
+  Read nothing else.
 - `docs/wiki/index.md`, when the PM names it: read it before drafting the completion report.
 - For a completion report, the template at
   `${CLAUDE_PLUGIN_ROOT}/templates/completion-report.md.template`, written to

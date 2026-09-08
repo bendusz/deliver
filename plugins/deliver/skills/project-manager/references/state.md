@@ -41,7 +41,9 @@ with `status: pending`. Fields: `status` (`pending`, `approved`, `revoked`), `ap
   behavioural rule still carries the gate.
 - Set `approved`, with `approver` and `approved_date`, only at the sign-off gate, in the same
   commit as the plan's Sign-off line. `plan_digest` is `git hash-object docs/plan.md`, taken after
-  the Sign-off line is written; `/deliver:doctor` reports a plan that changed since.
+  the Sign-off line is written. The hook and the runner compare it with the plan on every
+  implementation write, so a plan that changed since approval blocks building until
+  `/deliver:correct-course` runs or, after a cosmetic edit, the digest is refreshed.
   `/deliver:correct-course` sets `revoked` for a material change and refreshes the digest for a
   cosmetic one.
 - The file must be tracked and a regular file. The runner checks both before it writes.

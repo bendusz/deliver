@@ -20,7 +20,7 @@ if (process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
 // A damaged or missing lib.mjs must not block writes: fail open.
 let lib;
 try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
-const { readHookInput, hookFile, pmRelpath, readApproval, legacyState, APPROVAL_REL } = lib;
+const { readHookInput, hookFile, pmRelpath, readApproval, legacyState, git, chomp, APPROVAL_REL } = lib;
 
 const target = hookFile(readHookInput());
 if (!target) process.exit(0);
@@ -31,8 +31,16 @@ let reason;
 if (fs.existsSync(path.join(root, 'docs', 'approval.json'))) {
   const a = readApproval(root);
   if (!a) process.exit(0);
-  if (a.status === 'approved') process.exit(0);
-  reason = `${APPROVAL_REL} status is ${sanitize(a.status)}`;
+  if (a.status === 'approved') {
+    // An approved plan that changed since approval is not the approved plan. Fail open when
+    // there is no digest, no plan file, or git cannot answer.
+    const digest = typeof a.plan_digest === 'string' && a.plan_digest ? a.plan_digest : null;
+    const now = digest ? chomp(git(root, ['hash-object', 'docs/plan.md']) || '') : '';
+    if (!digest || !now || now === digest) process.exit(0);
+    reason = 'docs/plan.md changed since approval (plan_digest mismatch); run /deliver:correct-course, or refresh plan_digest after a cosmetic edit';
+  } else {
+    reason = `${APPROVAL_REL} status is ${sanitize(a.status)}`;
+  }
 } else {
   const legacy = legacyState(root);
   if (!legacy || !legacy.state || legacy.state.signed_off !== false) process.exit(0);

@@ -87,7 +87,7 @@ anything.
 | Skeleton (optional) | With `Skeleton: specdd` in the plan, `spec-architect` writes the sprint's `.sdd` contracts, the shape of the code, before any code exists. |
 | Analyze | A read-only cross-artifact consistency check for coverage, contradictions, and constitution, run after the plan and before decomposition, optionally before sign-off. |
 | Decomposition | Sprints, then self-contained story files under `docs/stories/`, each tracing to requirement IDs. |
-| Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. |
+| Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. At the sprint boundary, a cross-story review and a retrospective that feeds `AGENTS.md`. |
 | Parallel stories | Independent `[P]` stories can build at once in isolated git worktrees, then integrate one at a time. Opt-in, with a safe fallback to sequential. |
 | Review and verification | A separate read-only reviewer, the project's real test, lint, and build gates, and a final read-only `pm-verifier` PASS, with bounded fix loops. |
 | State | Git carries it. The claim is the story branch, each build and fix round is a commit, and the `--no-ff` merge body is the story record. Only an approval marker, a per-story Execution block, and an optional handoff are written, so concurrent sessions never overwrite each other and any lost session resumes from git. |
@@ -138,6 +138,7 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 | `/deliver:doctor` | Check environment readiness (toolchain, deps, gates run) and state health before building. |
 | `/deliver:benchmark-builders` | Run Opus and Codex on the same story in isolated worktrees, score the measured results, and merge neither. |
 | `/deliver:correct-course` | Handle a mid-flight scope change: re-plan at the right level, re-sign-off if material. |
+| `/deliver:retro` | At a sprint boundary, a bounded cross-story review and a retrospective that proposes `AGENTS.md` learnings as a diff. |
 | `/deliver:handoff` | End a session cleanly by writing a token-efficient `docs/handoff/<id>.md` briefing for the next agent. |
 | `/deliver:resume` | Read git, the approval marker, the story Execution blocks, and the handoff, then continue where you left off. |
 | `/deliver:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, `branch`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
@@ -170,6 +171,7 @@ Committed under `docs/`, which is authoritative:
 - `docs/research/*.md`, sourced research reports from `researcher` and `codex-researcher`. Optional.
 - `docs/verification/*.md`, per-story verification reports. Optional, and recommended for
   non-trivial work.
+- `docs/retros/sprint-<n>.md`, the sprint retrospective records. Optional.
 - `docs/completion-report.md`, the end-of-project summary `technical-writer` produces. Optional.
 - `docs/wiki/`, the project wiki: an index, a schema, and decision, concept, and source pages the
   `librarian` maintains. On at `standard` scale and above.
@@ -199,8 +201,9 @@ under `tmp/`; the report directories sit at the repository root:
 
 - **No implementation before your sign-off.** A behavioural rule the PM holds, plus the bundled
   `require-signoff.mjs` hook. The hook runs on `Write`, `Edit`, and `MultiEdit` only, and blocks a
-  write while `docs/approval.json` has any status but `approved`, honouring a pre-0.24
-  `pm/pm-state.json` until the migration runs. It exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, every `.sdd` file,
+  write while `docs/approval.json` has any status but `approved`, or while `docs/plan.md` no longer
+  matches the approved `plan_digest`, honouring a pre-0.24 `pm/pm-state.json` until the migration
+  runs. It exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, every `.sdd` file,
   `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and `.gitattributes`, fails open on any uncertainty, and
   does not see writes made through `Bash`.
 - **Audited Codex writes.** Codex builds require an approved, tracked `docs/approval.json` and

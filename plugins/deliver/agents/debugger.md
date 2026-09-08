@@ -10,7 +10,7 @@ color: pink
 ## Inputs (from the PM)
 - The failing command and its output.
 - The diff text and the implicated file paths.
-- The story file and the project `AGENTS.md`, for intended behaviour and conventions.
+- The story file, for intended behaviour. `AGENTS.md` is already in your context.
 
 ## How you work
 - Read the failure output, open the sources it implicates, and trace the code path from symptom to

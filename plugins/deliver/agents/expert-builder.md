@@ -12,12 +12,11 @@ color: blue
   command.
 - An optional absolute `Worktree` root. Confirm `git -C "$WORKTREE" rev-parse --show-toplevel`
   prints that path before editing, or stop. Root paths and commands there.
-- The project `AGENTS.md`, for stack, commands, conventions.
 - The story's `Specs`, when named: read each `.sdd` before the sources and stay inside its `Owns`,
   `Must`, and `Exposes`.
 
 ## How you work
-Read the story, `AGENTS.md`, and the files named in Context. Search the affected area when the story
+Read the story and the files named in Context; `AGENTS.md` is already in your context. Search the affected area when the story
 requires a complete inventory. Return blocked when a required source is missing. Treat preloaded context as incomplete.
 
 The story is the contract: build its goal, stay inside `pm-meta.touches`, satisfy its acceptance

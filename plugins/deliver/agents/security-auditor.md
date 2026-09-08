@@ -10,7 +10,6 @@ color: orange
 ## Inputs
 - The story file, for scope and acceptance criteria.
 - The diff text, which the PM generates for you.
-- The project `AGENTS.md`, for conventions and security requirements.
 - The story's `Specs`, when named.
 
 ## What to check

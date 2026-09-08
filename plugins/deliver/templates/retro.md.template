@@ -1,0 +1,21 @@
+<!-- docs/retros/sprint-<n>.md -->
+# Sprint <n> retrospective, <YYYY-MM-DD>
+
+## Sprint review
+- Range: `<from>...<to>` · changed lines: <n> · lens: <code-integrity-reviewer | architecture-reviewer>
+- Verdict: <PASS | CONCERNS | FAIL> · carried into the next sprint: <none | story ids>
+
+## What recurred
+- <finding or convention> · stories: <ids> · rounds spent: <n> · action: <AGENTS.md line | story Context | none>
+
+## What the stories lacked
+- <missing Context> · action: <next sprint's stories | none>
+
+## What earned nothing
+- <gate, lens, or step> · cost: <rounds or minutes> · decision: <keep | drop> (the user's)
+
+## AGENTS.md changes accepted
+- <one line per addition, or "none earned">
+
+## Carried over
+- <item>

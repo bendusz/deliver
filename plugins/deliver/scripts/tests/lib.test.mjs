@@ -129,6 +129,35 @@ test('lib.mjs CLI: scan and actor-id', () => {
   assert.equal(id.stdout.trim(), 'casey-example-com-589b8fa8ab93');
 });
 
+test('lib.mjs CLI: state prints the derived position and the phase moves with the artifacts', () => {
+  const lib = path.join(HOOKS_DIR, 'lib.mjs');
+  const none = spawnSync(process.execPath, [lib, 'state', tmpDir('nostate-')], { encoding: 'utf8' });
+  assert.equal(none.status, 1);
+  const p = newProj(true);
+  const state = () => { const r = spawnSync(process.execPath, [lib, 'state', p], { encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); };
+  let st = state();
+  assert.equal(st.phase, 'discovery');
+  assert.equal(st.next_reference, 'references/discovery.md');
+  assert.equal(st.approval.status, 'approved');
+  assert.equal(st.actor, 'casey-example-com-589b8fa8ab93');
+  fs.writeFileSync(path.join(p, 'docs', 'spec.md'), '# spec\n');
+  fs.rmSync(path.join(p, 'docs', 'approval.json'));
+  fs.writeFileSync(path.join(p, 'docs', 'approval.json'), JSON.stringify({ status: 'pending' }));
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# plan\n');
+  assert.equal(state().phase, 'planning');
+  fs.writeFileSync(path.join(p, 'docs', 'approval.json'), JSON.stringify({ status: 'approved' }));
+  assert.equal(state().phase, 'decomposition');
+  fs.writeFileSync(path.join(p, 'docs', 'stories', 'S1-1-x.md'), '# S1-1\n');
+  st = state();
+  assert.equal(st.phase, 'implementation');
+  assert.deepEqual(st.unmerged, ['S1-1']);
+  fs.writeFileSync(path.join(p, 'docs', 'stories', 'S1-1-x.md'), '# S1-1\n\n## Execution\n<!-- pm-exec: {"owner":"x","status":"merged"} -->\n');
+  st = state();
+  assert.equal(st.phase, 'done');
+  assert.deepEqual(st.unmerged, []);
+  assert.equal(typeof st.uncommitted, 'number');
+});
+
 test('pmRelpath resolves a symlink whose relative target traverses another symlink', (t) => {
   const p = newProj();
   fs.mkdirSync(path.join(p, 'pm'), { recursive: true });

@@ -25,7 +25,5 @@ Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 
 ## Gotchas
 - `plugin.json` version must equal the top CHANGELOG heading (validate check 11).
-- The actor-id salt in `hooks/lib.mjs` keeps the plugin's pre-0.21 name on purpose and must never
-  change; it named every pre-0.24 `pm/actors/` file and now names `docs/handoff/<id>.md`, so the
-  0.24 migration relies on it. The line carries a comment saying so.
+- Never change the actor-id salt in `hooks/lib.mjs`; the comment beside it says why.
 - `.gitattributes` pins LF for `*.mjs` and `*.sh`; Windows checkouts rely on it.

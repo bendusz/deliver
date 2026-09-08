@@ -153,6 +153,7 @@ test('session: approval line, branch line, and the resume pointer', () => {
   const s = newProj(true);
   const out = session({ cwd: s, source: 'startup' });
   assert.match(out, /^approval: approved by Casey on 2026-09-01$/m);
+  assert.match(out, /^phase: discovery · load references\/discovery\.md$/m);
   assert.match(out, /^branch: (main|master) · no story checked out · 0 unmerged stories$/m);
   assert.doesNotMatch(out, /^uncommitted:/m);
   assert.match(out, /run \/deliver:resume/);
@@ -168,6 +169,7 @@ test('session: the checked-out story shows its Execution block; another owner is
   assert.match(session({ cwd: s }), /^branch: (main|master) · no story checked out · 2 unmerged stories \(S1-1, S1-2\)$/m);
   gitIn(s, ['checkout', '-qb', 'pm/S1-1-thing']);
   const out = session({ cwd: s });
+  assert.match(out, /^phase: implementation · load references\/implementation-loop\.md$/m);
   assert.match(out, /^branch: pm\/S1-1-thing · story S1-1 status=in-review builder=expert-builder rounds=1\/3 retries=0\/2 owner=casey-example-com-589b8fa8ab93$/m);
   assert.doesNotMatch(out, /not you/);
   story(s, 'S1-1', { owner: 'jordan', branch: 'pm/S1-1-thing', status: 'building', rounds: 0, retries: 1 });
@@ -206,6 +208,13 @@ test('session: uncommitted paths, worktrees, and the plan digest drift line', ()
   assert.doesNotMatch(session({ cwd: s }), /^plan:/m);
   fs.writeFileSync(path.join(s, 'docs', 'plan.md'), '# plan v2\n');
   assert.match(session({ cwd: s }), /^plan: docs\/plan\.md changed since approval/m);
+  // The sign-off hook enforces the same digest, and fails open without one or without a plan.
+  assert.equal(signoff(writeInput(s, path.join(s, 'src', 'c.py'))), 2);
+  assert.match(runHook('require-signoff.mjs', writeInput(s, path.join(s, 'src', 'c.py'))).stderr, /plan_digest mismatch/);
+  fs.writeFileSync(path.join(s, 'docs', 'plan.md'), '# plan v1\n');
+  assert.equal(signoff(writeInput(s, path.join(s, 'src', 'c.py'))), 0);
+  fs.rmSync(path.join(s, 'docs', 'plan.md'));
+  assert.equal(signoff(writeInput(s, path.join(s, 'src', 'c.py'))), 0);
 });
 
 test('session: handoff freshness follows BASE_COMMIT against HEAD', () => {
