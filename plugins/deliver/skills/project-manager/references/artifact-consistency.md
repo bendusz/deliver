@@ -56,7 +56,7 @@ absent.
 
 ## State health (doctor)
 
-`state-health.md` owns the `OK` or `DRIFT` checks `/deliver:doctor` runs against `pm/`.
+`state-health.md` owns the `OK` or `DRIFT` checks `/deliver:doctor` runs against `docs/approval.json`, the story files, and git.
 
 ## Severities
 

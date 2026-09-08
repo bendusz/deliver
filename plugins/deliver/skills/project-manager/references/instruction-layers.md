@@ -25,7 +25,12 @@ Four layers carry what an agent needs. Keep each thing in exactly one of them.
   Code nor Codex loads them; the agent bodies already carry the persona. A project author who
   keeps one may import it from the bridge file.
 - Path-scoped constraints that only matter inside one directory go in `.claude/rules/<name>.md`
-  with a `paths:` frontmatter (Claude Code) and a nested `<dir>/AGENTS.md` (Codex).
+  with a `paths:` frontmatter. Two limits: such a rule fires when a matching file is *read*, and
+  the review panel gets the diff as text and rarely opens the file, so a constraint a reviewer
+  must enforce belongs in `AGENTS.md` or the story; and `codex-builder` runs at the repository
+  root, so a nested `<dir>/AGENTS.md` never loads for it. Codex reads `AGENTS.override.md` before
+  `AGENTS.md` in each directory from the root down to its working directory, concatenates them,
+  and truncates the whole at `project_doc_max_bytes`, 32 KiB by default.
 
 ## Migrating an existing project
 

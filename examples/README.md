@@ -13,7 +13,8 @@ project:
   round spent. Solo is a team of one. The bare owner id `bendusz` predates 0.10.1; a current
   project carries the salted form the `actor-id` command prints.
 - `todo-cli/docs/handoff/bendusz.md`, an end-of-session handoff from `/deliver:handoff`: terse,
-  agent-to-agent, pointers over prose, current only while `HEAD` is its `BASE_COMMIT`.
+  agent-to-agent, pointers over prose, current while nothing but that file changed since its
+  `BASE_COMMIT`.
 - `todo-cli/docs/wiki/`, the project wiki the `librarian` maintains: an index, the schema, and
   three pages.
 - `todo-cli/todo-cli.sdd`, `todo-cli/todo.sdd`, and `todo-cli/.specdd/bootstrap.md`, the SpecDD

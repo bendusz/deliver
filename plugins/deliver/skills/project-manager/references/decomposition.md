@@ -24,7 +24,7 @@ header. Three fields carry rules:
   Prefer `codex-builder` for one precise outcome with bounded `touches`, concrete evidence, and an
   exact verification command; such a story must not rest on an open design decision. Use `auto` only
   when the boundary cannot be known until the story starts; the implementation loop resolves it
-  before dispatch and logs the choice.
+  before dispatch and records the choice in the story's Execution block.
 - **Risk and review lenses.** The story's `Risk` (low, med, high) and the lenses it needs.
   `code-integrity-reviewer` always; add `architecture-reviewer` for structural change and
   `security-auditor` for security-sensitive work. The lens list is the story's sensitivity
