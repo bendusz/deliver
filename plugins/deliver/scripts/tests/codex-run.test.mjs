@@ -11,7 +11,7 @@ import { parseStory } from '../codex/lib/story.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
 import { runCodex } from '../codex/lib/spawn.mjs';
 import { cmdFallbackPrefix, CMD_FALLBACK_SUFFIX, requireCodex, BUILD_FLAGS, EXEC_FLAGS, REVIEW_FLAGS } from '../codex/lib/preflight.mjs';
-import { PLUGIN_ROOT, tmpDir, gitIn, canSymlink, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath, STORY_V2, STORY_LEGACY } from './helpers.mjs';
+import { PLUGIN_ROOT, tmpDir, gitIn, canSymlink, newBuildProject, makeStub, runRunner, stubArgs, stubActions, minimalPath, STORY_V2, STORY_LEGACY, APPROVED } from './helpers.mjs';
 
 test('args: defaults per mode and validation', () => {
   const b = parseArgs(['--mode', 'build', '--worktree', '/w', '--story', 'docs/stories/S1-1.md']);
@@ -261,6 +261,20 @@ test('build 2: failed auth stops before help or execution', () => {
   assert.doesNotMatch(stubActions(s), /^exec/m);
 });
 
+test('build 3b: a plan that changed since approval stops before Codex is invoked', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# plan v1\n');
+  const digest = gitIn(p, ['hash-object', 'docs/plan.md']).trim();
+  const marker = (d) => { fs.writeFileSync(path.join(p, 'docs', 'approval.json'), JSON.stringify({ ...APPROVED, plan_digest: d }) + '\n'); gitIn(p, ['add', 'docs']); gitIn(p, ['commit', '-qm', 'plan']); };
+  marker('0000000000000000000000000000000000000000');
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s });
+  assert.equal(r.status, 66); assert.match(r.out.reason, /plan_digest mismatch/);
+  assert.equal(stubActions(s), '');
+  marker(digest);
+  const ok = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+});
+
 test('build 3: sign-off false stops before Codex is invoked', () => {
   const p = newBuildProject(false); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s });
@@ -296,7 +310,7 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not change git state or edit stories, docs\/wiki\/, docs\/handoff\/, docs\/approval\.json, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /read AGENTS\.md, and CLAUDE\.md when it is more than a pointer/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /AGENTS\.md is already in your context; read CLAUDE\.md only when it is more than a pointer/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Read the story's Specs/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /summary holds at most five short strings\./);
   assert.equal(fs.readdirSync(s.tmp).length, 0);

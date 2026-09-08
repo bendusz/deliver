@@ -10,7 +10,7 @@ color: purple
 ## Inputs
 - The story file, for scope and acceptance criteria.
 - The diff text, which the PM generates for you.
-- The project `AGENTS.md`, and the plan's architecture section.
+- The plan's Architecture section.
 - The story's `Specs`, when named.
 
 ## What to check

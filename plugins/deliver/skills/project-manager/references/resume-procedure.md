@@ -7,8 +7,10 @@
    only after a fetch.
 2. `docs/approval.json`. When it is absent and `pm/pm-state.json` or `tmp/pm-state.json` exists,
    migrate per `migrations.md` first, in its own commit.
-3. `git branch --show-current`, `git status --porcelain`, `git worktree list`, and
-   `git log --first-parent -5 <integration branch>`.
+3. `node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" state .`, the derived position as JSON: phase and
+   the reference to load, branch, the checked-out story's Execution block, claims, unmerged
+   stories, worktrees, uncommitted count, and handoff freshness. Then
+   `git log --first-parent -5 <integration branch>` for what shipped last.
 4. On a `pm/S<sprint>-<n>-<slug>` branch, that story's file and its Execution block. On the
    integration branch, every story's Execution block, to see what is claimed and what is unmerged.
 5. `docs/handoff/<you>.md` when it is current, meaning `git diff --name-only <BASE_COMMIT> HEAD`

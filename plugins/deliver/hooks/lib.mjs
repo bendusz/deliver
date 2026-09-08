@@ -3,6 +3,7 @@
 // Also a tiny CLI:
 //   git diff <range> | node lib.mjs scan        # exit 1 if secret-shaped content found
 //   node lib.mjs actor-id [root]                # print this actor's id (names docs/handoff/<id>.md), exit 1 if none
+//   node lib.mjs state [root]                   # print the derived project position as JSON, exit 1 outside a managed project
 // Everything here is fail-open friendly: functions return null instead of throwing,
 // and callers treat null as "allow".
 import fs from 'node:fs';
@@ -12,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 // chomp(s): strip only trailing newlines, mirroring bash command substitution
 // (which strips trailing \n but leaves other whitespace, unlike String#trim()).
-const chomp = (s) => s.replace(/(\r?\n)+$/, '');
+export const chomp = (s) => s.replace(/(\r?\n)+$/, '');
 
 // git(cwd, args): stdout of `git -C cwd args...`, or null on any failure.
 export function git(cwd, args) {
@@ -217,6 +218,87 @@ export function pmSecretScan(text) {
   return null;
 }
 
+// PHASES maps the derived phase to the one reference the PM loads for it (SKILL.md).
+export const PHASES = {
+  migration: 'references/migrations.md',
+  discovery: 'references/discovery.md',
+  specification: 'references/specification.md',
+  planning: 'references/planning-and-signoff.md',
+  decomposition: 'references/decomposition.md',
+  implementation: 'references/implementation-loop.md',
+  done: 'references/documentation.md',
+};
+
+// inspectState(root): the derived position of a managed project as one plain object. The
+// session hook renders it, `node lib.mjs state` prints it, and doctor and resume read it
+// instead of re-deriving the same git facts. null outside a managed project, meaning no
+// docs/approval.json and no legacy pm-state.json. Every git failure degrades one field.
+export function inspectState(root) {
+  const hasMarker = fs.existsSync(path.join(root, 'docs', 'approval.json'));
+  const legacy = hasMarker ? null : legacyState(root);
+  if (!hasMarker && !legacy) return null;
+  const out = { managed: true, legacy: legacy ? legacy.file : null, approval: null, phase: null, next_reference: null, actor: null, branch: null, story: null, unmerged: [], claims: [], worktrees: 0, uncommitted: null, handoff: null, wiki_entries: null };
+  if (legacy) { out.phase = 'migration'; out.next_reference = PHASES.migration; return out; }
+  const a = readApproval(root);
+  if (!a) return out;
+  const digestNow = chomp(git(root, ['hash-object', 'docs/plan.md']) || '');
+  const digest = typeof a.plan_digest === 'string' && a.plan_digest ? a.plan_digest : null;
+  out.approval = { status: a.status, approver: a.approver ?? null, approved_date: a.approved_date ?? null, plan_digest: digest, plan_changed: Boolean(a.status === 'approved' && digest && digestNow && digest !== digestNow) };
+
+  const storiesDir = path.join(root, 'docs', 'stories');
+  const stories = [];
+  for (const name of listDir(storiesDir).filter((n) => /^S\d+-\d+-.*\.md$/.test(n)).sort()) {
+    const text = readText(path.join(storiesDir, name));
+    if (text === null) continue;
+    stories.push({ id: name.match(/^(S\d+-\d+)-/)[1], exec: parseExec(text) });
+  }
+  out.branch = chomp(git(root, ['branch', '--show-current']) || '') || 'DETACHED';
+  const mine = stories.find((s) => s.exec && s.exec.branch === out.branch) || stories.find((s) => out.branch.startsWith(`pm/${s.id}-`));
+  if (mine) out.story = { id: mine.id, exec: mine.exec };
+  out.unmerged = stories.filter((s) => !s.exec || s.exec.status !== 'merged').map((s) => s.id);
+  out.claims = stories.filter((s) => s !== mine && s.exec && s.exec.status && s.exec.status !== 'merged')
+    .map((s) => ({ id: s.id, owner: s.exec.owner ?? null, status: s.exec.status, branch: s.exec.branch ?? null }));
+  out.worktrees = Math.max(0, (git(root, ['worktree', 'list', '--porcelain']) || '').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).length - 1);
+  const porcelain = git(root, ['status', '--porcelain', '--untracked-files=all']);
+  out.uncommitted = porcelain === null ? null : porcelain.split(/\r?\n/).filter(Boolean).length;
+
+  const me = pmActorId(root);
+  out.actor = me;
+  if (me) {
+    const rel = `docs/handoff/${me}.md`;
+    const text = readText(path.join(root, 'docs', 'handoff', `${me}.md`));
+    if (text !== null) {
+      // Current when HEAD is BASE_COMMIT, or when every commit since touched nothing but this
+      // file: the handoff commit cannot name its own hash.
+      const base = (text.match(/^BASE_COMMIT:\s*([0-9a-f]{7,40})/m) || [])[1];
+      const head = chomp(git(root, ['rev-parse', 'HEAD']) || '');
+      let current = Boolean(base && head && head.startsWith(base));
+      if (!current && base && head) {
+        const changed = git(root, ['diff', '--name-only', base, 'HEAD', '--']);
+        if (changed !== null) current = changed.split(/\r?\n/).filter(Boolean).every((p) => p === rel);
+      }
+      out.handoff = { path: rel, current };
+    }
+  }
+  const index = readText(path.join(root, 'docs', 'wiki', 'index.md'));
+  if (index !== null) out.wiki_entries = index.split(/\r?\n/).filter((l) => l.startsWith('- ')).length;
+
+  // The phase is derived (references/state.md): no spec and no plan is discovery, a spec
+  // without a plan is specification, an unapproved plan is planning, an approved plan with
+  // no stories is decomposition, an unmerged story is implementation, all merged is done.
+  // Stories outrank a missing plan file, since they imply one was approved; an unapproved
+  // marker beside a plan outranks stories, since a revocation halts implementation.
+  const hasSpec = fs.existsSync(path.join(root, 'docs', 'spec.md'));
+  const hasPlan = fs.existsSync(path.join(root, 'docs', 'plan.md'));
+  if (hasPlan && a.status !== 'approved') out.phase = 'planning';
+  else if (stories.length > 0) out.phase = out.unmerged.length > 0 ? 'implementation' : 'done';
+  else if (!hasSpec && !hasPlan) out.phase = 'discovery';
+  else if (!hasPlan) out.phase = 'specification';
+  else out.phase = 'decomposition';
+  out.next_reference = PHASES[out.phase];
+  return out;
+}
+
 const invoked = process.argv[1] ? realpath(process.argv[1]) : null;
 if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
   const cmd = process.argv[2];
@@ -232,6 +314,11 @@ if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
     const id = pmActorId(process.argv[3] || process.cwd());
     if (!id) process.exit(1);
     fs.writeSync(1, `${id}\n`);
+    process.exit(0);
+  } else if (cmd === 'state') {
+    const st = inspectState(pmRoot(path.resolve(process.argv[3] || process.cwd())));
+    if (!st) { fs.writeSync(2, 'not a managed project: no docs/approval.json and no legacy pm-state.json\n'); process.exit(1); }
+    fs.writeSync(1, `${JSON.stringify(st, null, 2)}\n`);
     process.exit(0);
   }
 }

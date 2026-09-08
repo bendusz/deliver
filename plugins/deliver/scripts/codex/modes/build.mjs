@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pmRelpath, realpath, readJson, legacyState } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
-import { toplevel, isTracked, checkIgnore, gitOk } from '../lib/git.mjs';
+import { toplevel, isTracked, checkIgnore, gitOk, gitOut } from '../lib/git.mjs';
 import { parseStory } from '../lib/story.mjs';
 import { requireCodex, BUILD_FLAGS } from '../lib/preflight.mjs';
 import { runCodexWithFallback } from '../lib/spawn.mjs';
@@ -32,7 +32,7 @@ function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
   ];
   if (evidenceRel) lines.push(`Fix evidence: ${evidenceRel}`);
   lines.push('',
-    'Read the story first, then read AGENTS.md, and CLAUDE.md when it is more than a pointer, when present. Implement only that story.',
+    'Read the story first. AGENTS.md is already in your context; read CLAUDE.md only when it is more than a pointer. Implement only that story.',
     "Read the story's Specs (.sdd files) before the sources when it names any. If you must change a .sdd inside the allowed paths, name it in summary. Never edit .specdd/ or a root .sdd.",
     mode === 'fix'
       ? 'Read the fix evidence and make the smallest change that resolves its accepted findings or failing gate.'
@@ -108,6 +108,11 @@ export async function runBuild(o) {
   const approval = readJson(marker);
   if (!approval || typeof approval !== 'object' || Array.isArray(approval)) throw blocked('docs/approval.json is malformed; refusing a write-capable run');
   if (approval.status !== 'approved') throw blocked('the plan is not approved (docs/approval.json status is not "approved"); codex-builder may not write implementation files');
+  if (typeof approval.plan_digest === 'string' && approval.plan_digest) {
+    let digestNow = '';
+    try { digestNow = gitOut(worktree, ['hash-object', 'docs/plan.md']).trim(); } catch { digestNow = ''; }
+    if (digestNow && digestNow !== approval.plan_digest) throw blocked('docs/plan.md changed since approval (plan_digest mismatch); run /deliver:correct-course before codex-builder can write');
+  }
 
   const { found, version } = requireCodex(BUILD_FLAGS, { hint: ' or use expert-builder' });
   if (!fs.existsSync(SCHEMA)) throw new RunnerError('failed', 'bundled result schema is missing', { codex_version: version });

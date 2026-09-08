@@ -3,6 +3,9 @@
 Understand what the customer needs and agree on the best solution before specification and
 planning.
 
+**Enter** with a request and neither `docs/spec.md` nor `docs/plan.md`. **Leave** when the problem
+and the direction are agreed and written down.
+
 ## Goal
 Reach a shared, explicit understanding with the user, the customer-facing manager, of:
 - the problem and who has it,

@@ -2,6 +2,9 @@
 
 Turn the agreed direction into a written plan, get explicit human sign-off, then scaffold.
 
+**Enter** with a spec, or with inline intent on a `tiny` project. **Leave** when
+`docs/approval.json` says `approved` and the scaffold is committed.
+
 ## 0. Analyze existing code (brownfield, optional)
 If you are working in an existing codebase, dispatch `codebase-analyst` first. Fold its context pack
 into the plan's Architecture and Commands sections, and keep it to embed into story files later. Skip
@@ -70,8 +73,8 @@ responsibility.
 With a wiki, dispatch the first `librarian ingest` per `knowledge.md` and commit its output. With `Skeleton: specdd`, load `skeleton.md` next; otherwise load `decomposition.md`.
 
 ## Checkpoint policy (recorded in Delivery mode, applied during the loop)
-- Default sprint-level: run all the sprint's stories, then pause for the user's review at the sprint
-  boundary. A project may set story-level, pausing before each merge, or fully autonomous.
+- Default sprint-level: run all the sprint's stories, then `/deliver:retro` per
+  `retrospective.md`, then pause for the user's review at the sprint boundary. A project may set story-level, pausing before each merge, or fully autonomous.
 - Whatever the mode, **escalate** immediately before a high-risk merge or one that changes several
   dependent components.
 - Offer `/deliver:handoff` at natural stops: a sprint checkpoint, a long pause, or a session whose

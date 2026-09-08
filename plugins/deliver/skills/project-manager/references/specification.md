@@ -3,6 +3,9 @@
 Capture what the customer needs and why, as a durable product spec, before any technical plan.
 `/deliver:specify` drives it, and `/deliver:clarify` resolves ambiguity.
 
+**Enter** after discovery, or whenever `docs/spec.md` must change. **Leave** when the spec has no
+blocking `[NEEDS CLARIFICATION]`.
+
 ## When to create or update
 - After discovery has agreed the problem and direction, write `docs/spec.md` from
   `${CLAUDE_PLUGIN_ROOT}/templates/spec.md.template`.

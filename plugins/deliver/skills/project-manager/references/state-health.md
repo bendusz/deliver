@@ -1,14 +1,17 @@
 # State health (doctor)
 
 `/deliver:doctor` runs these when `docs/approval.json` or a legacy `pm/` exists, reporting `OK` or
-`DRIFT` per check.
+`DRIFT` per check. Start from `node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" state .`, which prints the
+derived position as JSON (`approval.plan_changed`, `unmerged`, `claims`, `worktrees`,
+`uncommitted`, `handoff.current`), and inspect git only for what it does not carry.
 
 - `docs/approval.json` parses, has a valid `status`, is a regular file, and is tracked
   (`git ls-files --error-unmatch docs/approval.json` succeeds; `git check-ignore` fails).
 - The plan's Sign-off line agrees with the marker: a filled-in line beside `pending`, or a blank
   line beside `approved`, is DRIFT.
-- `plan_digest` equals `git hash-object docs/plan.md`; otherwise the plan changed since approval
-  and the user confirms it or runs `/deliver:correct-course`.
+- `plan_digest` equals `git hash-object docs/plan.md`; otherwise the plan changed since approval,
+  the hook and the runner are already blocking implementation writes, and the user confirms the
+  edit (refresh the digest) or runs `/deliver:correct-course`.
 - Every story's `pm-exec` block parses, its `status` is one of the six, an unmerged block has an
   `owner` and a `builder`, and its `branch` exists locally or on the remote. A story branch with no
   Execution block, or two blocks naming one branch, is DRIFT.

@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented here.
 
+## 0.25.0 - 2026-09-08
+
+The workflow, tightened, from a two-model audit.
+
+- **One state inspector.** `node hooks/lib.mjs state` prints the derived position as JSON:
+  approval and whether the plan changed, the phase and the reference to load, branch, the
+  checked-out story's Execution block, claims, unmerged stories, worktrees, uncommitted count, and
+  handoff freshness. The session hook renders it, and doctor and resume read it instead of
+  re-deriving git facts.
+- **The session hook names the phase.** `phase: implementation · load
+  references/implementation-loop.md`, from the derivation in `state.md`. This is the cheap form of
+  a phase-dependent persona: the phase reference is the persona, and nothing is added to every
+  dispatch. Each phase reference opens with an Enter and Leave line.
+- **The plan digest is enforced.** The sign-off hook and the Codex runner compare
+  `plan_digest` with `git hash-object docs/plan.md`; a plan edited after approval blocks
+  implementation writes until `/deliver:correct-course` runs or the digest is refreshed.
+- **Analyze runs again after decomposition.** Its story detections never fired before, since the
+  plan-time run had no stories.
+- **Sprint retrospective.** `/deliver:retro` and `references/retrospective.md`: a bounded
+  cross-story review of the sprint's diff, three evidence-backed questions, `AGENTS.md` learnings
+  proposed as a diff, and a record under `docs/retros/` from `retro.md.template`. The sprint
+  checkpoint runs it before the pause.
+- **`AGENTS.md` is no longer a dispatch input.** Subagents receive it through the `CLAUDE.md`
+  hierarchy and Codex loads it natively, so seven agent prompts and the Codex prompt stop asking
+  for it. `instruction-layers.md` states the rule.
+
 ## 0.24.1 - 2026-09-08
 
 Audit fixes after 0.23 and 0.24.
