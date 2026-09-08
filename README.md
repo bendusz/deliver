@@ -140,7 +140,7 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 | `/deliver:correct-course` | Handle a mid-flight scope change: re-plan at the right level, re-sign-off if material. |
 | `/deliver:handoff` | End a session cleanly by writing a token-efficient `docs/handoff/<id>.md` briefing for the next agent. |
 | `/deliver:resume` | Read git, the approval marker, the story Execution blocks, and the handoff, then continue where you left off. |
-| `/deliver:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
+| `/deliver:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, `branch`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
 | `/deliver:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-6-astra` at `medium` with a one-time fallback to `gpt-5.6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
 
 ## Artifacts
@@ -163,8 +163,8 @@ Committed under `docs/`, which is authoritative:
 - `docs/plan.md`, the delivery plan, derived from the spec with traceability.
 - `docs/stories/*.md`, self-contained story files, each tracing to requirement IDs. A claimed
   story ends with an Execution block: owner, builder, branch, status, loop counters, and dated notes.
-- `docs/handoff/<actor-id>.md`, an end-of-session briefing, current only while `HEAD` is its
-  `BASE_COMMIT`. Optional.
+- `docs/handoff/<actor-id>.md`, an end-of-session briefing, current while nothing but that file
+  has changed since its `BASE_COMMIT`. Optional.
 - `docs/constitution.md`, project-specific governing principles. Optional.
 - `docs/checklists/*.md`, spec, plan, story, and verification quality checklists. Optional.
 - `docs/research/*.md`, sourced research reports from `researcher` and `codex-researcher`. Optional.

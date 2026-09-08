@@ -126,17 +126,21 @@ export function changedPaths(before, after) {
 }
 
 
-// hookDirFingerprint(gitDir): names, sizes, and modes of <gitdir>/hooks. A run that
-// installs or rewrites a git hook has changed protected repository state even though
-// nothing in the worktree moved.
+// hookDirFingerprint(gitDir): names, modes, and content hashes of <gitdir>/hooks. A run
+// that installs or rewrites a git hook has changed protected repository state even though
+// nothing in the worktree moved, and a same-size rewrite would slip past a size check, so
+// the content is hashed. Without an OS sandbox this is the only thing standing between a
+// hostile run and the PM's next `git commit`.
 function hookDirFingerprint(gitDir) {
   let names;
   try { names = fs.readdirSync(path.join(gitDir, 'hooks')); } catch { return ''; }
   const lines = [];
   for (const n of names.sort()) {
+    const p = path.join(gitDir, 'hooks', n);
     try {
-      const st = fs.lstatSync(path.join(gitDir, 'hooks', n));
-      lines.push(`${n}\t${st.size}\t${(st.mode & 0o7777).toString(8)}`);
+      const st = fs.lstatSync(p);
+      const body = st.isFile() ? sha(fs.readFileSync(p)) : st.isSymbolicLink() ? `link:${fs.readlinkSync(p)}` : 'other';
+      lines.push(`${n}\t${(st.mode & 0o7777).toString(8)}\t${body}`);
     } catch { lines.push(`${n}\t?\t?`); }
   }
   return lines.join('\n');
@@ -153,8 +157,11 @@ export function gitMetadataFingerprint(root) {
   // skip-worktree (S), and intent-to-add flags show up here even when the cached diff
   // is identical.
   const indexFlags = sha(safe(root, ['ls-files', '-v', '-z']));
-  const gitDirRaw = safe(root, ['rev-parse', '--git-dir']).replace(/(\r?\n)+$/, '');
-  const gitDir = gitDirRaw ? path.resolve(root, gitDirRaw) : '';
+  // Hooks and info/exclude live in the COMMON git dir. In a linked worktree --git-dir is the
+  // private .git/worktrees/<name>, which has neither, so a run there could rewrite the
+  // shared hooks unseen.
+  const commonRaw = safe(root, ['rev-parse', '--git-common-dir']).replace(/(\r?\n)+$/, '');
+  const gitDir = commonRaw ? path.resolve(root, commonRaw) : '';
   const hooks = sha(gitDir ? hookDirFingerprint(gitDir) : '');
   let exclude = '';
   if (gitDir) { try { exclude = fs.readFileSync(path.join(gitDir, 'info', 'exclude'), 'utf8'); } catch { exclude = ''; } }

@@ -46,9 +46,10 @@ guessed is not evidence.
 `codex-builder` has two model settings. Its Claude wrapper stays on `sonnet` / `medium`; the bundled
 runner defaults the implementation run to `gpt-6-astra` / `high`, with a one-time
 fallback to `gpt-5.6-sol` / `medium` when the account refuses it. Override the inner model or effort only in an
-explicit dispatch. Valid efforts are `none|minimal|low|medium|high|xhigh|max`. The
-runner ignores Codex user config and overrides safety-sensitive project settings, so local defaults
-cannot silently change its sandbox, model, effort, network, web, MCP, or hook posture.
+explicit dispatch. Valid efforts are `none|minimal|low|medium|high|xhigh|max`. Since
+0.23 the runner runs Codex without an OS sandbox and with the user's own config, so MCP servers and
+web search apply as configured; it still pins the model and effort it was asked for and keeps
+Codex hooks and subagents off.
 
 ## Overriding
 

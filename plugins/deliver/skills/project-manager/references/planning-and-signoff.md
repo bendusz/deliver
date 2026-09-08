@@ -20,7 +20,9 @@ If `docs/spec.md` exists, the plan derives from it: turn its requirements into d
 trace each story back to the spec's IDs. If there is no spec yet, run `/deliver:specify` first for
 non-trivial work, or fold the intent straight into the plan for something small.
 
-Initialise the approval marker if it does not exist yet: create `docs/approval.json` from
+If the project is not a git repository, offer to `git init` now, and **ask** first; the marker
+below must be committed, so this cannot wait for the scaffold. Then initialise the approval
+marker if it does not exist yet: create `docs/approval.json` from
 `${CLAUDE_PLUGIN_ROOT}/templates/approval.json.template` with `status: pending`, confirm
 `git check-ignore docs/approval.json` fails, and **commit** it. `state.md` owns what it means, the
 actor id, the commit discipline, and the no-secrets rule.
@@ -47,10 +49,10 @@ not `approved`, but it is fail-open and can be disabled, so holding the line is 
 responsibility.
 
 ## 3. Scaffold (only after sign-off), observing Repository safety
-- If the project is not a git repo, offer to `git init`, and **ask** first.
 - Generate the project instructions file `AGENTS.md` from
   `${CLAUDE_PLUGIN_ROOT}/templates/AGENTS.md.template`, facts only: commands, layout, non-default
-  conventions, gotchas, per `instruction-layers.md`. Then generate `CLAUDE.md` from
+  conventions, gotchas, per `instruction-layers.md`, replacing every template comment rather than
+  copying it, since Codex would read the comment as instructions. Then generate `CLAUDE.md` from
   `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.template`, a two-line `@AGENTS.md` bridge. **Never**
   overwrite an existing file. If `CLAUDE.md` exists without `AGENTS.md`, propose the migration in
   `instruction-layers.md`, show the diff, and ask. If both files exist and `CLAUDE.md` is

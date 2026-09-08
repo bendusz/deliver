@@ -66,7 +66,7 @@ export function parseArgs(argv) {
     if (o.preflight && (o.mode !== 'build' || o.evidence)) throw new UsageError('--preflight does not accept fix-mode options');
   } else if (o.mode === 'review') {
     if (!SCOPES.has(o.scope)) throw new UsageError('review scope must be recent, worktree, branch, or codebase');
-    if (o.scope === 'branch' && !o.base) throw new UsageError('--base is required for branch scope');
+    if (o.scope === 'branch' && !o.base && !o.preflight) throw new UsageError('--base is required for branch scope');
     if (o.base && o.scope !== 'branch') throw new UsageError('--base is only valid for branch scope');
     if (o.base && !/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(o.base)) throw new UsageError('unsafe base branch name');
     if (!o.preflight && !o.out) throw new UsageError('--out is required');

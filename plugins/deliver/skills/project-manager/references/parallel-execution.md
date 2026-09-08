@@ -23,8 +23,9 @@ larger sets in waves.
 ## 2. Claim the whole batch, then build in parallel
 - Resolve every `auto` builder by loop state 0 before dispatch. Then, in the clean integration
   checkout, claim **every** batch story at once: append each story's Execution block with its
-  owner, builder, branch, and `status: building`, and commit them together as
-  `chore(<ids>): claim batch`.
+  owner, builder, branch, and `status: claimed`, and commit them together as
+  `chore(<ids>): claim batch`. Set every block to `building` in one more commit right before the
+  dispatch, while no builder is running yet.
 - Give each story its own branch and worktree. Prefer the host's native worktree isolation if it
   offers any; otherwise
   `git worktree add tmp/worktrees/<slug> -b pm/S<sprint>-<n>-<slug> <integration_branch>`, having
@@ -32,9 +33,12 @@ larger sets in waves.
 - Run `--mode build --preflight` against every Codex worktree and story pair first. A failed
   preflight drops that story from the batch without consuming task quota.
 - Dispatch the batch's builders together, as concurrent subagent calls in one step, each with its
-  story file path and the absolute worktree root. Tell each to implement and self-check only, with
-  no full test-suite run, because you run the authoritative gates serially next and shared ports and
-  databases would collide.
+  story file path and the absolute worktree root. Tell each `expert-builder` to implement and
+  self-check only, with no full test-suite run, because you run the authoritative gates serially
+  next and shared ports and databases would collide. A `codex-builder` always runs its story's
+  verification command and refuses `done` without passing tests, and the runner's prompt cannot be
+  changed per dispatch, so batch a Codex story only when its verification command can run beside
+  the others: no shared ports, databases, or output paths.
 - **Run no git command that changes a ref, the index, or a worktree while any builder is running.**
   The Codex runner fingerprints every ref in the repository, so a commit on one branch fails a
   concurrent run on another. Leave every story's edits uncommitted and every Execution block

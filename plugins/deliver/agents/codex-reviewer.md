@@ -1,6 +1,6 @@
 ---
 name: codex-reviewer
-description: Use for an independent Codex review of the last commit, worktree, or codebase. Returns a severity-ordered digest and report path. Never reviews code itself.
+description: Use for an independent Codex review of the last commit, the worktree, the current branch against its base, or the codebase. Returns a severity-ordered digest and report path. Never reviews code itself.
 tools: Bash, Read
 model: sonnet
 effort: medium

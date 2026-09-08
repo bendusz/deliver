@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## 0.24.1 - 2026-09-08
+
+Audit fixes after 0.23 and 0.24.
+
+- **Hook rewrites are detected.** The runner's git metadata fingerprint hashes each hook's
+  content, so a same-size rewrite of a git hook no longer passes the after-run audit. It also reads
+  hooks and `info/exclude` from the common git dir, so a run in a linked worktree cannot change the
+  shared ones unseen.
+- **Two commands ran as written no longer fail.** The doctor's Codex preflight names
+  `--mode build`; a `branch` review preflight no longer demands `--base`.
+- **References agree with the code.** `git init` is offered before the marker is committed, not
+  after sign-off; the phase derivation handles a `tiny` project with no spec; parallel batches say
+  which builder can skip the full test run; nested `AGENTS.md` files are documented as unreachable
+  for `codex-builder`, with Codex's real `AGENTS.override.md` precedence and aggregate budget; a
+  handoff's own commit does not stale it, everywhere that rule is stated.
+- **Stale text removed** from the model-tiering doc, four agent prompts, the hardening and analysis
+  references, the doctor command, the handoff template, and the poteto notes. The validate scan for
+  retired state now covers every plugin, the docs, and the example.
+
 ## 0.24.0 - 2026-09-07
 
 Git is the state.

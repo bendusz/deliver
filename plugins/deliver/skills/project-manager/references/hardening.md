@@ -1,8 +1,8 @@
 # Hardening (optional)
 
 The deliver plugin uses behavioural rules, fail-open accident guards, and each agent's allowed
-tools. These controls are not a security boundary, and on Windows `codex-builder` runs with full
-host access and network. This reference adds an optional, Claude Code-native layer for teams that
+tools. These controls are not a security boundary, and `codex-builder` runs with full host access and
+network on every platform. This reference adds an optional, Claude Code-native layer for teams that
 want mechanical enforcement. It is opt-in and lives in the project's own config, not in the plugin,
 and needs no external process. The optional allowlist example does need `jq`.
 

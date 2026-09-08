@@ -1,6 +1,6 @@
 <!-- docs/handoff/<actor-id>.md, an agent-to-agent handoff. Terse by design: fragments over sentences,
      pointers over prose. Overwrite on every handoff. Omit any empty section. NO SECRETS, because
-     docs/ is tracked; reference locations, never values. Current only while HEAD is BASE_COMMIT. -->
+     docs/ is tracked; reference locations, never values. Current while nothing but this file changed since BASE_COMMIT. -->
 # HANDOFF <YYYY-MM-DD HH:MM>
 
 OBJECTIVE: <one line>

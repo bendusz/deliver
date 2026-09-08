@@ -139,7 +139,7 @@ export function readText(file) {
 
 export function readJson(file) {
   try {
-    // Refuse a symlink outright: PM state and actor files are in-repo artifacts, and a
+    // Refuse a symlink outright: the approval marker is an in-repo artifact, and a
     // link is a redirect to content this project does not own. Fail-open (null) as usual.
     if (fs.lstatSync(file).isSymbolicLink()) return null;
     // Refuse FIFOs, devices, etc.: reading them can hang or return garbage.

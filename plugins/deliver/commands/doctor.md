@@ -3,7 +3,7 @@ description: Check environment readiness before implementation, covering tooling
 ---
 
 Use the `project-manager` skill to run a pre-implementation environment readiness check. Inspect and
-probe only; the readiness report and its log entry are the only files you may write.
+probe only; the readiness report is the only file you may write.
 
 Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo)
 
@@ -24,7 +24,7 @@ Inspect (whichever apply):
 - **Setup steps.** Any documented bootstrap (README, CONTRIBUTING) needed before the gates pass.
 - **Codex builder readiness.** If any build-ready story selects `codex-builder`, or the active
   story's `auto` builder may resolve to it, call the bundled runner with
-  `--preflight --worktree <absolute-root> --story <story>` (omit `--story` for environment-only
+  `--mode build --preflight --worktree <absolute-root> --story <story>` (omit `--story` for environment-only
   readiness). Treat `runner_status: ready` as authoritative. It never starts model inference and
   reports `quota_consumed: false`. A missing or logged-out Codex blocks only an explicit
   `codex-builder` story; `auto` may resolve to `expert-builder` and should record that fallback.
@@ -32,7 +32,7 @@ Inspect (whichever apply):
   line is `@AGENTS.md` (report `standalone` when it is not, and `missing` when absent); `AGENTS.md`
   is under 200 lines and under 32 KiB, the Codex budget, and report both numbers; list any
   `AGENTS.md` lines that restate skill rules (sign-off before implementation, the PM writes no code,
-  log after every step, verifier PASS before ship, traceability to FR and AC ids) as trim candidates.
+  commit as you go, verifier PASS before ship, traceability to FR and AC ids) as trim candidates.
 - **State health.** When `docs/approval.json` or a legacy `pm/` exists, run the checks in
   `references/state-health.md` and report `OK` or `DRIFT` for each.
 

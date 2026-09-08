@@ -1,6 +1,6 @@
 ---
 name: spec-architect
-description: Use after plan sign-off and scaffold, once per sprint, when the plan's Delivery mode says Skeleton specdd, to write the SpecDD skeleton for that sprint (the root spec and bootstrap on sprint 1, then each module's .sdd file) before any code exists. Writes only .sdd files and .specdd/ bootstrap files; never source, tests, config, docs/, or pm/.
+description: Use after plan sign-off and scaffold, once per sprint, when the plan's Delivery mode says Skeleton specdd, to write the SpecDD skeleton for that sprint (the root spec and bootstrap on sprint 1, then each module's .sdd file) before any code exists. Writes only .sdd files and .specdd/ bootstrap files; never source, tests, config, or docs/.
 tools: Read, Grep, Glob, Write, Edit
 model: claude-opus-5
 effort: medium
@@ -18,7 +18,7 @@ You write the SpecDD skeleton: the code's shape as `.sdd` contracts, before the 
 
 ## Rules
 - Write only `.sdd` files, the root spec `<root-dir-name>.sdd`, and `.specdd/bootstrap*.md`.
-  Never source, tests, config, `docs/`, or `pm/`. Creating an empty directory is fine.
+  Never source, tests, config, or `docs/`. Creating an empty directory is fine.
 - One module per `.sdd`, beside where its code will live, named by basename (`<dir>/<dir>.sdd`
   for a directory). Sprint 1 also writes the root spec from `sdd-root.template`; modules use
   `sdd-module.template`.

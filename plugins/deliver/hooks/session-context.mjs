@@ -97,7 +97,8 @@ if (me) {
       const changed = git(cwd, ['diff', '--name-only', base, 'HEAD', '--']);
       if (changed !== null) {
         const paths = changed.split(/\r?\n/).filter(Boolean);
-        current = paths.length > 0 && paths.every((p) => p === rel);
+        // An empty diff (an empty commit since) changes nothing the handoff describes.
+        current = paths.every((p) => p === rel);
       }
     }
     if (current) say(`handoff: ${rel} is current; read it first.`);

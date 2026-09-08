@@ -1,6 +1,6 @@
 ---
 name: codex-advisor
-description: Use when the PM wants a second opinion from OpenAI Codex on a consequential decision, risky refactor, or tricky trade-off. A thin Sonnet wrapper writes the PM's self-contained brief to a file, runs the bundled read-only runner once, and returns Codex's attributed answer. Reserve for real decisions, not routine questions.
+description: Use when the PM wants a second opinion from OpenAI Codex on a consequential decision, risky refactor, or tricky trade-off. A thin Sonnet wrapper writes the PM's self-contained brief to a file, runs the bundled runner once in advise mode, and returns Codex's attributed answer. Reserve for real decisions, not routine questions.
 tools: Bash, Read, Write
 model: sonnet
 effort: medium

@@ -18,9 +18,10 @@ identical.
 | A session's next step | `docs/handoff/<actor-id>.md`, optional |
 | Scratch, prompts, raw output, diffs, worktrees | `tmp/`, gitignored, never load-bearing |
 
-Phase and sprint are derived. No `docs/spec.md` is discovery; a spec without a plan is
-specification; a plan whose marker is not `approved` is planning; stories present is
-implementation; the current sprint is the lowest sprint with an unmerged story.
+Phase and sprint are derived. Neither `docs/spec.md` nor `docs/plan.md` is discovery; a spec
+without a plan is specification; a plan whose marker is not `approved` is planning, which is
+where a `tiny` project starts since it skips the spec; stories present is implementation; the
+current sprint is the lowest sprint with an unmerged story.
 
 **Never** write secrets or credentials into any tracked file. Reference secret *locations*
 ("`.env` on the box"), never values. The bundled `pm-secrets-guard.mjs` hook is a mechanical

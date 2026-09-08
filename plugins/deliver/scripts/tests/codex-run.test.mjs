@@ -166,6 +166,21 @@ test('snapshot: detects content, new, deleted, mode, and ignored-protected chang
   const meta1 = gitMetadataFingerprint(p);
   gitIn(p, ['branch', 'other']);
   assert.notEqual(gitMetadataFingerprint(p), meta1);
+  // A same-size, same-mode hook rewrite is a content change, not a size change.
+  const hook = path.join(p, '.git', 'hooks', 'pre-commit');
+  fs.writeFileSync(hook, '#!/bin/sh\necho AAAA\n', { mode: 0o755 });
+  const withHook = gitMetadataFingerprint(p);
+  fs.writeFileSync(hook, '#!/bin/sh\necho BBBB\n', { mode: 0o755 });
+  assert.notEqual(gitMetadataFingerprint(p), withHook);
+  // From a linked worktree the shared hooks and info/exclude are still fingerprinted.
+  const wt = path.join(tmpDir('wt-'), 'w');
+  gitIn(p, ['worktree', 'add', '-q', wt, '-b', 'wt-branch']);
+  const fromWorktree = gitMetadataFingerprint(wt);
+  fs.writeFileSync(hook, '#!/bin/sh\necho CCCC\n', { mode: 0o755 });
+  assert.notEqual(gitMetadataFingerprint(wt), fromWorktree);
+  const afterHook = gitMetadataFingerprint(wt);
+  fs.appendFileSync(path.join(p, '.git', 'info', 'exclude'), 'secret.txt\n');
+  assert.notEqual(gitMetadataFingerprint(wt), afterHook);
 });
 
 test('snapshot: ignored files are fingerprinted cheaply and the runtime dir is skipped', () => {
@@ -707,6 +722,10 @@ test('review: branch scope uses --base, needs commits ahead of it, and names the
   const out = path.join(p, 'untracked');
   const main = gitIn(p, ['branch', '--show-current']).trim();
   assert.equal(runRunner(['--mode', 'review', '--scope', 'branch', '--out', out], { stub: s, cwd: p }).status, 64);
+  // Preflight needs no base: the command probes readiness before it knows the branch.
+  const pre = runRunner(['--mode', 'review', '--scope', 'branch', '--preflight'], { stub: s, cwd: p });
+  assert.equal(pre.status, 0, pre.stdout + pre.stderr);
+  assert.equal(pre.out.runner_status, 'ready');
   assert.equal(runRunner(['--mode', 'review', '--scope', 'branch', '--base', '--evil', '--out', out], { stub: s, cwd: p }).status, 64);
   assert.equal(runRunner(['--mode', 'review', '--scope', 'recent', '--base', main, '--out', out], { stub: s, cwd: p }).status, 64);
   const none = runRunner(['--mode', 'review', '--scope', 'branch', '--base', main, '--out', out], { stub: s, cwd: p });

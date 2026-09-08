@@ -224,7 +224,7 @@ fi
 # 17) instructions layer: templates exist, the AGENTS.md template stays small, the bridge is exact,
 #     and no agent prompt names CLAUDE.md without AGENTS.md on the same line.
 # 18) no retired state surface survives in the plugin, outside the documented legacy fallbacks.
-legacy_scan() { grep -rnE 'pm-state\.json|pm/log\.md|pm/actors|actor-guard' plugins/deliver README.md 2>/dev/null | grep -vE 'hooks/(require-signoff|session-context|lib)\.mjs|scripts/tests/|references/(migrations|state|state-health|hardening|resume-procedure)\.md|modes/build\.mjs|README\.md:.*(0\.24|legacy|migration)'; }
+legacy_scan() { grep -rnE 'pm-state\.json|pm/log\.md|pm/actors|actor-guard' plugins README.md docs/*.md examples 2>/dev/null | grep -vE 'hooks/(require-signoff|session-context|lib)\.mjs|scripts/tests/|references/(migrations|state|state-health|hardening|resume-procedure)\.md|modes/build\.mjs|codex-cli-reference\.md:.*(pre-0\.24|migration)|poteto/PORT\.md:.*(before 0\.24|named before)|README\.md:.*(0\.24|legacy|migration)'; }
 if legacy_scan >/dev/null 2>&1; then
   legacy_scan >&2
   err "retired pm/ state surface referenced outside the documented legacy fallbacks (see above)"

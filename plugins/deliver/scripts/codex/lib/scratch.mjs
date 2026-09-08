@@ -43,8 +43,8 @@ export function assertRuntimeRootReal(worktree) {
 
 // runtimeTmp(worktree, runId): the per-run TMPDIR handed to Codex. It must be a real
 // directory physically inside <worktree>/tmp/codex-runtime: a symlinked `tmp` or
-// `tmp/codex-runtime` would let a workspace-write (or, on win32, full-access) run read
-// and write outside the worktree through a path the runner itself created.
+// `tmp/codex-runtime` would let the run read and write outside the worktree through a
+// path the runner itself created, and the after-run audit would never see it.
 export function runtimeTmp(worktree, runId) {
   const runtimeRoot = path.join(worktree, 'tmp', 'codex-runtime');
   // Clears tmp/ and tmp/codex-runtime, so the only path left to test is the one this call

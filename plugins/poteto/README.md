@@ -68,7 +68,7 @@ as a menu a project can adopt.
   sign-off". Two entry points with opposite rules in one session would fight.
 - `swarm`, `figure-it-out`, `show-me-your-work`, `recall`, `tdd`. Each duplicates something the
   deliver plugin already provides (`parallel-execution`, the spec-plan-stories pipeline,
-  `pm/log.md`, `/resume`), or the Claude Code harness does, or would need a rewrite for a
+  the story Execution blocks and merge commit bodies, `/resume`), or the Claude Code harness does, or would need a rewrite for a
   non-Cursor host.
 - `no-comments` and the Comment Sicko agent. A matter of taste, and it wants an agent file.
 - `automate-me`, `setup-pstack`, and the Benny automations. Cursor-specific mechanisms.
