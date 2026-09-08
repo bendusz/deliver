@@ -11,7 +11,9 @@ derived position as JSON (`approval.plan_changed`, `unmerged`, `claims`, `worktr
   line beside `approved`, is DRIFT.
 - `plan_digest` equals `git hash-object docs/plan.md`; otherwise the plan changed since approval,
   the hook and the runner are already blocking implementation writes, and the user confirms the
-  edit (refresh the digest) or runs `/deliver:correct-course`.
+  edit (refresh the digest) or runs `/deliver:correct-course`. A null digest on an approved
+  marker is DRIFT too: nothing enforces the plan then.
+- `sprints_without_retro` is empty, or the scale skips retrospectives; `unreadable` is empty.
 - Every story's `pm-exec` block parses, its `status` is one of the six, an unmerged block has an
   `owner` and a `builder`, and its `branch` exists locally or on the remote. A story branch with no
   Execution block, or two blocks naming one branch, is DRIFT.

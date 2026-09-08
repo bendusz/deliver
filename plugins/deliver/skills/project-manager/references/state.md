@@ -18,10 +18,13 @@ identical.
 | A session's next step | `docs/handoff/<actor-id>.md`, optional |
 | Scratch, prompts, raw output, diffs, worktrees | `tmp/`, gitignored, never load-bearing |
 
-Phase and sprint are derived. Neither `docs/spec.md` nor `docs/plan.md` is discovery; a spec
-without a plan is specification; a plan whose marker is not `approved` is planning, which is
-where a `tiny` project starts since it skips the spec; stories present is implementation; the
-current sprint is the lowest sprint with an unmerged story.
+Phase and sprint are derived, in this order of precedence. A marker that is not `approved`, or
+whose plan changed since approval, is planning whatever else exists, since it halts every actor
+(`tiny` starts here, having no spec); a completed sprint with no `docs/retros/sprint-<n>.md` is
+retrospective, except at `tiny` and `small`; any story present is implementation, or done when
+all are `merged`, and an unreadable story counts as unmerged; then neither spec nor plan is
+discovery, a spec without a plan is specification, and a plan without stories is decomposition.
+The current sprint is the lowest sprint with an unmerged story.
 
 **Never** write secrets or credentials into any tracked file. Reference secret *locations*
 ("`.env` on the box"), never values. The bundled `pm-secrets-guard.mjs` hook is a mechanical
@@ -41,9 +44,11 @@ with `status: pending`. Fields: `status` (`pending`, `approved`, `revoked`), `ap
   behavioural rule still carries the gate.
 - Set `approved`, with `approver` and `approved_date`, only at the sign-off gate, in the same
   commit as the plan's Sign-off line. `plan_digest` is `git hash-object docs/plan.md`, taken after
-  the Sign-off line is written. The hook and the runner compare it with the plan on every
-  implementation write, so a plan that changed since approval blocks building until
-  `/deliver:correct-course` runs or, after a cosmetic edit, the digest is refreshed.
+  the Sign-off line is written. The sign-off hook compares it with the plan on every implementation write and the runner
+  before every dispatch, so a plan that changed since approval blocks building until
+  `/deliver:correct-course` runs or, after a cosmetic edit, the digest is refreshed. Both fail
+  open when the digest is null, the plan file is missing, or git cannot answer; the runner refuses
+  a plan that is not a regular file.
   `/deliver:correct-course` sets `revoked` for a material change and refreshes the digest for a
   cosmetic one.
 - The file must be tracked and a regular file. The runner checks both before it writes.

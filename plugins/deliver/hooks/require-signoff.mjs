@@ -35,7 +35,9 @@ if (fs.existsSync(path.join(root, 'docs', 'approval.json'))) {
     // An approved plan that changed since approval is not the approved plan. Fail open when
     // there is no digest, no plan file, or git cannot answer.
     const digest = typeof a.plan_digest === 'string' && a.plan_digest ? a.plan_digest : null;
-    const now = digest ? chomp(git(root, ['hash-object', 'docs/plan.md']) || '') : '';
+    let regular = false;
+    try { regular = digest ? fs.lstatSync(path.join(root, 'docs', 'plan.md')).isFile() : false; } catch { regular = false; }
+    const now = regular ? chomp(git(root, ['hash-object', 'docs/plan.md']) || '') : '';
     if (!digest || !now || now === digest) process.exit(0);
     reason = 'docs/plan.md changed since approval (plan_digest mismatch); run /deliver:correct-course, or refresh plan_digest after a cosmetic edit';
   } else {

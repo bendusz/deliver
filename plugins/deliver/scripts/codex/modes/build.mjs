@@ -109,8 +109,14 @@ export async function runBuild(o) {
   if (!approval || typeof approval !== 'object' || Array.isArray(approval)) throw blocked('docs/approval.json is malformed; refusing a write-capable run');
   if (approval.status !== 'approved') throw blocked('the plan is not approved (docs/approval.json status is not "approved"); codex-builder may not write implementation files');
   if (typeof approval.plan_digest === 'string' && approval.plan_digest) {
+    // lstat first: `git hash-object` on a FIFO would block forever, and a plan that is not a
+    // regular file is not the approved plan.
+    const plan = path.join(worktree, 'docs', 'plan.md');
+    let planStat = null;
+    try { planStat = fs.lstatSync(plan); } catch { planStat = null; }
+    if (planStat && !planStat.isFile()) throw blocked('docs/plan.md is not a regular file; refusing a write-capable run');
     let digestNow = '';
-    try { digestNow = gitOut(worktree, ['hash-object', 'docs/plan.md']).trim(); } catch { digestNow = ''; }
+    if (planStat) { try { digestNow = gitOut(worktree, ['hash-object', 'docs/plan.md']).trim(); } catch { digestNow = ''; } }
     if (digestNow && digestNow !== approval.plan_digest) throw blocked('docs/plan.md changed since approval (plan_digest mismatch); run /deliver:correct-course before codex-builder can write');
   }
 

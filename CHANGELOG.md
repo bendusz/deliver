@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here.
 
+## 0.25.1 - 2026-09-08
+
+Codex review fixes for 0.24.1 and 0.25.
+
+- **Phase precedence.** An unapproved marker, or an approved one whose plan changed, is
+  `planning` whatever else exists. A completed sprint with no `docs/retros/sprint-<n>.md` is a
+  new `retrospective` phase at `standard` scale and above, and resume claims nothing until it
+  has run. An unreadable story counts as unmerged and is named, so one merged story beside it can
+  no longer read as a finished sprint.
+- **`state` takes its explicit root.** `CLAUDE_PROJECT_DIR` no longer overrides the argument.
+- **A plan that is not a regular file** is refused by the runner and ignored by the hook, so a
+  FIFO at `docs/plan.md` cannot hang `git hash-object`. The session hook's rendering is wrapped
+  so a malformed field cannot take a session down.
+- **The retrospective's large-sprint path** gives `architecture-reviewer` a narrowed diff, which
+  its contract requires, not a file list.
+
 ## 0.25.0 - 2026-09-08
 
 The workflow, tightened, from a two-model audit.
