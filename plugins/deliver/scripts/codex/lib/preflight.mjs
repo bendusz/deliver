@@ -103,11 +103,11 @@ function requireFlags(help, flags) {
   for (const f of flags) if (!help.includes(f)) return f;
   return null;
 }
-export const BUILD_FLAGS = ['--cd', '--sandbox', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config', '--output-schema', '--output-last-message'];
-export const READONLY_FLAGS = ['--sandbox', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config', '--output-last-message'];
+export const BUILD_FLAGS = ['--cd', '--ephemeral', '--ignore-rules', '--output-schema', '--output-last-message'];
+export const EXEC_FLAGS = ['--ephemeral', '--ignore-rules', '--output-last-message'];
 // Every flag the runner passes to `codex exec review`, so a stale CLI is caught in
 // preflight rather than halfway through a review that has already spent quota.
-export const REVIEW_FLAGS = ['--commit', '--uncommitted', '--ignore-rules', '--ephemeral', '--strict-config', '--ignore-user-config'];
+export const REVIEW_FLAGS = ['--commit', '--uncommitted', '--ignore-rules', '--ephemeral'];
 
 // requireCodex(flags, opts) is the one preflight every mode runs. It finds the CLI, reads
 // its version, checks the login, and confirms that `codex exec` carries every flag this

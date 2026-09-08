@@ -11,7 +11,6 @@ import { makeScratch, runtimeTmp, assertRuntimeRootReal } from '../lib/scratch.m
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../lib/snapshot.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
 
-const WIN = process.platform === 'win32';
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SCHEMA = path.join(PLUGIN_ROOT, 'schemas', 'codex-builder-result.schema.json');
 const rejected = (r) => new RunnerError('rejected', r);
@@ -40,7 +39,7 @@ function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
       : 'Prefer a focused implementation. If the story needs broad architectural work or lacks enough context, return blocked instead of widening scope.',
     "Follow the story's Out of scope, acceptance criteria, and verification sections.",
     'Run the story verification command and the relevant project tests before reporting done.',
-    'Stay inside the allowed implementation paths. Do not use the network, change git state, or edit pm/, stories, docs/wiki/, docs/spec.md, docs/plan.md, docs/constitution.md, or .specdd/.',
+    'Stay inside the allowed implementation paths. Do not change git state or edit pm/, stories, docs/wiki/, docs/spec.md, docs/plan.md, docs/constitution.md, or .specdd/.',
     'Your shell environment is reduced and secret-like variables are removed. TMPDIR is an isolated directory inside this worktree.',
     'Return only JSON matching the supplied schema. List every changed path in files_changed. summary holds at most five short strings. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
   return `${lines.join('\n')}\n`;
@@ -60,9 +59,7 @@ function validateBuilderResult(r) {
 }
 
 function policy() {
-  return WIN
-    ? { sandbox: 'danger-full-access', network_access: true, web_search: 'disabled', mcp_servers: false, hooks: false, subagents: false, login_shell: false, environment: 'core-with-secret-filtering', host_tmp_writable: true }
-    : { sandbox: 'workspace-write', network_access: false, web_search: 'disabled', mcp_servers: false, hooks: false, subagents: false, login_shell: false, environment: 'core-with-secret-filtering', host_tmp_writable: false };
+  return { sandbox: 'danger-full-access', network_access: true, web_search: 'config', mcp_servers: 'config', hooks: false, subagents: false, login_shell: false, environment: 'core-with-secret-filtering', host_tmp_writable: true };
 }
 
 export async function runBuild(o) {
@@ -140,10 +137,8 @@ export async function runBuild(o) {
   try { before = snapshotWorktree(worktree); } catch { cleanupRuntime(); throw blocked('the worktree contains an unsupported path type or a tab/newline filename; refusing an ambiguous baseline', { scratch_dir: scratch, codex_version: version }); }
   const beforeMeta = gitMetadataFingerprint(worktree);
 
-  const sandboxArgs = WIN ? ['--sandbox', 'danger-full-access'] : ['--sandbox', 'workspace-write'];
-  const sandboxConfig = WIN ? [] : ['-c', 'sandbox_workspace_write.network_access=false', '-c', 'sandbox_workspace_write.exclude_slash_tmp=true', '-c', 'sandbox_workspace_write.exclude_tmpdir_env_var=true'];
-  const argsFor = ({ model, effort }) => ['exec', ...lockedExecArgs({ ...o, model, effort }), '-C', worktree, ...sandboxArgs, '--color', 'never',
-    '-c', 'allow_login_shell=false', ...sandboxConfig,
+  const argsFor = ({ model, effort }) => ['exec', ...lockedExecArgs({ ...o, model, effort }), '-C', worktree, '--color', 'never',
+    '-c', 'allow_login_shell=false',
     '-c', 'shell_environment_policy.inherit="core"', '-c', 'shell_environment_policy.ignore_default_excludes=false', '-c', 'shell_environment_policy.experimental_use_profile=false',
     '-c', `shell_environment_policy.set.TMPDIR=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TMP=${tomlString(rt)}`, '-c', `shell_environment_policy.set.TEMP=${tomlString(rt)}`,
     '--output-schema', SCHEMA, '-o', files.result, '-'];

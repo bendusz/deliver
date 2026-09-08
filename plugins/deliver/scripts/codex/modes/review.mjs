@@ -3,7 +3,7 @@ import path from 'node:path';
 import { realpath } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel, gitOut, gitOk, checkIgnore } from '../lib/git.mjs';
-import { requireCodex, READONLY_FLAGS, REVIEW_FLAGS } from '../lib/preflight.mjs';
+import { requireCodex, EXEC_FLAGS, REVIEW_FLAGS } from '../lib/preflight.mjs';
 import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
@@ -45,7 +45,7 @@ export async function runReview(o) {
 
   // Only recent and worktree scopes run `codex exec review`. Codebase scope uses plain
   // `codex exec`, so gating it on the review subcommand would refuse a usable CLI.
-  const { found, version } = requireCodex(READONLY_FLAGS, { reviewFlags: o.scope === 'codebase' ? null : REVIEW_FLAGS });
+  const { found, version } = requireCodex(EXEC_FLAGS, { reviewFlags: o.scope === 'codebase' ? null : REVIEW_FLAGS });
 
   if (o.preflight) return { exit: 0, envelope: { runner_status: 'ready', preflight: true, mode: 'review', scope: o.scope, codex_version: version, quota_consumed: false } };
 
@@ -73,11 +73,11 @@ export async function runReview(o) {
   const stderrPath = path.join(scratch, 'stderr.log');
   const stdoutPath = path.join(scratch, 'stdout.log');
   // `codex exec review` rejects --sandbox, -C, and --color, so the tail carries only the
-  // shared locked flags plus the report path. Review is read-only on every platform.
+  // shared locked flags plus the report path.
   const clause = objectiveClause(o.objective);
   const argsFor = ({ model, effort }) => {
     const tail = [...lockedExecArgs({ ...o, model, effort }), '-o', report];
-    if (o.scope === 'codebase') return ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', ...tail, '-'];
+    if (o.scope === 'codebase') return ['exec', '--skip-git-repo-check', '--color', 'never', ...tail, '-'];
     if (o.objective) {
       const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).' : 'Review the uncommitted changes: staged, unstaged, and untracked.';
       return ['exec', 'review', ...tail, `${scopeText}${clause}`];

@@ -202,13 +202,15 @@ under `tmp/`; the report directories sit at the repository root:
   exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, every `.sdd` file,
   `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and `.gitattributes`, fails open on any uncertainty, and
   does not see writes made through `Bash`.
-- **Guarded Codex writes.** Codex builds require signed-off tracked state and bounded story touch
-  paths. POSIX runs use `workspace-write`. Windows runs with full host access and an after-run
-  worktree audit. See `docs/codex-cli-reference.md` for the flag matrix, audited state, exit codes,
-  and platform limits.
-- Repository `AGENTS.md` and `CLAUDE.md`, and non-safety project configuration, remain trusted
-  project inputs. Command-line overrides win for every safety-sensitive setting above. This is an OS
-  sandbox, not a VM boundary.
+- **Audited Codex writes.** Codex builds require signed-off tracked state and bounded story touch
+  paths, and every run is audited afterwards against the worktree: an out-of-scope or protected-path
+  change, or touched git metadata, is a safety violation with the changes preserved. There is no OS
+  sandbox: Codex runs with full host access and network on every platform, and the runner cannot see
+  writes outside the worktree or network use. See `docs/codex-cli-reference.md` for the flag
+  matrix, audited state, and exit codes.
+- Repository `AGENTS.md`, `CLAUDE.md`, and `.codex/config.toml`, and your own Codex config, are
+  trusted inputs: MCP servers and web search apply as configured. Only Codex hooks and subagents are
+  pinned off.
 - **No secrets in tracked state.** A bundled hook blocks secret-shaped content, meaning key tokens,
   PEM blocks, and credential assignments, from being written into the git-tracked `pm/` and
   `docs/wiki/` directories.
@@ -227,12 +229,8 @@ tools; the fourth runs at session start and only reads `pm/`. None is a security
 coverage is the optional hardening allowlist described in
 `plugins/deliver/skills/project-manager/references/hardening.md`.
 
-**Windows.** Hooks and the Codex runner run under `node` directly, with no Git Bash needed. There is
-no platform sandbox on Windows: build and fix run with full host access and network. The runner
-audits only the worktree afterwards, meaning tracked, untracked, and ignored files inside it, so
-writes elsewhere on the machine and any network use are not detectable, and out-of-scope edits inside
-the worktree are reported after the fact, as a safety violation with changes preserved, rather than
-prevented. Review, advice, and research modes are read-only on every platform.
+**Windows.** Hooks and the Codex runner run under `node` directly, with no Git Bash needed. The
+Codex posture is the same as on macOS and Linux.
 
 ## Optional tools
 

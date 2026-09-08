@@ -30,7 +30,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" \
 
 In fix mode add `--evidence "$EVIDENCE"`. Add `--model`, `--effort`, or `--timeout-seconds` only
 when the dispatch overrides a default. Never add other arguments, including sandbox or approval
-flags. The runner owns preflight, sandbox, environment, snapshots, and scope enforcement.
+flags. The runner owns preflight, environment, snapshots, and scope enforcement.
 
 ## Return
 On `runner_status: completed`, exactly this shape, from the envelope and nothing else:

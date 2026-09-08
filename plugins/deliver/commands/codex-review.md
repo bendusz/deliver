@@ -4,7 +4,7 @@ description: Spawn OpenAI Codex CLI review agents over the last commit, the work
 
 Dispatch `codex-reviewer` agents, backed by the bundled Node runner, for an independent Codex
 review. Never review the code yourself and never run `codex`. Wrappers pass no sandbox or approval
-flags; the runner owns them and keeps Codex read-only.
+flags; the runner owns them.
 
 Arguments: $ARGUMENTS
 

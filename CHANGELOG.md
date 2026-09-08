@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## 0.23.0 - 2026-09-07
+
+Codex runs unsandboxed.
+
+- **No OS sandbox.** Every Codex mode runs with `sandbox_mode="danger-full-access"` on every
+  platform. Build and fix previously ran `workspace-write` with network off on macOS and Linux, and
+  review, advise, and research ran `read-only`. The after-run worktree audit, the protected-path and
+  `pm-meta.touches` checks, the git metadata fingerprint, the secret-filtered shell environment, and
+  the worktree-local temp directory are unchanged and are now the only guard.
+- **Your Codex config applies.** The runner no longer passes `--ignore-user-config` or
+  `--strict-config` and no longer pins `mcp_servers` or `web_search`, so MCP servers and web search
+  work as configured in `$CODEX_HOME/config.toml` and the repository's `.codex/config.toml`.
+  `features.hooks` and `agents.enabled` stay off. Research with `--search off` still disables web
+  search.
+- **Preflight.** `READONLY_FLAGS` is now `EXEC_FLAGS`, and `--sandbox`, `--ignore-user-config`, and
+  `--strict-config` are no longer required CLI flags.
+
 ## 0.22.0 - 2026-09-04
 
 The parked backlog, closed.
