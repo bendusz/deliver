@@ -30,14 +30,18 @@ const RESUME = 'To continue: run /deliver:resume.';
 let st = null;
 try { st = inspectState(cwd); } catch { st = null; }
 if (!st) finish();
+try { render(st); } catch { /* a malformed field must never take the session down */ }
+finish();
+
+function render(st) {
 if (st.legacy) {
   say(`deliver: pre-0.24 state in ${st.legacy}. Run /deliver:resume to migrate it to ${APPROVAL_REL} and story Execution blocks.`);
-  finish();
+  return;
 }
 if (!st.approval) {
   say(`deliver: ${APPROVAL_REL} is unreadable.`);
   say(RESUME);
-  finish();
+  return;
 }
 const a = st.approval;
 if (a.status === 'approved') say(`approval: approved by ${v(a.approver, '?')} on ${v(a.approved_date, '?')}`);
@@ -67,9 +71,10 @@ if (st.handoff) {
   else say(`handoff: ${st.handoff.path} is STALE (HEAD moved past its BASE_COMMIT); trust git and the story files.`);
 }
 if (st.wiki_entries !== null) say(`wiki: docs/wiki/index.md (${st.wiki_entries} entries)`);
-
+if (st.sprints_without_retro.length) say(`retro: sprint ${st.sprints_without_retro.join(', ')} complete with no docs/retros record; run /deliver:retro before the next claim.`);
+if (st.unreadable.length) say(`unreadable stories: ${st.unreadable.join(', ')} (counted as unmerged)`);
 say(RESUME);
-finish();
+}
 
 function finish() {
   // Synchronous write: a stream write immediately followed by process.exit() can be truncated.

@@ -222,6 +222,7 @@ export function pmSecretScan(text) {
 export const PHASES = {
   migration: 'references/migrations.md',
   discovery: 'references/discovery.md',
+  retrospective: 'references/retrospective.md',
   specification: 'references/specification.md',
   planning: 'references/planning-and-signoff.md',
   decomposition: 'references/decomposition.md',
@@ -237,7 +238,7 @@ export function inspectState(root) {
   const hasMarker = fs.existsSync(path.join(root, 'docs', 'approval.json'));
   const legacy = hasMarker ? null : legacyState(root);
   if (!hasMarker && !legacy) return null;
-  const out = { managed: true, legacy: legacy ? legacy.file : null, approval: null, phase: null, next_reference: null, actor: null, branch: null, story: null, unmerged: [], claims: [], worktrees: 0, uncommitted: null, handoff: null, wiki_entries: null };
+  const out = { managed: true, legacy: legacy ? legacy.file : null, approval: null, phase: null, next_reference: null, actor: null, branch: null, story: null, unmerged: [], unreadable: [], claims: [], sprints_without_retro: [], worktrees: 0, uncommitted: null, handoff: null, wiki_entries: null };
   if (legacy) { out.phase = 'migration'; out.next_reference = PHASES.migration; return out; }
   const a = readApproval(root);
   if (!a) return out;
@@ -248,9 +249,12 @@ export function inspectState(root) {
   const storiesDir = path.join(root, 'docs', 'stories');
   const stories = [];
   for (const name of listDir(storiesDir).filter((n) => /^S\d+-\d+-.*\.md$/.test(n)).sort()) {
+    const id = name.match(/^(S\d+-\d+)-/)[1];
     const text = readText(path.join(storiesDir, name));
-    if (text === null) continue;
-    stories.push({ id: name.match(/^(S\d+-\d+)-/)[1], exec: parseExec(text) });
+    // An unreadable story is unfinished until proven otherwise; dropping it would let one
+    // merged story beside it read as a finished sprint.
+    if (text === null) { out.unreadable.push(id); stories.push({ id, exec: null }); continue; }
+    stories.push({ id, exec: parseExec(text) });
   }
   out.branch = chomp(git(root, ['branch', '--show-current']) || '') || 'DETACHED';
   const mine = stories.find((s) => s.exec && s.exec.branch === out.branch) || stories.find((s) => out.branch.startsWith(`pm/${s.id}-`));
@@ -286,11 +290,26 @@ export function inspectState(root) {
   // The phase is derived (references/state.md): no spec and no plan is discovery, a spec
   // without a plan is specification, an unapproved plan is planning, an approved plan with
   // no stories is decomposition, an unmerged story is implementation, all merged is done.
-  // Stories outrank a missing plan file, since they imply one was approved; an unapproved
-  // marker beside a plan outranks stories, since a revocation halts implementation.
+  // A completed sprint with no retro record is owed one, unless the plan's scale skips it.
+  const sprintOf = (id) => Number(id.match(/^S(\d+)-/)[1]);
+  const sprints = [...new Set(stories.map((s) => sprintOf(s.id)))].sort((x, y) => x - y);
+  const plan = readText(path.join(root, 'docs', 'plan.md'));
+  const scale = ((plan || '').match(/^- Scale:\s*([a-z]+)/m) || [])[1] || null;
+  const retroSkipped = scale === 'tiny' || scale === 'small';
+  for (const n of sprints) {
+    const ofSprint = stories.filter((s) => sprintOf(s.id) === n);
+    const complete = ofSprint.every((s) => s.exec && s.exec.status === 'merged');
+    // A record is a readable regular file; a directory or FIFO in its place is no record.
+    if (complete && !retroSkipped && readText(path.join(root, 'docs', 'retros', `sprint-${n}.md`)) === null) out.sprints_without_retro.push(n);
+  }
+
+  // Precedence: an unapproved or drifted marker halts everything, so it is planning whatever
+  // else exists; then a completed sprint owed its retrospective; then stories outrank a
+  // missing plan file, since they imply one was approved.
   const hasSpec = fs.existsSync(path.join(root, 'docs', 'spec.md'));
-  const hasPlan = fs.existsSync(path.join(root, 'docs', 'plan.md'));
-  if (hasPlan && a.status !== 'approved') out.phase = 'planning';
+  const hasPlan = plan !== null;
+  if (a.status !== 'approved' || out.approval.plan_changed) out.phase = hasSpec || hasPlan || stories.length ? 'planning' : 'discovery';
+  else if (out.sprints_without_retro.length > 0) out.phase = 'retrospective';
   else if (stories.length > 0) out.phase = out.unmerged.length > 0 ? 'implementation' : 'done';
   else if (!hasSpec && !hasPlan) out.phase = 'discovery';
   else if (!hasPlan) out.phase = 'specification';
@@ -316,7 +335,11 @@ if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
     fs.writeSync(1, `${id}\n`);
     process.exit(0);
   } else if (cmd === 'state') {
-    const st = inspectState(pmRoot(path.resolve(process.argv[3] || process.cwd())));
+    // An explicit root is authoritative: pmRoot() would let CLAUDE_PROJECT_DIR override it and
+    // report another checkout. Without one, resolve the project root as the hooks do.
+    const explicit = process.argv[3];
+    const top = explicit ? chomp(git(path.resolve(explicit), ['rev-parse', '--show-toplevel']) || '') : '';
+    const st = inspectState(explicit ? (top ? path.resolve(top) : path.resolve(explicit)) : pmRoot(process.cwd()));
     if (!st) { fs.writeSync(2, 'not a managed project: no docs/approval.json and no legacy pm-state.json\n'); process.exit(1); }
     fs.writeSync(1, `${JSON.stringify(st, null, 2)}\n`);
     process.exit(0);

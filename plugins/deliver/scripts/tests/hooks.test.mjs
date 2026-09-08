@@ -208,6 +208,7 @@ test('session: uncommitted paths, worktrees, and the plan digest drift line', ()
   assert.doesNotMatch(session({ cwd: s }), /^plan:/m);
   fs.writeFileSync(path.join(s, 'docs', 'plan.md'), '# plan v2\n');
   assert.match(session({ cwd: s }), /^plan: docs\/plan\.md changed since approval/m);
+  assert.match(session({ cwd: s }), /^phase: planning · load references\/planning-and-signoff\.md$/m);
   // The sign-off hook enforces the same digest, and fails open without one or without a plan.
   assert.equal(signoff(writeInput(s, path.join(s, 'src', 'c.py'))), 2);
   assert.match(runHook('require-signoff.mjs', writeInput(s, path.join(s, 'src', 'c.py'))).stderr, /plan_digest mismatch/);
@@ -322,8 +323,9 @@ test('session: a FIFO where a story or handoff should be is skipped, never read'
   assert.equal(r.status, 0);
   assert.match(r.stdout, /claimed: S1-1 by jordan/);
   assert.doesNotMatch(r.stdout, /^handoff:/m);
-  // An unreadable story is skipped, not counted.
-  assert.match(r.stdout, /1 unmerged story \(S1-1\)/);
+  // An unreadable story counts as unmerged and is named, never silently dropped.
+  assert.match(r.stdout, /2 unmerged stories \(S1-1, S1-2\)/);
+  assert.match(r.stdout, /^unreadable stories: S1-2 \(counted as unmerged\)$/m);
 });
 
 test('require-signoff: a missing lib.mjs still fails open (exit 0)', () => {

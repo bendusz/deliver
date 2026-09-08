@@ -152,10 +152,55 @@ test('lib.mjs CLI: state prints the derived position and the phase moves with th
   assert.equal(st.phase, 'implementation');
   assert.deepEqual(st.unmerged, ['S1-1']);
   fs.writeFileSync(path.join(p, 'docs', 'stories', 'S1-1-x.md'), '# S1-1\n\n## Execution\n<!-- pm-exec: {"owner":"x","status":"merged"} -->\n');
+  // A completed sprint with no retro record is owed one at standard scale and above.
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# plan\n\n## Delivery mode\n- Scale: standard\n');
+  st = state();
+  assert.equal(st.phase, 'retrospective');
+  assert.deepEqual(st.sprints_without_retro, [1]);
+  fs.mkdirSync(path.join(p, 'docs', 'retros'));
+  // A directory where the record should be is no record.
+  fs.mkdirSync(path.join(p, 'docs', 'retros', 'sprint-1.md'));
+  assert.equal(state().phase, 'retrospective');
+  fs.rmdirSync(path.join(p, 'docs', 'retros', 'sprint-1.md'));
+  fs.writeFileSync(path.join(p, 'docs', 'retros', 'sprint-1.md'), '# retro\n');
   st = state();
   assert.equal(st.phase, 'done');
   assert.deepEqual(st.unmerged, []);
   assert.equal(typeof st.uncommitted, 'number');
+  // tiny and small skip the retrospective.
+  fs.rmSync(path.join(p, 'docs', 'retros'), { recursive: true });
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# plan\n\n## Delivery mode\n- Scale: tiny\n');
+  assert.equal(state().phase, 'done');
+  // A revoked marker, or an approved one whose plan changed, is planning whatever else exists.
+  fs.writeFileSync(path.join(p, 'docs', 'approval.json'), JSON.stringify({ status: 'revoked' }));
+  assert.equal(state().phase, 'planning');
+  const digest = gitIn(p, ['hash-object', 'docs/plan.md']).trim();
+  fs.writeFileSync(path.join(p, 'docs', 'approval.json'), JSON.stringify({ status: 'approved', plan_digest: digest }));
+  assert.equal(state().phase, 'done');
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# plan v2\n\n## Delivery mode\n- Scale: tiny\n');
+  st = state();
+  assert.equal(st.phase, 'planning');
+  assert.equal(st.approval.plan_changed, true);
+});
+
+test('lib.mjs CLI: state takes its explicit root over CLAUDE_PROJECT_DIR; an unreadable story counts as unmerged', (t) => {
+  const lib = path.join(HOOKS_DIR, 'lib.mjs');
+  const a = newProj(true);
+  const b = newProj(true);
+  fs.writeFileSync(path.join(b, 'docs', 'plan.md'), '# plan\n');
+  const r = spawnSync(process.execPath, [lib, 'state', b], { encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: a } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(r.stdout).phase, 'decomposition');
+  const sub = path.join(b, 'packages', 'foo');
+  assert.equal(JSON.parse(spawnSync(process.execPath, [lib, 'state', sub], { encoding: 'utf8' }).stdout).phase, 'decomposition');
+  if (process.platform === 'win32') return t.skip('no mkfifo on win32');
+  fs.writeFileSync(path.join(b, 'docs', 'stories', 'S1-1-x.md'), '# S1-1\n\n## Execution\n<!-- pm-exec: {"owner":"x","status":"merged"} -->\n');
+  const mk = spawnSync('mkfifo', [path.join(b, 'docs', 'stories', 'S1-2-pipe.md')]);
+  if (mk.status !== 0) return t.skip('mkfifo unavailable');
+  const st = JSON.parse(spawnSync(process.execPath, [lib, 'state', b], { encoding: 'utf8' }).stdout);
+  assert.deepEqual(st.unreadable, ['S1-2']);
+  assert.deepEqual(st.unmerged, ['S1-2']);
+  assert.equal(st.phase, 'implementation');
 });
 
 test('pmRelpath resolves a symlink whose relative target traverses another symlink', (t) => {

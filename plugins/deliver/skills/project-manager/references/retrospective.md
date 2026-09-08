@@ -1,7 +1,9 @@
 # Sprint retrospective
 
 Run at the sprint checkpoint, after the sprint's last story is `merged` and before the next
-sprint's first claim. `/deliver:retro` drives it. Two bounded steps, then a short record. The
+sprint's first claim. `/deliver:retro` drives it, and the session hook reports the phase as
+`retrospective` while a completed sprint has no `docs/retros/sprint-<n>.md`. `tiny` and `small`
+scales skip it (`scale-profiles.md`). Two bounded steps, then a short record. The
 point is to feed what the sprint taught back into `AGENTS.md` and the next stories, so the same
 mistake is not paid for twice.
 
@@ -12,7 +14,9 @@ the last story's merge commit (`git log --first-parent --merges`). Produce
 that diff, the plan's Architecture section, and the sprint's story files, asking only for problems
 no single story review could see: duplicated logic across stories, a convention two stories
 interpreted differently, an interface one story changed and another still assumes. A larger sprint
-gets `architecture-reviewer` with the changed-file list and the Architecture section instead.
+gets `architecture-reviewer` instead, with the same range diff narrowed to the paths that carry
+structure, `git diff <from>...<to> -- <module roots and interfaces>`, plus the changed-file list
+and the Architecture section; that lens needs diff text and has no shell to build its own.
 Findings enter `fix-loop.md` triage; a `block` or `major` becomes a fix story at the head of the
 next sprint, never a silent edit on the integration branch.
 

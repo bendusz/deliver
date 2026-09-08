@@ -53,7 +53,8 @@ subagents. Never write implementation code.
    gate, review, fix, verify, ship. `references/fix-loop.md` owns the fix rounds. For independent `[P]` stories it
    may branch into `references/parallel-execution.md`, which builds in isolated worktrees and
    integrates serially. At the sprint boundary, `references/retrospective.md` via
-   `/deliver:retro`: a cross-story review and the learnings that go back into `AGENTS.md`.
+   `/deliver:retro`: a cross-story review and the learnings that go back into `AGENTS.md`. No
+   claim in the next sprint before it has run, at `standard` scale and above.
 7. **Review and verification gates.** `references/review-gates.md` for lens selection,
    `references/verification.md` for running-app evidence and the durable report.
 8. **State.** `references/state.md`. The approval marker, each story's Execution block, the

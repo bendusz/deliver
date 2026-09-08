@@ -22,10 +22,13 @@ The bundled `session-context.mjs` hook prints these facts into every new or fres
 session, so a fresh session already carries the headline.
 
 ## Continue
-First place the project by `state.md`'s phase derivation. A `pending` or `revoked` marker means
-planning: return to `planning-and-signoff.md`'s sign-off gate. An `approved` marker with no story
-files means decomposition, or the skeleton when the plan asks for one. Stories with no Execution
-block at all mean the first claim. Only then continue from a story's Execution block `status`,
+First place the project by the `state` command's `phase`, which follows `state.md`'s derivation.
+A `pending` or `revoked` marker, or an approved one whose plan changed, means planning: return to
+`planning-and-signoff.md`'s sign-off gate or `/deliver:correct-course`. `retrospective` means a
+completed sprint has no record yet: run `/deliver:retro <n>` for each sprint the `state` command
+lists under `sprints_without_retro`, lowest first, before any claim. An `approved` marker
+with no story files means decomposition, or the skeleton when the plan asks for one. Stories with
+no Execution block at all mean the first claim. Only then continue from a story's Execution block `status`,
 using its persisted `builder` and counters rather than re-deciding from memory:
 - `claimed`: dispatch the build, loop state 1.
 - `building`: a builder was dispatched and may have left uncommitted output. Re-run the scope
@@ -36,7 +39,8 @@ using its persisted `builder` and counters rather than re-deciding from memory:
 - `blocked`: present the blocker and the Execution notes to the user before doing anything else.
 - `merged`: take the next unclaimed, build-ready story.
 
-With no story checked out, take the next unclaimed story in sprint order. A story whose Execution
+With no story checked out and no sprint owed a retrospective, take the next unclaimed story in
+sprint order. A story whose Execution
 block names another owner is theirs. A story with no block whose `pm/<id>-*` branch is already
 merged into the integration branch is done, not unclaimed: give it a `merged` block, commit, and
 move on.

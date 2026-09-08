@@ -273,6 +273,15 @@ test('build 3b: a plan that changed since approval stops before Codex is invoked
   marker(digest);
   const ok = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  // A plan that is not a regular file is refused before git could block on it.
+  if (process.platform !== 'win32') {
+    fs.rmSync(path.join(p, 'docs', 'plan.md'));
+    if (spawnSync('mkfifo', [path.join(p, 'docs', 'plan.md')]).status === 0) {
+      const fifo = runRunner(['--mode', 'build'], { project: p, stub: s });
+      assert.equal(fifo.status, 66, JSON.stringify(fifo.out));
+      assert.match(fifo.out.reason, /not a regular file/);
+    }
+  }
 });
 
 test('build 3: sign-off false stops before Codex is invoked', () => {
