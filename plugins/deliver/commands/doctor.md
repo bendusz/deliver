@@ -33,14 +33,13 @@ Inspect (whichever apply):
   is under 200 lines and under 32 KiB, the Codex budget, and report both numbers; list any
   `AGENTS.md` lines that restate skill rules (sign-off before implementation, the PM writes no code,
   log after every step, verifier PASS before ship, traceability to FR and AC ids) as trim candidates.
-- **PM state health.** When `pm/` exists, run the checks in `references/state-health.md` and report
-  `OK` or `DRIFT` for each.
+- **State health.** When `docs/approval.json` or a legacy `pm/` exists, run the checks in
+  `references/state-health.md` and report `OK` or `DRIFT` for each.
 
 Do **not** install or upgrade anything. Delegate heavy reading to a read-only subagent if that
 helps.
 
 Write the findings to `tmp/environment-check.md` (runtime-only): each check as `OK`, `MISSING`, or
 `UNKNOWN` with the evidence, then a one-line verdict (ready, or the blockers and what is missing).
-Append a one-line entry to `pm/log.md`.
 
 Run this before the implementation loop on a fresh or unfamiliar clone.

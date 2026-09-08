@@ -1,39 +1,52 @@
 # Resume procedure
 
-`/deliver:resume` runs this. `logging-and-state.md` owns the file schemas, the log rules, and the
-claim discipline behind it.
+`/deliver:resume` runs this. `state.md` owns what each file means.
 
 ## Read order
 1. Pull or rebase first when a remote exists, because teammates' claims and ships become visible
    only after a fetch.
-2. The shared `pm/pm-state.json`.
-3. **Your** `pm/actors/<you>.json`, then `pm/actors/<you>.HANDOFF.md` when it is current. The
-   handoff is stale when your `updated` is newer than its `handoff_written`; trust the state files
-   and the log instead.
-4. `docs/wiki/index.md` when it exists, before any `docs/` scan.
+2. `docs/approval.json`. When it is absent and `pm/pm-state.json` or `tmp/pm-state.json` exists,
+   migrate per `migrations.md` first, in its own commit.
+3. `git branch --show-current`, `git status --porcelain`, `git worktree list`, and
+   `git log --first-parent -5 <integration branch>`.
+4. On a `pm/S<sprint>-<n>-<slug>` branch, that story's file and its Execution block. On the
+   integration branch, every story's Execution block, to see what is claimed and what is unmerged.
+5. `docs/handoff/<you>.md` when it is current, meaning `git diff --name-only <BASE_COMMIT> HEAD`
+   is empty or lists only that file, which is what its own commit leaves. Otherwise it is stale:
+   skim it for gotchas and trust git and the story files.
+6. `docs/wiki/index.md` when it exists, before any `docs/` scan.
 
-The bundled `session-context.mjs` hook injects a short pointer, yours plus teammate one-liners, into
-every new or freshly-compacted session, so a fresh session already carries the headline.
+The bundled `session-context.mjs` hook prints these facts into every new or freshly compacted
+session, so a fresh session already carries the headline.
 
 ## Continue
-Continue from your recorded `next`, using the persisted `resolved_builder` and counters rather than
-re-deciding from memory. If you are a new actor on an existing project and have no
-`pm/actors/<you>.json` yet, create it from the template and commit it before continuing.
+First place the project by `state.md`'s phase derivation. A `pending` or `revoked` marker means
+planning: return to `planning-and-signoff.md`'s sign-off gate. An `approved` marker with no story
+files means decomposition, or the skeleton when the plan asks for one. Stories with no Execution
+block at all mean the first claim. Only then continue from a story's Execution block `status`,
+using its persisted `builder` and counters rather than re-deciding from memory:
+- `claimed`: dispatch the build, loop state 1.
+- `building`: a builder was dispatched and may have left uncommitted output. Re-run the scope
+  check, commit what passes, then gate, state 2.
+- `built`: gate, then review, states 2 and 3.
+- `in-review`: `rounds` says how many fix rounds are spent; re-run the gates and the review on the
+  committed diff.
+- `blocked`: present the blocker and the Execution notes to the user before doing anything else.
+- `merged`: take the next unclaimed, build-ready story.
+
+With no story checked out, take the next unclaimed story in sprint order. A story whose Execution
+block names another owner is theirs. A story with no block whose `pm/<id>-*` branch is already
+merged into the integration branch is done, not unclaimed: give it a `merged` block, commit, and
+move on.
 
 ## Parallel batches
-On resume from the main checkout, when your actor file holds a `parallel_batch`:
-- Continue each story with its persisted `builder`. Never resolve `auto` after a session loss.
-- Reconcile `parallel_batch` against `git worktree list`. **Log** any worktree that vanished
-  externally rather than moving on silently. Only work committed to the story branch survived, so
-  check it before assuming the story is intact.
-- A `building`, `built`, or `in-review` worktree with uncommitted changes is the expected state
-  before the tail commits. Re-run the scope check, then re-enter `parallel-execution.md`'s
-  integration tail at its step 1.
-- For a `blocked` story, present the blocker to the user and re-enter the continuation its
-  `pm/log.md` note calls for, resolving the tip-merge conflict from that tail's step 3 or re-running
-  loop state 4, before continuing the remaining unmerged stories.
-- Then `git worktree prune` true orphans and continue the integration tail.
-
-## Older layouts
-If the state you find uses a pre-0.10.1 actor id, a pre-0.13 actor file, a flat 0.8 layout, or a
-pre-0.8 `tmp/` layout, migrate it first per `migrations.md`, in its own commit.
+On resume from the main checkout, reconcile `git worktree list` against the Execution blocks whose
+`branch` is unmerged:
+- A worktree with uncommitted changes and status `building` is the expected state before the
+  tail commits. Re-run the scope check, then re-enter `parallel-execution.md`'s integration tail
+  at its step 1.
+- A branch whose worktree vanished externally: record it in the story's Execution notes rather
+  than moving on silently. Only work committed to the branch survived, so check it before assuming
+  the story is intact.
+- A `blocked` story: present the blocker and re-enter the continuation its notes call for.
+- Then `git worktree prune` true orphans and continue the tail.

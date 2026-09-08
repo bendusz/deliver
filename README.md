@@ -5,7 +5,7 @@ then delegates implementation and review to specialist agents. It never writes c
 
 One repeatable way of working:
 
-> **discover → specify → clarify → plan → sign-off → skeleton (optional) → analyze → decompose → build → gate → review → verify → ship → log**
+> **discover → specify → clarify → plan → sign-off → skeleton (optional) → analyze → decompose → claim → build → gate → review → verify → ship**
 
 It works on a bare Claude Code install and can use optional tools when they are present.
 
@@ -58,9 +58,9 @@ install under the new name:
 /plugin install deliver@deliver
 ```
 
-Nothing in your project needs to change. The `pm/` state directory, the `AGENTS.md` pointer, and
-`.claude/rules/pm-state.md` are read exactly as before, and `/deliver:resume` continues from them.
-`DELIVER_NO_ENFORCE=1` is the documented kill switch. The pre-0.21 name `PM_SKILL_NO_ENFORCE`
+A project managed before 0.24 carries a `pm/` state directory. `/deliver:resume` migrates it in
+one commit into `docs/approval.json` and per-story Execution blocks, and the sign-off hook honours
+the old file until then. `DELIVER_NO_ENFORCE=1` is the documented kill switch. The pre-0.21 name `PM_SKILL_NO_ENFORCE`
 stopped working in 0.22.
 
 ## Use
@@ -87,10 +87,10 @@ anything.
 | Skeleton (optional) | With `Skeleton: specdd` in the plan, `spec-architect` writes the sprint's `.sdd` contracts, the shape of the code, before any code exists. |
 | Analyze | A read-only cross-artifact consistency check for coverage, contradictions, and constitution, run after the plan and before decomposition, optionally before sign-off. |
 | Decomposition | Sprints, then self-contained story files under `docs/stories/`, each tracing to requirement IDs. |
-| Implementation loop | Per story: build, gate, review, fix, verify, ship, log, run by subagents. |
+| Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. |
 | Parallel stories | Independent `[P]` stories can build at once in isolated git worktrees, then integrate one at a time. Opt-in, with a safe fallback to sequential. |
 | Review and verification | A separate read-only reviewer, the project's real test, lint, and build gates, and a final read-only `pm-verifier` PASS, with bounded fix loops. |
-| Logging | A shared author-prefixed `pm/log.md` and per-actor state under `pm/actors/`, so concurrent PM sessions never overwrite each other and any lost session can resume. |
+| State | Git carries it. The claim is the story branch, each build and fix round is a commit, and the `--no-ff` merge body is the story record. Only an approval marker, a per-story Execution block, and an optional handoff are written, so concurrent sessions never overwrite each other and any lost session resumes from git. |
 
 Bundled specialist agents do the work:
 
@@ -135,11 +135,11 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 | `/deliver:skeleton` | Write or extend the SpecDD `.sdd` skeleton for a sprint, after sign-off and before decomposition. |
 | `/deliver:analyze` | Read-only consistency and quality report across all artifacts. Never edits. |
 | `/deliver:checklist` | Generate or evaluate a spec, plan, story, or verification quality checklist under `docs/checklists/`. |
-| `/deliver:doctor` | Check environment readiness (toolchain, deps, gates run) and PM-state health before building. |
+| `/deliver:doctor` | Check environment readiness (toolchain, deps, gates run) and state health before building. |
 | `/deliver:benchmark-builders` | Run Opus and Codex on the same story in isolated worktrees, score the measured results, and merge neither. |
 | `/deliver:correct-course` | Handle a mid-flight scope change: re-plan at the right level, re-sign-off if material. |
-| `/deliver:handoff` | End a session cleanly by writing a token-efficient `pm/actors/<id>.HANDOFF.md` briefing for the next agent. |
-| `/deliver:resume` | Read saved state, handoff, and logbook, then continue where you left off. |
+| `/deliver:handoff` | End a session cleanly by writing a token-efficient `docs/handoff/<id>.md` briefing for the next agent. |
+| `/deliver:resume` | Read git, the approval marker, the story Execution blocks, and the handoff, then continue where you left off. |
 | `/deliver:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
 | `/deliver:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-6-astra` at `medium` with a one-time fallback to `gpt-5.6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
 
@@ -151,17 +151,20 @@ At the project root:
   under 200 lines. Codex, Cursor, and Copilot read it natively.
 - `CLAUDE.md`, a two-line bridge whose first line is `@AGENTS.md`, so Claude Code reads the same
   file. Existing files are never overwritten; the PM proposes a migration instead.
-- `.claude/rules/pm-state.md` and `pm/AGENTS.md`, optional path-scoped `pm/` discipline, enabled by
-  `Instruction rules: pm-state` in the plan's Delivery mode.
 - `<root>.sdd`, `.specdd/bootstrap.md`, and `.sdd` files beside the code they describe: the SpecDD
   skeleton, when the plan's Delivery mode says `Skeleton: specdd`. Optional.
 
 Committed under `docs/`, which is authoritative:
 
+- `docs/approval.json`, the approval marker: status, approver, date, and the plan digest. The
+  sign-off hook and the Codex runner read it.
 - `docs/spec.md`, the product specification: user stories, requirements, acceptance criteria,
   metrics.
 - `docs/plan.md`, the delivery plan, derived from the spec with traceability.
-- `docs/stories/*.md`, self-contained story files, each tracing to requirement IDs.
+- `docs/stories/*.md`, self-contained story files, each tracing to requirement IDs. A claimed
+  story ends with an Execution block: owner, builder, branch, status, loop counters, and dated notes.
+- `docs/handoff/<actor-id>.md`, an end-of-session briefing, current only while `HEAD` is its
+  `BASE_COMMIT`. Optional.
 - `docs/constitution.md`, project-specific governing principles. Optional.
 - `docs/checklists/*.md`, spec, plan, story, and verification quality checklists. Optional.
 - `docs/research/*.md`, sourced research reports from `researcher` and `codex-researcher`. Optional.
@@ -171,15 +174,13 @@ Committed under `docs/`, which is authoritative:
 - `docs/wiki/`, the project wiki: an index, a schema, and decision, concept, and source pages the
   `librarian` maintains. On at `standard` scale and above.
 
-Committed under `pm/`, the tracked session state and the project's resume point. Solo is a team of
-one.
+In git, the rest of the state. Solo is a team of one.
 
-- `pm/pm-state.json`, the shared project state: sign-off, sprint, active story claims.
-- `pm/log.md`, one shared, append-only, author-prefixed logbook, with `merge=union` so concurrent
-  appends merge cleanly.
-- `pm/actors/<id>.json` and `pm/actors/<id>.HANDOFF.md`, each person's working position and
-  end-of-session briefing. Nobody writes anyone else's files, and a bundled hook enforces it.
-- State updates are committed alongside the work they describe. Never write secrets into `pm/`.
+- The story branch `pm/S<sprint>-<n>-<slug>` is the claim, and its commits are the build and fix
+  rounds. Counters are committed before the dispatch they bound.
+- The `--no-ff` merge commit body (Why, Scope, Tradeoffs, Blast radius, Verification) is the story
+  record, and `git log --first-parent` on the integration branch is the project log.
+- Never write secrets into any tracked file.
 
 Gitignored scratch and reports, disposable and never load-bearing for resume. The first four live
 under `tmp/`; the report directories sit at the repository root:
@@ -198,12 +199,12 @@ under `tmp/`; the report directories sit at the repository root:
 
 - **No implementation before your sign-off.** A behavioural rule the PM holds, plus the bundled
   `require-signoff.mjs` hook. The hook runs on `Write`, `Edit`, and `MultiEdit` only, and blocks a
-  write when `pm/pm-state.json`, or the legacy `tmp/pm-state.json`, has `signed_off: false`. It
-  exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, every `.sdd` file,
+  write while `docs/approval.json` has any status but `approved`, honouring a pre-0.24
+  `pm/pm-state.json` until the migration runs. It exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, every `.sdd` file,
   `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and `.gitattributes`, fails open on any uncertainty, and
   does not see writes made through `Bash`.
-- **Audited Codex writes.** Codex builds require signed-off tracked state and bounded story touch
-  paths, and every run is audited afterwards against the worktree: an out-of-scope or protected-path
+- **Audited Codex writes.** Codex builds require an approved, tracked `docs/approval.json` and
+  bounded story touch paths, and every run is audited afterwards against the worktree: an out-of-scope or protected-path
   change, or touched git metadata, is a safety violation with the changes preserved. There is no OS
   sandbox: Codex runs with full host access and network on every platform, and the runner cannot see
   writes outside the worktree or network use. See `docs/codex-cli-reference.md` for the flag
@@ -211,10 +212,8 @@ under `tmp/`; the report directories sit at the repository root:
 - Repository `AGENTS.md`, `CLAUDE.md`, and `.codex/config.toml`, and your own Codex config, are
   trusted inputs: MCP servers and web search apply as configured. Only Codex hooks and subagents are
   pinned off.
-- **No secrets in tracked state.** A bundled hook blocks secret-shaped content, meaning key tokens,
-  PEM blocks, and credential assignments, from being written into the git-tracked `pm/` and
-  `docs/wiki/` directories.
-- **Actor isolation.** A bundled hook blocks writes to another person's `pm/actors/` state files.
+- **No secrets in tracked docs.** A bundled hook blocks secret-shaped content, meaning key tokens,
+  PEM blocks, and credential assignments, from being written under the git-tracked `docs/`.
 - **The companion plugin is inert.** The optional `poteto` plugin ships skills only, with no hooks,
   agents, or commands, so it cannot change any guardrail above.
 - **Repository safety.** The PM never overwrites your files without asking, commits only what it
@@ -224,8 +223,8 @@ under `tmp/`; the report directories sit at the repository root:
   bundled hardening guide uses Claude Code permissions and hooks. Its verifier Bash allowlist
   requires `jq`.
 
-Three of the four bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
-tools; the fourth runs at session start and only reads `pm/`. None is a security boundary. Bash
+Two of the three bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
+tools; the third runs at session start and only reads. None is a security boundary. Bash
 coverage is the optional hardening allowlist described in
 `plugins/deliver/skills/project-manager/references/hardening.md`.
 

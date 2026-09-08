@@ -19,6 +19,6 @@ Do this:
   its principles, engineering and testing standards, security and privacy requirements, and product
   constraints. If they have none, write "No additional project-specific rules." under the heading
   and stop. Do not fill the file with the skill's own defaults.
-- Append a one-line entry to `pm/log.md` and set `constitution` in `pm/pm-state.json` (if state exists).
+- Commit it.
 
 Keep it short and enforceable. `/deliver:analyze` checks the plan and stories against it.

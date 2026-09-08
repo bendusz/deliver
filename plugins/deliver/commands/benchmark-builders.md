@@ -12,7 +12,7 @@ benchmark run.
 Before starting:
 
 - Require one tracked, build-ready story and a clean repository at a fixed base commit.
-- Require valid story `pm-meta`, signed-off tracked PM state, an ignored `tmp/`, and passing
+- Require valid story `pm-meta`, an approved and tracked `docs/approval.json`, an ignored `tmp/`, and passing
   `node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" --mode build --preflight --worktree <root> --story <story>`.
 - If `$ARGUMENTS` is missing or identifies more than one story, stop and ask for one story.
 - Record the base commit and create a timestamped directory under

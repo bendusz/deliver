@@ -5,7 +5,7 @@
 - **Spec:** docs/spec.md
 - **Plan:** docs/plan.md
 - **Constitution:** docs/constitution.md  <!-- omit if none -->
-- **Log:** pm/log.md
+- **History:** `git log --first-parent <integration branch>`
 
 ## Overview
 <2 to 4 sentences: what was delivered, and the outcome against the plan's goals.>

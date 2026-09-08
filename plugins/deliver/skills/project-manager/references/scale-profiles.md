@@ -2,7 +2,7 @@
 
 Right-size the workflow to the work. The full lifecycle, spec through clarify, plan, analyze,
 decompose, verify, and ship, is right for serious projects and heavy for a one-file fix. Pick a scale
-up front and record it in `docs/plan.md` under Delivery mode and in `pm/pm-state.json` as `scale`.
+up front and record it in `docs/plan.md` under Delivery mode.
 The default is `standard`. This file is authoritative for which phases a scale skips.
 
 `standard` is the baseline; the other rows carry only what differs from it.
@@ -28,7 +28,4 @@ The default is `standard`. This file is authoritative for which phases a scale s
   lowering it mid-project needs the user's agreement.
 
 ## Recording it
-- `docs/plan.md`, Delivery mode: scale and checkpoint policy.
-- `docs/plan.md`, Delivery mode also carries `Instruction rules: none | pm-state`. The default is
-  `none`; offer `pm-state` at `standard` scale and above, per `instruction-layers.md`.
-- `pm/pm-state.json`: `"scale": "standard"`.
+- `docs/plan.md`, Delivery mode: scale, checkpoint policy, integration branch, and skeleton.

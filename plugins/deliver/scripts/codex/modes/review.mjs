@@ -43,7 +43,7 @@ export async function runReview(o) {
   if (o.scope !== 'codebase' && !root) throw new RunnerError('rejected', `${o.scope} scope requires a git repository`);
   const base = root || realpath(cwd);
 
-  // Only recent and worktree scopes run `codex exec review`. Codebase scope uses plain
+  // Recent, worktree, and branch scopes run `codex exec review`. Codebase scope uses plain
   // `codex exec`, so gating it on the review subcommand would refuse a usable CLI.
   const { found, version } = requireCodex(EXEC_FLAGS, { reviewFlags: o.scope === 'codebase' ? null : REVIEW_FLAGS });
 
@@ -51,6 +51,13 @@ export async function runReview(o) {
 
   if (o.scope === 'worktree' && gitOut(root, ['status', '--porcelain']).trim() === '') return { exit: 0, envelope: { runner_status: 'nothing-to-review', mode: 'review', scope: o.scope, reason: 'the working tree is clean', codex_version: version } };
   if (o.scope === 'recent' && !gitOk(root, ['rev-parse', '--verify', 'HEAD'])) return { exit: 0, envelope: { runner_status: 'nothing-to-review', mode: 'review', scope: o.scope, reason: 'no commit to review', codex_version: version } };
+  if (o.scope === 'branch') {
+    if (!gitOk(root, ['rev-parse', '--verify', '--quiet', `${o.base}^{commit}`])) throw new RunnerError('rejected', `base branch ${o.base} does not exist`);
+    // `codex exec review --base` diffs against the merge base, so an orphan branch or a
+    // shallow history with no common ancestor would fail after the dispatch spent quota.
+    if (!gitOk(root, ['merge-base', o.base, 'HEAD'])) throw new RunnerError('rejected', `no common history between ${o.base} and HEAD`);
+    if (gitOut(root, ['rev-list', '--count', `${o.base}..HEAD`]).trim() === '0') return { exit: 0, envelope: { runner_status: 'nothing-to-review', mode: 'review', scope: o.scope, reason: `no commits ahead of ${o.base}`, codex_version: version } };
+  }
 
   if (!path.isAbsolute(o.out)) throw new RunnerError('rejected', '--out must be an absolute path');
   const outName = path.basename(o.out);
@@ -79,9 +86,14 @@ export async function runReview(o) {
     const tail = [...lockedExecArgs({ ...o, model, effort }), '-o', report];
     if (o.scope === 'codebase') return ['exec', '--skip-git-repo-check', '--color', 'never', ...tail, '-'];
     if (o.objective) {
-      const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).' : 'Review the uncommitted changes: staged, unstaged, and untracked.';
+      // A prompt and a scope flag are mutually exclusive on `codex exec review`, so the prompt
+      // names the scope, including the base branch for a branch review.
+      const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).'
+        : o.scope === 'branch' ? `Review the changes on the current branch relative to ${o.base} (git diff ${o.base}...HEAD).`
+          : 'Review the uncommitted changes: staged, unstaged, and untracked.';
       return ['exec', 'review', ...tail, `${scopeText}${clause}`];
     }
+    if (o.scope === 'branch') return ['exec', 'review', '--base', o.base, ...tail];
     return ['exec', 'review', ...(o.scope === 'recent' ? ['--commit', 'HEAD'] : ['--uncommitted']), ...tail];
   };
   const stdinText = o.scope === 'codebase' ? `${CODEBASE_PROMPT}${clause}\n` : undefined;

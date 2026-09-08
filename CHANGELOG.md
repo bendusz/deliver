@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented here.
 
+## 0.24.0 - 2026-09-07
+
+Git is the state.
+
+- **The `pm/` directory is gone.** The shared `pm-state.json`, the per-actor JSONs, the
+  union-merged `pm/log.md`, and the per-actor handoffs are replaced by three tracked things: an
+  approval marker, `docs/approval.json` (`status`, `approver`, `approved_date`, `plan_digest`);
+  an `## Execution` block at the end of each claimed story (`owner`, `builder`, `branch`,
+  `status`, `rounds`, `retries`, plus dated notes for events with no commit); and an optional
+  `docs/handoff/<actor-id>.md` with a `BASE_COMMIT` line. Everything else comes from git: the
+  claim is the story branch, each build and fix round is a commit, the `--no-ff` merge body is the
+  story record, and `git log --first-parent` is the project log. `references/state.md` replaces
+  `logging-and-state.md`.
+- **Commit as you go.** The sequential loop commits after the build and after every fix round;
+  counters are committed before the dispatch they bound. A parallel wave commits nothing until
+  every builder has returned, because the Codex runner fingerprints every ref.
+- **Hooks.** `require-signoff.mjs` reads the marker and honours a pre-0.24 `signed_off` field
+  until the migration runs. `pm-secrets-guard.mjs` guards all of `docs/`. `actor-guard.mjs` is
+  removed. `session-context.mjs` prints approval, branch, the story's Execution state, claims,
+  worktrees, uncommitted paths, handoff freshness, and the wiki line, all derived from git.
+- **Runner.** Build and fix require a tracked, approved `docs/approval.json`; a project with only
+  legacy state is refused with a message naming the migration. `docs/approval.json` and
+  `docs/handoff/` are protected paths.
+- **Migration.** `/deliver:resume` on a pre-0.24 project writes the marker and the Execution
+  blocks from the old state, folds old handoffs into story notes, removes `pm/`, the union-merge
+  attribute, and the `pm-state` rules, and commits once. The old log stays in history.
+- **Branch review scope.** `/deliver:codex-review branch base=<branch>` reviews every commit on the
+  current branch against its base through `codex exec review --base`, which is how external review
+  reaches a story whose work is already committed.
+- **Plan and templates.** Delivery mode gains `Integration branch` and drops `Instruction rules`.
+  `approval.json.template` is new; the story and handoff templates change; five state templates
+  are deleted. The worked example follows the new layout.
+
 ## 0.23.0 - 2026-09-07
 
 Codex runs unsandboxed.

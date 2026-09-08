@@ -11,7 +11,7 @@ demonstrate the deliver workflow end to end.
 ## Delivery mode
 - Scale: standard
 - Checkpoint policy: sprint-level
-- Instruction rules: none
+- Integration branch: main
 - Skeleton: specdd
 
 ## Goals

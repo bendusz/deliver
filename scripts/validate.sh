@@ -125,8 +125,7 @@ for md in plugins/deliver/commands/*.md; do
 done
 
 # 10) JSON templates parse
-for f in plugins/deliver/templates/pm-state.json.template \
-         plugins/deliver/templates/actor-state.json.template \
+for f in plugins/deliver/templates/approval.json.template \
          plugins/deliver/templates/claude-settings-hardening.json.template; do
   [ -f "$f" ] && { jq empty "$f" 2>/dev/null || err "invalid JSON template: $f"; }
 done
@@ -224,8 +223,13 @@ fi
 
 # 17) instructions layer: templates exist, the AGENTS.md template stays small, the bridge is exact,
 #     and no agent prompt names CLAUDE.md without AGENTS.md on the same line.
-for f in plugins/deliver/templates/AGENTS.md.template plugins/deliver/templates/CLAUDE.md.template \
-         plugins/deliver/templates/rules-pm-state.md.template plugins/deliver/templates/pm-AGENTS.md.template; do
+# 18) no retired state surface survives in the plugin, outside the documented legacy fallbacks.
+legacy_scan() { grep -rnE 'pm-state\.json|pm/log\.md|pm/actors|actor-guard' plugins/deliver README.md 2>/dev/null | grep -vE 'hooks/(require-signoff|session-context|lib)\.mjs|scripts/tests/|references/(migrations|state|state-health|hardening|resume-procedure)\.md|modes/build\.mjs|README\.md:.*(0\.24|legacy|migration)'; }
+if legacy_scan >/dev/null 2>&1; then
+  legacy_scan >&2
+  err "retired pm/ state surface referenced outside the documented legacy fallbacks (see above)"
+fi
+for f in plugins/deliver/templates/AGENTS.md.template plugins/deliver/templates/CLAUDE.md.template; do
   [ -f "$f" ] || err "missing template: $f"
 done
 if [ -f plugins/deliver/templates/AGENTS.md.template ]; then
@@ -236,8 +240,7 @@ if [ -f plugins/deliver/templates/CLAUDE.md.template ]; then
   [ "$(sed -n '1p' plugins/deliver/templates/CLAUDE.md.template)" = "@AGENTS.md" ] || err "CLAUDE.md.template must start with @AGENTS.md"
 fi
 # Scoped to agents/ and the worked example: commands and references legitimately discuss the
-# CLAUDE.md bridge. The two-line bridge files hold no prose, and the example's frozen
-# pm/log.md may keep its history, so neither is scanned.
+# CLAUDE.md bridge. The two-line bridge files hold no prose, so they are not scanned.
 bridge_scan() { grep -rn 'CLAUDE\.md' plugins/deliver/agents examples/todo-cli/docs examples/todo-cli/*.md 2>/dev/null | grep -v 'AGENTS\.md'; }
 if bridge_scan >/dev/null 2>&1; then
   bridge_scan >&2

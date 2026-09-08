@@ -28,3 +28,7 @@ Stand up the `todo.py` entry point with an `argparse` CLI and a JSON store that 
 ## Verification evidence
 STATUS: PASS · gates: test PASS 2026-06-04 15:12, lint N/A, build N/A · inline verifier pass, no
 durable report at this scale.
+
+## Execution
+<!-- pm-exec: {"owner":"bendusz","builder":"expert-builder","branch":"pm/S1-1-cli-skeleton","status":"merged","rounds":0,"retries":0,"updated":"2026-06-04 15:12"} -->
+- 2026-06-04 15:12 merged to main in 4b7e2a1 (no-ff).

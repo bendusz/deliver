@@ -83,7 +83,8 @@ Every caller falls back to `gpt-5.6-sol` at `medium`.
 
 A caller wanting another tier passes `model=` and `effort=`, which reach the runner as `--model` and
 `--effort`. Scope keywords: `recent` = last commit (`--commit HEAD`), `worktree` = `--uncommitted`
-(default), `codebase` = whole-repository audit.
+(default), `branch` = `--base <branch>` (the story branch against its integration branch),
+`codebase` = whole-repository audit.
 
 ## Auth, exit codes, output streams
 
@@ -113,7 +114,7 @@ common:   [--model <id>] [--effort <level>] [--timeout-seconds <n>]
           [--preflight]  (build, review, advise, research; NOT fix)
 build:    --worktree <abs> --story <docs/stories/x.md>
 fix:      --worktree <abs> --story <docs/stories/x.md> --evidence <tmp/codex-builder/x.md>
-review:   --scope recent|worktree|codebase [--objective "<text>"] --out <dir>
+review:   --scope recent|worktree|branch|codebase [--base <branch>] [--objective "<text>"] --out <dir>
 advise:   --prompt-file <abs>
 research: --prompt-file <abs> [--search auto|off]
 ```
@@ -140,7 +141,8 @@ subagents would run outside the runner's timeout and audit. `--ignore-rules` and
 Codex has full host access and network during every run, and the runner audits only the worktree
 afterwards, so writes elsewhere on the machine and network use are not detectable.
 
-`build` and `fix` fail closed on a missing or unsigned `pm/pm-state.json`, an untracked story, or a
+`build` and `fix` fail closed on a missing or unapproved `docs/approval.json` (a pre-0.24
+`pm/pm-state.json` alone is refused with a message naming the migration), an untracked story, or a
 fix without `--evidence`, then snapshot the worktree and git metadata around the run: an
 out-of-scope change, a protected-path change, or a `files_changed` claim that disagrees with the
 snapshot delta is a safety violation, worktree preserved, while changed ignored files are reported
@@ -204,7 +206,7 @@ node plugins/deliver/scripts/codex/run.mjs --mode build --preflight --worktree <
 
 `--preflight` never invokes model inference and always reports `quota_consumed: false`. It validates
 sign-off, authentication, required CLI flags, the ignored `tmp/` setup, the bundled result schema,
-and optional story metadata. For `recent` and `worktree` it also checks that `codex exec review`
+and optional story metadata. For `recent`, `worktree`, and `branch` it also checks that `codex exec review`
 offers the flags in `preflight.mjs`'s `REVIEW_FLAGS`; `codebase` uses plain `exec` and skips that
 check.
 

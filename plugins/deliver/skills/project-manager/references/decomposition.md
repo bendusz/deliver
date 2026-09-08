@@ -32,6 +32,9 @@ header. Three fields carry rules:
   names `architecture-reviewer`, `design-exploration.md` owns the optional design pass that may
   precede build-ready.
 
+- **Execution.** The template's final `## Execution` section is never written at decomposition.
+  The claim commit adds it; `state.md` owns its fields.
+
 With a skeleton, `Specs` names the `.sdd` files the story implements; `pm-meta.touches` are the
 paths those specs `Own`; Context names the specs instead of restating interfaces; each criterion
 cites the `Done when` line it satisfies where one exists. `skeleton.md` owns the phase.
@@ -50,5 +53,5 @@ dispatch the builder on an unready story.
 `${CLAUDE_PLUGIN_ROOT}/templates/checklist-story-readiness.md.template` is the full checklist.
 
 ## Hand to the user
-Show the sprint-to-story map, log it, then load `implementation-loop.md`. This is not a second
+Show the sprint-to-story map, commit the stories, then load `implementation-loop.md`. This is not a second
 sign-off gate.

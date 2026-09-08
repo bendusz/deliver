@@ -12,7 +12,7 @@
 ## Delivery mode
 - Scale: <tiny | small | standard | large | regulated>  <!-- see references/scale-profiles.md -->
 - Checkpoint policy: <story-level | sprint-level | autonomous>
-- Instruction rules: <none | pm-state>  <!-- pm-state writes .claude/rules/pm-state.md and pm/AGENTS.md at scaffold -->
+- Integration branch: <main>  <!-- the branch every story branch is cut from and merged back into -->
 - Skeleton: <specdd | none>  <!-- specdd writes .sdd contracts per sprint before decomposition; default none below large -->
 
 <!-- Omit Goals and Target users when docs/spec.md exists; the spec owns them. -->

@@ -23,11 +23,11 @@ Give `spec-architect`:
 - `Bootstrap`, the path of `.specdd/bootstrap.md` or the word `template`.
 - Optional: `Analyst pack` on brownfield work, `Design sketch`, `Wiki index`.
 
-## Checkpoint, commit, log
+## Checkpoint and commit
 Show the user the tree and, when the CLI ran, the `inspect` output. This is a checkpoint, not a
 gate. Sign-off already happened, so report it and load `decomposition.md`. Commit the skeleton as
-you commit the scaffold, and append one entry to `pm/log.md`, for example
-`- 2026-09-04 14:10 pm-a1b2: skeleton written for sprint 2. 6 module specs, 1 superseded.`
+you commit the scaffold, with a message that names the sprint and the spec count, for example
+`chore(skeleton): sprint 2, 6 module specs, 1 superseded`.
 
 ## What the rest of the pipeline does with it
 - A builder may edit a `.sdd` inside its own touches when the implementation forces it and must

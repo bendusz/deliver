@@ -25,13 +25,19 @@ export function gitIn(dir, args) {
   return execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
-export function newProj(signedOff = false) {
+export const APPROVED = { status: 'approved', approver: 'Casey', approved_date: '2026-09-01', plan_digest: null, updated: '2026-09-01 10:00' };
+export const PENDING = { status: 'pending', approver: null, approved_date: null, plan_digest: null, updated: '2026-09-01 09:00' };
+
+// A managed project: docs/approval.json committed, git identity set, HEAD present.
+export function newProj(approved = false) {
   const d = tmpDir('pmproj-');
-  for (const sub of ['pm/actors', 'src', 'docs', 'packages/foo']) fs.mkdirSync(path.join(d, sub), { recursive: true });
-  fs.writeFileSync(path.join(d, 'pm', 'pm-state.json'), JSON.stringify({ signed_off: signedOff, phase: 'implementation' }) + '\n');
+  for (const sub of ['src', 'docs/stories', 'docs/handoff', 'packages/foo']) fs.mkdirSync(path.join(d, sub), { recursive: true });
+  fs.writeFileSync(path.join(d, 'docs', 'approval.json'), JSON.stringify(approved ? APPROVED : PENDING) + '\n');
   gitIn(d, ['init', '-q']);
   gitIn(d, ['config', 'user.email', 'casey@example.com']);
   gitIn(d, ['config', 'user.name', 'Casey Example']);
+  gitIn(d, ['add', 'docs/approval.json']);
+  gitIn(d, ['commit', '-qm', 'approval marker']);
   return d;
 }
 
@@ -84,18 +90,18 @@ export const STORY_LEGACY = STORY_V2
   .replace('Parallel-safe: yes', 'Parallel-safe: yes · Touches: src')
   .replace('Risk: low · Review lenses: code-integrity-reviewer', 'Risk: low · Review lenses: code-integrity-reviewer · Security-sensitive: no · Architecture-sensitive: no\nBuilder: codex-builder');
 
-export function newBuildProject(signedOff = true) {
+export function newBuildProject(approved = true) {
   const d = tmpDir('pmbuild-');
   for (const sub of ['docs/stories', 'tmp/codex-builder', 'pm', 'src']) fs.mkdirSync(path.join(d, sub), { recursive: true });
   fs.writeFileSync(path.join(d, '.gitignore'), 'tmp/\n');
-  fs.writeFileSync(path.join(d, 'pm', 'pm-state.json'), `{"signed_off":${signedOff},"phase":"implementation"}\n`);
+  fs.writeFileSync(path.join(d, 'docs', 'approval.json'), JSON.stringify(approved ? APPROVED : PENDING) + '\n');
   fs.writeFileSync(path.join(d, 'docs', 'stories', 'S1-1-fix.md'), STORY_V2);
   fs.writeFileSync(path.join(d, 'tmp', 'codex-builder', 'S1-1-round-1.md'), '# Evidence\nRun `true`; fix src/fix.txt.\n');
   fs.writeFileSync(path.join(d, 'src', 'script.sh'), '#!/usr/bin/env sh\nexit 0\n');
   gitIn(d, ['init', '-q']);
   gitIn(d, ['config', 'user.email', 'builder-tests@example.com']);
   gitIn(d, ['config', 'user.name', 'Builder Tests']);
-  gitIn(d, ['add', '.gitignore', 'docs/stories/S1-1-fix.md', 'pm/pm-state.json', 'src/script.sh']);
+  gitIn(d, ['add', '.gitignore', 'docs/approval.json', 'docs/stories/S1-1-fix.md', 'src/script.sh']);
   gitIn(d, ['commit', '-qm', 'fixture']);
   return d;
 }

@@ -14,9 +14,10 @@ them, a criterion that can only be proven by driving the app comes back UNKNOWN.
 
 ## Where evidence lives
 - Lightweight or single-story work: an inline verifier pass is enough. `STATUS` is still required,
-  but you may skip the durable report and checklists and summarise the result in `pm/log.md`.
+  but you may skip the durable report and checklists and summarise the result under the story's
+  Verification evidence heading.
 - Non-trivial projects, recommended: write a durable `docs/verification/<story-id>.md` from
   `${CLAUDE_PLUGIN_ROOT}/templates/verification-report.md.template`.
 - Optionally tick `docs/checklists/verification-<id>.md` from the verification-quality template.
 - Record STATUS, the gate results, and the report link under the story's Verification evidence
-  heading, and set `current_story_verification_status` in `pm/actors/<you>.json`.
+  heading, and commit the story file with the work.

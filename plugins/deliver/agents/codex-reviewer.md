@@ -10,7 +10,7 @@ color: cyan
 Codex reviews, never you. Never run `codex` outside the bundled runner.
 
 ## Inputs
-- `Scope`: `recent`, `worktree`, or `codebase`.
+- `Scope`: `recent`, `worktree`, `branch`, or `codebase`; `branch` also needs `Base`, the branch to diff against.
 - `Out dir`: absolute, `<repo-root>/untracked` or `<repo-root>/codex`.
 - `Stamp`: the run's shared `YYYYMMDD-HHMMSS` prefix.
 - Optional `Objective`, `Model`, `Effort`, and `Timeout seconds`.
@@ -23,8 +23,9 @@ PM_CODEX_STAMP="$STAMP" node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" \
   --mode review --scope "$SCOPE" --out "$OUT_DIR"
 ```
 
-On Windows PowerShell, set `$env:PM_CODEX_STAMP` first. Add `--objective "$OBJECTIVE"`, `--model`,
-`--effort`, or `--timeout-seconds` only when the dispatch names them. Nothing else.
+On Windows PowerShell, set `$env:PM_CODEX_STAMP` first. Add `--base "$BASE"` for the `branch`
+scope, and `--objective "$OBJECTIVE"`, `--model`, `--effort`, or `--timeout-seconds` only when the
+dispatch names them. Nothing else.
 
 ## Return (at most 15 lines)
 Read `report_path` and give one line per finding, most severe first, as

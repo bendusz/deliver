@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// deliver PreToolUse hook: block secret-shaped content from being written into pm/ or docs/wiki/.
+// deliver PreToolUse hook: block secret-shaped content from being written under docs/ (or the
+// legacy pm/).
 //
-// pm/ and docs/wiki/ are git-tracked, so a leaked credential there enters history. This
+// docs/ holds the tracked plan, stories, handoffs, and wiki, so a leaked credential there
+// enters history. This
 // guard scans Write.content, Edit.new_string, and MultiEdit.edits[].new_string targeting
 // those paths for high-confidence secret shapes and blocks with exit 2. FAIL-OPEN like the
 // other hooks: kill switch, unparseable input, or a target outside those paths all allow (exit 0).
@@ -22,7 +24,7 @@ const { file, root } = target;
 const ti = input.tool_input;
 
 const rel = pmRelpath(root, file);
-const prefix = rel === null ? null : ['pm/', 'docs/wiki/'].find((p) => rel.startsWith(p));
+const prefix = rel === null ? null : ['docs/', 'pm/'].find((p) => rel.startsWith(p));
 if (!prefix) process.exit(0);
 
 const parts = [];

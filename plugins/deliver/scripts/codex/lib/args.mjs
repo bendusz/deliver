@@ -3,7 +3,7 @@ export class UsageError extends Error {}
 
 const MODES = new Set(['build', 'fix', 'review', 'advise', 'research']);
 const EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
-const SCOPES = new Set(['recent', 'worktree', 'codebase']);
+const SCOPES = new Set(['recent', 'worktree', 'branch', 'codebase']);
 const DEFAULT_MODEL = 'gpt-6-astra';
 const DEFAULTS = {
   build: { model: DEFAULT_MODEL, effort: 'high' },
@@ -14,15 +14,15 @@ const DEFAULTS = {
 };
 // When the default model is refused for this account, every mode retries once on this pair.
 export const FALLBACK = { model: 'gpt-5.6-sol', effort: 'medium' };
-const VALUE_FLAGS = new Set(['--mode', '--worktree', '--story', '--evidence', '--model', '--effort', '--timeout-seconds', '--scope', '--objective', '--out', '--prompt-file', '--search']);
+const VALUE_FLAGS = new Set(['--mode', '--worktree', '--story', '--evidence', '--model', '--effort', '--timeout-seconds', '--scope', '--base', '--objective', '--out', '--prompt-file', '--search']);
 
 export const USAGE = 'usage: run.mjs --mode build|fix|review|advise|research [--preflight] [--model <id>] [--effort <level>] [--timeout-seconds <n>] ' +
   '(build/fix: --worktree <abs> --story <docs/stories/x.md> [--evidence <tmp/codex-builder/x.md>]) ' +
-  '(review: --scope recent|worktree|codebase [--objective <text>] --out <abs-dir>) ' +
+  '(review: --scope recent|worktree|branch|codebase [--base <branch>] [--objective <text>] --out <abs-dir>) ' +
   '(advise/research: --prompt-file <abs> [--search auto|off])';
 
 export function parseArgs(argv) {
-  const o = { mode: '', preflight: false, model: '', effort: '', timeoutSeconds: 600, worktree: '', story: '', evidence: '', scope: '', objective: '', out: '', promptFile: '', search: 'auto' };
+  const o = { mode: '', preflight: false, model: '', effort: '', timeoutSeconds: 600, worktree: '', story: '', evidence: '', scope: '', base: '', objective: '', out: '', promptFile: '', search: 'auto' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--preflight') { o.preflight = true; continue; }
@@ -39,6 +39,7 @@ export function parseArgs(argv) {
       case '--effort': o.effort = v; break;
       case '--timeout-seconds': o.timeoutSeconds = v; break;
       case '--scope': o.scope = v; break;
+      case '--base': o.base = v; break;
       case '--objective': o.objective = v; break;
       case '--out': o.out = v; break;
       case '--prompt-file': o.promptFile = v; break;
@@ -64,7 +65,10 @@ export function parseArgs(argv) {
     if (o.mode === 'build' && o.evidence) throw new UsageError('--evidence is only valid in fix mode');
     if (o.preflight && (o.mode !== 'build' || o.evidence)) throw new UsageError('--preflight does not accept fix-mode options');
   } else if (o.mode === 'review') {
-    if (!SCOPES.has(o.scope)) throw new UsageError('review scope must be recent, worktree, or codebase');
+    if (!SCOPES.has(o.scope)) throw new UsageError('review scope must be recent, worktree, branch, or codebase');
+    if (o.scope === 'branch' && !o.base) throw new UsageError('--base is required for branch scope');
+    if (o.base && o.scope !== 'branch') throw new UsageError('--base is only valid for branch scope');
+    if (o.base && !/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(o.base)) throw new UsageError('unsafe base branch name');
     if (!o.preflight && !o.out) throw new UsageError('--out is required');
     // "under 500" is exclusive, and tab/LF/CR are not printable either: the objective
     // is embedded in a prompt and in a report filename slug.
