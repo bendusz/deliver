@@ -53,9 +53,10 @@ newer, so an exhausted counter is never reset. Show the user what you found, the
    the three-dot scope diff stays clean. A delete/modify conflict on a `pm/` file resolves by
    taking the deletion (`git rm`), because the Execution block already carries its fields.
 
-The actor id derivation is unchanged, so an old id and the new one agree. Fields git now derives
-are not carried: `phase`, `current_sprint`, `total_sprints`, `last_analysis_status`, and
-`current_story_verification_status`.
+The actor id derivation is unchanged, so an old id and the new one agree. Not carried: `phase`,
+`current_sprint`, and `total_sprints`, which git now derives, and `last_analysis_status` and
+`current_story_verification_status`, which have no successor; rerun `/deliver:analyze` or the
+verifier when the position needs them.
 
 ## Stories created before 0.13 (no `pm-meta`)
 
