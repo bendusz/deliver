@@ -303,9 +303,9 @@ export function inspectState(root) {
     if (complete && !retroSkipped && readText(path.join(root, 'docs', 'retros', `sprint-${n}.md`)) === null) out.sprints_without_retro.push(n);
   }
 
-  // Precedence: an unapproved or drifted marker halts everything, so it is planning whatever
-  // else exists; then a completed sprint owed its retrospective; then stories outrank a
-  // missing plan file, since they imply one was approved.
+  // Precedence: an unapproved or drifted marker halts everything, so it is planning whenever
+  // any artifact exists, else discovery; then a completed sprint owed its retrospective; then
+  // stories outrank a missing plan file, since they imply one was approved.
   const hasSpec = fs.existsSync(path.join(root, 'docs', 'spec.md'));
   const hasPlan = plan !== null;
   if (a.status !== 'approved' || out.approval.plan_changed) out.phase = hasSpec || hasPlan || stories.length ? 'planning' : 'discovery';

@@ -1,5 +1,8 @@
 # Documentation
 
+**Enter** at a sprint or project boundary, once the work has shipped. **Leave** when the docs, and
+at project end the completion report, are committed.
+
 `technical-writer` writes docs only, never source, tests, or config. Load the boundary work below at
 a sprint or project boundary, never per story.
 

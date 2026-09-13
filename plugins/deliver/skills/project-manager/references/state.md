@@ -10,7 +10,7 @@ identical.
 | Fact | Where |
 | --- | --- |
 | The plan is approved, by whom, when | `docs/approval.json` |
-| Scale, checkpoint policy, integration branch | `docs/plan.md`, Delivery mode |
+| Scale, checkpoint policy, integration branch, skeleton | `docs/plan.md`, Delivery mode |
 | What each story must do | `docs/stories/*.md` |
 | Who holds a story, its builder, branch, status, and loop counters | the story's `## Execution` block |
 | What a story changed, why, and how it was verified | the `--no-ff` merge commit body |
@@ -19,11 +19,12 @@ identical.
 | Scratch, prompts, raw output, diffs, worktrees | `tmp/`, gitignored, never load-bearing |
 
 Phase and sprint are derived, in this order of precedence. A marker that is not `approved`, or
-whose plan changed since approval, is planning whatever else exists, since it halts every actor
-(`tiny` starts here, having no spec); a completed sprint with no `docs/retros/sprint-<n>.md` is
-retrospective, except at `tiny` and `small`; any story present is implementation, or done when
-all are `merged`, and an unreadable story counts as unmerged; then neither spec nor plan is
-discovery, a spec without a plan is specification, and a plan without stories is decomposition.
+whose plan changed since approval, is planning whenever a spec, plan, or story exists, since it
+halts every actor (`tiny` starts here, having no spec), and discovery when none of the three
+does; a completed sprint with no `docs/retros/sprint-<n>.md` is retrospective, except at `tiny`
+and `small`; any story present is implementation, or done when all are `merged`, and an
+unreadable story counts as unmerged; then neither spec nor plan is discovery, a spec without a
+plan is specification, and a plan without stories is decomposition.
 The current sprint is the lowest sprint with an unmerged story.
 
 **Never** write secrets or credentials into any tracked file. Reference secret *locations*

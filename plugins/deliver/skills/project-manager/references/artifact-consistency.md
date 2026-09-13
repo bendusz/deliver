@@ -8,7 +8,7 @@ contradictions and **never** fixes them. `/deliver:analyze` drives it.
 ## Read-only contract
 
 Read the artifacts and produce a report. **Never** edit, create, scaffold, or fix anything, not even
-logs or state. Offer remediation as suggestions only.
+state. Offer remediation as suggestions only.
 
 ## Inputs (whichever exist)
 

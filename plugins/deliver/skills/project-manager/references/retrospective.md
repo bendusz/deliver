@@ -1,5 +1,8 @@
 # Sprint retrospective
 
+**Enter** when a sprint's last story is `merged` and `docs/retros/sprint-<n>.md` does not exist.
+**Leave** when the record is committed.
+
 Run at the sprint checkpoint, after the sprint's last story is `merged` and before the next
 sprint's first claim. `/deliver:retro` drives it, and the session hook reports the phase as
 `retrospective` while a completed sprint has no `docs/retros/sprint-<n>.md`. `tiny` and `small`

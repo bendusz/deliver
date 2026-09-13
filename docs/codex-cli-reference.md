@@ -1,6 +1,6 @@
 # Codex CLI reference (for deliver's codex commands)
 
-CLI facts verified 2026-08-23 against **codex-cli 0.149.0**, the
+CLI facts verified 2026-09-11 against **codex-cli 0.153.4**, the
 [official command reference](https://learn.chatgpt.com/docs/developer-commands), and local help
 output; models and defaults updated 2026-09-04. Re-verify against `codex exec --help` when the CLI
 major-bumps.
@@ -18,12 +18,15 @@ major-bumps.
 
 | Group | Flags |
 |---|---|
-| Both subcommands | `-m/--model`, `-c/--config` (TOML value, else literal), `-o/--output-last-message` (final message → file, which is the review report), `--json`, `--output-schema`, `--ephemeral`, `--ignore-user-config` (skips `$CODEX_HOME/config.toml`; auth still uses `CODEX_HOME`), `--ignore-rules`, `--strict-config`, `--skip-git-repo-check`, `--dangerously-bypass-approvals-and-sandbox` (never passed by deliver) |
+| Both subcommands | `-m/--model`, `-c/--config` (TOML value, else literal), `-o/--output-last-message` (final message → file, which is the review report), `--json`, `--output-schema`, `--ephemeral`, `--ignore-user-config` (skips `$CODEX_HOME/config.toml`; auth still uses `CODEX_HOME`), `--ignore-rules`, `--strict-config`, `--skip-git-repo-check`, `--enable`/`--disable <FEATURE>` (0.153: shorthand for `-c features.<name>=`), `--thread-source`, `--dangerously-bypass-approvals-and-sandbox` and `--dangerously-bypass-hook-trust` (never passed by deliver) |
 | `exec` only, **exit 2** on review | `-s/--sandbox` (`exec` defaults to `read-only`), `-C/--cd` (for review, `cd` to the repo root first), `--color` (cost us a 5-agent run) |
 | `exec` only, no error | `-i/--image` |
+| `exec` only, untested on review | `-p/--profile`, `--approve-for-me`, `--add-dir`, `--oss`, `--local-provider` (all 0.153) |
+| `review` only | `--title` |
 | Neither | a reasoning-effort flag; use `-c model_reasoning_effort="<level>"` |
 
-`codex exec` hard-sets approval to `never`, so failures go back to the model. `--full-auto` is a
+`codex exec` hard-sets approval to `never` unless `--approve-for-me` is passed, so failures go
+back to the model. `--full-auto` is a
 deprecated alias for `--sandbox workspace-write`.
 
 ## Review scope semantics: mutually exclusive, including with PROMPT
@@ -95,7 +98,7 @@ A caller wanting another tier passes `model=` and `effort=`, which reach the run
 - Codex exit codes: `0` success · `1` runtime/auth failure · `2` CLI usage error.
 - Streams: progress and the session header → **stderr**; final message → **stdout** or the `-o` file.
 
-## Runner (Node, against codex-cli 0.149.0, since v0.16)
+## Runner (Node, against codex-cli 0.153.4, since v0.16)
 
 No deliver agent or command assembles a Codex command line or shells out to `codex`. Every
 invocation goes through `plugins/deliver/scripts/codex/run.mjs`, called by a thin Sonnet wrapper
@@ -144,7 +147,9 @@ afterwards, so writes elsewhere on the machine and network use are not detectabl
 `build` and `fix` fail closed on a missing or unapproved `docs/approval.json` (a pre-0.24
 `pm/pm-state.json` alone is refused with a message naming the migration), an untracked story, or a
 fix without `--evidence`, then snapshot the worktree and git metadata around the run: an
-out-of-scope change, a protected-path change, or a `files_changed` claim that disagrees with the
+out-of-scope change, a protected-path change (`pm/`, `docs/stories/`, `docs/wiki/`,
+`docs/handoff/`, `.specdd/`, `docs/approval.json`, `docs/spec.md`, `docs/plan.md`,
+`docs/constitution.md`, or git metadata), or a `files_changed` claim that disagrees with the
 snapshot delta is a safety violation, worktree preserved, while changed ignored files are reported
 rather than blocked. `review` writes only into `<root>/untracked` or `<root>/codex`, which must hold
 no tracked files; one `lstat` rejects a symlink or a path resolving elsewhere, and `COPYFILE_EXCL`
@@ -220,6 +225,7 @@ stories.
 ## Web search (`--search`), noted 2026-08-02
 
 Neither `codex exec --help` nor `codex exec review --help` accepts `--search` as of codex-cli
-0.145.0. The runner probes `codex exec --help` at research runtime and adds the flag when present,
+0.153.4, re-verified 2026-09-11. The runner probes `codex exec --help` at research runtime and
+adds the flag when present,
 so research uses live sources where supported and model knowledge plus repo reading where it is
 not.
