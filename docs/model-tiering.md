@@ -4,7 +4,7 @@ Control cost and quality by giving heavier work a stronger model and routine wor
 This file is repository documentation. The agents do not load it; each one pins its own model and
 effort in its frontmatter.
 
-## Shipped defaults (v0.20)
+## Shipped defaults (0.25)
 
 Every agent declares a model and effort level. Opus roles use `claude-opus-5` instead of the moving
 `opus` alias, so a future Opus release cannot change the gate-bearing fleet without an explicit
@@ -53,8 +53,9 @@ Codex hooks and subagents off.
 
 ## Overriding
 
-- **Per agent, model.** Edit the `model:` field in the agent's frontmatter: any Claude Code model
-  alias (`haiku`/`sonnet`/`opus`/`fable`), a full model ID, or `inherit` to follow the session.
+- **Per agent, model.** Edit the `model:` field in the agent's frontmatter: a Claude Code model
+  alias (`haiku`, `sonnet`, `fable`), a full model ID, or `inherit` to follow the session. For an
+  Opus role use the pinned `claude-opus-5`; the moving `opus` alias fails `validate.sh` and doctor.
   Plugin updates overwrite edited bundled agents, so keep a note of your overrides.
 - **Per agent, effort.** Edit the `effort:` field: `low`, `medium`, `high`, `xhigh`, or `max`, with
   the available levels depending on the model. Remove the field to inherit the session's effort.

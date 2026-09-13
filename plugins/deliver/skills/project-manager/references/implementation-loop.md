@@ -1,7 +1,7 @@
 # Implementation loop
 
-**Enter** with build-ready stories. **Leave** the sprint when every story is `merged` and
-`/deliver:retro` has run.
+**Enter** with build-ready stories. **Leave** the sprint when every story is `merged` and, at
+`standard` scale and above, `/deliver:retro` has run.
 
 Run each story through the states below; the story's Execution block, not memory, bounds them.
 The integration branch is the one named in the plan's Delivery mode, `main` by default; cut every

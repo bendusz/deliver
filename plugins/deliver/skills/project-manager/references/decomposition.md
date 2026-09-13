@@ -3,7 +3,8 @@
 Break the approved plan into sprints and self-contained story files.
 
 **Enter** with an approved plan and no story files for the sprint. **Leave** when every story of
-the sprint passes readiness and `/deliver:analyze` over the stories reports no CRITICAL or HIGH.
+the sprint passes readiness and, at `standard` scale and above, `/deliver:analyze` over the
+stories reports no CRITICAL or HIGH.
 
 ## Sprints
 Group the plan's stories into sprints. Each sprint should deliver something independently valuable.
@@ -56,7 +57,8 @@ dispatch the builder on an unready story.
 `${CLAUDE_PLUGIN_ROOT}/templates/checklist-story-readiness.md.template` is the full checklist.
 
 ## Hand to the user
-Show the sprint-to-story map and commit the stories. Then run `/deliver:analyze` once more: the
+Show the sprint-to-story map and commit the stories. Then, at `standard` scale and above, run
+`/deliver:analyze` once more: the
 plan-time run had no stories, so the story detections in `artifact-consistency.md` (coverage,
 touches overlap, dependency cycles, declared lenses) fire only now. Resolve CRITICAL and HIGH, then
 load `implementation-loop.md`. This is not a second

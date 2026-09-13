@@ -23,7 +23,8 @@ session, so a fresh session already carries the headline.
 
 ## Continue
 First place the project by the `state` command's `phase`, which follows `state.md`'s derivation.
-A `pending` or `revoked` marker, or an approved one whose plan changed, means planning: return to
+A `pending` or `revoked` marker, or an approved one whose plan changed, means planning, or
+discovery while no spec, plan, or story exists yet: return to
 `planning-and-signoff.md`'s sign-off gate or `/deliver:correct-course`. `retrospective` means a
 completed sprint has no record yet: run `/deliver:retro <n>` for each sprint the `state` command
 lists under `sprints_without_retro`, lowest first, before any claim. An `approved` marker

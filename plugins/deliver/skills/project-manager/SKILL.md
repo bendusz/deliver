@@ -48,7 +48,7 @@ subagents. Never write implementation code.
 4. **Analyze artifacts.** `references/artifact-consistency.md`. Read-only cross-artifact check via
    `/deliver:analyze`.
 5. **Decomposition.** `references/decomposition.md`. Sprints and self-contained story files, then
-   `/deliver:analyze` again over the stories before the first claim.
+   `/deliver:analyze` again over the stories before the first claim, where the scale runs it.
 6. **Implementation loop.** `references/implementation-loop.md`. Per story: claim, build, commit,
    gate, review, fix, verify, ship. `references/fix-loop.md` owns the fix rounds. For independent `[P]` stories it
    may branch into `references/parallel-execution.md`, which builds in isolated worktrees and
@@ -68,8 +68,8 @@ for what each scale skips.
 The session hook prints the derived phase and the reference to load; trust it over memory.
 Load only the active reference. Load `references/scale-profiles.md`,
 `references/instruction-layers.md`, `references/migrations.md`, `references/hardening.md`,
-`references/knowledge.md`, `references/design-exploration.md`, or `references/environment.md` only
-when its own trigger occurs. Read the matching template from `${CLAUDE_PLUGIN_ROOT}/templates/` when
-a phase creates an artifact. If `docs/approval.json` or a pre-0.24 `pm/` directory exists, run
-`/deliver:resume`.
+`references/knowledge.md`, `references/design-exploration.md`, `references/environment.md`, or
+`references/documentation.md` only when its own trigger occurs. Read the matching template from
+`${CLAUDE_PLUGIN_ROOT}/templates/` when a phase creates an artifact. If `docs/approval.json` or a
+pre-0.24 `pm/` directory exists, run `/deliver:resume`.
 

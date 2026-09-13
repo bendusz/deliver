@@ -19,6 +19,8 @@ All optional, in any order:
   fallback to `gpt-5.6-sol` at `medium` if the account is refused it.
 - **Effort.** `effort=<level>`, one of `none|minimal|low|medium|high|xhigh|max`. Default `high`.
 - **Timeout.** `timeout=<minutes>`, the per-agent timeout. Default `10`.
+- **Base.** `base=<branch>`, the comparison branch for the `branch` scope. Default the plan's
+  Integration branch.
 - **Objectives.** Every remaining token. Presets are `security`, `bugs`, `architecture`, `tests`,
   `performance`; `panel` expands to all five; any other word or quoted phrase is free-form; none
   means one general review. The runner owns each preset's focus clause.

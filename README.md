@@ -5,7 +5,7 @@ then delegates implementation and review to specialist agents. It never writes c
 
 One repeatable way of working:
 
-> **discover → specify → clarify → plan → sign-off → skeleton (optional) → analyze → decompose → claim → build → gate → review → verify → ship**
+> **discover → specify → clarify → plan → sign-off → skeleton (optional) → analyze → decompose → claim → build → gate → review → verify → ship → retro**
 
 It works on a bare Claude Code install and can use optional tools when they are present.
 
@@ -89,7 +89,7 @@ anything.
 | Decomposition | Sprints, then self-contained story files under `docs/stories/`, each tracing to requirement IDs. |
 | Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. At the sprint boundary, a cross-story review and a retrospective that feeds `AGENTS.md`. |
 | Parallel stories | Independent `[P]` stories can build at once in isolated git worktrees, then integrate one at a time. Opt-in, with a safe fallback to sequential. |
-| Review and verification | A separate read-only reviewer, the project's real test, lint, and build gates, and a final read-only `pm-verifier` PASS, with bounded fix loops. |
+| Review and verification | A separate read-only reviewer, the project's real test, lint, and build gates, and a final `pm-verifier` PASS, with bounded fix loops. |
 | State | Git carries it. The claim is the story branch, each build and fix round is a commit, and the `--no-ff` merge body is the story record. Only an approval marker, a per-story Execution block, and an optional handoff are written, so concurrent sessions never overwrite each other and any lost session resumes from git. |
 
 Bundled specialist agents do the work:
@@ -171,7 +171,8 @@ Committed under `docs/`, which is authoritative:
 - `docs/research/*.md`, sourced research reports from `researcher` and `codex-researcher`. Optional.
 - `docs/verification/*.md`, per-story verification reports. Optional, and recommended for
   non-trivial work.
-- `docs/retros/sprint-<n>.md`, the sprint retrospective records. Optional.
+- `docs/retros/sprint-<n>.md`, the sprint retrospective records. On at `standard` scale and
+  above, and the next sprint's first claim waits for the current one.
 - `docs/completion-report.md`, the end-of-project summary `technical-writer` produces. Optional.
 - `docs/wiki/`, the project wiki: an index, a schema, and decision, concept, and source pages the
   `librarian` maintains. On at `standard` scale and above.
@@ -216,7 +217,8 @@ under `tmp/`; the report directories sit at the repository root:
   trusted inputs: MCP servers and web search apply as configured. Only Codex hooks and subagents are
   pinned off.
 - **No secrets in tracked docs.** A bundled hook blocks secret-shaped content, meaning key tokens,
-  PEM blocks, and credential assignments, from being written under the git-tracked `docs/`.
+  PEM blocks, and credential assignments, from being written under the git-tracked `docs/` or a
+  pre-0.24 `pm/`.
 - **The companion plugin is inert.** The optional `poteto` plugin ships skills only, with no hooks,
   agents, or commands, so it cannot change any guardrail above.
 - **Repository safety.** The PM never overwrites your files without asking, commits only what it

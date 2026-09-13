@@ -14,7 +14,7 @@ color: yellow
 
 ## Rules
 - Write only under `docs/wiki/`. Never edit raw artifacts, `docs/approval.json`, or code. Never run git; the PM
-  commits and logs.
+  commits.
 - Search the index before creating a page. Never delete a page; set
   `Status: superseded by <slug>` and link the replacement.
 - Every page keeps the schema header, cites a source path per claim, and is linked from the index
