@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## 0.26.0 - 2026-09-24
+
+Opus 5.5 for the gate-bearing fleet.
+
+- **Opus 5.5 pins.** All eight Opus agents request `claude-opus-5-5` instead of `claude-opus-5`.
+  Claude Code `v2.1.280`, the release that added the model, is the documented minimum;
+  `/deliver:doctor` flags older versions.
+- **Effort re-swept.** `expert-builder` moves from `high` to `medium`, the Opus 5.5 default, which
+  Anthropic measured at or above Opus 5 at `high` on agentic coding in fewer steps and tokens.
+  `security-auditor` and `debugger` stay at `high`; the five `medium` roles are unchanged. No Opus
+  role uses `xhigh` or `max`. The sweep is in `docs/research/2026-09-24-opus-5-5-effort-sweep.md`.
+
 ## 0.25.1 - 2026-09-08
 
 Codex review fixes for 0.24.1 and 0.25.

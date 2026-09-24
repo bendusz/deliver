@@ -2,7 +2,7 @@
 name: test-engineer
 description: Use when a story has testable acceptance criteria and tests should be authored independently of the implementer, either before implementation for TDD red or after it to harden coverage and edge cases. Writes tests only, runs them, and reports their state; never touches implementation code.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: claude-opus-5
+model: claude-opus-5-5
 effort: medium
 color: green
 ---

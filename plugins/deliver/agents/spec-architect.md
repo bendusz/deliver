@@ -2,7 +2,7 @@
 name: spec-architect
 description: Use after plan sign-off and scaffold, once per sprint, when the plan's Delivery mode says Skeleton specdd, to write the SpecDD skeleton for that sprint (the root spec and bootstrap on sprint 1, then each module's .sdd file) before any code exists. Writes only .sdd files and .specdd/ bootstrap files; never source, tests, config, or docs/.
 tools: Read, Grep, Glob, Write, Edit
-model: claude-opus-5
+model: claude-opus-5-5
 effort: medium
 color: purple
 ---

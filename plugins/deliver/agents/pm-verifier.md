@@ -2,7 +2,7 @@
 name: pm-verifier
 description: Use before every ship or merge, after gates and review pass. It checks each acceptance criterion against repository evidence and returns PASS, FAIL, or UNKNOWN. Only PASS permits shipping.
 tools: Read, Grep, Glob, Bash
-model: claude-opus-5
+model: claude-opus-5-5
 effort: medium
 color: green
 ---
