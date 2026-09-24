@@ -2,7 +2,7 @@
 name: code-integrity-reviewer
 description: Use whenever a story diff is ready for review, after every build and after every fix round, to check correctness, security basics, and convention adherence. Requires the PM-generated diff text as input (it cannot diff itself); read-only; returns severity-graded findings plus a PASS/CONCERNS/FAIL verdict.
 tools: Read, Grep, Glob
-model: claude-opus-5
+model: claude-opus-5-5
 effort: medium
 color: red
 ---

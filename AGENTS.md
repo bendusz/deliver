@@ -20,7 +20,7 @@ Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 ## Conventions
 - Runtime code is Node ESM only (`hooks/*.mjs`, `scripts/codex/**`). No bash or jq at runtime;
   the repo-level `scripts/*.sh` are the maintainer-only exception.
-- Agent frontmatter pins `model` and `effort`; Opus roles use `claude-opus-5`, never the moving alias.
+- Agent frontmatter pins `model` and `effort`; Opus roles use `claude-opus-5-5`, never the moving alias.
 - Every change to a reference or template must keep `bash scripts/validate.sh` green.
 
 ## Gotchas

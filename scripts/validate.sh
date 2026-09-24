@@ -155,13 +155,13 @@ check_agent_regime() {
   [ "$actual_effort" = "$expected_effort" ] || \
     err "$agent effort must be $expected_effort, found ${actual_effort:-missing}"
 }
-check_agent_regime expert-builder claude-opus-5 high
-check_agent_regime security-auditor claude-opus-5 high
-check_agent_regime debugger claude-opus-5 high
-check_agent_regime architecture-reviewer claude-opus-5 medium
-check_agent_regime code-integrity-reviewer claude-opus-5 medium
-check_agent_regime pm-verifier claude-opus-5 medium
-check_agent_regime test-engineer claude-opus-5 medium
+check_agent_regime expert-builder claude-opus-5-5 medium
+check_agent_regime security-auditor claude-opus-5-5 high
+check_agent_regime debugger claude-opus-5-5 high
+check_agent_regime architecture-reviewer claude-opus-5-5 medium
+check_agent_regime code-integrity-reviewer claude-opus-5-5 medium
+check_agent_regime pm-verifier claude-opus-5-5 medium
+check_agent_regime test-engineer claude-opus-5-5 medium
 check_agent_regime codex-builder sonnet medium
 check_agent_regime codex-reviewer sonnet medium
 check_agent_regime codex-advisor sonnet medium
@@ -170,13 +170,13 @@ check_agent_regime codebase-analyst sonnet medium
 check_agent_regime technical-writer sonnet medium
 check_agent_regime researcher sonnet medium
 check_agent_regime librarian sonnet medium
-check_agent_regime spec-architect claude-opus-5 medium
+check_agent_regime spec-architect claude-opus-5-5 medium
 
 for md in plugins/deliver/agents/*.md; do
   model="$(grep -m1 '^model:' "$md" 2>/dev/null | awk '{print $2}')"
   effort="$(grep -m1 '^effort:' "$md" 2>/dev/null | awk '{print $2}')"
   [ "$model" != "opus" ] || err "moving model alias is forbidden in $md"
-  if [ "$model" = "claude-opus-5" ]; then
+  if [ "$model" = "claude-opus-5-5" ]; then
     case "$effort" in
       xhigh|max) err "Opus agent may not ship at $effort effort: $md" ;;
     esac
