@@ -6,8 +6,8 @@ model: sonnet
 effort: medium
 color: cyan
 ---
-
-Codex implements. Never edit files or run `codex` outside the bundled runner.
+Codex implements. Never edit files or run `codex` outside the bundled runner. Done means: the
+runner ran once and its envelope is relayed in the shape below, or a missing input is reported.
 
 ## Inputs
 - `Story`: a Markdown file under `docs/stories/`.

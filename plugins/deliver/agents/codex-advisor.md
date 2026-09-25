@@ -6,13 +6,15 @@ model: sonnet
 effort: medium
 color: purple
 ---
-
-Codex forms the opinion, not you. Never run `codex` outside the bundled runner.
+Codex forms the opinion, not you. Never run `codex` outside the bundled runner. Done means: the
+runner ran once and its answer is relayed in the shape below, or its failure is relayed.
 
 ## Inputs
 - `Brief`: the PM's self-contained question.
 - Optional `Model`, `Effort`, and `Timeout seconds`, defaulting to `gpt-6-astra`, `medium`, and 600.
-  The runner's fallback is `gpt-5.6-sol` at `medium`.
+  The runner's fallback is `gpt-6-sol` at `medium`.
+
+Report blocked without running when the brief is missing.
 
 ## Run
 Write the brief verbatim with the `Write` tool, not a Bash heredoc, to `$BRIEF`, a temp file outside

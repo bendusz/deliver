@@ -16,8 +16,9 @@ All optional, in any order:
   every commit on the current branch against `base=<branch>`, defaulting to the plan's Integration
   branch, and is the scope for a story whose work is already committed.
 - **Model.** `model=<id>`, a Codex model id. Default `gpt-6-astra`, with a one-time runner
-  fallback to `gpt-5.6-sol` at `medium` if the account is refused it.
-- **Effort.** `effort=<level>`, one of `none|minimal|low|medium|high|xhigh|max`. Default `high`.
+  fallback to `gpt-6-sol` at `medium` if the account is refused it. `gpt-6-sol` is the cheaper
+  explicit choice; `gpt-6-luna` runs only at `effort=high` or above.
+- **Effort.** `effort=<level>`, one of `low|medium|high|xhigh|max`. Default `high`.
 - **Timeout.** `timeout=<minutes>`, the per-agent timeout. Default `10`.
 - **Base.** `base=<branch>`, the comparison branch for the `branch` scope. Default the plan's
   Integration branch.

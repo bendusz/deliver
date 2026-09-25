@@ -317,9 +317,11 @@ test('build 5: structured success uses the fixed safe invocation', () => {
   assert.equal(r.out.runner_status, 'completed');
   assert.equal(r.out.result.status, 'done');
   assert.deepEqual(r.out.actual_files_changed, ['src/fix.txt']);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Stay inside the allowed implementation paths\. Do not change git state or edit stories, docs\/wiki\/, docs\/handoff\/, docs\/approval\.json, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, or \.specdd\/\./);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /- change a tracked or unignored file outside the allowed paths\. The runner diffs the worktree after you finish and rejects the whole run if any such path changed\. Git-ignored artifacts your build or tests write, such as caches or build output, are reported, not rejected\.\n- edit docs\/stories\/, docs\/wiki\/, docs\/handoff\/, docs\/approval\.json, docs\/spec\.md, docs\/plan\.md, docs\/constitution\.md, \.specdd\/, or a root \.sdd\./);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Done means: every acceptance criterion in the story holds and its verification command passes/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Nobody can answer questions during this run, so do not ask any\./);
   assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /rebase, merge, branch/);
-  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /AGENTS\.md is already in your context; read CLAUDE\.md only when it is more than a pointer/);
+  assert.match(fs.readFileSync(s.promptFile, 'utf8'), /AGENTS\.md is already loaded\. If CLAUDE\.md holds more than the @AGENTS\.md pointer, read it too\./);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /Read the story's Specs/);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /summary holds at most five short strings\./);
   assert.equal(fs.readdirSync(s.tmp).length, 0);
@@ -345,12 +347,12 @@ test('model fallback: an unsupported default model retries once on the mode fall
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_WRITE_PATH: 'src/fix.txt' } });
   assert.equal(r.status, 0);
-  assert.deepEqual([r.out.model, r.out.effort], ['gpt-5.6-sol', 'medium']);
+  assert.deepEqual([r.out.model, r.out.effort], ['gpt-6-sol', 'medium']);
   assert.deepEqual(r.out.model_fallback.from, { model: 'gpt-6-astra', effort: 'high' });
-  assert.deepEqual(r.out.model_fallback.to, { model: 'gpt-5.6-sol', effort: 'medium' });
+  assert.deepEqual(r.out.model_fallback.to, { model: 'gpt-6-sol', effort: 'medium' });
   assert.match(r.out.model_fallback.reason, /not supported when using Codex/);
   assert.equal((stubActions(s).match(/^exec(?! --help)/gm) || []).length, 2);
-  assert.ok(has(stubArgs(s), 'gpt-5.6-sol'));
+  assert.ok(has(stubArgs(s), 'gpt-6-sol'));
   assert.ok(has(stubArgs(s), 'model_reasoning_effort=medium'));
 });
 
@@ -368,25 +370,25 @@ test('model fallback: an explicit --model never falls back; other failures never
   assert.equal(ok.status, 0); assert.equal(ok.out.model, 'gpt-6-astra'); assert.equal('model_fallback' in ok.out, false);
 });
 
-test('model fallback: review and advise take the same gpt-5.6-sol fallback at medium', () => {
+test('model fallback: review and advise take the same gpt-6-sol fallback at medium', () => {
   const p = newBuildProject(true);
   const s = makeStub();
   const rv = runRunner(['--mode', 'review', '--scope', 'codebase', '--out', path.join(p, 'untracked')], { stub: s, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra' } });
-  assert.equal(rv.status, 0); assert.deepEqual([rv.out.model, rv.out.effort], ['gpt-5.6-sol', 'medium']);
-  assert.equal(rv.out.model_fallback.to.model, 'gpt-5.6-sol');
+  assert.equal(rv.status, 0); assert.deepEqual([rv.out.model, rv.out.effort], ['gpt-6-sol', 'medium']);
+  assert.equal(rv.out.model_fallback.to.model, 'gpt-6-sol');
   const brief = path.join(s.dir, 'brief.md'); fs.writeFileSync(brief, 'Should we use X or Y?\n');
   const s2 = makeStub();
   const ad = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s2, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_ANSWER: '1' } });
-  assert.equal(ad.status, 0); assert.deepEqual([ad.out.model, ad.out.effort], ['gpt-5.6-sol', 'medium']);
-  assert.equal(ad.out.model_fallback.to.model, 'gpt-5.6-sol');
+  assert.equal(ad.status, 0); assert.deepEqual([ad.out.model, ad.out.effort], ['gpt-6-sol', 'medium']);
+  assert.equal(ad.out.model_fallback.to.model, 'gpt-6-sol');
 });
 
 test('model fallback: a failure after the fallback names the model that ran', () => {
   const p = newBuildProject(true); const s = makeStub();
   const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra', STUB_EXEC_EXIT: '5' } });
   assert.equal(r.status, 70, JSON.stringify(r.out));
-  assert.deepEqual([r.out.model, r.out.effort], ['gpt-5.6-sol', 'medium']);
-  assert.equal(r.out.model_fallback.to.model, 'gpt-5.6-sol');
+  assert.deepEqual([r.out.model, r.out.effort], ['gpt-6-sol', 'medium']);
+  assert.equal(r.out.model_fallback.to.model, 'gpt-6-sol');
 });
 
 test('build 6: fix mode passes the evidence brief', () => {

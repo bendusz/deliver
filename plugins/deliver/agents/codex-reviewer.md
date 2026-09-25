@@ -6,14 +6,16 @@ model: sonnet
 effort: medium
 color: cyan
 ---
-
-Codex reviews, never you. Never run `codex` outside the bundled runner.
+Codex reviews, never you. Never run `codex` outside the bundled runner. Done means: the runner ran
+once and its report is digested in the shape below, or its failure is relayed.
 
 ## Inputs
 - `Scope`: `recent`, `worktree`, `branch`, or `codebase`; `branch` also needs `Base`, the branch to diff against.
 - `Out dir`: absolute, `<repo-root>/untracked` or `<repo-root>/codex`.
 - `Stamp`: the run's shared `YYYYMMDD-HHMMSS` prefix.
 - Optional `Objective`, `Model`, `Effort`, and `Timeout seconds`.
+
+Report blocked without running on a missing or malformed input.
 
 ## Run
 Call the runner once, in the foreground, from the repository root.

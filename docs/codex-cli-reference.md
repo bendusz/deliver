@@ -50,12 +50,14 @@ Whole-codebase review is not native at all: it is plain `codex exec` with a prom
 | Model | Position | API price /1M in/out |
 |---|---|---|
 | `gpt-6-astra` | current flagship; deliver's default everywhere | not recorded here |
-| `gpt-5.6-sol` | previous flagship; strongest 5.6 coding judgment | $4 / $20 |
+| `gpt-6-sol` | GPT-6 mid tier, released 2026-09-22; deliver's fallback everywhere | about half the 5.6 line; not recorded here |
+| `gpt-6-luna` | GPT-6 fast tier, released 2026-09-22; `high` effort and above only | not recorded here |
+| `gpt-5.6-sol` | previous flagship and deliver's fallback before 0.27 | $4 / $20 |
 | `gpt-5.6-terra` | balanced everyday workhorse | $2.50 / $15 |
 | `gpt-5.6-luna` | fast/cheap, high volume | $1 / $6 |
 | `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex` | previous generations, still selectable | n/a |
 
-Reasoning effort is `none | minimal | low | medium | high | xhigh | max`. No review-specific model
+Reasoning effort is `low | medium | high | xhigh | max`. The runner stopped accepting `none` and `minimal` in 0.27, since `gpt-6-astra` rejects `none` and Codex lists neither, and it does not offer `ultra`, which delegates to the subagents the runner keeps off. No review-specific model
 exists; `review_model` in `~/.codex/config.toml` overrides the session model for `/review`, and
 deliver never touches that file. ChatGPT sign-in is quota-based (Free/Go: Terra only); API-key auth
 is per-token.
@@ -67,15 +69,15 @@ A ChatGPT-account login can be refused a model outright. Observed 2026-09-04:
 
 When the model came from the mode default, never from an explicit `--model`, and Codex exits
 non-zero with that refusal naming that model on stdout or stderr, the runner retries the command
-once on the one fallback for every mode, `gpt-5.6-sol` at `medium`. Timeouts, interrupts, and other
+once on the one fallback for every mode, `gpt-6-sol` at `medium`. Timeouts, interrupts, and other
 non-zero exits are returned as they are. The envelope reports `model` and `effort` as the pair that
 ran plus `model_fallback: {from, to, reason}`, where `from` and `to` are `{model, effort}` objects
 and `reason` is the refusal line cut to 300 characters.
 `--timeout-seconds` bounds each attempt, so a fallback run can take twice that.
 
-## deliver's chosen defaults (models 2026-09-04, efforts 2026-07-16)
+## deliver's chosen defaults (models 2026-09-25, efforts 2026-07-16)
 
-Every caller falls back to `gpt-5.6-sol` at `medium`.
+Every caller falls back to `gpt-6-sol` at `medium`.
 
 | Caller | Model | Effort |
 |---|---|---|

@@ -166,10 +166,10 @@ check_agent_regime codex-builder sonnet medium
 check_agent_regime codex-reviewer sonnet medium
 check_agent_regime codex-advisor sonnet medium
 check_agent_regime codex-researcher sonnet medium
-check_agent_regime codebase-analyst sonnet medium
-check_agent_regime technical-writer sonnet medium
-check_agent_regime researcher sonnet medium
-check_agent_regime librarian sonnet medium
+check_agent_regime codebase-analyst claude-opus-5-5 low
+check_agent_regime technical-writer claude-opus-5-5 low
+check_agent_regime researcher claude-opus-5-5 low
+check_agent_regime librarian claude-opus-5-5 low
 check_agent_regime spec-architect claude-opus-5-5 medium
 
 for md in plugins/deliver/agents/*.md; do

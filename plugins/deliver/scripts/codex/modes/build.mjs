@@ -23,25 +23,32 @@ const tomlString = (s) => JSON.stringify(s);
 
 function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
   const lines = [
-    'You are the implementation worker for one build-ready PM story.',
-    `Worktree root: ${worktree}`,
-    `Story: ${storyRel}`,
-    'Allowed implementation paths from story pm-meta:',
-    ...scopes.map((s) => `- ${s}`),
-    `Mode: ${mode}`,
+    `You are implementing one build-ready PM story in the git worktree at ${worktree}.`,
+    `Story: ${storyRel}. Read it first; AGENTS.md is already loaded. If CLAUDE.md holds more than the @AGENTS.md pointer, read it too. Mode: ${mode}.`,
   ];
   if (evidenceRel) lines.push(`Fix evidence: ${evidenceRel}`);
   lines.push('',
-    'Read the story first. AGENTS.md is already in your context; read CLAUDE.md only when it is more than a pointer. Implement only that story.',
-    "Read the story's Specs (.sdd files) before the sources when it names any. If you must change a .sdd inside the allowed paths, name it in summary. Never edit .specdd/ or a root .sdd.",
+    "Done means: every acceptance criterion in the story holds and its verification command passes, with nothing added past the story. When that is true, stop.",
+    '',
+    "Without asking, you may read anything in the worktree, run the project's build, test, and lint commands, and create, edit, or delete files under these paths only:",
+    ...scopes.map((s) => `- ${s}`),
+    "Read the story's Specs (.sdd files) before the sources when it names any. A .sdd inside the allowed paths may change when the implementation forces it; name it in summary.",
+    '',
+    'Never:',
+    '- change a tracked or unignored file outside the allowed paths. The runner diffs the worktree after you finish and rejects the whole run if any such path changed. Git-ignored artifacts your build or tests write, such as caches or build output, are reported, not rejected.',
+    '- edit docs/stories/, docs/wiki/, docs/handoff/, docs/approval.json, docs/spec.md, docs/plan.md, docs/constitution.md, .specdd/, or a root .sdd. These are the PM\'s records.',
+    '- run a git command that changes state. The PM owns history.',
+    '',
     mode === 'fix'
       ? 'Read the fix evidence and make the smallest change that resolves its accepted findings or failing gate.'
-      : 'Prefer a focused implementation. If the story needs broad architectural work or lacks enough context, return blocked instead of widening scope.',
-    "Follow the story's Out of scope, acceptance criteria, and verification sections.",
-    'Run the story verification command and the relevant project tests before reporting done.',
-    'Stay inside the allowed implementation paths. Do not change git state or edit stories, docs/wiki/, docs/handoff/, docs/approval.json, docs/spec.md, docs/plan.md, docs/constitution.md, or .specdd/.',
+      : "Follow the story's Out of scope section. Make routine judgment calls yourself; do not widen the scope to resolve them.",
+    "Testing: run the story's verification command and the tests covering what you changed. Add tests only where an acceptance criterion needs them.",
+    '',
+    'Report blocked, without working around the limit, when finishing needs a change outside the allowed paths, a decision the story leaves open, or a fix for a failure you cannot resolve inside the allowed paths. Nobody can answer questions during this run, so do not ask any.',
+    'If this brief conflicts with AGENTS.md or a skill, this brief wins.',
     'Your shell environment is reduced and secret-like variables are removed. TMPDIR is an isolated directory inside this worktree.',
-    'Return only JSON matching the supplied schema. List every changed path in files_changed. summary holds at most five short strings. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing.');
+    '',
+    'Return only JSON matching the supplied schema. List every changed path in files_changed. summary holds at most five short strings. Use status blocked when tests fail, scope is wider than this brief, or required evidence is missing, and put the reason in root_cause.');
   return `${lines.join('\n')}\n`;
 }
 

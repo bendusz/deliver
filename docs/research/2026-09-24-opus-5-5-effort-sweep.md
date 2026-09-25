@@ -99,6 +99,16 @@ than before at a lower per-token price.
   `medium`, that is the signal to run the builder experiment below before touching the default.
 - **Claude Code version.** `v2.1.280` is the minimum; `/deliver:doctor` flags older installs.
 
+## Addendum, 2026-09-25: the Sonnet roles
+
+Four of the eight roles the sweep left on the moving `sonnet` alias at `medium` moved to
+`claude-opus-5-5` at `low` in 0.27.0. The four Codex wrappers stay on Sonnet: they do no model work
+of their own. `codebase-analyst`, `researcher`, `technical-writer`, and `librarian` read and
+summarise; Anthropic's first-party numbers put Opus 5.5 at `low` close to `medium` on coding, and
+`low` is the level its guidance names for subagents and simple tasks. Per token it costs twice
+Sonnet 5; whether it uses fewer tokens per task was not measured here. The second experiment
+below now also covers these roles.
+
 ## Recommended next experiments
 
 Both use the same design: several representative stories, repeated runs, measured outside the

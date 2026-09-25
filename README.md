@@ -142,7 +142,7 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 | `/deliver:handoff` | End a session cleanly by writing a token-efficient `docs/handoff/<id>.md` briefing for the next agent. |
 | `/deliver:resume` | Read git, the approval marker, the story Execution blocks, and the handoff, then continue where you left off. |
 | `/deliver:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, `branch`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
-| `/deliver:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-6-astra` at `medium` with a one-time fallback to `gpt-5.6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
+| `/deliver:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-6-astra` at `medium` with a one-time fallback to `gpt-6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
 
 ## Artifacts
 

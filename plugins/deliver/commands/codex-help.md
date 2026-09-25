@@ -10,9 +10,10 @@ Arguments: $ARGUMENTS
 
 ## 1. Parse arguments
 
-- **model=<id>**, default `gpt-6-astra`, with a one-time runner fallback to `gpt-5.6-sol` at
-  `medium` if the account is refused it.
-- **effort=<level>**: `none|minimal|low|medium|high|xhigh|max`, default `medium`.
+- **model=<id>**, default `gpt-6-astra`, with a one-time runner fallback to `gpt-6-sol` at
+  `medium` if the account is refused it. `gpt-6-sol` is the cheaper explicit choice;
+  `gpt-6-luna` runs only at `effort=high` or above.
+- **effort=<level>**: `low|medium|high|xhigh|max`, default `medium`.
 - Everything else is the question. If it is empty, ask the user what they want Codex's opinion on.
 
 ## 2. Compose the brief
