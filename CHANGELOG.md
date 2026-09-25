@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented here.
 
+## 0.27.0 - 2026-09-25
+
+Agent files reshaped for Opus 5.5 and GPT-6.
+
+- **Every agent body opens with a finish line and a blocked rule.** Each of the sixteen agents
+  now states what done means in one sentence, names the inputs it needs and returns
+  `BLOCKED: <what is missing>` when one is absent, and returns only when done or blocked, never
+  with a progress report. Prose that only repeated the tool allowlist ("do not modify files" on a
+  read-only agent) is gone. The research behind the shape is
+  `docs/research/2026-09-25-claude-subagent-definition-practices.md`.
+- **Reviewers report every finding with a reproduction, verdict first.** The three review lenses
+  put the verdict at the top, ask for how to show each finding fails (an input, call, or test),
+  and state the cost of under-grading beside the cost of over-grading, since a
+  conservative-only instruction depresses recall on Opus 5. `code-integrity-reviewer` places
+  every acceptance criterion as met, unmet, or not verifiable. `security-auditor` asks for the
+  input and code path that reaches a flaw instead of an exploit path.
+- **Codex build preamble rewritten as a four-part brief.** Goal, allowed actions, never-list with
+  reasons, done condition, named blocked triggers, "do not ask questions", and an
+  instruction-priority line, per OpenAI's Codex guidance in
+  `docs/research/2026-09-25-codex-task-briefing-practices.md`. The scope warning now matches
+  the runner: ignored artifacts are reported, not rejected. The conditional `CLAUDE.md` read
+  stays for projects that kept a standalone file. `danger-full-access` stays, deliberately.
+- **Codex effort list and fallback.** `--effort` accepts `low|medium|high|xhigh|max`; `none` and
+  `minimal` are rejected, as `gpt-6-astra` rejects `none` and Codex lists neither. The one-time
+  fallback moves from `gpt-5.6-sol` to `gpt-6-sol`, released 2026-09-22 at about half the price.
+- **Breadth roles moved to Opus 5.5 at `low`.** `codebase-analyst`, `researcher`,
+  `technical-writer`, and `librarian` now pin `claude-opus-5-5` at `effort: low` instead of the
+  moving `sonnet` alias at `medium`. `low` is the level Anthropic recommends for subagents and
+  simple tasks on Opus 5.5, and its published sweep puts `low` close to `medium` on coding. The
+  four Codex wrappers stay on `sonnet` / `medium`, since they only marshal a Codex run. The eight
+  gate-bearing roles are unchanged. `validate.sh` check 14 pins the new values; the doc is `docs/model-tiering.md`.
+
 ## 0.26.0 - 2026-09-24
 
 Opus 5.5 for the gate-bearing fleet.

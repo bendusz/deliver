@@ -2,7 +2,8 @@
 export class UsageError extends Error {}
 
 const MODES = new Set(['build', 'fix', 'review', 'advise', 'research']);
-const EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+// gpt-6-astra rejects `none`; `minimal` is not a Codex level; `ultra` delegates to subagents, which the runner keeps off.
+const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 const SCOPES = new Set(['recent', 'worktree', 'branch', 'codebase']);
 const DEFAULT_MODEL = 'gpt-6-astra';
 const DEFAULTS = {
@@ -13,7 +14,8 @@ const DEFAULTS = {
   advise: { model: DEFAULT_MODEL, effort: 'medium' },
 };
 // When the default model is refused for this account, every mode retries once on this pair.
-export const FALLBACK = { model: 'gpt-5.6-sol', effort: 'medium' };
+// gpt-6-sol (2026-09-22) replaced gpt-5.6-sol as the mid-tier GPT-6 model at about half the price.
+export const FALLBACK = { model: 'gpt-6-sol', effort: 'medium' };
 const VALUE_FLAGS = new Set(['--mode', '--worktree', '--story', '--evidence', '--model', '--effort', '--timeout-seconds', '--scope', '--base', '--objective', '--out', '--prompt-file', '--search']);
 
 export const USAGE = 'usage: run.mjs --mode build|fix|review|advise|research [--preflight] [--model <id>] [--effort <level>] [--timeout-seconds <n>] ' +

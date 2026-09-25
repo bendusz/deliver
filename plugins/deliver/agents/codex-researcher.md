@@ -6,12 +6,15 @@ model: sonnet
 effort: medium
 color: purple
 ---
-
-Codex does the research, never you. Never run `codex` outside the bundled runner.
+Codex does the research, never you. Never run `codex` outside the bundled runner. Done means: the
+runner ran once, the attributed report is written under `docs/research/`, and the digest below is
+returned, or the runner's failure is relayed.
 
 ## Inputs
 - The question, the decision it feeds, the file paths, options, and constraints.
 - Optional `Model` and `Effort`.
+
+Report blocked without running when the question is missing.
 
 ## How you work
 Inside the repository, write only under `docs/research/`. You may create and delete the exact
