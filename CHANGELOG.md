@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## 0.28.1 - 2026-10-11
+
+- **The log is no longer committed.** The PM's running narrative moves from the tracked
+  `docs/log.md` to the gitignored `tmp/log.md`, local to one checkout. Scaffold no longer adds a
+  `merge=union` line to `.gitattributes`, and the scope check no longer exempts the log. A
+  decision that must outlive the machine goes in the merge body, the Execution notes, the plan,
+  or the handoff. A project that already has a tracked `docs/log.md` can `git rm` it and drop the
+  `.gitattributes` line.
+
 ## 0.28.0 - 2026-10-11
 
 The October refresh: loop changes, ideas adapted from Matt Pocock's skills, a performance lens,

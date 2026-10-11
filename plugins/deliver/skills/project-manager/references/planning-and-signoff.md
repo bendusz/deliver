@@ -72,11 +72,11 @@ responsibility.
 - At `standard` scale and above, scaffold `docs/wiki/` from the wiki templates per `knowledge.md`.
 - With `Skeleton: specdd`, append the SpecDD line held in `AGENTS.md.template`'s comment,
   uncommented, to the project `AGENTS.md` Conventions.
-- Create `docs/log.md` from `${CLAUDE_PLUGIN_ROOT}/templates/log.md.template` with a first entry
-  recording the sign-off, and append `docs/log.md merge=union` to `.gitattributes`, creating the
-  file if it is missing and leaving its other lines alone. `state.md` owns the entry format.
 - Ensure `.gitignore` includes `tmp/`, appending rather than clobbering an existing `.gitignore`.
   `tmp/` is ephemeral scratch and never enters git.
+- Create `tmp/log.md` from `${CLAUDE_PLUGIN_ROOT}/templates/log.md.template` with a first entry
+  recording the sign-off. It is gitignored with the rest of `tmp/`; never commit it. `state.md`
+  owns the entry format.
 - **Commit** only the files you created or changed. No `git add -A` over the user's other work.
 - If git has no `user.name` or `user.email`, ask before committing.
 - The branch the scaffold commit lands on, `main` by default, is the integration branch: the base you
@@ -87,7 +87,7 @@ With a wiki, dispatch the first `librarian ingest` per `knowledge.md` and commit
 ## Checkpoint policy (recorded in Delivery mode, applied during the loop)
 - Default sprint-level: run all the sprint's stories, then `/deliver:retro` per
   `retrospective.md`, then pause for the user's review at the sprint boundary. A project may set story-level, pausing before each merge, or fully autonomous.
-- Between checkpoints, `docs/log.md` carries the progress. Message the user when they ask, when
+- Between checkpoints, `tmp/log.md` carries the progress. Message the user when they ask, when
   you escalate, and at the checkpoint. The checkpoint report names what shipped, the retro's
   numbers, the decisions you took without asking, and anything waiting on the user.
 - Whatever the mode, **escalate** immediately before a high-risk merge or one that changes several

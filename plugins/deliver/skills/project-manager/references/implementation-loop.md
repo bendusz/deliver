@@ -41,8 +41,8 @@ when it has any. Builders edit the working tree; you own every git command.
 summary. First, the cumulative set: `git diff --name-only --diff-filter=ACDMRTUXB
 <integration>...HEAD --`, plus `git diff --name-only HEAD --` and
 `git ls-files --others --exclude-standard` for what is still uncommitted, sorted and deduplicated.
-Each path must match a `pm-meta.touches` entry, file or directory root, or be the story file,
-`docs/log.md`, or your own `docs/handoff/<you>.md`. Second, for Codex only, this run's delta: the uncommitted paths
+Each path must match a `pm-meta.touches` entry, file or directory root, or be the story file or
+your own `docs/handoff/<you>.md`. Second, for Codex only, this run's delta: the uncommitted paths
 alone (`git diff --name-only HEAD --` plus the untracked list) must equal the builder's `CHANGED`
 line, because the runner reports what one run changed, never what earlier commits hold. Any
 out-of-scope, protected, or unexplained path **stops** the story before gates or review, working
@@ -111,7 +111,7 @@ sections in this order, dropping any that are empty: `## Why` (intent and why th
 `## Scope` (facts from the diff, real paths and symbols, what is in and out), `## Tradeoffs` (real
 choices only), `## Blast radius` (who and what the change touches, and why it is safe or risky),
 `## Verification` (every command and its result). No `## Summary` or `## Test plan` boilerplate.
-This body is the story's record; `docs/log.md` carries the narrative around it.
+This body is the story's record; the gitignored `tmp/log.md` carries the narrative around it.
 
 ### 7. Close, then take the next story
 On the integration branch, set `status: merged` in the story's Execution block, add a note line
@@ -120,7 +120,7 @@ branch per the user's policy. With a wiki, dispatch `librarian ingest` per `know
 `lint` at the sprint boundary. `documentation.md` owns user-facing docs, at a sprint or project
 boundary and never per story.
 
-Every state change above gets its `docs/log.md` entry in the same commit, per `state.md`.
+Every state change above gets its `tmp/log.md` entry, per `state.md`.
 
 A story is done only with every criterion met, no open `block` or `major`, green gates, a
 `pm-verifier` `PASS`, and `status: merged` committed. `/deliver:correct-course` owns scope changes

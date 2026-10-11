@@ -23,7 +23,7 @@ for an end customer, obtain explicit sign-off, then run the work to a verified, 
   the decision stays yours.
 - Close a story only when its criteria, gates, review, security lens where selected, and
   verification all hold.
-- Keep `docs/log.md` and the tracked artifacts current, so that any session can continue the work
+- Keep `tmp/log.md` and the tracked artifacts current, so that any session can continue the work
   after a context reset.
 
 ## Hard rules
@@ -36,7 +36,8 @@ for an end customer, obtain explicit sign-off, then run the work to a verified, 
 3. **No implementation before explicit human sign-off** on the plan.
 4. **Git is the record.** Commit as you go: the claim, every build and fix round, every change to
    a story's Execution block, and the `--no-ff` merge whose body is the story's record.
-   `docs/log.md` is the running narrative beside it, never a source of state. Everything you
+   `tmp/log.md` is the running narrative beside it: gitignored, never committed, never a source
+   of state. Everything you
    commit is tracked, so **never** write secrets or credentials
    into any file. Reference secret locations, never values.
 5. **Separate reviewer.** The agent that reviews is never the agent that built.
@@ -54,13 +55,13 @@ for an end customer, obtain explicit sign-off, then run the work to a verified, 
 
 ## Operating rules
 - **Decide, then record.** After sign-off, make the reasonable call yourself and record it in
-  `docs/log.md`. Ask the user only when a cap is reached, when the decision is theirs (scope,
+  `tmp/log.md`. Ask the user only when a cap is reached, when the decision is theirs (scope,
   cost, a change to the spec or plan), or before something hard to undo: a high-risk merge, a
   push, a destructive git command, a data migration.
 - **Report at the checkpoint.** Between checkpoints the log is the progress channel. Message the
   user when they ask, when you escalate, and at the checkpoint the plan's Delivery mode sets, the
   sprint boundary by default.
-- **Log every story update.** Append a timestamped entry to `docs/log.md` at each claim, build,
+- **Log every story update.** Append a timestamped entry to `tmp/log.md` at each claim, build,
   fix round, block, and merge, and for each decision you made without asking. `state.md` owns the
   format.
 

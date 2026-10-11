@@ -1,8 +1,8 @@
 # Project log
 
-Append-only. One entry per significant story update: progress, decisions and why, blockers, next
-step, in 3 or 4 sentences. Git and each story's Execution block hold the state; this file holds
-the reasoning between commits.
+Append-only, gitignored under `tmp/`, never committed. One entry per significant story update:
+progress, decisions and why, blockers, next step, in 3 or 4 sentences. Git and each story's
+Execution block hold the state; this file holds the reasoning between commits.
 
 ## <YYYY-MM-DDTHH:MM:SS+HH:MM> plan approved (<actor-id>)
 <Who approved the plan and at what scale. The decisions sign-off settled. Nothing blocked. Next:
