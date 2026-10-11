@@ -169,9 +169,6 @@ Committed under `docs/`, which is authoritative:
 - `docs/plan.md`, the delivery plan, derived from the spec with traceability.
 - `docs/stories/*.md`, self-contained story files, each tracing to requirement IDs. A claimed
   story ends with an Execution block: owner, builder, branch, status, loop counters, and dated notes.
-- `docs/log.md`, the running narrative: a timestamped entry of three or four sentences at every
-  claim, build, fix round, block, and merge, and for each decision the PM took without asking.
-  Append-only, merged with `merge=union`, and never a source of state.
 - `docs/handoff/<actor-id>.md`, an end-of-session briefing, current while nothing but that file
   has changed since its `BASE_COMMIT`. Optional.
 - `docs/constitution.md`, project-specific governing principles. Optional.
@@ -193,9 +190,12 @@ In git, the rest of the state. Solo is a team of one.
   record, and `git log --first-parent` on the integration branch is the project history.
 - Never write secrets into any tracked file.
 
-Gitignored scratch and reports, disposable and never load-bearing for resume. The first four live
+Gitignored scratch and reports, disposable and never load-bearing for resume. The first five live
 under `tmp/`; the report directories sit at the repository root:
 
+- `tmp/log.md`, the PM's running narrative: a timestamped entry of three or four sentences at
+  every claim, build, fix round, block, and merge, and for each decision the PM took without
+  asking. Never committed and never a source of state.
 - `tmp/environment-check.md`, `/deliver:doctor`'s readiness report.
 - `tmp/codex-builder/*.md`, focused fix briefs passed to `codex-builder`. Never authoritative and
   safe to discard after the story.

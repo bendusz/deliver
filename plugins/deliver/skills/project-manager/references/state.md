@@ -15,9 +15,9 @@ identical.
 | Who holds a story, its builder, branch, status, and loop counters | the story's `## Execution` block |
 | What a story changed, why, and how it was verified | the `--no-ff` merge commit body |
 | The project history | `git log --first-parent <integration branch>` |
-| Progress, decisions, blockers, and next steps as they happen | `docs/log.md` |
+| Progress, decisions, blockers, and next steps as they happen | `tmp/log.md`, gitignored, local to this checkout |
 | A session's next step | `docs/handoff/<actor-id>.md`, optional |
-| Scratch, prompts, raw output, diffs, worktrees | `tmp/`, gitignored, never load-bearing |
+| Scratch, prompts, raw output, diffs, worktrees, the log | `tmp/`, gitignored, never load-bearing |
 
 Phase and sprint are derived, in this order of precedence. A marker that is not `approved`, or
 whose plan changed since approval, is planning whenever a spec, plan, or story exists, since it
@@ -112,11 +112,13 @@ which. **Overwrite** it each handoff,
 since history is git. Durable decisions never live only here: they go to the spec, plan, story,
 or constitution.
 
-## `docs/log.md` (the running narrative)
+## `tmp/log.md` (the running narrative)
 
-Scaffold creates it from `${CLAUDE_PLUGIN_ROOT}/templates/log.md.template`. It is append-only and
-read by people and by a resuming session. Nothing derives phase, ownership, or counters from it;
-when it disagrees with an Execution block or with git, they are right.
+Create it from `${CLAUDE_PLUGIN_ROOT}/templates/log.md.template` at sign-off. It lives under the
+gitignored `tmp/`, so it is never committed and never leaves this checkout. It is append-only and
+read by people and by a resuming session on the same machine. Nothing derives phase, ownership,
+or counters from it; when it disagrees with an Execution block or with git, they are right, and
+a checkout without it loses nothing it needs.
 
 Append one entry at each significant story update: the claim, the build commit, every fix round, a
 block or escalation, the merge, and any decision you made without asking the user. Also append one
@@ -131,11 +133,10 @@ the gates, then re-review the round's diff.
 ```
 
 - The timestamp is ISO 8601 with the UTC offset, read from the system clock, never estimated.
-- Write the entry in the commit that carries the update, after the scope check has run, so a
-  builder's changed paths are compared before the log moves. An update with no commit of its own
-  still gets its entry, committed with the next one.
-- Scaffold adds `docs/log.md merge=union` to `.gitattributes`, so entries appended on a story
-  branch and on the integration branch merge without a conflict.
+- Write to the main checkout's `tmp/log.md`, also when the work runs in a worktree, so one file
+  holds the whole account.
+- A decision that must outlive this machine goes where it is tracked: the merge commit body, the
+  story's Execution notes, the plan, or the handoff. The log only narrates.
 - Keep entries short. Findings, diffs, and command output stay in their own artifacts; the entry
   points at them.
 
