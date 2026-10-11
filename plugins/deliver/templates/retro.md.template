@@ -1,12 +1,18 @@
 <!-- docs/retros/sprint-<n>.md -->
 # Sprint <n> retrospective, <YYYY-MM-DD>
 
+## Numbers
+<!-- Paste the table from scripts/retro-stats.mjs. -->
+| story | builder | rounds | retries |
+|-------|---------|--------|---------|
+| S<n>-1 | <builder> | <n> | <n> |
+
 ## Sprint review
 - Range: `<from>...<to>` · changed lines: <n> · lens: <code-integrity-reviewer | architecture-reviewer>
 - Verdict: <PASS | CONCERNS | FAIL> · carried into the next sprint: <none | story ids>
 
 ## What recurred
-- <finding or convention> · stories: <ids> · rounds spent: <n> · action: <AGENTS.md line | story Context | none>
+- <finding or convention> · stories: <ids> · rounds spent: <n> · learned line broken: <L id | none> · action: <check story | AGENTS.md line | story Context | none>
 
 ## What the stories lacked
 - <missing Context> · action: <next sprint's stories | none>
@@ -14,8 +20,13 @@
 ## What earned nothing
 - <gate, lens, or step> · cost: <rounds or minutes> · decision: <keep | drop> (the user's)
 
-## AGENTS.md changes accepted
-- <one line per addition, or "none earned">
+## Lessons
+<!-- One row per AGENTS.md line accepted this sprint, three at most. The id also ends the line in AGENTS.md. -->
+| id | line | evidence | review by |
+|----|------|----------|-----------|
+| L<n>-1 | <the line> | <story ids and fix rounds> | sprint <n+3> |
+
+Retired this sprint: <ids and why: uncited since added, or now caught by a check; or "none">
 
 ## Carried over
 - <item>

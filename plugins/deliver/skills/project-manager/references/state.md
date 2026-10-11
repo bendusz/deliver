@@ -1,8 +1,8 @@
 # State: git is the record
 
 Keep on disk only what git cannot derive: whether the plan is approved, where each claimed story
-stands, and an optional handoff. Everything else, who holds what, what shipped, and why, is the
-branches, the commits, and the tracked `docs/` artifacts. Solo is a team of one: the layout is
+stands, the reasoning between commits, and an optional handoff. Everything else, who holds what,
+what shipped, and why, is the branches, the commits, and the tracked `docs/` artifacts. Solo is a team of one: the layout is
 identical.
 
 ## What lives where
@@ -15,6 +15,7 @@ identical.
 | Who holds a story, its builder, branch, status, and loop counters | the story's `## Execution` block |
 | What a story changed, why, and how it was verified | the `--no-ff` merge commit body |
 | The project history | `git log --first-parent <integration branch>` |
+| Progress, decisions, blockers, and next steps as they happen | `docs/log.md` |
 | A session's next step | `docs/handoff/<actor-id>.md`, optional |
 | Scratch, prompts, raw output, diffs, worktrees | `tmp/`, gitignored, never load-bearing |
 
@@ -60,7 +61,7 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
 
 ```
 ## Execution
-<!-- pm-exec: {"owner":"v-bende-a1b2c3d4e5f6","builder":"expert-builder","branch":"pm/S1-2-add-and-list","status":"building","rounds":0,"retries":0,"updated":"2026-09-07 10:15"} -->
+<!-- pm-exec: {"owner":"v-bende-a1b2c3d4e5f6","builder":"expert-builder","branch":"pm/S1-2-add-and-list","status":"building","rounds":0,"retries":0,"deliver":"0.28.0","updated":"2026-09-07 10:15"} -->
 - 2026-09-07 11:02 external review skipped: codex CLI absent on this machine.
 ```
 
@@ -69,9 +70,11 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
 - `rounds` (fix and re-review rounds) and `retries` (builder retries) bound the loop across
   sessions. Increment and commit **before** the dispatch they count, so a builder that dies before
   committing still spent its attempt. The **caps** are 3 rounds and 2 retries.
+- `deliver` is the plugin version that claimed the story: the `version` in
+  `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`, read at the claim and never changed after.
+  It lets `retro-stats.mjs` compare loop counters across plugin versions.
 - Below the comment, optional dated bullet lines record what has no commit of its own: a skipped
-  external review, an escalation, a blocker, a worktree that vanished. This is where the old
-  logbook's mid-flight entries go.
+  external review, an escalation, a blocker, a worktree that vanished.
 - Decomposition never writes the section; the claim commit adds it. `merged` is terminal and the
   block stays as history.
 
@@ -108,6 +111,33 @@ while nothing but the handoff file itself has changed since that commit, and the
 which. **Overwrite** it each handoff,
 since history is git. Durable decisions never live only here: they go to the spec, plan, story,
 or constitution.
+
+## `docs/log.md` (the running narrative)
+
+Scaffold creates it from `${CLAUDE_PLUGIN_ROOT}/templates/log.md.template`. It is append-only and
+read by people and by a resuming session. Nothing derives phase, ownership, or counters from it;
+when it disagrees with an Execution block or with git, they are right.
+
+Append one entry at each significant story update: the claim, the build commit, every fix round, a
+block or escalation, the merge, and any decision you made without asking the user. Also append one
+at sign-off and one at each sprint boundary. An entry is a heading and 3 or 4 sentences covering
+progress, decisions and why, blockers, and the next step:
+
+```
+## 2026-10-11T14:32:05+02:00 S1-2 fix round 1 (v-bende-a1b2c3d4e5f6)
+The review found one major: the list endpoint returned unpaginated rows. Chose cursor pagination
+over offset because the table is append-heavy; `codex-advisor` agreed. No blockers. Next: re-run
+the gates, then re-review the round's diff.
+```
+
+- The timestamp is ISO 8601 with the UTC offset, read from the system clock, never estimated.
+- Write the entry in the commit that carries the update, after the scope check has run, so a
+  builder's changed paths are compared before the log moves. An update with no commit of its own
+  still gets its entry, committed with the next one.
+- Scaffold adds `docs/log.md merge=union` to `.gitattributes`, so entries appended on a story
+  branch and on the integration branch merge without a conflict.
+- Keep entries short. Findings, diffs, and command output stay in their own artifacts; the entry
+  points at them.
 
 ## Projects managed before 0.24
 

@@ -22,6 +22,15 @@ Derive every test from an acceptance criterion, black-box, never internals, in t
 framework and conventions. Cover the happy path, the boundaries, and the error cases the criteria
 name. Skip trivial tests.
 
+Never write a test that:
+- asserts a mock was called, in place of what the code returned or changed;
+- computes its expected value with the same logic as the implementation;
+- reaches a private function, internal state, or file layout;
+- still passes with the feature deleted;
+- checks several behaviours at once, so one failure hides the rest.
+
+Mock only at a system boundary: network, clock, filesystem, a third-party service.
+
 Touch only test files. Never run a git command that changes repository state; the PM owns commits.
 
 You run before implementation for TDD red or after it to harden coverage. Either way, run the tests
@@ -37,3 +46,5 @@ contract, then return.
 - Criteria you could not cover, with the reason.
 
 Do not paste test files or logs.
+
+<!-- The list of tests never to write is adapted from Matt Pocock's skills (mattpocock/skills, MIT). -->

@@ -36,6 +36,17 @@ Return once the diff is covered, or when input is missing; never with a partial 
 Verdict first: FAIL for any block or major, CONCERNS for minors only, otherwise PASS.
 Then one line per acceptance criterion: met, unmet, or not verifiable, with the `file:line` or
 missing evidence behind it.
-Then one entry per finding: `severity`, `file:line`, what is wrong and why, how to show it fails
-(an input, call, or test), and a concrete fix.
+Then the findings in two lists, so the PM can tell "not what was asked" from "not sound":
+- **Spec findings.** A criterion, a `Specs` line, or a stated scope limit the diff misses,
+  contradicts, or exceeds.
+- **Standards findings.** Correctness, security, and convention problems in code that does what
+  was asked.
+
+One entry per finding in either list: `severity`, `file:line`, what is wrong and why, how to show
+it fails (an input, call, or test), and a concrete fix.
+Then **Smells**, at most five one-line `minor` notes with `file:line`, for shapes that will cost
+the next change: a function doing several jobs, a duplicated block, a flag argument, a test that
+mirrors the code. Omit the heading when there are none.
 End with one line naming the files and contracts you inspected.
+
+<!-- The spec and standards split and the smells list are adapted from Matt Pocock's skills (mattpocock/skills, MIT). -->

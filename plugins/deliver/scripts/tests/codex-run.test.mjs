@@ -17,9 +17,9 @@ test('args: defaults per mode and validation', () => {
   const b = parseArgs(['--mode', 'build', '--worktree', '/w', '--story', 'docs/stories/S1-1.md']);
   assert.deepEqual([b.model, b.effort, b.timeoutSeconds], ['gpt-6-astra', 'high', 600]);
   const r = parseArgs(['--mode', 'review', '--scope', 'recent', '--out', '/w/untracked']);
-  assert.deepEqual([r.model, r.effort], ['gpt-6-astra', 'high']);
+  assert.deepEqual([r.model, r.effort], ['gpt-6.1-sol', 'high']);
   const a = parseArgs(['--mode', 'advise', '--prompt-file', '/p.md']);
-  assert.deepEqual([a.model, a.effort], ['gpt-6-astra', 'medium']);
+  assert.deepEqual([a.model, a.effort], ['gpt-6-astra', 'high']);
   const s = parseArgs(['--mode', 'research', '--prompt-file', '/p.md', '--search', 'off']);
   assert.equal(s.search, 'off');
   assert.throws(() => parseArgs(['--mode', 'build', '--worktree', '/w']), UsageError);
@@ -373,7 +373,7 @@ test('model fallback: an explicit --model never falls back; other failures never
 test('model fallback: review and advise take the same gpt-6-sol fallback at medium', () => {
   const p = newBuildProject(true);
   const s = makeStub();
-  const rv = runRunner(['--mode', 'review', '--scope', 'codebase', '--out', path.join(p, 'untracked')], { stub: s, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6-astra' } });
+  const rv = runRunner(['--mode', 'review', '--scope', 'codebase', '--out', path.join(p, 'untracked')], { stub: s, cwd: p, env: { STUB_UNSUPPORTED_MODEL: 'gpt-6.1-sol' } });
   assert.equal(rv.status, 0); assert.deepEqual([rv.out.model, rv.out.effort], ['gpt-6-sol', 'medium']);
   assert.equal(rv.out.model_fallback.to.model, 'gpt-6-sol');
   const brief = path.join(s.dir, 'brief.md'); fs.writeFileSync(brief, 'Should we use X or Y?\n');
@@ -705,7 +705,7 @@ test('review: recent scope with an objective goes through exec review with promp
   const a = stubArgs(s);
   assert.equal(a[0], 'review');
   for (const x of ['--sandbox', '-C', '--cd', '--color', '--commit']) assert.ok(!has(a, x), `must not pass ${x}`);
-  for (const x of ['--ignore-rules', '--ephemeral', 'gpt-6-astra', 'model_reasoning_effort=high', 'sandbox_mode="danger-full-access"', 'features.hooks=false', 'agents.enabled=false', '-o']) assert.ok(has(a, x), x);
+  for (const x of ['--ignore-rules', '--ephemeral', 'gpt-6.1-sol', 'model_reasoning_effort=high', 'sandbox_mode="danger-full-access"', 'features.hooks=false', 'agents.enabled=false', '-o']) assert.ok(has(a, x), x);
   for (const x of ['--ignore-user-config', '--strict-config', 'mcp_servers={}', 'web_search="disabled"']) assert.ok(!has(a, x), `must not pass ${x}`);
   assert.match(fs.readFileSync(s.promptFile, 'utf8'), /last commit \(HEAD\).*security/s);
   assert.ok(fs.existsSync(r.out.report_path));
@@ -898,7 +898,7 @@ test('advise: exec with the prompt on stdin, answer retained', () => {
   const r = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_ANSWER: '1' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const a = stubArgs(s);
-  for (const x of ['--ephemeral', '--color', 'never', '--ignore-rules', 'gpt-6-astra', 'model_reasoning_effort=medium', 'sandbox_mode="danger-full-access"', 'features.hooks=false', 'agents.enabled=false', '-o', '-']) assert.ok(has(a, x), x);
+  for (const x of ['--ephemeral', '--color', 'never', '--ignore-rules', 'gpt-6-astra', 'model_reasoning_effort=high', 'sandbox_mode="danger-full-access"', 'features.hooks=false', 'agents.enabled=false', '-o', '-']) assert.ok(has(a, x), x);
   for (const x of ['--sandbox', 'read-only', '--ignore-user-config', '--strict-config', 'mcp_servers={}', 'web_search="disabled"']) assert.ok(!has(a, x), `must not pass ${x}`);
   assert.ok(!has(a, '--search') && !has(a, '--skip-git-repo-check'));
   assert.equal(fs.readFileSync(s.promptFile, 'utf8'), 'Should we use X or Y?\n');

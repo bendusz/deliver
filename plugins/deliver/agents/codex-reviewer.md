@@ -29,8 +29,8 @@ On Windows PowerShell, set `$env:PM_CODEX_STAMP` first. Add `--base "$BASE"` for
 scope, and `--objective "$OBJECTIVE"`, `--model`, `--effort`, or `--timeout-seconds` only when the
 dispatch names them. Nothing else.
 
-## Return (at most 15 lines)
-Read `report_path` and give one line per finding, most severe first, as
+## Return
+Read `report_path` and give one line per finding, every finding, most severe first, as
 `[severity] file:line: claim`, then the report path, model, effort, and Codex version. Add
 `gitignore_rule_needed` or `NOTHING TO REVIEW: <reason>` when the runner reports either. On a
 non-zero exit, return the runner status, reason, and retained diagnostics, and do not retry

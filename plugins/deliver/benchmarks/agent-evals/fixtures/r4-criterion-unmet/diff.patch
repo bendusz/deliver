@@ -1,0 +1,22 @@
+diff --git a/src/get.js b/src/get.js
+new file mode 100644
+--- /dev/null
++++ b/src/get.js
+@@ -0,0 +1,4 @@
++export function getTask(db, id) {
++  const rows = db.query('SELECT id, title, done FROM tasks WHERE id = ?', [id]);
++  return { status: 200, body: rows[0] ?? null };
++}
+diff --git a/test/get.test.js b/test/get.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/get.test.js
+@@ -0,0 +1,9 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { getTask } from '../src/get.js';
++
++test('getTask returns an existing task', () => {
++  const db = { query: () => [{ id: 1, title: 'a', done: false }] };
++  assert.deepEqual(getTask(db, 1), { status: 200, body: { id: 1, title: 'a', done: false } });
++});

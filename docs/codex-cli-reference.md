@@ -49,7 +49,8 @@ Whole-codebase review is not native at all: it is plain `codex exec` with a prom
 
 | Model | Position | API price /1M in/out |
 |---|---|---|
-| `gpt-6-astra` | current flagship; deliver's default everywhere | not recorded here |
+| `gpt-6-astra` | current flagship; deliver's default for build, fix, research, and advice | not recorded here |
+| `gpt-6.1-sol` | 6.1 mid tier; deliver's review default since 0.28, chosen by the user | not recorded here |
 | `gpt-6-sol` | GPT-6 mid tier, released 2026-09-22; deliver's fallback everywhere | about half the 5.6 line; not recorded here |
 | `gpt-6-luna` | GPT-6 fast tier, released 2026-09-22; `high` effort and above only | not recorded here |
 | `gpt-5.6-sol` | previous flagship and deliver's fallback before 0.27 | $4 / $20 |
@@ -75,14 +76,14 @@ ran plus `model_fallback: {from, to, reason}`, where `from` and `to` are `{model
 and `reason` is the refusal line cut to 300 characters.
 `--timeout-seconds` bounds each attempt, so a fallback run can take twice that.
 
-## deliver's chosen defaults (models 2026-09-25, efforts 2026-07-16)
+## deliver's chosen defaults (review model and advice effort 2026-10-11, the rest 2026-09-25)
 
 Every caller falls back to `gpt-6-sol` at `medium`.
 
 | Caller | Model | Effort |
 |---|---|---|
-| `/deliver:codex-review` | `gpt-6-astra` | `high` |
-| `/deliver:codex-help` | `gpt-6-astra` | `medium` |
+| `/deliver:codex-review` and the loop's per-story review | `gpt-6.1-sol` | `high` |
+| `/deliver:codex-help` and `codex-advisor` | `gpt-6-astra` | `high` |
 | `codex-researcher` | `gpt-6-astra` | `high` |
 | `codex-builder` (build and fix) | `gpt-6-astra` | `high` |
 

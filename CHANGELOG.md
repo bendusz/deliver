@@ -2,6 +2,83 @@
 
 All notable changes to this project are documented here.
 
+## 0.28.0 - 2026-10-11
+
+The October refresh: loop changes, ideas adapted from Matt Pocock's skills, a performance lens,
+and pstack 0.15.17.
+
+- **The PM is an autonomous technical project manager.** `SKILL.md` now states the role, its
+  responsibilities, and three operating rules. After sign-off the PM decides and records instead
+  of asking, except at a cap, on a decision that is the user's, or before something hard to undo.
+  It messages the user when asked, on escalation, and at the checkpoint.
+- **`docs/log.md` is back, as narrative only.** A timestamped ISO 8601 entry of three or four
+  sentences at every claim, build, fix round, block, and merge, and for each decision taken
+  without asking. Scaffold creates it with `merge=union`; resume reads its last five entries.
+  Git and the Execution block still hold all state, as they have since 0.24.
+- **A second model reviews every story.** With Codex ready, `codex-reviewer` runs once per story
+  beside the panel at `small` scale and above, and `codex-advisor` is asked before a
+  consequential technical decision.
+- **New Codex defaults for review and advice.** Review runs on `gpt-6.1-sol` at `high`, and
+  advice on `gpt-6-astra` at `high`, up from `medium`. Build, fix, and research stay on
+  `gpt-6-astra` at `high`, and the fallback stays `gpt-6-sol` at `medium`.
+- **Learned lines earn and keep their place.** A retro adds at most three `AGENTS.md` lines, each
+  tagged `[L<sprint>-<n>]` with its evidence and a review-by sprint in the record's Lessons
+  table. `retro-stats.mjs --audit` lists the lines due for review; one no later retro cited is
+  retired. A proposed check must fail on the offending commit before it is kept. Web pages,
+  research reports, and tool output never count as evidence for a rule.
+- **Stories record the plugin version.** The Execution block gains `deliver`, stamped at the
+  claim, and `retro-stats.mjs` groups counters by it once a project spans two versions.
+- **A frozen eval set for the two gate agents.** `benchmarks/agent-evals` holds 16 fixtures: nine
+  diffs for `code-integrity-reviewer` and seven small repositories for `pm-verifier`, split into
+  `dev` and `heldout` and pinned by `MANIFEST.sha256`, which `validate.sh` checks.
+  `/deliver:agent-evals` runs three trials per case and `scripts/agent-evals.mjs` scores them.
+- **New `/deliver:improve`, for maintainers.** One hypothesis, one edit of at most 20 lines to one
+  agent or reference, measured against the evals and accepted only when it is no worse on the
+  held-out cases and the prompt did not grow by more than 10%. Hooks, scripts, fixtures,
+  frontmatter, hard rules, and caps are frozen to it, and it never commits.
+- **Failed attempts escalate effort.** `expert-builder` runs at its frontmatter `medium` first. A
+  builder retry, and every fix round from the second on, passes `effort: high` on the dispatch.
+  Needs Claude Code `v2.1.292`; `/deliver:doctor` flags older versions.
+- **Open criteria get a targeted continuation.** When a builder reports done with a criterion
+  plainly unaddressed, the PM sends one continuation naming the open criteria, twice at most,
+  then blocks the story. A continuation is neither a retry nor a fix round.
+- **A bug fix lands with its regression test.** The fix brief for a failing gate or a correctness
+  or security finding names the behaviour to pin. The builder writes the test, sees it fail, then
+  fixes, and the PM checks the test is in the round's diff.
+- **The debugger reproduces first.** It names no cause before a command has shown the failure. It
+  stays read-only: it returns `NEED: <command>` and the PM runs it, which spends no round or
+  retry.
+- **Reviews separate "not what was asked" from "not sound".** `code-integrity-reviewer` reports
+  spec findings and standards findings as two lists, then up to five `minor` smells.
+- **Stories are thin vertical slices.** `decomposition.md` asks for one behaviour through every
+  layer, folds layer-only stories into the first story that needs them, and splits a wide
+  refactor into expand, migrate, contract. The readiness checklist checks it.
+- **Retros turn mechanical mistakes into checks.** A recurrence a tool could have caught becomes
+  a proposed lint rule, test, or gate; only judgement calls become `AGENTS.md` lines.
+- **Retros start from numbers.** New `scripts/retro-stats.mjs` prints fix rounds and retries per
+  story and per builder from the story files. `/deliver:retro` runs it and the record carries
+  the table.
+- **`test-engineer` names the tests never to write**: asserting on mocks, mirroring the
+  implementation, reaching internals, passing with the feature deleted.
+- **The app-driving check is planned.** For a UI, CLI, or service whose criteria need the running
+  app, the plan carries a sprint-1 story that creates the `verify-<app>` skill, so the verifier
+  stops returning `UNKNOWN` for them. `/deliver:analyze` flags its absence.
+- **New `performance-reviewer` lens.** A seventeenth agent, read-only, Opus 5.5 at `medium`,
+  selected for hot paths, data-access changes, unbounded loops, caching, concurrency, and stated
+  budgets. Every finding names the input size at which it hurts.
+- **Agent frontmatter keys are allowlisted.** `validate.sh` fails on an unknown key, so a typo
+  such as `efort:` no longer drops a setting silently.
+- **Prompt audit fixes.** References that told the PM to invoke `poteto:architect` and
+  `poteto:blast-radius` now ask the user to run them, since both are user-invoked.
+  `codex-reviewer` no longer caps its digest at 15 lines, which could drop findings. A dead
+  pointer, a stale skill name, and two history leftovers are removed.
+- **poteto 0.15.17**, 40 skills: adds `ketchup`, `benchmark-checklist`, and three principles.
+  Upstream's skills are now user-invoked; `unslop` stays automatic. See `plugins/poteto/PORT.md`.
+
+The slice shape, check-before-rule, reproduce-first, the findings split, and the test
+anti-patterns are adapted from Matt Pocock's skills (`mattpocock/skills`, MIT), rewritten for
+this workflow; no files were copied.
+
 ## 0.27.0 - 2026-09-25
 
 Agent files reshaped for Opus 5.5 and GPT-6.

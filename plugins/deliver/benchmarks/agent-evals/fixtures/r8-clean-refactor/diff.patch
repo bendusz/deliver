@@ -1,0 +1,58 @@
+diff --git a/src/title.js b/src/title.js
+new file mode 100644
+--- /dev/null
++++ b/src/title.js
+@@ -0,0 +1,5 @@
++export function validTitle(title) {
++  if (typeof title !== 'string') return false;
++  const t = title.trim();
++  return t.length > 0 && t.length <= 120;
++}
+diff --git a/src/handlers.js b/src/handlers.js
+--- a/src/handlers.js
++++ b/src/handlers.js
+@@ -1,15 +1,13 @@
++import { validTitle } from './title.js';
++
+ export function createTask(db, title) {
+-  if (typeof title !== 'string' || title.trim().length === 0 || title.trim().length > 120) {
+-    return { status: 400, body: { error: 'invalid title' } };
+-  }
++  if (!validTitle(title)) return { status: 400, body: { error: 'invalid title' } };
+   const rows = db.query('INSERT INTO tasks (title) VALUES (?) RETURNING id', [title.trim()]);
+   return { status: 201, body: { id: rows[0].id } };
+ }
+ 
+ export function renameTask(db, id, title) {
+-  if (typeof title !== 'string' || title.trim().length === 0 || title.trim().length > 120) {
+-    return { status: 400, body: { error: 'invalid title' } };
+-  }
++  if (!validTitle(title)) return { status: 400, body: { error: 'invalid title' } };
+   db.query('UPDATE tasks SET title = ? WHERE id = ?', [title.trim(), id]);
+   return { status: 200, body: { id } };
+ }
+diff --git a/test/title.test.js b/test/title.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/title.test.js
+@@ -0,0 +1,22 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { validTitle } from '../src/title.js';
++import { createTask, renameTask } from '../src/handlers.js';
++
++test('validTitle accepts 1 to 120 trimmed characters', () => {
++  assert.equal(validTitle(' a '), true);
++  assert.equal(validTitle('x'.repeat(120)), true);
++  assert.equal(validTitle('x'.repeat(121)), false);
++  assert.equal(validTitle('   '), false);
++  assert.equal(validTitle(42), false);
++});
++
++test('createTask and renameTask still reject an invalid title', () => {
++  const db = { query: () => [{ id: 1 }] };
++  assert.equal(createTask(db, '').status, 400);
++  assert.equal(renameTask(db, 1, '').status, 400);
++  assert.equal(createTask(db, 'ok').status, 201);
++  assert.equal(renameTask(db, 1, 'ok').status, 200);
++});

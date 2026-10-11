@@ -22,7 +22,9 @@ absent.
 - **Requirement coverage.** Spec requirements (`FR-`/`AC-`) that no story `Covers:`.
 - **Story grounding.** Stories that cover no requirement, which is orphan scope.
 - **Testability.** Acceptance criteria that are not observable or testable as written.
-- **Verification.** Stories missing a concrete verification command; a plan missing real commands.
+- **Verification.** Stories missing a concrete verification command; a plan missing real commands;
+  above `tiny`, a criterion provable only by driving the app with no story that creates the
+  app-driving check (MEDIUM).
 - **Sign-off.** Missing or inconsistent sign-off between `docs/plan.md` and `docs/approval.json`,
   or a `plan_digest` that no longer matches `git hash-object docs/plan.md`.
 - **Constitution alignment.** A plan or story that conflicts with a rule in `docs/constitution.md`.
@@ -35,7 +37,8 @@ absent.
 - **Gate references.** Stories naming a gate that `docs/plan.md`'s Commands does not list.
 - **Risk lenses, declared against actual.** A story whose content looks security-sensitive (auth,
   secrets, untrusted input, I/O, dependencies) but omits `security-auditor` from its `Review lenses`,
-  and likewise an architecture-changing story that omits `architecture-reviewer`. Flag any mismatch
+  and likewise an architecture-changing story that omits `architecture-reviewer`, or a story on a
+  hot path or with a stated budget that omits `performance-reviewer`. Flag any mismatch
   between the declared `Risk` and lenses and the real scope.
 - **Terminology drift.** The same concept named differently across spec, plan, and stories.
 - **State sanity.** `docs/approval.json` ignored, untracked, or uncommitted while `docs/` moved

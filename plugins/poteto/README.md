@@ -6,7 +6,7 @@ helps build React Compiler, and wrote [pstack](https://github.com/cursor/plugins
 as her answer to slop. Her line for it is the whole philosophy in nine words: *if you want to go
 fast, go deep first.*
 
-Every skill in this directory is hers. The words, the structure, the opinions, the 21 principles,
+Every skill in this directory is hers. The words, the structure, the opinions, the 24 principles,
 and the habit of proving work on the real artifact instead of a summary are her work, published
 under the MIT license. What we did is small. We copied the skills that complement deliver, swapped
 Cursor's model names, subagent parameters, and file paths for Claude Code's, and put them next to
@@ -35,28 +35,33 @@ examples, so it works with or without this plugin. If you kept a hand-copied por
 
 ## What is here
 
-Fourteen workflow skills. Most carry `disable-model-invocation: true` upstream, which means you
-invoke them by slash command and the model does not reach for them on its own. `how`, `why`,
-`unslop`, and `typescript-best-practices` are the exceptions and trigger on their descriptions.
+Sixteen workflow skills, synced to pstack 0.15.17. Upstream now sets
+`disable-model-invocation: true` on every skill, which means you invoke them by slash command and
+the model does not reach for them on its own. `unslop` is the one exception this port keeps: it drops that
+line and still applies on its own, because three other skills here rely on it. `typescript-best-practices` carries upstream's
+`paths:` scope for `.ts` and `.tsx` files.
 
 | Skill | Use it when |
 |---|---|
-| `/poteto:how` | You want a walkthrough of how a subsystem works, or a placement / layering answer. |
+| `/poteto:how` | You want a walkthrough of how a subsystem works, or a placement / layering answer. Upstream removed its critique mode; use `interrogate` for that. |
 | `/poteto:why` | You want to know why something was built this way. Queries every evidence source the session's MCP servers expose. |
 | `/poteto:teach` | You want to actually understand a change or subsystem. Runs `how` and `why` and weaves one plain explanation. |
 | `/poteto:architect` | You are about to write code that crosses a function boundary and want the types, signatures, and module shape settled first. Runs `arena`. |
 | `/poteto:arena` | You want N parallel attempts at the same artifact, then the best parts of each grafted into one. |
 | `/poteto:interrogate` | You have a diff and want several models to try to break it, then a lead reviewer's Act on / Consider / Noted / Dismissed verdict. |
+| `/poteto:benchmark-checklist` | You measured a speedup or regression and want it vetted (limiter, tuning, limits, errors, repeatability, relevance, whether the work ran) before you report it. |
 | `/poteto:blast-radius` | You have a small-looking change and want to know what else it could break, with the one safety fact proven by running code. |
 | `/poteto:reflect` | A long task landed and you want its lessons captured as edits to existing skills, with your approval before anything changes. |
 | `/poteto:create-verification-skill` | Your project has no scripted way to prove app behavior. Generates `.claude/skills/verify-<app>/` with a feature map. |
 | `/poteto:maintain-verification-skill` | The verify skill's feature map has drifted from the app. One source wave, one live pass, at most one PR of proven corrections. |
 | `/poteto:technical-writing` | You are writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages. Diátaxis, Google developer style, STE, Global English. |
 | `unslop` | Any prose. Cuts AI tells. Applies on its own. |
-| `typescript-best-practices` | Reading or editing `.ts` / `.tsx`. Grounds the type-system-discipline principle in syntax. Applies on its own. |
+| `/poteto:typescript-best-practices` | Reading or editing `.ts` / `.tsx`. Grounds the type-system-discipline principle in syntax. Scoped by `paths:` to TypeScript files. |
 | `/poteto:bro` | Restate the last message in plain human language. |
+| `/poteto:ketchup` | You stepped away from a long chat. Catches you up on everything since your last message, with a summary for each decision waiting on you. |
 
-Twenty-one principle skills, one rule each, named `principle-<slug>`. You do not invoke them. You
+Twenty-four principle skills, one rule each, named `principle-<slug>`. New in 0.15.17:
+`explain-the-number`, `attack-the-premise`, and `test-behavior-not-implementation`. You do not invoke them. You
 steer with their names ("use subtract before you add", "apply prove it works"), and `architect`,
 `arena`, `blast-radius`, and `interrogate` cite them. The deliver constitution template offers them
 as a menu a project can adopt.
@@ -72,17 +77,19 @@ as a menu a project can adopt.
   non-Cursor host.
 - `no-comments` and the Comment Sicko agent. A matter of taste, and it wants an agent file.
 - `automate-me`, `setup-pstack`, and the Benny automations. Cursor-specific mechanisms.
+- `correct`, `make-bot-ui`, and `poteto-help`. Newer upstream skills, not yet evaluated
+  for this port.
 
 Read them upstream. Several are worth borrowing ideas from even where they are not worth porting.
 The deliver PR body format and its handoff log audit came from there.
 
 ## What changed for Claude Code
 
-Six classes of edit, nothing else. `PORT.md` lists every occurrence by skill.
+Six classes of edit, plus one deliberate deviation (`unslop` keeps auto-loading). `PORT.md` lists
+every occurrence by skill.
 
-1. Model names. Cursor's slugs became Claude Code's `fable`, `opus`, and `sonnet` aliases. Where
-   pstack used a fourth model family for diversity, the port names the OpenAI Codex CLI as an
-   optional cross-family voice and skips it when absent.
+1. Model names. Cursor's slugs became Claude Code's `opus` and `sonnet` aliases, matching the
+   two-seat panels upstream moved to in 0.15.15.
 2. Subagent parameters. `generalPurpose` became `general-purpose`; `readonly: true` became the
    read-only `Explore` agent; roles that need MCP tools stay on `general-purpose` with a note.
 3. Config lookups. The `~/.cursor/rules/pstack-models.mdc` override layer was removed. The inline

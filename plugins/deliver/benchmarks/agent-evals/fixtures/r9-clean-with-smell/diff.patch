@@ -1,0 +1,30 @@
+diff --git a/src/count.js b/src/count.js
+new file mode 100644
+--- /dev/null
++++ b/src/count.js
+@@ -0,0 +1,9 @@
++export function openCount(tasks) {
++  let x = 0;
++  for (const t of tasks) {
++    if (t.done === false) {
++      x = x + 1;
++    }
++  }
++  return x;
++}
+diff --git a/test/count.test.js b/test/count.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/count.test.js
+@@ -0,0 +1,11 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { openCount } from '../src/count.js';
++
++test('openCount counts tasks that are not done', () => {
++  assert.equal(openCount([{ done: false }, { done: true }, { done: false }]), 2);
++});
++
++test('openCount of an empty list is 0', () => {
++  assert.equal(openCount([]), 0);
++});

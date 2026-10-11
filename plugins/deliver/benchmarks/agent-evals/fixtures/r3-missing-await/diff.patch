@@ -1,0 +1,27 @@
+diff --git a/src/create.js b/src/create.js
+new file mode 100644
+--- /dev/null
++++ b/src/create.js
+@@ -0,0 +1,10 @@
++export async function createTask(store, title) {
++  const task = { title, done: false };
++  try {
++    store.save(task);
++  } catch (err) {
++    throw new Error(`could not save task: ${err.message}`);
++  }
++  return task;
++}
+diff --git a/test/create.test.js b/test/create.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/create.test.js
+@@ -0,0 +1,9 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { createTask } from '../src/create.js';
++
++test('createTask returns the task', async () => {
++  const store = { save: async (t) => ({ ...t, id: 7 }) };
++  assert.equal((await createTask(store, 'x')).title, 'x');
++});

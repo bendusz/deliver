@@ -42,7 +42,8 @@ larger sets in waves.
 - **Run no git command that changes a ref, the index, or a worktree while any builder is running.**
   The Codex runner fingerprints every ref in the repository, so a commit on one branch fails a
   concurrent run on another. Leave every story's edits uncommitted and every Execution block
-  untouched until the whole wave has returned.
+  and `docs/log.md` untouched until the whole wave has returned; write the wave's log entries
+  with the commits that follow.
 - Once the wave has returned, run loop state 1's scope check per story against its own worktree,
   prefixing each git command with `-C <worktree>`, then commit each passing story's build to its
   branch from its worktree and set `status: built`. A story that fails the scope check stops with

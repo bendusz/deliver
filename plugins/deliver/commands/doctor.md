@@ -12,7 +12,8 @@ Inspect (whichever apply):
   whether `node --version` reports 20 or newer.
 - **Claude version and agent settings.** Run `claude --version` when available and record the
   configured `model` and `effort` frontmatter for every agent the active story may use. For a story that
-  uses an Opus agent, flag Claude Code older than `v2.1.280`, a moving `model: opus` alias, or a host-level
+  uses an Opus agent, flag Claude Code older than `v2.1.292` (no per-dispatch effort, so the fix loop
+  cannot escalate), a moving `model: opus` alias, or a host-level
   `CLAUDE_CODE_SUBAGENT_MODEL` or `CLAUDE_CODE_EFFORT_LEVEL` override. Do not claim a delivered
   model ID unless the host exposes it.
 - **Dependencies.** Lockfiles present, and whether install has been run (`node_modules`, a venv).

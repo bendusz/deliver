@@ -1,0 +1,34 @@
+diff --git a/src/billing.js b/src/billing.js
+new file mode 100644
+--- /dev/null
++++ b/src/billing.js
+@@ -0,0 +1,9 @@
++export async function fetchInvoice(http, token, id) {
++  const headers = { Authorization: `Bearer ${token}` };
++  console.log('billing request', { id, headers });
++  const res = await http.get(`/invoices/${encodeURIComponent(id)}`, { headers });
++  if (res.status !== 200) {
++    throw new Error(`billing returned ${res.status}`);
++  }
++  return JSON.parse(res.body);
++}
+diff --git a/test/billing.test.js b/test/billing.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/billing.test.js
+@@ -0,0 +1,16 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { fetchInvoice } from '../src/billing.js';
++
++test('fetchInvoice sends the bearer token and parses the body', async () => {
++  let seen;
++  const http = { get: async (url, opts) => { seen = opts.headers; return { status: 200, body: '{"id":"a1"}' }; } };
++  assert.deepEqual(await fetchInvoice(http, 't0k', 'a1'), { id: 'a1' });
++  assert.equal(seen.Authorization, 'Bearer t0k');
++});
++
++test('fetchInvoice rejects on a non-200', async () => {
++  const http = { get: async () => ({ status: 503, body: '' }) };
++  await assert.rejects(fetchInvoice(http, 't', 'a1'), /503/);
++});

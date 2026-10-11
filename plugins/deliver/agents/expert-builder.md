@@ -31,6 +31,9 @@ Write tests in the project's framework, test-first where practical, where an acc
 needs one. Run the story's verification command and the project's tests, or the subset the story
 argues for. Reading the code is not evidence.
 
+On a fix dispatch whose brief names a regression test, write that test first, run it to see it
+fail for the stated reason, then fix. Report both results.
+
 Never run a git command that changes repository state, delegate, or add speculative cleanup; the PM
 owns commits. You may edit a `.sdd` inside `pm-meta.touches` when the implementation forces it,
 never the root spec or `.specdd/`.

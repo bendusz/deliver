@@ -6,12 +6,14 @@ const MODES = new Set(['build', 'fix', 'review', 'advise', 'research']);
 const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 const SCOPES = new Set(['recent', 'worktree', 'branch', 'codebase']);
 const DEFAULT_MODEL = 'gpt-6-astra';
+// Review runs on the 6.1 mid tier: a second model that differs from the builder's.
+const REVIEW_MODEL = 'gpt-6.1-sol';
 const DEFAULTS = {
   build: { model: DEFAULT_MODEL, effort: 'high' },
   fix: { model: DEFAULT_MODEL, effort: 'high' },
-  review: { model: DEFAULT_MODEL, effort: 'high' },
+  review: { model: REVIEW_MODEL, effort: 'high' },
   research: { model: DEFAULT_MODEL, effort: 'high' },
-  advise: { model: DEFAULT_MODEL, effort: 'medium' },
+  advise: { model: DEFAULT_MODEL, effort: 'high' },
 };
 // When the default model is refused for this account, every mode retries once on this pair.
 // gpt-6-sol (2026-09-22) replaced gpt-5.6-sol as the mid-tier GPT-6 model at about half the price.

@@ -8,8 +8,9 @@ so the rules below are about what you may not add.
   or a particular environment. Name external tools only as optional examples in `README.md` and
   `docs/`.
 - **Keep `SKILL.md` lean**, under 500 lines, and put detail in `references/`, one level deep.
-- **Five agents stay read-only** on `Read, Grep, Glob`: `code-integrity-reviewer`,
-  `architecture-reviewer`, `security-auditor`, `debugger`, and `codebase-analyst`. `pm-verifier`
+- **Six agents stay read-only** on `Read, Grep, Glob`: `code-integrity-reviewer`,
+  `architecture-reviewer`, `security-auditor`, `performance-reviewer`, `debugger`, and
+  `codebase-analyst`. `pm-verifier`
   also has `Bash`, because it must run the gates, and the Codex wrappers have `Bash` to call the
   bundled runner.
 

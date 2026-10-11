@@ -86,8 +86,8 @@ anything.
 | Plan and sign-off | A written `docs/plan.md` that derives from the spec, with traceability. You approve it before any code. |
 | Skeleton (optional) | With `Skeleton: specdd` in the plan, `spec-architect` writes the sprint's `.sdd` contracts, the shape of the code, before any code exists. |
 | Analyze | A read-only cross-artifact consistency check for coverage, contradictions, and constitution, run after the plan and before decomposition, optionally before sign-off. |
-| Decomposition | Sprints, then self-contained story files under `docs/stories/`, each tracing to requirement IDs. |
-| Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. At the sprint boundary, a cross-story review and a retrospective that feeds `AGENTS.md`. |
+| Decomposition | Sprints, then self-contained story files under `docs/stories/`, each a thin end-to-end slice tracing to requirement IDs. |
+| Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. A bug fix lands with a regression test, and a failed attempt is retried at higher effort. At the sprint boundary, a cross-story review and a retrospective that reads fix rounds and retries per builder, turns mechanical mistakes into checks, and feeds the rest into `AGENTS.md`. |
 | Parallel stories | Independent `[P]` stories can build at once in isolated git worktrees, then integrate one at a time. Opt-in, with a safe fallback to sequential. |
 | Review and verification | A separate read-only reviewer, the project's real test, lint, and build gates, and a final `pm-verifier` PASS, with bounded fix loops. |
 | State | Git carries it. The claim is the story branch, each build and fix round is a commit, and the `--no-ff` merge body is the story record. Only an approval marker, a per-story Execution block, and an optional handoff are written, so concurrent sessions never overwrite each other and any lost session resumes from git. |
@@ -98,7 +98,7 @@ Bundled specialist agents do the work:
 |------|-------|
 | Build with broad repo context | `expert-builder` (Opus) |
 | Build one bounded outcome | `codex-builder` (Codex CLI, optional) |
-| Risk-selected read-only review panel | `code-integrity-reviewer`, `architecture-reviewer`, `security-auditor` |
+| Risk-selected read-only review panel | `code-integrity-reviewer`, `architecture-reviewer`, `security-auditor`, `performance-reviewer` |
 | Write tests, nothing else | `test-engineer` |
 | Root cause and a fix plan, read-only | `debugger` |
 | Independent PASS, FAIL, or UNKNOWN before ship | `pm-verifier` |
@@ -109,6 +109,9 @@ Bundled specialist agents do the work:
 | External research, reports under `docs/research/` | `researcher` (web), `codex-researcher` |
 | Second opinion on code and on decisions | `codex-reviewer`, `codex-advisor` |
 
+With Codex installed, the PM asks `codex-advisor` before a consequential technical decision and
+runs `codex-reviewer` once on every story at `small` scale and above. The advisor defaults to
+`gpt-6-astra` and the reviewer to `gpt-6.1-sol`, both at `high`.
 `codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`, and `codex-advisor`
 relays its answer in chat. Every Codex invocation goes through one of these thin Sonnet wrappers and
 the bundled Node runner; the PM never runs `codex` itself. The PM stays an orchestrator and protects
@@ -138,7 +141,9 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 | `/deliver:doctor` | Check environment readiness (toolchain, deps, gates run) and state health before building. |
 | `/deliver:benchmark-builders` | Run Opus and Codex on the same story in isolated worktrees, score the measured results, and merge neither. |
 | `/deliver:correct-course` | Handle a mid-flight scope change: re-plan at the right level, re-sign-off if material. |
-| `/deliver:retro` | At a sprint boundary, a bounded cross-story review and a retrospective that proposes `AGENTS.md` learnings as a diff. |
+| `/deliver:retro` | At a sprint boundary, a bounded cross-story review and a retrospective that proposes `AGENTS.md` learnings as a diff. Each learned line carries its evidence and a review-by sprint, three at most per retro, and is retired when no later retro cites it. |
+| `/deliver:agent-evals` | Maintainers only. Run one agent's prompt over the frozen eval fixtures, three trials per case, and score it. |
+| `/deliver:improve` | Maintainers only. Propose one small, evidence-backed edit to one agent or reference, test it against the frozen evals, and leave the decision to you. |
 | `/deliver:handoff` | End a session cleanly by writing a token-efficient `docs/handoff/<id>.md` briefing for the next agent. |
 | `/deliver:resume` | Read git, the approval marker, the story Execution blocks, and the handoff, then continue where you left off. |
 | `/deliver:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, `branch`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
@@ -164,6 +169,9 @@ Committed under `docs/`, which is authoritative:
 - `docs/plan.md`, the delivery plan, derived from the spec with traceability.
 - `docs/stories/*.md`, self-contained story files, each tracing to requirement IDs. A claimed
   story ends with an Execution block: owner, builder, branch, status, loop counters, and dated notes.
+- `docs/log.md`, the running narrative: a timestamped entry of three or four sentences at every
+  claim, build, fix round, block, and merge, and for each decision the PM took without asking.
+  Append-only, merged with `merge=union`, and never a source of state.
 - `docs/handoff/<actor-id>.md`, an end-of-session briefing, current while nothing but that file
   has changed since its `BASE_COMMIT`. Optional.
 - `docs/constitution.md`, project-specific governing principles. Optional.
@@ -182,7 +190,7 @@ In git, the rest of the state. Solo is a team of one.
 - The story branch `pm/S<sprint>-<n>-<slug>` is the claim, and its commits are the build and fix
   rounds. Counters are committed before the dispatch they bound.
 - The `--no-ff` merge commit body (Why, Scope, Tradeoffs, Blast radius, Verification) is the story
-  record, and `git log --first-parent` on the integration branch is the project log.
+  record, and `git log --first-parent` on the integration branch is the project history.
 - Never write secrets into any tracked file.
 
 Gitignored scratch and reports, disposable and never load-bearing for resume. The first four live
