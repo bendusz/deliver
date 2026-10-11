@@ -1,0 +1,21 @@
+diff --git a/src/format.js b/src/format.js
+new file mode 100644
+--- /dev/null
++++ b/src/format.js
+@@ -0,0 +1,4 @@
++export function format(tasks, opts = {}) {
++  if (opts.json) return JSON.stringify(tasks);
++  return tasks.map((t) => `- ${t.title}`).join('\n');
++}
+diff --git a/test/format.test.js b/test/format.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/format.test.js
+@@ -0,0 +1,7 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { format } from '../src/format.js';
++
++test('format prints JSON when asked', () => {
++  assert.equal(format([{ title: 'a' }], { json: true }), '[{"title":"a"}]');
++});

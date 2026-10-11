@@ -15,6 +15,9 @@
 - [ ] `builder` is `expert-builder`, `codex-builder`, or `auto`; a Codex choice has one exact
       verification command and bounded `touches` covering code and tests.
 - [ ] `Risk` is set and `Review lenses` lists `code-integrity-reviewer` plus `security-auditor`
-      when the story touches auth, secrets, untrusted input, I/O, or dependencies, and
-      `architecture-reviewer` when it changes structure or boundaries.
+      when the story touches auth, secrets, untrusted input, I/O, or dependencies,
+      `architecture-reviewer` when it changes structure or boundaries, and `performance-reviewer`
+      when it sits on a hot path or carries a stated budget.
+- [ ] The story is a vertical slice: its verification command shows one behaviour working end to
+      end, and it does not exist only to build a layer for a later story.
 - [ ] With a skeleton, every path in `Specs` exists and its `Owns` covers the story's `touches`.

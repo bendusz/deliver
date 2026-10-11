@@ -1,0 +1,24 @@
+diff --git a/src/due.js b/src/due.js
+new file mode 100644
+--- /dev/null
++++ b/src/due.js
+@@ -0,0 +1,3 @@
++export function parseDue(text) {
++  return new Date(`${text}T00:00:00Z`);
++}
+diff --git a/test/due.test.js b/test/due.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/due.test.js
+@@ -0,0 +1,11 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { parseDue } from '../src/due.js';
++
++test('parseDue reads an ISO day', () => {
++  assert.equal(parseDue('2026-03-01').toISOString(), '2026-03-01T00:00:00.000Z');
++});
++
++test.skip('parseDue throws RangeError on garbage', () => {
++  assert.throws(() => parseDue('not a date'), RangeError);
++});

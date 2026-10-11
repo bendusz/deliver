@@ -18,7 +18,9 @@ Run only the lenses a story warrants.
 - Add `security-auditor`, a deeper security lens, for auth or authz, crypto, secrets, untrusted
   input, file, network, or process I/O, deserialization, or dependency changes. Skip it when
   nothing is security-relevant.
-- A performance lens can join when such an agent exists.
+- Add `performance-reviewer` for a hot path, a query or data-access change, a loop over unbounded
+  input, caching, or concurrency, and whenever the story or plan states a latency, throughput, or
+  size budget. Skip it for code that runs rarely on small input.
 
 Start from the story's declared `Risk` and `Review lenses`, see `decomposition.md`. **Add** an
 undeclared lens when the diff calls for it, and note the gap. `technical-writer` and `debugger` are

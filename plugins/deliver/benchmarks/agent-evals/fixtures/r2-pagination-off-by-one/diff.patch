@@ -1,0 +1,29 @@
+diff --git a/src/page.js b/src/page.js
+new file mode 100644
+--- /dev/null
++++ b/src/page.js
+@@ -0,0 +1,8 @@
++export function page(items, n, size) {
++  const start = (n - 1) * size;
++  return items.slice(start, start + size);
++}
++
++export function pageCount(items, size) {
++  return Math.floor(items.length / size);
++}
+diff --git a/test/page.test.js b/test/page.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/page.test.js
+@@ -0,0 +1,13 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { page, pageCount } from '../src/page.js';
++
++test('page returns the requested slice', () => {
++  assert.deepEqual(page([1, 2, 3, 4], 2, 2), [3, 4]);
++});
++
++test('pageCount for an exact multiple', () => {
++  assert.equal(pageCount([1, 2, 3, 4], 2), 2);
++});

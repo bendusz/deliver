@@ -9,10 +9,11 @@ references are enough on their own.
 - `git` for version control. Offer to init if it is absent and the user wants it.
 - `gh` plus a GitHub remote, and only then real PRs; otherwise local merges.
 - A more specialized tool or skill for one step, a dedicated planner or an external reviewer for
-  example. You MAY prefer it where it exists.
+  example. You may prefer it where it exists.
 - The optional `poteto` companion plugin from the same marketplace. When its skills are installed,
-  the references name them at the right phase (`architect`, `interrogate`, `blast-radius`,
-  `create-verification-skill`, `technical-writing`). Absent, nothing changes.
+  the references name them at the right phase (`architect`, `blast-radius`,
+  `create-verification-skill`, `technical-writing`). They are user-invoked, so ask the user to
+  run them. Absent, nothing changes.
 
 ## Remote PRs, opt-in
 The loop merges locally by default. Open a real PR only when the user has explicitly asked for
@@ -26,13 +27,14 @@ Run reviewers as a risk-selected **panel** (see `review-gates.md`), not always a
 The PM never assembles a `codex` command line. It may call the bundled runner
 `scripts/codex/run.mjs`, the `--preflight` probe for example, and every model run goes through a
 Sonnet wrapper agent. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
-prompt. When the OpenAI Codex CLI is installed, `/deliver:codex-review` can add an independent
-second-model review alongside the panel, never as a replacement for it, and `/deliver:codex-help`
-offers a one-off second opinion on a consequential decision. Use both sparingly. The
+prompt. When the OpenAI Codex CLI is installed, the loop adds an independent second-model review
+to each story's first review, alongside the panel and never as a replacement for it, and
+`codex-advisor` gives a second opinion on a consequential decision; `SKILL.md` and
+`implementation-loop.md` state 3 own when. `/deliver:codex-review` and `/deliver:codex-help` are
+the user-run forms. The
 `codex-researcher` agent plays the same independent-second-model role for research questions.
 `codex-builder` is different: it is write-capable inside one fixed worktree and may replace
 `expert-builder` only when the story or fix brief is narrow enough. The normal gates, separate review
 panel, and `pm-verifier` still judge its work.
 
-Every agent pins its model and effort in its frontmatter; see `docs/model-tiering.md` in the
-repository for the rationale.
+Every agent pins its model and effort in its frontmatter.

@@ -10,7 +10,6 @@ and needs no external process. The optional allowlist example does need `jq`.
 Two bundled `PreToolUse` hooks guard writes. Each matches `Write`, `Edit`, and `MultiEdit` only,
 fails open on any uncertainty (a missing or unparseable state file, a target outside the project
 tree, or the kill switch `DELIVER_NO_ENFORCE=1`), and never sees a write made through `Bash`.
-The pre-0.21 name `PM_SKILL_NO_ENFORCE` stopped working in 0.22.
 
 - **Approval.** `require-signoff.mjs` blocks a write while `docs/approval.json` has any status but
   `approved`, and honours a pre-0.24 `pm/pm-state.json` or `tmp/pm-state.json` `signed_off`
@@ -23,7 +22,7 @@ The pre-0.21 name `PM_SKILL_NO_ENFORCE` stopped working in 0.22.
 the current position to new and compacted sessions. It is a `SessionStart` hook and only reads.
 
 **Read-only review and verify agents.** `code-integrity-reviewer`, `architecture-reviewer`,
-`security-auditor`, `debugger`, and `codebase-analyst` carry only `Read`, `Grep`, and `Glob`, so the
+`security-auditor`, `performance-reviewer`, `debugger`, and `codebase-analyst` carry only `Read`, `Grep`, and `Glob`, so the
 allowed-tool list blocks writes. `pm-verifier` also has `Bash`, because it runs the gates; see below.
 
 ## The Bash gap

@@ -35,7 +35,7 @@ then delete exactly the scratch directory the envelope named.
 
 ## Report at `docs/research/YYYY-MM-DD-<slug>-codex.md`
 - **Question.** With the model, effort, and `search_used`.
-- **Findings and recommendation.** Attributed ("Codex (gpt-6-astra) finds ..."), distilled, not
+- **Findings and recommendation.** Attributed ("Codex (<model>) finds ..."), distilled, not
   pasted.
 - **Caveats.** Where Codex looks weak or stale. Nothing else of yours.
 

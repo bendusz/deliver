@@ -36,6 +36,15 @@ the spec IDs each story satisfies; Traceability maps every spec requirement to a
 flags any that is not; Commands are the project's real `test`, `lint`, `build`, and `run`, discovered
 now, with `N/A` where one does not exist.
 
+**Plan the app-driving check.** When the product is something a person or a client drives, a UI, a
+CLI session, or an HTTP service, and any acceptance criterion can only be shown by running it, the
+Stories table carries a sprint-1 story that creates that check: a `verify-<app>` skill under
+`.claude/skills/`, or the project's own end-to-end command where it has one. With poteto
+installed, ask the user to run `/poteto:create-verification-skill` for that story, since the
+skill is user-invoked only; otherwise a builder writes the check. Order it straight after the first slice that
+makes the app start. Without it, `pm-verifier` returns `UNKNOWN` for every such criterion.
+`tiny` scale is exempt.
+
 Present it and iterate with the user until they are happy. When the scale requires analysis, run
 `/deliver:analyze` before decomposition, optionally on the drafted plan before you record sign-off,
 for a read-only consistency and coverage check; the Stories table carries the `covers` mapping.
@@ -63,6 +72,9 @@ responsibility.
 - At `standard` scale and above, scaffold `docs/wiki/` from the wiki templates per `knowledge.md`.
 - With `Skeleton: specdd`, append the SpecDD line held in `AGENTS.md.template`'s comment,
   uncommented, to the project `AGENTS.md` Conventions.
+- Create `docs/log.md` from `${CLAUDE_PLUGIN_ROOT}/templates/log.md.template` with a first entry
+  recording the sign-off, and append `docs/log.md merge=union` to `.gitattributes`, creating the
+  file if it is missing and leaving its other lines alone. `state.md` owns the entry format.
 - Ensure `.gitignore` includes `tmp/`, appending rather than clobbering an existing `.gitignore`.
   `tmp/` is ephemeral scratch and never enters git.
 - **Commit** only the files you created or changed. No `git add -A` over the user's other work.
@@ -75,6 +87,9 @@ With a wiki, dispatch the first `librarian ingest` per `knowledge.md` and commit
 ## Checkpoint policy (recorded in Delivery mode, applied during the loop)
 - Default sprint-level: run all the sprint's stories, then `/deliver:retro` per
   `retrospective.md`, then pause for the user's review at the sprint boundary. A project may set story-level, pausing before each merge, or fully autonomous.
+- Between checkpoints, `docs/log.md` carries the progress. Message the user when they ask, when
+  you escalate, and at the checkpoint. The checkpoint report names what shipped, the retro's
+  numbers, the decisions you took without asking, and anything waiting on the user.
 - Whatever the mode, **escalate** immediately before a high-risk merge or one that changes several
   dependent components.
 - Offer `/deliver:handoff` at natural stops: a sprint checkpoint, a long pause, or a session whose

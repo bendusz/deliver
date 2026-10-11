@@ -25,7 +25,7 @@ never switches workers silently.
 **Claim.** Pull or rebase the integration branch. Confirm no `pm/<story-id>-*` branch exists
 locally or on the remote and that the story has no Execution block owned by someone else. Append
 the `## Execution` section per `state.md`, with your `owner`, the resolved `builder`, the branch
-name, `status: claimed`, and both counters at `0`, and commit it on the integration branch as
+name, `status: claimed`, both counters at `0`, and the `deliver` version, and commit it on the integration branch as
 `chore(<story-id>): claim`. Push it only under a standing push permission, then create and check
 out `pm/S<sprint>-<n>-<slug>`.
 
@@ -41,13 +41,21 @@ when it has any. Builders edit the working tree; you own every git command.
 summary. First, the cumulative set: `git diff --name-only --diff-filter=ACDMRTUXB
 <integration>...HEAD --`, plus `git diff --name-only HEAD --` and
 `git ls-files --others --exclude-standard` for what is still uncommitted, sorted and deduplicated.
-Each path must match a `pm-meta.touches` entry, file or directory root, or be the story file or
-your own `docs/handoff/<you>.md`. Second, for Codex only, this run's delta: the uncommitted paths
+Each path must match a `pm-meta.touches` entry, file or directory root, or be the story file,
+`docs/log.md`, or your own `docs/handoff/<you>.md`. Second, for Codex only, this run's delta: the uncommitted paths
 alone (`git diff --name-only HEAD --` plus the untracked list) must equal the builder's `CHANGED`
 line, because the runner reports what one run changed, never what earlier commits hold. Any
 out-of-scope, protected, or unexplained path **stops** the story before gates or review, working
 tree preserved. The three-dot diff excludes the integration tip's own history, so bring that tip
 into the story branch by merge, never by cherry-pick.
+
+**Open criteria, after a builder reports done.** Place each acceptance criterion against the
+changed paths and the builder's test result. When one is plainly unaddressed, its test absent or
+failing or its named file untouched, wait for any background agent still running, then send the
+same builder one continuation that names the open criteria and nothing else; for `codex-builder`
+that is a `Mode: fix` dispatch whose brief lists them. A continuation is neither a retry nor a fix
+round; add a dated note line to the Execution block for each. **Two** at most. Still open, set
+`status: blocked` and escalate.
 
 When the scope check passes, commit the changed paths to the story branch as
 `build(<story-id>): <subject>`, with `status: built` in the same commit.
@@ -55,7 +63,9 @@ When the scope check passes, commit the changed paths to the story branch as
 Work broader than its brief re-routes to `expert-builder`: set `builder` in the Execution block and
 note the reason, in one commit, before retrying. A blocked or failed builder earns **2** retries
 with clarification. Increment `retries` and commit before each retry; that **cap** spans sessions
-and a worker switch does not reset it. Then escalate.
+and a worker switch does not reset it. Then escalate. The first `expert-builder` dispatch runs at
+its frontmatter effort; a retry passes `effort: high` on the dispatch, on Claude Code `v2.1.292` or
+newer.
 
 ### 2. Gate, then review or fix
 The gates are the project's `test`, `lint`, and `build` from `docs/plan.md` and `AGENTS.md`;
@@ -67,18 +77,24 @@ Re-derive and scope-check the paths, then produce the diff yourself, since revie
 `git diff <integration>...HEAD -- <paths>`, plus `git add -N -- <paths> && git diff -- <paths>`
 for anything still uncommitted, **never** `git add -A`. Set `status: in-review` and commit.
 Dispatch the panel per `review-gates.md`: always `code-integrity-reviewer`, plus the lenses its
-risk triggers select, and `architecture-reviewer` also gets the plan's Architecture section. Every
+risk triggers select; `architecture-reviewer` also gets the plan's Architecture section, and
+`performance-reviewer` its Non-functional requirements. Every
 lens gets the story file, that diff text, and the story's `Specs`. Aggregate the lenses' findings;
 any open `block` or `major` loads `fix-loop.md`.
+
+**Second-model review, once per story.** At `small` scale and above, with Codex ready, dispatch
+`codex-reviewer` beside the panel on the story's first review: `Scope: branch`, `Base:` the
+integration branch, at the runner's default model and effort, after the secret scan and preflight
+that `/deliver:codex-review` describes. Grade its findings yourself against `review-gates.md`'s
+severities and aggregate them with the panel's. Fix rounds are re-reviewed by the panel alone.
+With Codex absent or refused, note the skip in the story's Execution notes and continue.
 
 ### 4. Fix
 `fix-loop.md` owns this state. Every fix lands on the story branch as
 `fix(<story-id>): round <n>` before the gates re-run.
 
 ### 5. Verify, then ship or fix
-External review is optional; `/deliver:codex-review branch base=<integration>` owns it, since the
-story's work is committed and the `worktree` scope would find nothing. Note a skip in the story's
-Execution notes. With the gates green and no `block` or `major` open, dispatch the read-only `pm-verifier`
+With the gates green and no `block` or `major` open, dispatch the read-only `pm-verifier`
 with the inputs its agent file lists and its `Specs`. `PASS` alone permits shipping. `FAIL` loads
 `fix-loop.md`, then re-verify. `UNKNOWN` means you obtain the evidence it named and re-verify, or
 escalate. Load `verification.md` only when a criterion needs the running app or the story needs a
@@ -95,7 +111,7 @@ sections in this order, dropping any that are empty: `## Why` (intent and why th
 `## Scope` (facts from the diff, real paths and symbols, what is in and out), `## Tradeoffs` (real
 choices only), `## Blast radius` (who and what the change touches, and why it is safe or risky),
 `## Verification` (every command and its result). No `## Summary` or `## Test plan` boilerplate.
-This body is the story's record; there is no separate log.
+This body is the story's record; `docs/log.md` carries the narrative around it.
 
 ### 7. Close, then take the next story
 On the integration branch, set `status: merged` in the story's Execution block, add a note line
@@ -103,6 +119,8 @@ naming the merge commit, and commit it as `chore(<story-id>): merged`. Keep or d
 branch per the user's policy. With a wiki, dispatch `librarian ingest` per `knowledge.md`, and
 `lint` at the sprint boundary. `documentation.md` owns user-facing docs, at a sprint or project
 boundary and never per story.
+
+Every state change above gets its `docs/log.md` entry in the same commit, per `state.md`.
 
 A story is done only with every criterion met, no open `block` or `major`, green gates, a
 `pm-verifier` `PASS`, and `status: merged` committed. `/deliver:correct-course` owns scope changes

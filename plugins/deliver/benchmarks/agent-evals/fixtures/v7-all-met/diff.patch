@@ -1,0 +1,27 @@
+diff --git a/src/clamp.js b/src/clamp.js
+new file mode 100644
+--- /dev/null
++++ b/src/clamp.js
+@@ -0,0 +1,4 @@
++export function clamp(n) {
++  if (typeof n !== 'number' || Number.isNaN(n)) throw new TypeError('priority must be a number');
++  return Math.min(5, Math.max(1, n));
++}
+diff --git a/test/clamp.test.js b/test/clamp.test.js
+new file mode 100644
+--- /dev/null
++++ b/test/clamp.test.js
+@@ -0,0 +1,13 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { clamp } from '../src/clamp.js';
++
++test('clamp bounds the value', () => {
++  assert.equal(clamp(0), 1);
++  assert.equal(clamp(9), 5);
++  assert.equal(clamp(3), 3);
++});
++
++test('clamp rejects a non-number', () => {
++  assert.throws(() => clamp('x'), TypeError);
++});

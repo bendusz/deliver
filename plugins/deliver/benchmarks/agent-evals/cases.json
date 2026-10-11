@@ -1,0 +1,227 @@
+{
+  "version": 1,
+  "trials": 3,
+  "cases": [
+    {
+      "id": "r1-sql-injection",
+      "agent": "code-integrity-reviewer",
+      "split": "dev",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "inject",
+          "tasks\\.js"
+        ]
+      }
+    },
+    {
+      "id": "r2-pagination-off-by-one",
+      "agent": "code-integrity-reviewer",
+      "split": "heldout",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "pageCount|floor|ceil|last page|remainder|partial"
+        ]
+      }
+    },
+    {
+      "id": "r3-missing-await",
+      "agent": "code-integrity-reviewer",
+      "split": "dev",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "await|promise|not awaited|unawaited"
+        ]
+      }
+    },
+    {
+      "id": "r4-criterion-unmet",
+      "agent": "code-integrity-reviewer",
+      "split": "heldout",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "404"
+        ]
+      }
+    },
+    {
+      "id": "r5-token-logged",
+      "agent": "code-integrity-reviewer",
+      "split": "dev",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "log",
+          "token|secret|credential|authorization"
+        ]
+      }
+    },
+    {
+      "id": "r6-swallowed-error",
+      "agent": "code-integrity-reviewer",
+      "split": "heldout",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "500|swallow|catch|ignored"
+        ]
+      }
+    },
+    {
+      "id": "r7-clean-feature",
+      "agent": "code-integrity-reviewer",
+      "split": "dev",
+      "kind": "clean",
+      "expect": {
+        "verdicts": [
+          "PASS",
+          "CONCERNS"
+        ],
+        "must_match": []
+      }
+    },
+    {
+      "id": "r8-clean-refactor",
+      "agent": "code-integrity-reviewer",
+      "split": "heldout",
+      "kind": "clean",
+      "expect": {
+        "verdicts": [
+          "PASS",
+          "CONCERNS"
+        ],
+        "must_match": []
+      }
+    },
+    {
+      "id": "r9-clean-with-smell",
+      "agent": "code-integrity-reviewer",
+      "split": "dev",
+      "kind": "clean",
+      "expect": {
+        "verdicts": [
+          "PASS",
+          "CONCERNS"
+        ],
+        "must_match": []
+      }
+    },
+    {
+      "id": "v1-criterion-not-built",
+      "agent": "pm-verifier",
+      "split": "dev",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "400|empty|whitespace|title required"
+        ]
+      }
+    },
+    {
+      "id": "v2-test-skipped",
+      "agent": "pm-verifier",
+      "split": "heldout",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL",
+          "UNKNOWN"
+        ],
+        "must_match": [
+          "skip|RangeError|throw"
+        ]
+      }
+    },
+    {
+      "id": "v3-test-misses-criterion",
+      "agent": "pm-verifier",
+      "split": "dev",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "sort|order|ascending"
+        ]
+      }
+    },
+    {
+      "id": "v4-needs-running-app",
+      "agent": "pm-verifier",
+      "split": "heldout",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "UNKNOWN",
+          "FAIL"
+        ],
+        "must_match": [
+          "staging|latency|200 ?ms|percentile|artifact|evidence"
+        ]
+      }
+    },
+    {
+      "id": "v5-docs-claimed",
+      "agent": "pm-verifier",
+      "split": "dev",
+      "kind": "seeded",
+      "expect": {
+        "verdicts": [
+          "FAIL"
+        ],
+        "must_match": [
+          "README|--json|document"
+        ]
+      }
+    },
+    {
+      "id": "v6-all-met",
+      "agent": "pm-verifier",
+      "split": "heldout",
+      "kind": "clean",
+      "expect": {
+        "verdicts": [
+          "PASS"
+        ],
+        "must_match": []
+      }
+    },
+    {
+      "id": "v7-all-met",
+      "agent": "pm-verifier",
+      "split": "dev",
+      "kind": "clean",
+      "expect": {
+        "verdicts": [
+          "PASS"
+        ],
+        "must_match": []
+      }
+    }
+  ]
+}

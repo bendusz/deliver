@@ -18,8 +18,8 @@ Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
 - `docs/specs/`, `docs/plans/`: this repo's own design history, named `YYYY-MM-DD-vX.Y-topic.md`.
 
 ## Conventions
-- Runtime code is Node ESM only (`hooks/*.mjs`, `scripts/codex/**`). No bash or jq at runtime;
-  the repo-level `scripts/*.sh` are the maintainer-only exception.
+- Runtime code is Node ESM only (`plugins/deliver/hooks/*.mjs`, `plugins/deliver/scripts/**/*.mjs`).
+  No bash or jq at runtime; the repo-level `scripts/*.sh` are the maintainer-only exception.
 - Agent frontmatter pins `model` and `effort`; Opus roles use `claude-opus-5-5`, never the moving alias.
 - Every change to a reference or template must keep `bash scripts/validate.sh` green.
 

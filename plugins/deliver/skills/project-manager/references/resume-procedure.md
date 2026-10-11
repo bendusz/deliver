@@ -16,7 +16,9 @@
 5. `docs/handoff/<you>.md` when it is current, meaning `git diff --name-only <BASE_COMMIT> HEAD`
    is empty or lists only that file, which is what its own commit leaves. Otherwise it is stale:
    skim it for gotchas and trust git and the story files.
-6. `docs/wiki/index.md` when it exists, before any `docs/` scan.
+6. The last five entries of `docs/log.md`, for the reasoning behind where things stand. It never
+   overrides the `state` command or an Execution block.
+7. `docs/wiki/index.md` when it exists, before any `docs/` scan.
 
 The bundled `session-context.mjs` hook prints these facts into every new or freshly compacted
 session, so a fresh session already carries the headline.

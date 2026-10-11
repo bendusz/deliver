@@ -4,7 +4,7 @@ Control cost and quality by giving heavier work a stronger model and routine wor
 This file is repository documentation. The agents do not load it; each one pins its own model and
 effort in its frontmatter.
 
-## Shipped defaults (0.27)
+## Shipped defaults (0.28)
 
 Every agent declares a model and effort level. Every role that does its own model work runs on
 `claude-opus-5-5`, pinned instead of the moving `opus` alias, so a future Opus release cannot change
@@ -21,6 +21,7 @@ alias at `medium`: they only marshal a Codex run, so a silent alias change carri
 | `debugger` | `claude-opus-5-5` | `high` | root-cause analysis is the workflow's hardest read-only task |
 | `code-integrity-reviewer` | `claude-opus-5-5` | `medium` | judgement-heavy review at standard depth |
 | `architecture-reviewer` | `claude-opus-5-5` | `medium` | design judgement at standard depth |
+| `performance-reviewer` | `claude-opus-5-5` | `medium` | cost judgement at standard depth; selected only for hot paths and stated budgets |
 | `pm-verifier` | `claude-opus-5-5` | `medium` | independent evidence-checking at standard depth |
 | `test-engineer` | `claude-opus-5-5` | `medium` | derives tests from written criteria |
 | `spec-architect` | `claude-opus-5-5` | `medium` | design judgement, turns plan decisions into contracts |
@@ -29,8 +30,12 @@ alias at `medium`: they only marshal a Codex run, so a silent alias change carri
 | `researcher` | `claude-opus-5-5` | `low` | web research; breadth and sourcing over depth |
 | `librarian` | `claude-opus-5-5` | `low` | summarises shipped artifacts into wiki pages |
 | `codex-researcher` | `sonnet` | `medium` | thin wrapper; the thinking happens inside Codex |
-| `codex-reviewer` | `sonnet` | `medium` | thin wrapper; the review happens inside Codex |
-| `codex-advisor` | `sonnet` | `medium` | thin wrapper; the opinion happens inside Codex |
+| `codex-reviewer` | `sonnet` | `medium` | thin wrapper; the review happens inside Codex on `gpt-6.1-sol` / `high` |
+| `codex-advisor` | `sonnet` | `medium` | thin wrapper; the opinion happens inside Codex on `gpt-6-astra` / `high` |
+
+`expert-builder` starts at `medium` and the PM passes `effort: high` on the dispatch for a builder
+retry and from fix round 2 on, so the extra thinking is spent only where the cheaper attempt has
+already failed.
 
 `medium` is the builder default on Opus 5.5. Effort level names do not carry the same amount of
 thinking across models: Anthropic measured Opus 5.5 at `medium` matching or beating Opus 5 at `high`

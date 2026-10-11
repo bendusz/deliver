@@ -7,8 +7,20 @@ the sprint passes readiness and, at `standard` scale and above, `/deliver:analyz
 stories reports no CRITICAL or HIGH.
 
 ## Sprints
-Group the plan's stories into sprints. Each sprint should deliver something independently valuable.
-Foundations first; later sprints build on earlier ones.
+Group the plan's stories into sprints. Each sprint should deliver something independently valuable,
+and later sprints build on earlier ones.
+
+## Slice shape
+Cut each story as a thin vertical slice: one behaviour through every layer it needs, interface,
+logic, storage, and test, shown working by its own verification command. A story that builds one
+layer for later stories to use, "add the schema" or "write the API client", is a horizontal slice;
+fold it into the first story that needs it. A sprint's first story is the thinnest path end to
+end, and the rest widen it.
+
+A wide refactor, a signature, schema, or interface with many callers, is three stories that each
+leave the gates green. **Expand** adds the new shape beside the old. **Migrate** moves the
+callers, in `[P]` batches where `touches` allow. **Contract** deletes the old shape once nothing
+uses it.
 
 ## Story files
 For each story, create `docs/stories/S<sprint>-<n>-<slug>.md` from
@@ -30,8 +42,9 @@ header. Three fields carry rules:
   when the boundary cannot be known until the story starts; the implementation loop resolves it
   before dispatch and records the choice in the story's Execution block.
 - **Risk and review lenses.** The story's `Risk` (low, med, high) and the lenses it needs.
-  `code-integrity-reviewer` always; add `architecture-reviewer` for structural change and
-  `security-auditor` for security-sensitive work. The lens list is the story's sensitivity
+  `code-integrity-reviewer` always; add `architecture-reviewer` for structural change,
+  `security-auditor` for security-sensitive work, and `performance-reviewer` for a hot path or
+  large data. The lens list is the story's sensitivity
   declaration, which lets `/deliver:analyze` check declared against actual. For a story that
   names `architecture-reviewer`, `design-exploration.md` owns the optional design pass that may
   precede build-ready.
@@ -63,3 +76,5 @@ plan-time run had no stories, so the story detections in `artifact-consistency.m
 touches overlap, dependency cycles, declared lenses) fire only now. Resolve CRITICAL and HIGH, then
 load `implementation-loop.md`. This is not a second
 sign-off gate.
+
+<!-- Slice shape and expand, migrate, contract are adapted from Matt Pocock's skills (mattpocock/skills, MIT). -->

@@ -16,7 +16,8 @@ for f in .claude-plugin/marketplace.json \
          plugins/deliver/hooks/hooks.json \
          plugins/deliver/schemas/codex-builder-result.schema.json \
          plugins/deliver/schemas/builder-benchmark-result.schema.json \
-         plugins/deliver/benchmarks/codex-builder-routing-cases.json; do
+         plugins/deliver/benchmarks/codex-builder-routing-cases.json \
+         plugins/deliver/benchmarks/agent-evals/cases.json; do
   if [ -f "$f" ]; then jq empty "$f" 2>/dev/null || err "invalid JSON: $f"; else err "missing: $f"; fi
 done
 
@@ -66,6 +67,26 @@ for md in plugins/deliver/skills/project-manager/SKILL.md plugins/deliver/agents
   [ -f "$md" ] || continue
   check_frontmatter "$md" name description
 done
+
+# 4b) agent frontmatter keys come from an allowlist. Claude Code ignores a key it does not know,
+# so a typo such as `efort:` would silently drop the setting.
+agent_keys=' name description model effort tools disallowedTools color maxTurns autoCompactWindow skills mcpServers permissionMode memory isolation '
+unknown_agent_keys() {
+  local key
+  while IFS= read -r key; do
+    case "$agent_keys" in *" $key "*) ;; *) printf '%s\n' "$key" ;; esac
+  done < <(awk '/^---$/{n++; next} n==1{sub(/:.*/,""); print} n==2{exit}' "$1")
+}
+for md in plugins/deliver/agents/*.md; do
+  [ -f "$md" ] || continue
+  while IFS= read -r key; do
+    err "unknown frontmatter key '$key' in $md"
+  done < <(unknown_agent_keys "$md")
+done
+typo_fixture="$(mktemp)"
+printf -- '---\nname: x\ndescription: y\nefort: low\n---\n' > "$typo_fixture"
+[ "$(unknown_agent_keys "$typo_fixture")" = "efort" ] || err "agent frontmatter allowlist did not reject a misspelt key"
+rm -f "$typo_fixture"
 
 # 5) every bundled hook is valid Node ESM and no bash or jq survives under hooks/
 for h in plugins/deliver/hooks/*.mjs; do
@@ -171,6 +192,7 @@ check_agent_regime technical-writer claude-opus-5-5 low
 check_agent_regime researcher claude-opus-5-5 low
 check_agent_regime librarian claude-opus-5-5 low
 check_agent_regime spec-architect claude-opus-5-5 medium
+check_agent_regime performance-reviewer claude-opus-5-5 medium
 
 for md in plugins/deliver/agents/*.md; do
   model="$(grep -m1 '^model:' "$md" 2>/dev/null | awk '{print $2}')"
@@ -196,6 +218,12 @@ suite "hook behavioral tests failed (node --test plugins/deliver/scripts/tests)"
   node --test plugins/deliver/scripts/tests/lib.test.mjs plugins/deliver/scripts/tests/hooks.test.mjs
 suite "Codex runner tests failed (node --test plugins/deliver/scripts/tests/codex-run.test.mjs)" \
   node --test plugins/deliver/scripts/tests/codex-run.test.mjs
+suite "retro stats tests failed (node --test plugins/deliver/scripts/tests/retro-stats.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/retro-stats.test.mjs
+suite "agent eval tests failed (node --test plugins/deliver/scripts/tests/agent-evals.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/agent-evals.test.mjs
+suite "agent eval fixtures differ from MANIFEST.sha256 (the eval set is frozen)" \
+  node plugins/deliver/scripts/agent-evals.mjs manifest --check
 suite "builder benchmark tests failed (scripts/test-builder-benchmark.sh)" \
   bash "$(dirname "$0")/test-builder-benchmark.sh"
 
