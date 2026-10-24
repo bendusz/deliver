@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 0edc7fc..de0ae8e 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Stock summary helpers.
++
++export function inventorySummary(items, {includeEmpty = false} = {}) {
++  return items.filter(item => includeEmpty || item.quantity > 0)
++    .map(({sku, quantity}) => ({sku, quantity}));
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..63f73a7
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { inventorySummary } from '../src/feature.mjs';
++test('stocked items', () => assert.deepEqual(inventorySummary([{sku:'a',quantity:2},{sku:'b',quantity:0}]),[{sku:'a',quantity:2}]));

@@ -1,0 +1,38 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 3756e00..e89970e 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,12 @@
+ // Request flight helpers.
++
++export function createFlights(request) {
++  const pending = new Map();
++  return key => {
++    if (!pending.has(key)) {
++      const promise = Promise.resolve().then(() => request(key)).finally(() => pending.delete(key));
++      pending.set(key, promise);
++    }
++    return pending.get(key);
++  };
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..4671991
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,15 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { createFlights } from '../src/feature.mjs';
++test('share a pending request but reload after success', async () => {
++  let calls=0,release; const gate=new Promise(resolve=>{release=resolve;});
++  const get=createFlights(async()=>{calls++; await gate; return calls;});
++  const first=get('x'),second=get('x'); assert.equal(first,second); release();
++  assert.deepEqual(await Promise.all([first,second]),[1,1]); assert.equal(calls,1);
++  assert.equal(await get('x'),2);
++});
++test('failure leaves a retryable key', async () => {
++  let calls=0; const error=new Error('offline');
++  const get=createFlights(async()=>{if(++calls===1)throw error; return 7;});
++  await assert.rejects(get('x'),e=>e===error); assert.equal(await get('x'),7); assert.equal(calls,2);
++});

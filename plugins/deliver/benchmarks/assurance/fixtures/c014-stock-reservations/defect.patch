@@ -1,0 +1,48 @@
+diff --git a/src/inventory.mjs b/src/inventory.mjs
+index 3e48785..ada6658 100644
+--- a/src/inventory.mjs
++++ b/src/inventory.mjs
+@@ -3,3 +3,16 @@ export function available(stock, sku) {
+   const s = stock.get(sku);
+   return s ? s.onHand - s.reserved : 0;
+ }
++
++// reserve(stock, sku, qty): reserves qty units of sku and returns the units still available.
++export function reserve(stock, sku, qty) {
++  if (!Number.isInteger(qty) || qty < 1) throw new RangeError('qty must be a positive integer');
++  const s = stock.get(sku);
++  if (!s || s.onHand < qty) {
++    const err = new Error(`not enough ${sku} in stock`);
++    err.code = 'EINSUFFICIENT';
++    throw err;
++  }
++  s.reserved += qty;
++  return s.onHand - s.reserved;
++}
+diff --git a/test/inventory.test.mjs b/test/inventory.test.mjs
+new file mode 100644
+index 0000000..fdeb618
+--- /dev/null
++++ b/test/inventory.test.mjs
+@@ -0,0 +1,21 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { reserve } from '../src/inventory.mjs';
++
++test('reserve counts the units and returns what is left', () => {
++  const stock = new Map([['mug', { onHand: 5, reserved: 1 }]]);
++  assert.equal(reserve(stock, 'mug', 3), 1);
++  assert.deepEqual(stock.get('mug'), { onHand: 5, reserved: 4 });
++});
++
++test('units reserved by other orders cannot be reserved again', () => {
++  const stock = new Map([['mug', { onHand: 5, reserved: 0 }]]);
++  reserve(stock, 'mug', 3);
++  assert.throws(() => reserve(stock, 'mug', 6), { code: 'EINSUFFICIENT' });
++  assert.equal(stock.get('mug').reserved, 3);
++  assert.throws(() => reserve(stock, 'cup', 1), { code: 'EINSUFFICIENT' });
++});
++
++test('qty must be a positive integer', () => {
++  assert.throws(() => reserve(new Map(), 'mug', 0), RangeError);
++});

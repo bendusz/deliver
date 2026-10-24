@@ -1,0 +1,59 @@
+diff --git a/src/http.mjs b/src/http.mjs
+index 0bae26d..47cbf9f 100644
+--- a/src/http.mjs
++++ b/src/http.mjs
+@@ -3,3 +3,25 @@ export function header(headers, name) {
+   const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase());
+   return key === undefined ? undefined : headers[key];
+ }
++
++// isAllowedOrigin(origin, allowed): whether a browser origin is on the allow-list.
++export function isAllowedOrigin(origin, allowed) {
++  let url;
++  try {
++    url = new URL(origin);
++  } catch {
++    return false;
++  }
++  if (url.origin !== origin) return false;
++  return allowed.some((entry) => {
++    if (!entry.includes('://*.')) return entry === origin;
++    const [scheme, domain] = entry.split('://*.');
++    return url.protocol === `${scheme}:` && url.port === '' && url.hostname.endsWith(domain);
++  });
++}
++
++// corsHeaders(origin, allowed): CORS response headers for a request from origin.
++export function corsHeaders(origin, allowed) {
++  if (!origin || !isAllowedOrigin(origin, allowed)) return {};
++  return { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' };
++}
+diff --git a/test/http.test.mjs b/test/http.test.mjs
+new file mode 100644
+index 0000000..6522d4d
+--- /dev/null
++++ b/test/http.test.mjs
+@@ -0,0 +1,23 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { isAllowedOrigin, corsHeaders } from '../src/http.mjs';
++
++const allowed = ['https://app.example.com', 'https://*.example.com', 'http://localhost:5173'];
++
++test('exact and wildcard origins are allowed', () => {
++  assert.equal(isAllowedOrigin('https://app.example.com', allowed), true);
++  assert.equal(isAllowedOrigin('https://docs.eu.example.com', allowed), true);
++  assert.equal(isAllowedOrigin('http://localhost:5173', allowed), true);
++});
++
++test('other origins are refused', () => {
++  for (const o of ['null', 'http://app.example.com', 'https://a.example.com:8443', 'https://app.example.com/', 'nonsense']) {
++    assert.equal(isAllowedOrigin(o, allowed), false, o);
++  }
++});
++
++test('corsHeaders echoes only allowed origins', () => {
++  assert.equal(corsHeaders('https://app.example.com', allowed)['Access-Control-Allow-Origin'], 'https://app.example.com');
++  assert.deepEqual(corsHeaders('https://evil.test', allowed), {});
++  assert.deepEqual(corsHeaders(undefined, allowed), {});
++});

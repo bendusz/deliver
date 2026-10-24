@@ -1,0 +1,23 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 5b3aec2..f6eb57e 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,8 @@
+ // Account query helpers.
++
++export function listQuery(tenant, sort) {
++  const columns = new Map([['name','name'],['created','created_at']]);
++  const column = columns.get(sort);
++  if (!column) throw new RangeError('unsupported sort');
++  return {sql: `SELECT id FROM accounts WHERE tenant_id = ? ORDER BY ${column}`, params: [tenant]};
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..35f8421
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { listQuery } from '../src/feature.mjs';
++test('supported sorting', () => assert.deepEqual(listQuery('t','created'),{sql:'SELECT id FROM accounts WHERE tenant_id = ? ORDER BY created_at',params:['t']}));

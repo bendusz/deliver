@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 3eb78ad..52ac99d 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Order batches helpers.
++
++export function customerBatches(orders) {
++  const customers = [...new Set(orders.map(order => order.customer))];
++  return customers.map(customer => ({customer, orders: orders.filter(order => order.customer === customer)}));
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..b0b1d26
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { customerBatches } from '../src/feature.mjs';
++test('batch customer orders', () => { const a={customer:'a'},b={customer:'b'},c={customer:'a'}; assert.deepEqual(customerBatches([a,b,c]),[{customer:'a',orders:[a,c]},{customer:'b',orders:[b]}]); });

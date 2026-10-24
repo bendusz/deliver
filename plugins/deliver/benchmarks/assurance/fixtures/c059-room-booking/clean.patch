@@ -1,0 +1,52 @@
+diff --git a/src/rooms.mjs b/src/rooms.mjs
+index a5fbbf8..ca2a4d9 100644
+--- a/src/rooms.mjs
++++ b/src/rooms.mjs
+@@ -3,3 +3,21 @@ export const ROOMS = [
+   { id: 'atlas', seats: 8 },
+   { id: 'borealis', seats: 4 },
+ ];
++
++// overlaps(a, b): whether two bookings of the same room share any instant.
++export function overlaps(a, b) {
++  return a.roomId === b.roomId && a.start < b.end && b.start < a.end;
++}
++
++// book(bookings, request): the bookings with request added; throws ECONFLICT when the room is taken.
++export function book(bookings, request) {
++  if (!(request.end > request.start)) throw new RangeError('a booking must end after it starts');
++  const clash = bookings.find((b) => overlaps(b, request));
++  if (clash) {
++    const err = new Error(`room ${request.roomId} is already booked`);
++    err.code = 'ECONFLICT';
++    err.booking = clash;
++    throw err;
++  }
++  return [...bookings, request];
++}
+diff --git a/test/rooms.test.mjs b/test/rooms.test.mjs
+new file mode 100644
+index 0000000..2138db1
+--- /dev/null
++++ b/test/rooms.test.mjs
+@@ -0,0 +1,20 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { overlaps, book } from '../src/rooms.mjs';
++
++const H = 3600000;
++const nine = { roomId: 'atlas', start: 9 * H, end: 10 * H };
++
++test('overlapping bookings of one room clash', () => {
++  assert.throws(() => book([nine], { roomId: 'atlas', start: 9.5 * H, end: 11 * H }), { code: 'ECONFLICT' });
++  assert.equal(overlaps(nine, { roomId: 'borealis', start: 9 * H, end: 10 * H }), false);
++});
++
++test('back-to-back bookings do not clash', () => {
++  assert.equal(overlaps(nine, { roomId: 'atlas', start: 10 * H, end: 11 * H }), false);
++  assert.equal(book([nine], { roomId: 'atlas', start: 8 * H, end: 9 * H }).length, 2);
++});
++
++test('a booking must end after it starts', () => {
++  assert.throws(() => book([], { roomId: 'atlas', start: H, end: H }), RangeError);
++});

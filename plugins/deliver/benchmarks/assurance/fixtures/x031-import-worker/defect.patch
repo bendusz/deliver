@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index e1d5854..36e8fb0 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,10 @@
+ // Import worker helpers.
++
++export function createWorker() {
++  let tail = Promise.resolve();
++  return work => {
++    const next = Promise.all([tail, work()]).then(([, value]) => value);
++    tail = next.catch(() => {});
++    return next;
++  };
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..c602185
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { createWorker } from '../src/feature.mjs';
++test('individual work result', async () => { const submit=createWorker(); assert.equal(await submit(async()=>3),3); assert.equal(await submit(async()=>4),4); });

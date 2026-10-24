@@ -1,0 +1,40 @@
+diff --git a/src/session.mjs b/src/session.mjs
+index df882a4..d18370d 100644
+--- a/src/session.mjs
++++ b/src/session.mjs
+@@ -4,3 +4,12 @@ export const DEFAULT_LANDING = '/dashboard';
+ export function sessionCookie(id) {
+   return `sid=${id}; Path=/; HttpOnly; Secure; SameSite=Lax`;
+ }
++
++// safeRedirect(target): the post-login redirect target when it is a path on this site, else the
++// default landing page.
++export function safeRedirect(target) {
++  if (typeof target !== 'string' || target === '') return DEFAULT_LANDING;
++  if (!target.startsWith('/') || target.startsWith('//')) return DEFAULT_LANDING;
++  if (/[\\\u0000-\u001f\u007f]/.test(target)) return DEFAULT_LANDING;
++  return target;
++}
+diff --git a/test/session.test.mjs b/test/session.test.mjs
+new file mode 100644
+index 0000000..aef9297
+--- /dev/null
++++ b/test/session.test.mjs
+@@ -0,0 +1,17 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { safeRedirect, DEFAULT_LANDING } from '../src/session.mjs';
++
++test('site paths pass through', () => {
++  assert.equal(safeRedirect('/invoices/42?tab=notes'), '/invoices/42?tab=notes');
++  assert.equal(safeRedirect('/'), '/');
++});
++
++test('other hosts and odd input fall back to the landing page', () => {
++  assert.equal(safeRedirect('https://evil.example/'), DEFAULT_LANDING);
++  assert.equal(safeRedirect('/\\evil.example'), DEFAULT_LANDING);
++  assert.equal(safeRedirect('/\t/evil.example'), DEFAULT_LANDING);
++  assert.equal(safeRedirect('settings'), DEFAULT_LANDING);
++  assert.equal(safeRedirect(''), DEFAULT_LANDING);
++  assert.equal(safeRedirect(undefined), DEFAULT_LANDING);
++});

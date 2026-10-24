@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index c737a94..54def35 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Timeline order helpers.
++
++export function orderTimeline(entries) {
++  return [...entries].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..b2943c8
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,9 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { orderTimeline } from '../src/feature.mjs';
++test('offset timestamps compare by instant with stable ties', () => {
++  const a={timestamp:'2026-04-02T01:00:00+02:00'},b={timestamp:'2026-04-01T23:00:00Z'},c={timestamp:'2026-04-02T00:00:00Z'},d={timestamp:'2026-04-01T22:59:59Z'};
++  const entries=[c,a,b,d]; const result=orderTimeline(entries);
++  assert.deepEqual(result,[d,a,b,c]); assert.deepEqual(entries,[c,a,b,d]); assert.notEqual(result,entries); assert.equal(result[0],d);
++  assert.deepEqual(orderTimeline([]),[]); assert.deepEqual(orderTimeline([a]),[a]);
++});

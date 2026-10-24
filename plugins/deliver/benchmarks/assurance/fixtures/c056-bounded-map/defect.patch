@@ -1,0 +1,55 @@
+diff --git a/src/tasks.mjs b/src/tasks.mjs
+index d3b874a..3b4b686 100644
+--- a/src/tasks.mjs
++++ b/src/tasks.mjs
+@@ -1,2 +1,18 @@
+ // Small helpers for running background work.
+ export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
++
++// mapLimit(items, limit, fn): calls fn(item, index) for every item with at most `limit` calls in
++// flight, and resolves to the results in input order. Rejects with the first error.
++export async function mapLimit(items, limit, fn) {
++  if (!Number.isInteger(limit) || limit < 1) throw new RangeError('limit must be a positive integer');
++  const results = [];
++  let next = 0;
++  const worker = async () => {
++    while (next < items.length) {
++      const index = next++;
++      results.push(await fn(items[index], index));
++    }
++  };
++  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
++  return results;
++}
+diff --git a/test/tasks.test.mjs b/test/tasks.test.mjs
+new file mode 100644
+index 0000000..ac1f043
+--- /dev/null
++++ b/test/tasks.test.mjs
+@@ -0,0 +1,26 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { mapLimit } from '../src/tasks.mjs';
++
++test('mapLimit never exceeds the limit', async () => {
++  let active = 0;
++  let peak = 0;
++  const out = await mapLimit([1, 2, 3, 4, 5, 6, 7], 3, async (x) => {
++    active++;
++    peak = Math.max(peak, active);
++    await new Promise((r) => setImmediate(r));
++    active--;
++    return x * 2;
++  });
++  assert.equal(peak, 3);
++  assert.equal(out.length, 7);
++});
++
++test('mapLimit handles an empty list and rejects a bad limit', async () => {
++  assert.deepEqual(await mapLimit([], 4, async (x) => x), []);
++  await assert.rejects(mapLimit([1], 0, async (x) => x), RangeError);
++});
++
++test('mapLimit rejects with the first error', async () => {
++  await assert.rejects(mapLimit([1, 2], 2, async (x) => { if (x === 2) throw new Error('boom'); return x; }), /boom/);
++});

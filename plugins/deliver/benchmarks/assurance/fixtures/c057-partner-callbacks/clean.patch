@@ -1,0 +1,62 @@
+diff --git a/src/partners.mjs b/src/partners.mjs
+index b088f9b..dbc99bb 100644
+--- a/src/partners.mjs
++++ b/src/partners.mjs
+@@ -1,2 +1,27 @@
+ // Integration partners receive order events by webhook. Codes worth one retry:
+ export const RETRYABLE = new Set(['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN']);
++
++const MAX_ATTEMPTS = 2;
++
++async function postWithRetry(post, url, event) {
++  for (let attempt = 1; ; attempt++) {
++    try {
++      return await post(url, event);
++    } catch (err) {
++      if (!RETRYABLE.has(err.code)) throw err;
++      if (attempt >= MAX_ATTEMPTS) throw err;
++    }
++  }
++}
++
++// notifyPartners(partners, event, post): posts event to every partner; reports who got it.
++export async function notifyPartners(partners, event, post) {
++  const results = await Promise.allSettled(partners.map((p) => postWithRetry(post, p.url, event)));
++  const delivered = [];
++  const failed = [];
++  results.forEach((r, i) => {
++    if (r.status === 'fulfilled') delivered.push(partners[i].id);
++    else failed.push({ id: partners[i].id, error: r.reason.message });
++  });
++  return { delivered, failed };
++}
+diff --git a/test/partners.test.mjs b/test/partners.test.mjs
+new file mode 100644
+index 0000000..0c2aad6
+--- /dev/null
++++ b/test/partners.test.mjs
+@@ -0,0 +1,24 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { notifyPartners } from '../src/partners.mjs';
++
++const fail = (code, message = code) => Object.assign(new Error(message), { code });
++
++test('every partner is posted to and a hard failure is reported', async () => {
++  const calls = [];
++  const post = async (url) => {
++    calls.push(url);
++    if (url === 'https://b.test/hook') throw fail('EPROTO', 'bad certificate');
++  };
++  const out = await notifyPartners([{ id: 'a', url: 'https://a.test/hook' }, { id: 'b', url: 'https://b.test/hook' }], { type: 'order.paid' }, post);
++  assert.deepEqual(out, { delivered: ['a'], failed: [{ id: 'b', error: 'bad certificate' }] });
++  assert.equal(calls.length, 2);
++});
++
++test('a transient failure is retried once', async () => {
++  let attempts = 0;
++  const post = async () => { if (++attempts === 1) throw fail('ECONNRESET'); };
++  const out = await notifyPartners([{ id: 'a', url: 'https://a.test/hook' }], {}, post);
++  assert.deepEqual(out, { delivered: ['a'], failed: [] });
++  assert.equal(attempts, 2);
++});

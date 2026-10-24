@@ -1,0 +1,46 @@
+diff --git a/src/keys.mjs b/src/keys.mjs
+index 36bda65..102b884 100644
+--- a/src/keys.mjs
++++ b/src/keys.mjs
+@@ -2,3 +2,18 @@
+ export function parseScopes(header) {
+   return String(header || '').split(/\s+/).filter(Boolean);
+ }
++
++// hasScope(granted, needed): whether a key with the granted scopes may perform `needed`.
++export function hasScope(granted, needed) {
++  const [resource, action, extra] = String(needed).split(':');
++  if (!resource || !action || extra !== undefined) throw new Error(`malformed scope: ${needed}`);
++  return granted.some((scope) => scope === '*' || scope === needed || (scope.endsWith(':*') && scope.slice(0, -2) === resource));
++}
++
++// requireScope(granted, needed): throws EFORBIDDEN unless the key may perform `needed`.
++export function requireScope(granted, needed) {
++  if (hasScope(granted, needed)) return;
++  const err = new Error(`missing scope ${needed}`);
++  err.code = 'EFORBIDDEN';
++  throw err;
++}
+diff --git a/test/keys.test.mjs b/test/keys.test.mjs
+new file mode 100644
+index 0000000..cc92b48
+--- /dev/null
++++ b/test/keys.test.mjs
+@@ -0,0 +1,17 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { hasScope, requireScope, parseScopes } from '../src/keys.mjs';
++
++test('exact, resource-wide and global scopes', () => {
++  assert.equal(hasScope(['invoices:read'], 'invoices:read'), true);
++  assert.equal(hasScope(['invoices:read'], 'invoices:write'), false);
++  assert.equal(hasScope(['invoices:*'], 'invoices:delete'), true);
++  assert.equal(hasScope(['invoices:*'], 'users:read'), false);
++  assert.equal(hasScope(['*'], 'users-admin:write'), true);
++});
++
++test('malformed scopes and forbidden calls', () => {
++  assert.throws(() => hasScope(['*'], 'invoices'), Error);
++  assert.throws(() => requireScope(parseScopes('users:read'), 'users:write'), { code: 'EFORBIDDEN' });
++  assert.equal(requireScope(parseScopes('users:read users:write'), 'users:write'), undefined);
++});

@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 7e09902..b6bb647 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Course enrollment helpers.
++
++export function enrollments(students, registrations) {
++  return registrations.map(row => ({course: row.course, student: students.find(student => student.id === row.studentId) ?? null}));
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..7cee1d9
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { enrollments } from '../src/feature.mjs';
++test('join registrations', () => { const s={id:'s'}; assert.deepEqual(enrollments([s],[{course:'c',studentId:'s'},{course:'d',studentId:'x'}]),[{course:'c',student:s},{course:'d',student:null}]); });

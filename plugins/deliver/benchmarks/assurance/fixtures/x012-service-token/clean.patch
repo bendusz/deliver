@@ -1,0 +1,23 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index d76abdf..5ce22ab 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,8 @@
+ // Service token helpers.
++
++import { timingSafeEqual } from 'node:crypto';
++export function verifyToken(expected, supplied) {
++  const a = Buffer.from(expected, 'utf8');
++  const b = Buffer.from(supplied, 'utf8');
++  return a.length === b.length && timingSafeEqual(a, b);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..57c2b86
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { verifyToken } from '../src/feature.mjs';
++test('matching and different tokens', () => { assert.equal(verifyToken('abc','abc'),true); assert.equal(verifyToken('abc','xyz'),false); assert.equal(verifyToken('abc','a'),false); });

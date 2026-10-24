@@ -1,0 +1,63 @@
+diff --git a/src/bucket.mjs b/src/bucket.mjs
+new file mode 100644
+index 0000000..11bb550
+--- /dev/null
++++ b/src/bucket.mjs
+@@ -0,0 +1,28 @@
++// TokenBucket: bursts of up to `capacity` requests, refilled at `refillPerSec` tokens per second.
++export class TokenBucket {
++  constructor({ capacity, refillPerSec }, now) {
++    this.capacity = capacity;
++    this.refillPerSec = refillPerSec;
++    this.tokens = capacity;
++    this.updatedAt = now;
++  }
++
++  refill(now) {
++    const elapsed = Math.max(0, now - this.updatedAt) / 1000;
++    this.tokens = Math.min(this.capacity, this.tokens + elapsed * this.refillPerSec);
++    this.updatedAt = now;
++  }
++
++  tryTake(now, cost = 1) {
++    this.refill(now);
++    if (this.tokens < cost) return false;
++    this.tokens -= cost;
++    return true;
++  }
++
++  retryAfterMs(now, cost = 1) {
++    this.refill(now);
++    if (this.tokens >= cost) return 0;
++    return Math.ceil(((cost - this.tokens) / this.refillPerSec) * 1000);
++  }
++}
+diff --git a/test/bucket.test.mjs b/test/bucket.test.mjs
+new file mode 100644
+index 0000000..0736390
+--- /dev/null
++++ b/test/bucket.test.mjs
+@@ -0,0 +1,23 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { TokenBucket } from '../src/bucket.mjs';
++
++test('a burst up to capacity passes, then requests are refused', () => {
++  const b = new TokenBucket({ capacity: 3, refillPerSec: 1 }, 0);
++  assert.deepEqual([1, 2, 3, 4].map(() => b.tryTake(0)), [true, true, true, false]);
++});
++
++test('tokens refill with time', () => {
++  const b = new TokenBucket({ capacity: 10, refillPerSec: 5 }, 0);
++  for (let i = 0; i < 10; i++) b.tryTake(0);
++  assert.equal(b.tryTake(100), false);
++  assert.equal(b.retryAfterMs(100), 100);
++  assert.equal(b.tryTake(1000), true);
++  assert.equal(b.tryTake(1000), true);
++});
++
++test('a large cost is refused without spending tokens', () => {
++  const b = new TokenBucket({ capacity: 4, refillPerSec: 1 }, 0);
++  assert.equal(b.tryTake(0, 5), false);
++  assert.equal(b.tryTake(0, 4), true);
++});

@@ -1,0 +1,49 @@
+diff --git a/src/customers.mjs b/src/customers.mjs
+index 4f43cfd..8114e88 100644
+--- a/src/customers.mjs
++++ b/src/customers.mjs
+@@ -2,3 +2,18 @@
+ export function displayName({ firstName, lastName }) {
+   return [firstName, lastName].filter(Boolean).join(' ');
+ }
++
++const CALLING_CODES = { BE: '32', DE: '49', GB: '44', NL: '31' };
++
++// toE164(input, country): the number in E.164 form, or null when it cannot be one.
++export function toE164(input, country) {
++  const code = CALLING_CODES[country];
++  if (!code) throw new Error(`unsupported country: ${country}`);
++  const compact = String(input).replace(/[\s\-.()]/g, '');
++  let digits;
++  if (/^\+[1-9]\d*$/.test(compact)) digits = compact.slice(1);
++  else if (/^00[1-9]\d*$/.test(compact)) digits = compact.slice(2);
++  else if (/^0[1-9]\d*$/.test(compact)) digits = code + compact.slice(1);
++  else return null;
++  return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
++}
+diff --git a/test/customers.test.mjs b/test/customers.test.mjs
+new file mode 100644
+index 0000000..1dc1f6a
+--- /dev/null
++++ b/test/customers.test.mjs
+@@ -0,0 +1,20 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { toE164 } from '../src/customers.mjs';
++
++test('national numbers get the country code', () => {
++  assert.equal(toE164('06-1234 5678', 'NL'), '+31612345678');
++  assert.equal(toE164('(030) 123.456', 'DE'), '+4930123456');
++});
++
++test('international numbers keep their own code', () => {
++  assert.equal(toE164('+44 20 7946 0958', 'NL'), '+442079460958');
++  assert.equal(toE164('0032 2 123 45 67', 'NL'), '+3221234567');
++});
++
++test('junk and unsupported countries', () => {
++  assert.equal(toE164('call me', 'NL'), null);
++  assert.equal(toE164('0612', 'NL'), null);
++  assert.equal(toE164('+0123456789', 'NL'), null);
++  assert.throws(() => toE164('0612345678', 'FR'), Error);
++});

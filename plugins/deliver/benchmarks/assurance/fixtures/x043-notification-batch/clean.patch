@@ -1,0 +1,23 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 52f4d1c..aa39631 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,8 @@
+ // Notification batch helpers.
++
++export async function notifyAll(messages, send) {
++  const settled = await Promise.allSettled(messages.map(message => send(message)));
++  const failures = settled.filter(item => item.status === 'rejected').map(item => item.reason);
++  if (failures.length) throw new AggregateError(failures, 'Notification delivery failed');
++  return settled.map(item => item.value);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..dbc9392
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { notifyAll } from '../src/feature.mjs';
++test('deliver a batch', async () => assert.deepEqual(await notifyAll(['a','b'],async m=>m.toUpperCase()),['A','B']));

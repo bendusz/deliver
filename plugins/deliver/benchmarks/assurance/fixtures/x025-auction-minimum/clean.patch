@@ -1,0 +1,23 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 5353316..7884cd4 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1,3 +1,4 @@
+ export function lowestBid(values) {
++  if (values.length === 0) return null;
+   return Math.min(...values);
+ }
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..2ebabf5
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,8 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { lowestBid } from '../src/feature.mjs';
++test('no bids have no minimum', () => {
++  const result = lowestBid([]);
++  assert.equal(result, null);
++});
++test('choose cheapest bid', () => assert.equal(lowestBid([7,3]),3));

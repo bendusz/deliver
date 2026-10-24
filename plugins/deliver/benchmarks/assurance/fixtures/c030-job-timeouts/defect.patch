@@ -1,0 +1,42 @@
+diff --git a/src/timeouts.mjs b/src/timeouts.mjs
+index 3fc0ebb..f130779 100644
+--- a/src/timeouts.mjs
++++ b/src/timeouts.mjs
+@@ -1,2 +1,11 @@
+ // Timeout settings for the job runner, in seconds.
+ export const DEFAULT_TIMEOUT_SEC = 600;
++
++// parseDuration(text): the seconds in a duration such as "90s", "15m", "1h30m" or "2d".
++export function parseDuration(text) {
++  const s = String(text).trim();
++  const m = /^(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/.exec(s);
++  if (!s || !m) throw new SyntaxError(`invalid duration: ${text}`);
++  const [, d = 0, h = 0, min = 0, sec = 0] = m;
++  return Number(d) * 86400 + Number(h) * 3600 + Number(min) * 60 + Number(sec);
++}
+diff --git a/test/timeouts.test.mjs b/test/timeouts.test.mjs
+new file mode 100644
+index 0000000..169259f
+--- /dev/null
++++ b/test/timeouts.test.mjs
+@@ -0,0 +1,20 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { parseDuration } from '../src/timeouts.mjs';
++
++test('valid durations', () => {
++  assert.equal(parseDuration('90s'), 90);
++  assert.equal(parseDuration(' 1h30m '), 5400);
++  assert.equal(parseDuration('2d'), 172800);
++  assert.equal(parseDuration('1d2h3m4s'), 93784);
++});
++
++test('invalid durations are rejected', () => {
++  for (const bad of ['', '5x', '1h30', 'm', '30m1h']) {
++    try {
++      parseDuration(bad);
++    } catch (err) {
++      assert.ok(err instanceof SyntaxError, bad);
++    }
++  }
++});

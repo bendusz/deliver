@@ -1,0 +1,56 @@
+diff --git a/src/shipping.mjs b/src/shipping.mjs
+index e9f59c6..8145c40 100644
+--- a/src/shipping.mjs
++++ b/src/shipping.mjs
+@@ -1,2 +1,26 @@
+ // Shipping estimates. Dates are 'YYYY-MM-DD' on the UTC calendar.
+ export const WAREHOUSE_HOLIDAYS = ['2024-12-25', '2024-12-26', '2025-01-01'];
++
++function isBusinessDay(date, holidays) {
++  const dow = date.getUTCDay();
++  return dow !== 0 && dow !== 6 && !holidays.has(date.toISOString().slice(0, 10));
++}
++
++// addBusinessDays(start, n, holidays): the date n business days after start.
++export function addBusinessDays(start, n, holidays = []) {
++  if (!Number.isInteger(n) || n < 0) throw new RangeError('n must be a non-negative integer');
++  const off = new Set(holidays);
++  const date = new Date(`${start}T00:00:00Z`);
++  let left = n;
++  while (left > 0) {
++    date.setUTCDate(date.getUTCDate() + 1);
++    if (isBusinessDay(date, off)) left--;
++  }
++  while (!isBusinessDay(date, off)) date.setUTCDate(date.getUTCDate() + 1);
++  return date.toISOString().slice(0, 10);
++}
++
++// estimateDelivery(orderDate, serviceDays): the delivery date for a shipping service.
++export function estimateDelivery(orderDate, serviceDays) {
++  return addBusinessDays(orderDate, serviceDays, WAREHOUSE_HOLIDAYS);
++}
+diff --git a/test/shipping.test.mjs b/test/shipping.test.mjs
+new file mode 100644
+index 0000000..41c017c
+--- /dev/null
++++ b/test/shipping.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { addBusinessDays, estimateDelivery } from '../src/shipping.mjs';
++
++test('weekends are skipped', () => {
++  assert.equal(addBusinessDays('2024-05-10', 1), '2024-05-13');
++  assert.equal(addBusinessDays('2024-05-08', 5), '2024-05-15');
++  assert.equal(addBusinessDays('2024-05-11', 1), '2024-05-13');
++});
++
++test('zero days stays on a business day or moves to the next one', () => {
++  assert.equal(addBusinessDays('2024-05-08', 0), '2024-05-08');
++  assert.equal(addBusinessDays('2024-05-11', 0), '2024-05-13');
++  assert.throws(() => addBusinessDays('2024-05-08', -1), RangeError);
++});
++
++test('an order landing on Christmas ships after it', () => {
++  assert.equal(estimateDelivery('2024-12-24', 1), '2024-12-27');
++});

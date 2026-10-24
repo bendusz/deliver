@@ -1,0 +1,48 @@
+diff --git a/src/markdown.mjs b/src/markdown.mjs
+index 5c50895..4095cfd 100644
+--- a/src/markdown.mjs
++++ b/src/markdown.mjs
+@@ -2,3 +2,20 @@
+ export function headingAnchor(text) {
+   return text.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+ }
++
++// tableOfContents(markdown, maxDepth): the headings down to maxDepth as { depth, text, anchor },
++// in document order.
++export function tableOfContents(markdown, maxDepth = 3) {
++  const entries = [];
++  const used = new Map();
++  for (const line of markdown.split('\n')) {
++    const m = /^(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
++    if (!m || m[1].length > maxDepth) continue;
++    const text = m[2];
++    const base = headingAnchor(text);
++    const n = used.get(base) ?? 0;
++    used.set(base, n + 1);
++    entries.push({ depth: m[1].length, text, anchor: n === 0 ? base : `${base}-${n}` });
++  }
++  return entries;
++}
+diff --git a/test/markdown.test.mjs b/test/markdown.test.mjs
+new file mode 100644
+index 0000000..7e7dede
+--- /dev/null
++++ b/test/markdown.test.mjs
+@@ -0,0 +1,17 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { tableOfContents } from '../src/markdown.mjs';
++
++const page = ['# Install', 'text', '## On macOS', '## On Linux', '#### Deep', '## Usage ##', '### Options', '## Options'].join('\n');
++
++test('headings down to maxDepth in order', () => {
++  assert.deepEqual(tableOfContents(page).map((e) => [e.depth, e.text]), [
++    [1, 'Install'], [2, 'On macOS'], [2, 'On Linux'], [2, 'Usage'], [3, 'Options'], [2, 'Options'],
++  ]);
++  assert.equal(tableOfContents(page, 1).length, 1);
++});
++
++test('repeated anchors get a counter', () => {
++  assert.deepEqual(tableOfContents(page).slice(-2).map((e) => e.anchor), ['options', 'options-1']);
++  assert.equal(tableOfContents('#nospace').length, 0);
++});

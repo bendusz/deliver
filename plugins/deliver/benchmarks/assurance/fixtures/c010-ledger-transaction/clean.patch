@@ -1,0 +1,47 @@
+diff --git a/src/db.mjs b/src/db.mjs
+index 4db423e..543f9e0 100644
+--- a/src/db.mjs
++++ b/src/db.mjs
+@@ -9,3 +9,17 @@ export class FakeDb {
+     return { sql, params, rows: [] };
+   }
+ }
++
++// transaction(db, work): runs work(db) between BEGIN and COMMIT and resolves to its result.
++// When work fails, issues ROLLBACK instead.
++export async function transaction(db, work) {
++  await db.query('BEGIN');
++  try {
++    const result = await work(db);
++    await db.query('COMMIT');
++    return result;
++  } catch (err) {
++    await db.query('ROLLBACK');
++    throw err;
++  }
++}
+diff --git a/test/db.test.mjs b/test/db.test.mjs
+new file mode 100644
+index 0000000..083c50d
+--- /dev/null
++++ b/test/db.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { FakeDb, transaction } from '../src/db.mjs';
++
++test('transaction commits and returns the work result', async () => {
++  const db = new FakeDb();
++  const result = await transaction(db, async (tx) => {
++    await tx.query('UPDATE accounts SET balance = balance - 5 WHERE id = $1', [1]);
++    return 'ok';
++  });
++  assert.equal(result, 'ok');
++  assert.deepEqual(db.log, ['BEGIN', 'UPDATE accounts SET balance = balance - 5 WHERE id = $1', 'COMMIT']);
++});
++
++test('a failing step rolls back', async () => {
++  const db = new FakeDb();
++  await transaction(db, async () => { throw new Error('constraint'); }).catch(() => {});
++  assert.deepEqual(db.log, ['BEGIN', 'ROLLBACK']);
++});

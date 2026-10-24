@@ -1,0 +1,42 @@
+diff --git a/src/feed.mjs b/src/feed.mjs
+new file mode 100644
+index 0000000..d8ca642
+--- /dev/null
++++ b/src/feed.mjs
+@@ -0,0 +1,11 @@
++// withAuthors(posts, repo): each post with an `author` field holding { id, name } of the user
++// whose id is post.authorId, or null when that user no longer exists.
++export async function withAuthors(posts, repo) {
++  if (posts.length === 0) return [];
++  const users = await repo.findByIds(posts.map((p) => p.authorId));
++  const byId = new Map(users.map((u) => [u.id, u]));
++  return posts.map((p) => {
++    const u = byId.get(p.authorId);
++    return { ...p, author: u ? { id: u.id, name: u.name } : null };
++  });
++}
+diff --git a/test/feed.test.mjs b/test/feed.test.mjs
+new file mode 100644
+index 0000000..3778cde
+--- /dev/null
++++ b/test/feed.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { UserRepo } from '../src/repo.mjs';
++import { withAuthors } from '../src/feed.mjs';
++
++const repo = () => new UserRepo([{ id: 1, name: 'Ann', email: 'ann@x.test' }, { id: 2, name: 'Bo', email: 'bo@x.test' }]);
++
++test('withAuthors attaches the author name and keeps order', async () => {
++  const posts = [{ id: 'p1', authorId: 2, text: 'hi' }, { id: 'p2', authorId: 1, text: 'yo' }, { id: 'p3', authorId: 9, text: '?' }];
++  const out = await withAuthors(posts, repo());
++  assert.deepEqual(out.map((p) => p.author), [{ id: 2, name: 'Bo' }, { id: 1, name: 'Ann' }, null]);
++  assert.equal(posts[0].author, undefined);
++});
++
++test('an empty page needs no query', async () => {
++  const r = repo();
++  assert.deepEqual(await withAuthors([], r), []);
++  assert.equal(r.queries, 0);
++});

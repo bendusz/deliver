@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 606e893..4518c2e 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Payment amount helpers.
++
++export function toCents(value) {
++  return Math.trunc(Number(value) * 100);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..a0ce728
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { toCents } from '../src/feature.mjs';
++test('whole and half currency units', () => { assert.equal(toCents('12.50'),1250); assert.equal(toCents('-2.00'),-200); });

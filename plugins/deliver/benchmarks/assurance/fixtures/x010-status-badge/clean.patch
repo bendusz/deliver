@@ -1,0 +1,22 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 2a16d58..37c40ec 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,7 @@
+ // Status badge helpers.
++
++const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
++export function renderBadge(label, compact = false) {
++  if (compact) return `<span title="${escape(label)}">*</span>`;
++  return `<span>${escape(label)}</span>`;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..fe20b7f
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { renderBadge } from '../src/feature.mjs';
++test('badge text', () => assert.equal(renderBadge('<ok>'),'<span>&lt;ok&gt;</span>'));

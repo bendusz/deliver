@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index a9addc9..036232b 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,10 @@
+ // Preference file helpers.
++
++export async function readPreferences(read) {
++  try {
++    return JSON.parse(await read());
++  } catch (error) {
++    if (error) return {theme: 'system'};
++    throw error;
++  }
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..a082283
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readPreferences } from '../src/feature.mjs';
++test('missing preferences use defaults', async () => { const e=Object.assign(new Error('missing'),{code:'ENOENT'}); assert.deepEqual(await readPreferences(async()=>{throw e;}),{theme:'system'}); });

@@ -1,0 +1,57 @@
+diff --git a/src/tags.mjs b/src/tags.mjs
+index b6648d4..be052e8 100644
+--- a/src/tags.mjs
++++ b/src/tags.mjs
+@@ -1,2 +1,21 @@
+ // Post tags.
+ export const MAX_TAGS = 10;
++
++// parseTags(input): the normalised, de-duplicated tags in a comma-separated string.
++export function parseTags(input) {
++  const tags = [];
++  for (const part of String(input).split(',')) {
++    const tag = part
++      .trim()
++      .toLowerCase()
++      .replace(/\s+/g, '-')
++      .replace(/[^a-z0-9-]/g, '')
++      .replace(/-+/g, '-')
++      .replace(/^-|-$/g, '');
++    if (!tag) continue;
++    if (tag.length > 30) throw new RangeError(`tag longer than 30 characters: ${tag}`);
++    if (!tags.includes(tag)) tags.push(tag);
++  }
++  if (tags.length > MAX_TAGS) throw new RangeError(`at most ${MAX_TAGS} tags`);
++  return tags;
++}
+diff --git a/test/tags.test.mjs b/test/tags.test.mjs
+new file mode 100644
+index 0000000..c5eeea6
+--- /dev/null
++++ b/test/tags.test.mjs
+@@ -0,0 +1,25 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { parseTags, MAX_TAGS } from '../src/tags.mjs';
++
++test('parts are normalised', () => {
++  assert.deepEqual(parseTags('  Machine   Learning , C++, node.js,--edge--case-- '), ['machine-learning', 'c', 'nodejs', 'edge-case']);
++});
++
++test('empty parts and duplicates are skipped', () => {
++  assert.deepEqual(parseTags('a, ,A,,b, a '), ['a', 'b']);
++  assert.deepEqual(parseTags(''), []);
++  assert.deepEqual(parseTags('!!!, ---'), []);
++});
++
++test('a tag of exactly 30 characters is fine, 31 is not', () => {
++  assert.deepEqual(parseTags('x'.repeat(30)), ['x'.repeat(30)]);
++  assert.throws(() => parseTags('x'.repeat(31)), RangeError);
++});
++
++test('MAX_TAGS distinct tags are fine, one more is not', () => {
++  const tags = Array.from({ length: MAX_TAGS }, (_, i) => `t${i}`);
++  assert.deepEqual(parseTags(tags.join(',')), tags);
++  assert.deepEqual(parseTags([...tags, 't0'].join(',')), tags);
++  assert.throws(() => parseTags([...tags, 'extra'].join(',')), RangeError);
++});

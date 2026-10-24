@@ -1,0 +1,55 @@
+diff --git a/src/units.mjs b/src/units.mjs
+index d7a36b5..03056ee 100644
+--- a/src/units.mjs
++++ b/src/units.mjs
+@@ -1,2 +1,19 @@
+ // Size units for the file browser, binary multiples.
+ export const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
++
++// formatBytes(bytes): a short label such as "1.5 MB".
++export function formatBytes(bytes) {
++  if (!Number.isInteger(bytes) || bytes < 0) throw new RangeError('bytes must be a non-negative integer');
++  let unit = 0;
++  let value = bytes;
++  while (unit < UNITS.length - 1 && value >= 1024) {
++    value /= 1024;
++    unit++;
++  }
++  let rounded = Math.round(value * 10) / 10;
++  if (rounded >= 1024 && unit < UNITS.length - 1) {
++    unit++;
++    rounded = Math.round((value / 1024) * 10) / 10;
++  }
++  return `${rounded} ${UNITS[unit]}`;
++}
+diff --git a/test/units.test.mjs b/test/units.test.mjs
+new file mode 100644
+index 0000000..c0574bb
+--- /dev/null
++++ b/test/units.test.mjs
+@@ -0,0 +1,25 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { formatBytes } from '../src/units.mjs';
++
++test('small sizes are bytes', () => {
++  assert.equal(formatBytes(0), '0 B');
++  assert.equal(formatBytes(1023), '1023 B');
++});
++
++test('larger sizes use one decimal without a trailing .0', () => {
++  assert.equal(formatBytes(1024), '1 KB');
++  assert.equal(formatBytes(1536), '1.5 KB');
++  assert.equal(formatBytes(5 * 1024 ** 3 + 300 * 1024 ** 2), '5.3 GB');
++});
++
++test('rounding up to 1024 moves to the next unit', () => {
++  assert.equal(formatBytes(1048575), '1 MB');
++  assert.equal(formatBytes(1024 ** 3 - 1), '1 GB');
++  assert.equal(formatBytes(2048 * 1024 ** 4), '2048 TB');
++});
++
++test('bad input throws', () => {
++  assert.throws(() => formatBytes(-1), RangeError);
++  assert.throws(() => formatBytes(1.5), RangeError);
++});

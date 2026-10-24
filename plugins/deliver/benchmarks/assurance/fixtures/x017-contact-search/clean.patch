@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 31bfd21..6295190 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Contact search helpers.
++
++export function searchContacts(contacts, query, {includeArchived = false} = {}) {
++  const needle = query.toLowerCase();
++  return contacts.filter(c => (includeArchived || !c.archived) && c.name.toLowerCase().includes(needle));
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..d5cc76d
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { searchContacts } from '../src/feature.mjs';
++test('current contacts', () => assert.deepEqual(searchContacts([{name:'Ada',archived:false},{name:'Adam',archived:true}], 'AD'),[{name:'Ada',archived:false}]));

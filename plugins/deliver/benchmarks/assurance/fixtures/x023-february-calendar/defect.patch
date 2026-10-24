@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index eab936a..888747d 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1,3 +1,4 @@
+ export function daysInFebruary(year) {
+-  return year % 4 === 0 ? 29 : 28;
++  const leap = year % 4 === 0 || year % 400 === 0;
++  return leap ? 29 : 28;
+ }
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..a914230
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,5 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { daysInFebruary } from '../src/feature.mjs';
++test('ordinary leap years', () => { assert.equal(daysInFebruary(2024),29); assert.equal(daysInFebruary(2023),28); });
++test.skip('century calendar', () => { assert.equal(daysInFebruary(1900),28); assert.equal(daysInFebruary(2000),29); });

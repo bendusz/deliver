@@ -1,0 +1,63 @@
+diff --git a/src/exports.mjs b/src/exports.mjs
+index 10cbdb7..b9ebdc7 100644
+--- a/src/exports.mjs
++++ b/src/exports.mjs
+@@ -1,2 +1,17 @@
+ // Data export jobs: the API reports { state: 'queued' | 'running' | 'done' | 'failed', url, error }.
+ export const TERMINAL = new Set(['done', 'failed']);
++
++const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
++
++// waitForExport(getStatus, options): polls until the export is done and resolves to its url.
++export async function waitForExport(getStatus, { intervalMs = 2000, maxAttempts = 30, sleep = defaultSleep } = {}) {
++  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++    const status = await getStatus();
++    if (status.state === 'done') return status.url;
++    if (status.state === 'failed') throw new Error(`export failed: ${status.error ?? 'unknown error'}`);
++    if (attempt < maxAttempts) await sleep(intervalMs);
++  }
++  const err = new Error(`export not ready after ${maxAttempts} attempts`);
++  err.code = 'ETIMEDOUT';
++  throw err;
++}
+diff --git a/test/exports.test.mjs b/test/exports.test.mjs
+new file mode 100644
+index 0000000..4bd8d29
+--- /dev/null
++++ b/test/exports.test.mjs
+@@ -0,0 +1,35 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { waitForExport } from '../src/exports.mjs';
++
++const sequence = (...states) => {
++  let i = 0;
++  return async () => states[Math.min(i++, states.length - 1)];
++};
++
++test('polls until done and returns the url', async () => {
++  const sleeps = [];
++  const url = await waitForExport(sequence({ state: 'queued' }, { state: 'running' }, { state: 'done', url: 'https://x.test/e.zip' }), {
++    intervalMs: 500,
++    sleep: async (ms) => { sleeps.push(ms); },
++  });
++  assert.equal(url, 'https://x.test/e.zip');
++  assert.deepEqual(sleeps, [500, 500]);
++});
++
++test('a failed export rejects with its error', async () => {
++  await assert.rejects(waitForExport(sequence({ state: 'failed', error: 'quota exceeded' }), { sleep: async () => {} }), /quota exceeded/);
++});
++
++test('gives up after maxAttempts without a trailing sleep', async () => {
++  let sleeps = 0;
++  let polls = 0;
++  const getStatus = async () => { polls++; return { state: 'running' }; };
++  await assert.rejects(waitForExport(getStatus, { maxAttempts: 3, sleep: async () => { sleeps++; } }), { code: 'ETIMEDOUT' });
++  assert.equal(polls, 3);
++  assert.equal(sleeps, 2);
++});
++
++test('a network error from getStatus propagates', async () => {
++  await assert.rejects(waitForExport(async () => { throw new Error('ECONNREFUSED'); }, { sleep: async () => {} }), /ECONNREFUSED/);
++});

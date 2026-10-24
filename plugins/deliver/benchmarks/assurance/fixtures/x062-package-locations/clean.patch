@@ -1,0 +1,39 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index ed89ee3..21dcfd6 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,13 @@
+ // Package locations helpers.
++
++export async function readPackage(paths, read) {
++  const missing = [];
++  for (const path of paths) {
++    try { return await read(path); }
++    catch (error) {
++      if (error.code !== 'ENOENT') throw error;
++      missing.push(error);
++    }
++  }
++  throw new AggregateError(missing, 'Package not found');
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..72db87a
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,15 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readPackage } from '../src/feature.mjs';
++test('try missing locations and preserve empty content', async () => {
++  const calls=[]; const missing=Object.assign(new Error('missing'),{code:'ENOENT'});
++  assert.equal(await readPackage(['a','b','c'],async p=>{calls.push(p);if(p==='a')throw missing;return '';}),'');
++  assert.deepEqual(calls,['a','b']);
++});
++test('permission failure and exhaustive misses', async () => {
++  const denied=Object.assign(new Error('denied'),{code:'EACCES'}); let calls=0;
++  await assert.rejects(readPackage(['a','b'],async()=>{calls++;throw denied;}),e=>e===denied); assert.equal(calls,1);
++  const errors=['a','b'].map(x=>Object.assign(new Error(x),{code:'ENOENT'}));
++  await assert.rejects(readPackage(['a','b'],async p=>{throw errors[p==='a'?0:1];}),e=>e instanceof AggregateError && e.errors[0]===errors[0] && e.errors[1]===errors[1]);
++  await assert.rejects(readPackage([],async()=>assert.fail('read')),e=>e instanceof AggregateError && e.errors.length===0);
++});

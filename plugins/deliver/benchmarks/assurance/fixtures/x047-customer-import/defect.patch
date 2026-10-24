@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 2acd396..e3518e3 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Customer import helpers.
++
++export function parseCustomer(line) {
++  const [id, name] = line.split('\t');
++  return {id: String(Number(id)), name};
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..da5bd3f
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { parseCustomer } from '../src/feature.mjs';
++test('customer import', () => assert.deepEqual(parseCustomer('123\tAda'),{id:'123',name:'Ada'}));

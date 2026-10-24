@@ -1,0 +1,49 @@
+diff --git a/src/locale.mjs b/src/locale.mjs
+index 22a34e2..4cb04c0 100644
+--- a/src/locale.mjs
++++ b/src/locale.mjs
+@@ -4,3 +4,14 @@ export const SEPARATORS = {
+   nl: { group: '.', decimal: ',' },
+   fr: { group: '\u202f', decimal: ',' },
+ };
++
++// formatAmount(cents, locale): integer cents as a grouped amount with two decimals.
++export function formatAmount(cents, locale = 'en') {
++  if (!Object.hasOwn(SEPARATORS, locale)) throw new Error(`unsupported locale: ${locale}`);
++  const sep = SEPARATORS[locale];
++  if (!Number.isSafeInteger(cents)) throw new RangeError('cents must be a safe integer');
++  const sign = cents < 0 ? '-' : '';
++  const abs = Math.abs(cents);
++  const whole = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, sep.group);
++  return `${sign}${whole}${sep.decimal}${String(abs % 100).padStart(2, '0')}`;
++}
+diff --git a/test/locale.test.mjs b/test/locale.test.mjs
+new file mode 100644
+index 0000000..11091d9
+--- /dev/null
++++ b/test/locale.test.mjs
+@@ -0,0 +1,24 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { formatAmount } from '../src/locale.mjs';
++
++test('grouping and decimals per locale', () => {
++  assert.equal(formatAmount(123456789), '1,234,567.89');
++  assert.equal(formatAmount(123456789, 'nl'), '1.234.567,89');
++  assert.equal(formatAmount(100000, 'fr'), '1\u202f000,00');
++  assert.equal(formatAmount(5), '0.05');
++  assert.equal(formatAmount(99999), '999.99');
++});
++
++test('signs', () => {
++  assert.equal(formatAmount(-150050, 'nl'), '-1.500,50');
++  assert.equal(formatAmount(0), '0.00');
++  assert.equal(formatAmount(-0), '0.00');
++});
++
++test('bad input', () => {
++  assert.throws(() => formatAmount(1.5), RangeError);
++  assert.throws(() => formatAmount(2 ** 60), RangeError);
++  assert.throws(() => formatAmount(1, 'de'), Error);
++  assert.throws(() => formatAmount(1, 'toString'), Error);
++});

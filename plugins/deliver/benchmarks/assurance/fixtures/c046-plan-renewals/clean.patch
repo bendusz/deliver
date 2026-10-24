@@ -1,0 +1,40 @@
+diff --git a/src/subscriptions.mjs b/src/subscriptions.mjs
+index 5d6cb9e..a7c747a 100644
+--- a/src/subscriptions.mjs
++++ b/src/subscriptions.mjs
+@@ -1,2 +1,15 @@
+ // Subscription plans: months per billing period. Dates are 'YYYY-MM-DD' strings in UTC.
+ export const PLANS = { monthly: 1, quarterly: 3, yearly: 12 };
++
++// nextRenewal(startDate, plan, periods): the date `periods` billing periods after startDate.
++export function nextRenewal(startDate, plan, periods = 1) {
++  const months = PLANS[plan];
++  if (!months) throw new Error(`unknown plan: ${plan}`);
++  const [y, m, d] = startDate.split('-').map(Number);
++  const index = m - 1 + months * periods;
++  const year = y + Math.floor(index / 12);
++  const month = index % 12;
++  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
++  const day = Math.min(d, lastDay);
++  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
++}
+diff --git a/test/subscriptions.test.mjs b/test/subscriptions.test.mjs
+new file mode 100644
+index 0000000..ef3cd6e
+--- /dev/null
++++ b/test/subscriptions.test.mjs
+@@ -0,0 +1,14 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { nextRenewal } from '../src/subscriptions.mjs';
++
++test('renewals land on the same day of the month', () => {
++  assert.equal(nextRenewal('2024-03-15', 'monthly'), '2024-04-15');
++  assert.equal(nextRenewal('2024-03-15', 'yearly'), '2025-03-15');
++  assert.equal(nextRenewal('2024-11-10', 'quarterly', 2), '2025-05-10');
++  assert.equal(nextRenewal('2024-12-01', 'monthly'), '2025-01-01');
++});
++
++test('an unknown plan throws', () => {
++  assert.throws(() => nextRenewal('2024-01-01', 'weekly'), Error);
++});

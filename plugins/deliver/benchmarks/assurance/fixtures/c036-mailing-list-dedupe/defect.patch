@@ -1,0 +1,44 @@
+diff --git a/src/contacts.mjs b/src/contacts.mjs
+index 440e4ad..8ce1c7e 100644
+--- a/src/contacts.mjs
++++ b/src/contacts.mjs
+@@ -2,3 +2,15 @@
+ export function normalizeEmail(email) {
+   return String(email).trim().toLowerCase();
+ }
++
++// dedupeContacts(contacts): the contacts with duplicate emails removed, keeping the first
++// occurrence of each normalized email, in input order.
++export function dedupeContacts(contacts) {
++  const out = [];
++  for (const contact of contacts) {
++    const key = normalizeEmail(contact.email);
++    if (out.some((c) => normalizeEmail(c.email) === key)) continue;
++    out.push(contact);
++  }
++  return out;
++}
+diff --git a/test/contacts.test.mjs b/test/contacts.test.mjs
+new file mode 100644
+index 0000000..72e436e
+--- /dev/null
++++ b/test/contacts.test.mjs
+@@ -0,0 +1,18 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { dedupeContacts } from '../src/contacts.mjs';
++
++test('dedupeContacts keeps the first row per normalized email', () => {
++  const input = [
++    { email: 'Ann@Example.com', name: 'Ann' },
++    { email: 'bob@example.com', name: 'Bob' },
++    { email: ' ann@example.com ', name: 'Ann 2' },
++  ];
++  const out = dedupeContacts(input);
++  assert.deepEqual(out.map((c) => c.name), ['Ann', 'Bob']);
++  assert.equal(input.length, 3);
++});
++
++test('dedupeContacts of an empty upload is empty', () => {
++  assert.deepEqual(dedupeContacts([]), []);
++});

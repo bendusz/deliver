@@ -1,0 +1,46 @@
+diff --git a/src/memo.mjs b/src/memo.mjs
+new file mode 100644
+index 0000000..ee7a6ce
+--- /dev/null
++++ b/src/memo.mjs
+@@ -0,0 +1,12 @@
++// memoize(fn, options): fn with results cached by the JSON value of its arguments.
++export function memoize(fn, { max = 1000 } = {}) {
++  const cache = new Map();
++  return (...args) => {
++    const key = args.length === 1 ? args[0] : JSON.stringify(args);
++    if (cache.has(key)) return cache.get(key);
++    const value = fn(...args);
++    cache.set(key, value);
++    if (cache.size > max) cache.delete(cache.keys().next().value);
++    return value;
++  };
++}
+diff --git a/test/memo.test.mjs b/test/memo.test.mjs
+new file mode 100644
+index 0000000..c43053e
+--- /dev/null
++++ b/test/memo.test.mjs
+@@ -0,0 +1,22 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { memoize } from '../src/memo.mjs';
++import { distanceKm } from '../src/geo.mjs';
++
++test('equal point pairs are computed once', () => {
++  let calls = 0;
++  const dist = memoize((a, b) => { calls++; return distanceKm(a, b); });
++  const d1 = dist({ lat: 52.37, lng: 4.9 }, { lat: 51.92, lng: 4.48 });
++  const d2 = dist({ lat: 52.37, lng: 4.9 }, { lat: 51.92, lng: 4.48 });
++  assert.equal(d1, d2);
++  assert.equal(calls, 1);
++});
++
++test('primitive arguments are cached and the oldest result is evicted', () => {
++  let calls = 0;
++  const sq = memoize((n) => { calls++; return n * n; }, { max: 2 });
++  sq(2); sq(3); sq(2);
++  assert.equal(calls, 2);
++  sq(4); sq(2);
++  assert.equal(calls, 4);
++});

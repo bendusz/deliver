@@ -1,0 +1,57 @@
+diff --git a/src/metrics.mjs b/src/metrics.mjs
+index 435bdc4..55b577a 100644
+--- a/src/metrics.mjs
++++ b/src/metrics.mjs
+@@ -2,3 +2,22 @@
+ export function mean(samples) {
+   return samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : null;
+ }
++
++// percentile(samples, p): the p-th percentile of the samples by the nearest-rank method.
++export function percentile(samples, p) {
++  if (!Number.isInteger(p) || p < 0 || p > 100) throw new RangeError('p must be an integer from 0 to 100');
++  if (samples.length === 0) return null;
++  const sorted = [...samples].sort((a, b) => a - b);
++  const rank = Math.max(1, Math.ceil((p * sorted.length) / 100));
++  return sorted[rank - 1];
++}
++
++// latencySummary(samples): sample count and the p50, p95 and p99 response times.
++export function latencySummary(samples) {
++  return {
++    count: samples.length,
++    p50: percentile(samples, 50),
++    p95: percentile(samples, 95),
++    p99: percentile(samples, 99),
++  };
++}
+diff --git a/test/metrics.test.mjs b/test/metrics.test.mjs
+new file mode 100644
+index 0000000..3cb602d
+--- /dev/null
++++ b/test/metrics.test.mjs
+@@ -0,0 +1,24 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { percentile, latencySummary } from '../src/metrics.mjs';
++
++const hundred = Array.from({ length: 100 }, (_, i) => 100 - i);
++
++test('percentile on a hundred samples', () => {
++  assert.equal(percentile(hundred, 50), 50);
++  assert.equal(percentile(hundred, 99), 99);
++  assert.equal(percentile(hundred, 100), 100);
++  assert.equal(percentile(hundred, 0), 1);
++  assert.equal(hundred[0], 100);
++});
++
++test('percentile edge cases', () => {
++  assert.equal(percentile([], 50), null);
++  assert.equal(percentile([42], 95), 42);
++  assert.throws(() => percentile([1], 101), RangeError);
++  assert.throws(() => percentile([1], 99.5), RangeError);
++});
++
++test('latencySummary reports the three percentiles', () => {
++  assert.deepEqual(latencySummary([10, 20, 30, 40]), { count: 4, p50: 20, p95: 40, p99: 40 });
++});

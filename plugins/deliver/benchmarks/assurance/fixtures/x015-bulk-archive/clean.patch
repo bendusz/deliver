@@ -1,0 +1,22 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 2646ac3..ab771ad 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,7 @@
+ // Bulk archive helpers.
++
++export function archive(records, ids, {dryRun = false} = {}) {
++  const selected = records.filter(r => ids.includes(r.id) && !r.archived);
++  if (!dryRun) for (const row of selected) row.archived = true;
++  return selected.map(r => r.id);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..7d5a5d6
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { archive } from '../src/feature.mjs';
++test('archive selected records', () => { const rows=[{id:'a',archived:false}]; assert.deepEqual(archive(rows,['a']),['a']); assert.equal(rows[0].archived,true); });
