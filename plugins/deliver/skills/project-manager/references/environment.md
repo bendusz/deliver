@@ -27,8 +27,8 @@ Run reviewers as a risk-selected **panel** (see `review-gates.md`), not always a
 The PM never assembles a `codex` command line. It may call the bundled runner
 `scripts/codex/run.mjs`, the `--preflight` probe for example, and every model run goes through a
 Sonnet wrapper agent. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
-prompt. When the OpenAI Codex CLI is installed, the loop adds an independent second-model review
-to each story's first review, alongside the panel and never as a replacement for it, and
+prompt. When the OpenAI Codex CLI is installed, `codex-reviewer` is the opposite-family lens for
+work Claude wrote, alongside the panel and never as a replacement for it, and
 `codex-advisor` gives a second opinion on a consequential decision; `SKILL.md` and
 `implementation-loop.md` state 3 own when. `/deliver:codex-review` and `/deliver:codex-help` are
 the user-run forms. The

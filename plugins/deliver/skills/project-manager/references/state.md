@@ -12,8 +12,9 @@ identical.
 | The plan is approved, by whom, when | `docs/approval.json` |
 | Scale, checkpoint policy, integration branch, skeleton | `docs/plan.md`, Delivery mode |
 | What each story must do | `docs/stories/*.md` |
-| Who holds a story, its builder, branch, status, and loop counters | the story's `## Execution` block |
+| Who holds a story, its builder, branch, status, tier, protected paths, gate verdicts, and loop counters | the story's `## Execution` block |
 | What a story changed, why, and how it was verified | the `--no-ff` merge commit body |
+| A `T2` story's holdout checks | the private ref `refs/deliver/holdout/<story-id>`, never checked out or pushed (`implementation-loop.md` state 1) |
 | The project history | `git log --first-parent <integration branch>` |
 | Progress, decisions, blockers, and next steps as they happen | `tmp/log.md`, gitignored, local to this checkout |
 | A session's next step | `docs/handoff/<actor-id>.md`, optional |
@@ -61,12 +62,34 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
 
 ```
 ## Execution
-<!-- pm-exec: {"owner":"v-bende-a1b2c3d4e5f6","builder":"expert-builder","branch":"pm/S1-2-add-and-list","status":"building","rounds":0,"retries":0,"deliver":"0.28.0","updated":"2026-09-07 10:15"} -->
+<!-- pm-exec: {"owner":"v-bende-a1b2c3d4e5f6","builder":"expert-builder","branch":"pm/S1-2-add-and-list","status":"in-review","tier":"T1","protected":["tests/acceptance/add-and-list.test.js"],"protected_base":"3f2a9c1e5b7d4f60a8e2c9b1d3f5a7c9e1b3d5f7","integrity":"pass 8c4e1a7b2d9f3e6c5a1b8d7e4f2a9c3b6d1e5f80","rounds":0,"retries":0,"deliver":"0.29.0","updated":"2026-09-07 10:15"} -->
 - 2026-09-07 11:02 external review skipped: codex CLI absent on this machine.
 ```
 
 - `owner` is your actor id (below). `builder` is the resolved route, never `auto`. `status` is
   `claimed`, `building`, `built`, `in-review`, `merged`, or `blocked`.
+- `tier` is `T0`, `T1`, or `T2`, copied from the story's `Tier` at the claim
+  (`decomposition.md`).
+- `protected` lists the repo-relative paths no builder may change: the acceptance tests
+  `test-engineer` wrote before the build, mandatory at `T1` and `T2`. It is `[]` when there are
+  none. `protected_base` is the full SHA of the commit that added them. The scope check rejects
+  any change to them since that commit, and the integrity gate gets both.
+- `integrity` is `"<pass|fail> <sha>"`: the latest `test-integrity.mjs` verdict and the full
+  commit SHA it judged, recorded after every writer run at `T1` and `T2`. It is `n/a` at `T0`.
+- `verifier` is `"<PASS|FAIL|UNKNOWN> <sha>"`: the latest `pm-verifier` verdict and the full
+  commit SHA it judged, recorded at state 5 and absent before the first verification. The
+  `require-verified.mjs` hook blocks a merge of the story branch unless this reads `PASS` and,
+  at `T1` and `T2`, `integrity` reads `pass`. Each SHA must be the branch head, or a commit after
+  which the branch gained only story-file commits and merges whose tree equals the automatic
+  merge of their parents outside the story file.
+- **Claim fields.** `tier`, `deliver`, `branch`, `protected`, `protected_base`, and pm-meta
+  `integrity_allow` are set on the integration branch: the first three in the claim commit, the
+  protected pair in a `chore(<story-id>): protect` commit that you then merge into the story
+  branch. The ship gate and the integrity gate read the integration copy, and the hook blocks a
+  branch whose copy differs. Only `verifier` and `integrity` are trusted from the story branch. A
+  claim with neither `deliver` nor `tier` predates these fields and ships on the old rules. Any
+  other claim needs a parseable `deliver` when it has one and a `tier` of exactly `T0`, `T1`, or
+  `T2`, and at `T1` and `T2` a non-empty `protected` and a `protected_base`.
 - `rounds` (fix and re-review rounds) and `retries` (builder retries) bound the loop across
   sessions. Increment and commit **before** the dispatch they count, so a builder that dies before
   committing still spent its attempt. The **caps** are 3 rounds and 2 retries.

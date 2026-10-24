@@ -1,14 +1,14 @@
 # Fix loop
 
-Load this when a gate fails, or when a reviewer leaves a `block` or `major` finding open. Each fix
-returns to `implementation-loop.md` state 2, which re-runs the gates and then the review.
+Load this when a gate fails, the integrity gate included, when a reviewer leaves a `block` or
+`major` finding open, or when the verifier returns `FAIL`. Each fix returns to
+`implementation-loop.md` state 2, which re-runs the gates and then the review.
 
 ## Triage: you are the lead reviewer, not an aggregator
 Sort every finding into one of four buckets and show the user all four. The Dismissed list is how
 they override you.
 - **Act on.** Real correctness, security, or maintainability problems, given the story's actual goal.
-  These are the `block` and `major` items that go to the fix round. More than about 5 means you are
-  not filtering hard enough.
+  These are the `block` and `major` items that go to the fix round.
 - **Consider.** The finding is real, but its fix may not justify the cost now. Show it to the user.
 - **Noted.** Valid but not actionable: context-dependent, premature, or low impact.
 - **Dismissed.** Wrong, nitpicky, or missing context, each with a one-line reason.
@@ -36,7 +36,9 @@ effort. From round 2 on, pass `effort: high` on the dispatch: the cheaper attemp
 failed once. Claude Code older than `v2.1.292` has no per-dispatch effort, so pass none there.
 
 **The fix brief** is runtime-only. It carries the accepted findings or the failing command, the
-relevant output, the implicated paths, the exclusions, and the story's verification command.
+relevant output, the implicated paths, the exclusions, and the story's verification command. It
+lists the `protected` paths as untouchable and never mentions a holdout check. An integrity
+failure's brief names each finding to undo.
 
 **A bug fix lands with its regression test.** For a failing gate, or a correctness or security
 finding, the brief also names the behaviour to pin and the test file that holds it, inside
@@ -57,6 +59,7 @@ the gate where you can: one test file, not the suite. It has no shell, so when i
 spends neither a round nor a retry.
 
 ## The round cap
-Each round re-runs the gates and regenerates the cumulative diff for re-review, **up to 3 rounds**.
+Each round re-runs the gates and regenerates the cumulative diff for re-review by the story's tier
+panel, per `review-gates.md`, **up to 3 rounds**.
 Increment `rounds` in the story's Execution block and commit it before the round's dispatch; that
 **cap** counts earlier sessions' rounds. Still failing, **escalate** to the user.

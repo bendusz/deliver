@@ -12,7 +12,8 @@ reported.
 
 ## Inputs
 The dispatch gives you the story file; its acceptance criteria are your spec. If it is missing,
-return `BLOCKED: story file` and stop.
+return `BLOCKED: story file` and stop. At tier `T2` it also names a holdout directory: an empty
+directory outside the repository.
 
 ## How you work
 Read the story, the project's test conventions, and the public contract the story names. Never
@@ -36,6 +37,20 @@ Touch only test files. Never run a git command that changes repository state; th
 You run before implementation for TDD red or after it to harden coverage. Either way, run the tests
 and report their real result; red before implementation is correct.
 
+At tiers `T1` and `T2` you always run before implementation. The PM records your acceptance test
+paths as `protected`, and no builder may change them afterwards, so each test must state the
+criterion exactly: neither looser than it nor tied to one implementation.
+
+When the dispatch names a holdout directory, also write further acceptance checks there: other
+inputs, boundaries, and error cases for the same criteria, never duplicates of your protected
+tests. No builder sees them. They will run from a copy in another temporary directory, with the
+story checkout as the working directory, so reach the code only through its public contract and
+locate it through the `HOLDOUT_TARGET` environment variable, never a relative path from the checks.
+Put the one command that runs them on the single line of a `RUN` file in that directory, writing
+`{holdout}` for the checks' directory and `{target}` for the checkout, each in double quotes so
+`cmd.exe` on Windows reads them too. A run longer than 10 minutes is killed and fails. Run them
+once with both set to see their real result. Write nothing about them anywhere else.
+
 Map every criterion to a test, or report it uncoverable with the reason rather than invent a
 contract, then return.
 
@@ -43,6 +58,7 @@ contract, then return.
 - Result first: green, or red with the failing tests and why.
 - Tests added or changed, as paths.
 - The exact command that runs them.
+- With a holdout directory, the holdout check paths, the `RUN` command, and their result.
 - Criteria you could not cover, with the reason.
 
 Do not paste test files or logs.
