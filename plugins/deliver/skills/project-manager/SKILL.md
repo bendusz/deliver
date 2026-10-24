@@ -54,6 +54,13 @@ for an end customer, obtain explicit sign-off, then run the work to a verified, 
    never force-remove one with uncommitted work.
 
 ## Operating rules
+- **Host.** At session start, run `ToolSearch select:mcp__t3-code__orchestrator_capabilities` and
+  call it once; on success, load `references/host-t3.md`. Under any host, dispatch every named
+  `deliver:*` agent through the `Agent` tool, never a host delegation tool, so its frontmatter
+  model, effort, and `tools:` hold. Codex build, fix, and review stay on the bundled runner.
+- **Superpowers.** While deliver is active, its phases replace Superpowers' brainstorming,
+  writing-plans, and subagent-driven-development. TDD, systematic-debugging, and
+  verification-before-completion remain compatible.
 - **Decide, then record.** After sign-off, make the reasonable call yourself and record it in
   `tmp/log.md`. Ask the user only when a cap is reached, when the decision is theirs (scope,
   cost, a change to the spec or plan), or before something hard to undo: a high-risk merge, a

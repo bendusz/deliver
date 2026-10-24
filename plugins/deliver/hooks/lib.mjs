@@ -230,6 +230,54 @@ export const PHASES = {
   done: 'references/documentation.md',
 };
 
+// parseWorktrees(text): the entries of `git worktree list --porcelain`, in order, the main
+// checkout first. Lines split on LF or CRLF; `branch` is '' for a detached or bare entry.
+export function parseWorktrees(text) {
+  const out = [];
+  let cur = null;
+  for (const line of String(text).split(/\r?\n/)) {
+    if (line.startsWith('worktree ')) out.push(cur = { path: line.slice(9), branch: '', prunable: false });
+    else if (!cur) continue;
+    else if (line.startsWith('branch ')) cur.branch = line.slice(7);
+    else if (line === 'prunable' || line.startsWith('prunable ')) cur.prunable = true;
+  }
+  return out;
+}
+
+// canonPath(p): p with symlinks resolved. A path that no longer exists resolves its deepest
+// existing ancestor and re-appends the missing tail, so a stale worktree under a symlinked
+// tmp/ still compares equal to git's recorded path.
+function canonPath(p) {
+  let head = path.resolve(p);
+  const tail = [];
+  for (;;) {
+    const r = realpath(head);
+    if (r) return path.join(r, ...tail);
+    const up = path.dirname(head);
+    if (up === head) return path.resolve(p);
+    tail.unshift(path.basename(head));
+    head = up;
+  }
+}
+
+// classifyWorktrees(root): every linked worktree, split by owner, or null when git cannot
+// list them. Deliver owns one under tmp/worktrees/ or on a pm/* branch; any other belongs to
+// the host (a T3 thread, the user) and is reported apart, never pruned. Paths compare
+// canonicalized, since tmp/ or the root may be reached through a symlink (macOS /var is
+// /private/var). `prunable` marks an entry whose directory is gone.
+export function classifyWorktrees(root) {
+  const text = git(root, ['worktree', 'list', '--porcelain']);
+  if (text === null) return null;
+  const wts = parseWorktrees(text);
+  const bases = [...new Set([root, wts[0] && wts[0].path].filter(Boolean).map((p) => canonPath(path.join(p, 'tmp', 'worktrees')) + path.sep))];
+  const out = { deliver: [], host: [] };
+  for (const w of wts.slice(1)) {
+    const mine = w.branch.startsWith('refs/heads/pm/') || bases.some((b) => (canonPath(w.path) + path.sep).startsWith(b));
+    out[mine ? 'deliver' : 'host'].push(w);
+  }
+  return out;
+}
+
 // inspectState(root): the derived position of a managed project as one plain object. The
 // session hook renders it, `node lib.mjs state` prints it, and doctor and resume read it
 // instead of re-deriving the same git facts. null outside a managed project, meaning no
@@ -238,7 +286,7 @@ export function inspectState(root) {
   const hasMarker = fs.existsSync(path.join(root, 'docs', 'approval.json'));
   const legacy = hasMarker ? null : legacyState(root);
   if (!hasMarker && !legacy) return null;
-  const out = { managed: true, legacy: legacy ? legacy.file : null, approval: null, phase: null, next_reference: null, actor: null, branch: null, story: null, unmerged: [], unreadable: [], claims: [], sprints_without_retro: [], worktrees: 0, uncommitted: null, handoff: null, wiki_entries: null };
+  const out = { managed: true, legacy: legacy ? legacy.file : null, approval: null, phase: null, next_reference: null, actor: null, branch: null, story: null, unmerged: [], unreadable: [], claims: [], sprints_without_retro: [], worktrees: 0, hostWorktrees: 0, uncommitted: null, handoff: null, wiki_entries: null };
   if (legacy) { out.phase = 'migration'; out.next_reference = PHASES.migration; return out; }
   const a = readApproval(root);
   if (!a) return out;
@@ -262,7 +310,8 @@ export function inspectState(root) {
   out.unmerged = stories.filter((s) => !s.exec || s.exec.status !== 'merged').map((s) => s.id);
   out.claims = stories.filter((s) => s !== mine && s.exec && s.exec.status && s.exec.status !== 'merged')
     .map((s) => ({ id: s.id, owner: s.exec.owner ?? null, status: s.exec.status, branch: s.exec.branch ?? null }));
-  out.worktrees = Math.max(0, (git(root, ['worktree', 'list', '--porcelain']) || '').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).length - 1);
+  const wt = classifyWorktrees(root);
+  if (wt) { out.worktrees = wt.deliver.length; out.hostWorktrees = wt.host.length; }
   const porcelain = git(root, ['status', '--porcelain', '--untracked-files=all']);
   out.uncommitted = porcelain === null ? null : porcelain.split(/\r?\n/).filter(Boolean).length;
 
@@ -342,6 +391,12 @@ if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
     const st = inspectState(explicit ? (top ? path.resolve(top) : path.resolve(explicit)) : pmRoot(process.cwd()));
     if (!st) { fs.writeSync(2, 'not a managed project: no docs/approval.json and no legacy pm-state.json\n'); process.exit(1); }
     fs.writeSync(1, `${JSON.stringify(st, null, 2)}\n`);
+    process.exit(0);
+  } else if (cmd === 'worktrees') {
+    // A non-zero exit tells resume to skip worktree cleanup rather than act on an empty list.
+    const wt = classifyWorktrees(path.resolve(process.argv[3] || process.cwd()));
+    if (!wt) { fs.writeSync(2, 'git worktree list failed: not a git repository, or git is unavailable\n'); process.exit(1); }
+    fs.writeSync(1, `${JSON.stringify(wt, null, 2)}\n`);
     process.exit(0);
   }
 }

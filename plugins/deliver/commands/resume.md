@@ -2,6 +2,19 @@
 description: Resume a PM-managed project from git, the approval marker, and the story Execution blocks, then continue.
 ---
 
+Mode: $ARGUMENTS  (optional; `--heartbeat` when a scheduled T3 heartbeat sent this, see
+`references/host-t3.md`)
+
+With `--heartbeat`, do nothing when any of these holds:
+- a turn or subagent is still running;
+- an escalation is unanswered and no independent build-ready story remains in the current sprint;
+- the work is at any checkpoint the plan's configured checkpoint policy says to wait at
+  (`references/planning-and-signoff.md`), and the user has not yet answered it.
+
+Then append `heartbeat: idle, <reason>` to `tmp/log.md` only when the reason differs from the
+last heartbeat entry there, so an unchanged state logs once, not every 30 minutes. Otherwise
+resume as below.
+
 Use the `project-manager` skill to resume work on this project. Load
 `references/resume-procedure.md` and follow it, then `references/migrations.md` when it finds a
 pre-0.24 `pm/` directory or an old story format.
