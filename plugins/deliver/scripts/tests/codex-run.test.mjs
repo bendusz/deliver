@@ -95,6 +95,14 @@ test('story: pm-meta is authoritative; legacy visible fields are optional but mu
   expectBlocked(STORY_LEGACY.replace('Touches: src', 'Touches: '), /visible Touches/);
   fs.writeFileSync(story, STORY_V2.replace('## Acceptance criteria (testable)', '## Acceptance criteria (testable)\nTouches: nothing'));
   assert.deepEqual(parseStory(p, rel), { builder: 'codex-builder', scopes: ['src'] });
+  // test-integrity.mjs exemptions a story declares; only known kinds, unique, never other keys.
+  fs.writeFileSync(story, STORY_V2.replace('"touches":["src"]', '"touches":["src"],"integrity_allow":["config-weakened"]'));
+  assert.deepEqual(parseStory(p, rel), { builder: 'codex-builder', scopes: ['src'] });
+  fs.writeFileSync(story, STORY_V2.replace('"touches":["src"]', '"touches":["src"],"integrity_allow":["pragma-added"]'));
+  assert.deepEqual(parseStory(p, rel), { builder: 'codex-builder', scopes: ['src'] });
+  expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["src"],"integrity_allow":["everything"]'), /pm-meta/);
+  expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["src"],"integrity_allow":"skip-added"'), /pm-meta/);
+  expectBlocked(STORY_V2.replace('"touches":["src"]', '"touches":["src"],"tier":"T1"'), /pm-meta/);
 });
 
 test('result.emit: a synchronous write is not truncated by an immediate process.exit', () => {

@@ -9,7 +9,8 @@
 - [ ] Out-of-scope is explicit.
 - [ ] A concrete Verification command is given.
 - [ ] `depends-on` IDs are valid and (before build) already merged.
-- [ ] A first-12-lines `pm-meta` JSON comment has exactly `builder` and `touches`; `touches` holds
+- [ ] A first-12-lines `pm-meta` JSON comment has `builder` and `touches`, plus `integrity_allow`
+      only when the story must do something `test-integrity.mjs` flags; `touches` holds
       unique repo-relative file or directory roots with no globs, placeholders, whole-repo grants,
       or traversal. `[P]` stories have non-overlapping `touches`.
 - [ ] `builder` is `expert-builder`, `codex-builder`, or `auto`; a Codex choice has one exact
@@ -18,6 +19,7 @@
       when the story touches auth, secrets, untrusted input, I/O, or dependencies,
       `architecture-reviewer` when it changes structure or boundaries, and `performance-reviewer`
       when it sits on a hot path or carries a stated budget.
+- [ ] `Tier` is `T0`, `T1`, or `T2` by `decomposition.md`'s mapping, the highest that applies.
 - [ ] The story is a vertical slice: its verification command shows one behaviour working end to
       end, and it does not exist only to build a layer for a later story.
 - [ ] With a skeleton, every path in `Specs` exists and its `Owns` covers the story's `touches`.
