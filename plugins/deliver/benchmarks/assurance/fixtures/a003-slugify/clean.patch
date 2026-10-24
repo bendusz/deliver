@@ -1,0 +1,30 @@
+diff --git a/src/text.mjs b/src/text.mjs
+index 6c06627..1a41436 100644
+--- a/src/text.mjs
++++ b/src/text.mjs
+@@ -1,2 +1,7 @@
+ // Text helpers.
+ export const collapseSpaces = (s) => s.replace(/\s+/g, ' ').trim();
++
++// slugify(title): lowercase ASCII letters and digits joined by single hyphens.
++export function slugify(title) {
++  return String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
++}
+diff --git a/test/text.test.mjs b/test/text.test.mjs
+new file mode 100644
+index 0000000..376119e
+--- /dev/null
++++ b/test/text.test.mjs
+@@ -0,0 +1,12 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { slugify } from '../src/text.mjs';
++
++test('slugify joins words with single hyphens', () => {
++  assert.equal(slugify('  Buy milk, eggs & bread!  '), 'buy-milk-eggs-bread');
++  assert.equal(slugify('Q3 -- plan'), 'q3-plan');
++});
++
++test('slugify of punctuation alone is empty', () => {
++  assert.equal(slugify('?!'), '');
++});

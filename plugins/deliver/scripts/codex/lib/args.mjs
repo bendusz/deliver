@@ -15,6 +15,8 @@ const DEFAULTS = {
   research: { model: DEFAULT_MODEL, effort: 'high' },
   advise: { model: DEFAULT_MODEL, effort: 'high' },
 };
+// The review defaults, read by scripts/assurance.mjs to tell when a calibration of codex-reviewer is stale.
+export const REVIEW_DEFAULTS = Object.freeze({ ...DEFAULTS.review });
 // When the default model is refused for this account, every mode retries once on this pair.
 // gpt-6-sol (2026-09-22) replaced gpt-5.6-sol as the mid-tier GPT-6 model at about half the price.
 export const FALLBACK = { model: 'gpt-6-sol', effort: 'medium' };

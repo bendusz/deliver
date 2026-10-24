@@ -1,0 +1,5 @@
+[
+  { "id": "a001-page-count", "class": "correctness", "kind": "seeded", "split": "select", "batch": "batch-0" },
+  { "id": "a002-upload-path", "class": "security", "kind": "seeded", "split": "certify", "batch": "batch-0" },
+  { "id": "a003-slugify", "class": "data", "kind": "clean", "split": "select", "batch": "batch-0" }
+]
