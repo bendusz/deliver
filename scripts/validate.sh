@@ -252,6 +252,16 @@ suite "agent eval fixtures differ from MANIFEST.sha256 (the eval set is frozen)"
 suite "builder benchmark tests failed (scripts/test-builder-benchmark.sh)" \
   bash "$(dirname "$0")/test-builder-benchmark.sh"
 
+# 15b) assurance corpus: frozen by its own manifest (results/ and panels.json excluded), and
+# every seeded witness fails with its defect and passes clean.
+jq empty plugins/deliver/benchmarks/assurance/cases.json 2>/dev/null || err "invalid JSON: plugins/deliver/benchmarks/assurance/cases.json"
+suite "assurance tests failed (node --test plugins/deliver/scripts/tests/assurance.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/assurance.test.mjs
+suite "assurance corpus differs from MANIFEST.sha256 (the corpus is frozen; a batch re-runs manifest --write alone)" \
+  node plugins/deliver/scripts/assurance.mjs manifest --check
+suite "assurance witness check failed (node plugins/deliver/scripts/assurance.mjs witness)" \
+  node plugins/deliver/scripts/assurance.mjs witness
+
 # 16) poteto companion plugin (plugins/poteto): manifest, attribution, skills, no Cursor residue
 pp=plugins/poteto
 if [ -d "$pp" ]; then

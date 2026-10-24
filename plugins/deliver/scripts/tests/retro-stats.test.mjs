@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { tmpDir, PLUGIN_ROOT } from './helpers.mjs';
-import { collect, render, auditLessons, renderAudit } from '../retro-stats.mjs';
+import { spawnSync, execFileSync } from 'node:child_process';
+import { tmpDir, gitIn, PLUGIN_ROOT } from './helpers.mjs';
+import { collect, render, auditLessons, renderAudit, trust, renderTrust } from '../retro-stats.mjs';
+import { upperBound, CORPUS_ROOT } from '../assurance.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'retro-stats.mjs');
 const proj = () => {
@@ -108,4 +110,192 @@ test('retro-stats --audit: nothing is due before the review-by sprint, and the C
   const r = run(p, '--audit', '--json');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(JSON.parse(r.stdout).lessons.length, 3);
+});
+
+// ---------- --trust ----------
+
+const trustStory = (p, id, ex, notes = []) => {
+  const lines = [`# ${id}: thing`, '<!-- pm-meta: {"builder":"auto","touches":["src"]} -->', '', '## Goal', 'x', '', '## Execution', `<!-- pm-exec: ${JSON.stringify(ex)} -->`, ...notes];
+  fs.writeFileSync(path.join(p, 'docs', 'stories', `${id}-thing.md`), lines.join('\n') + '\n');
+};
+const fileSha = (f) => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
+// A current calibration: the corpus manifest and the code-integrity-reviewer prompt as they are now.
+const PANELS = {
+  stamp: {
+    deliver: '0.29.0',
+    corpusSha256: fileSha(path.join(CORPUS_ROOT, 'MANIFEST.sha256')),
+    lenses: { 'code-integrity-reviewer': { model: 'claude-opus-5-5', effort: 'medium', promptSha256: fileSha(path.join(PLUGIN_ROOT, 'agents', 'code-integrity-reviewer.md')) } },
+    codexArgsSha256: fileSha(path.join(PLUGIN_ROOT, 'scripts', 'codex', 'lib', 'args.mjs')),
+    calibratedAt: '2026-10-01T00:00:00.000Z',
+  },
+  tiers: {
+    T0: { status: 'measured', panel: [{ lens: 'code-integrity-reviewer', trials: 1 }], bound: 0.0488, certifyBound: 0.0488, target: 0.1, fpRate: 0.05, tokens: 9000 },
+    T1: { status: 'unmeasured', panel: [], bound: 0.0617, certifyBound: 0.0617, target: 0.05, fpRate: 0.1, tokens: 30000 },
+    T2: { status: 'unmeasured', panel: [], bound: 0.08, certifyBound: null, target: 0.02, fpRate: null, tokens: 30000 },
+  },
+};
+const ex = (tier, rounds = 0, retries = 0, extra = {}) => ({ ...exec('expert-builder', rounds, retries), tier, updated: '2026-10-05 10:00', ...extra });
+const gitProj = (p) => {
+  gitIn(p, ['init', '-q']);
+  gitIn(p, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+  gitIn(p, ['config', 'user.email', 'casey@example.com']);
+  gitIn(p, ['config', 'user.name', 'Casey Example']);
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'stories']);
+};
+const trustProject = () => {
+  const p = proj();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n');
+  trustStory(p, 'S1-1', ex('T1'));
+  trustStory(p, 'S1-2', ex('T1', 2, 0, { integrity: 'pass' }), ['- 2026-10-01 10:00 integrity: fail, an assertion was removed from test/a.test.mjs.', '- 2026-10-01 11:00 integrity: pass after the fix.']);
+  trustStory(p, 'S1-3', ex('T2', 1, 1, { holdout: 'pass' }), ['- 2026-10-02 09:00 holdout FAIL: tmp/holdout/S1-3/limits.test.mjs.', '- 2026-10-02 10:00 holdout: 0 failures after the fix.']);
+  trustStory(p, 'S1-4', ex('T0'));
+  trustStory(p, 'S1-5', ex('T1'));
+  trustStory(p, 'S2-1', ex('T1'));
+  trustStory(p, 'S2-2', { ...ex('T2'), status: 'building' });
+  fs.writeFileSync(path.join(p, 'panels.json'), JSON.stringify(PANELS));
+  gitProj(p);
+  gitIn(p, ['commit', '-q', '--allow-empty', '-m', 'fix(S2-1): page count rounds up\n\nThe last partial page was dropped.\n\nEscaped-From: S1-1']);
+  gitIn(p, ['commit', '-q', '--allow-empty', '-m', 'fix(S2-1): and the empty list\n\nescaped-from: S1-1, S9-9']);
+  gitIn(p, ['checkout', '-qb', 'side']);
+  gitIn(p, ['commit', '-q', '--allow-empty', '-m', 'fix: elsewhere\n\nEscaped-From: S1-4']);
+  gitIn(p, ['checkout', '-q', 'main']);
+  return p;
+};
+
+test('retro-stats --trust: per tier shipped, panel, bound, first pass, rounds, integrity blocks, holdout failures', () => {
+  const p = trustProject();
+  const r = trust(p, { sprint: 1, panelsFile: path.join(p, 'panels.json') });
+  assert.equal(r.branch, 'main');
+  assert.deepEqual(r.panels.stale, []);
+  assert.deepEqual(r.tiers.T1, {
+    shipped: 3, panel: null, calibratedBound: null, bestBound: 0.0617, target: 0.05, firstPass: 2, fixRounds: 2, integrityBlocks: 1, holdoutFailures: null,
+    observed: { since: '2026-10-01T00:00:00.000Z', shipped: 4, escapedStories: 1, escapeCommits: 2, bound: upperBound(1, 4), overTarget: true },
+    observedToDate: { shipped: 4, escapedStories: 1, escapeCommits: 2, bound: upperBound(1, 4), overTarget: true },
+  });
+  assert.deepEqual(r.tiers.T0.panel, [{ lens: 'code-integrity-reviewer', trials: 1 }]);
+  assert.equal(r.tiers.T0.calibratedBound, 0.0488);
+  assert.equal(r.tiers.T0.observed.escapedStories, 0, 'the side-branch trailer is not on the integration branch');
+  assert.equal(r.tiers.T2.holdoutFailures, 1, '"holdout: 0 failures" is not a failure');
+  assert.equal(r.tiers.T2.bestBound, null, 'a tier never certified shows no bound, never a select-split figure');
+  assert.equal(r.tiers.T2.observed.shipped, 1, 'a story still building has not shipped');
+  assert.deepEqual(r.unmapped.map((e) => e.story), ['S9-9']);
+  const text = renderTrust(r);
+  assert.match(text, /\| T0 \| 1 \| code-integrity-reviewer \| 4\.9% \| 10\.0% \| 1\/1 \| 0 \| 0 \| not recorded \|/);
+  assert.match(text, /\| T1 \| 3 \| unmeasured, maximum panel \| unmeasured \(best 6\.2%\) \| 5\.0% \| 2\/3 \| 2 \| 1 \| not recorded \|/);
+  assert.match(text, /\| T1 \| 4 \| 1 \| 2 \| \d+\.\d% \| 5\.0% \| OVER TARGET: maximum panel next sprint \| 1\/4, /);
+  assert.match(text, /\| T0 \| 1 \| 0 \| 0 \| 95\.0% \| 10\.0% \| no escapes; too few stories to bound under target \|/);
+  assert.match(text, /since the calibration of 2026-10-01T00:00:00\.000Z/);
+  assert.match(text, /\| T2 \| 1 \| unmeasured, maximum panel \| - \|/);
+  assert.match(text, /S9-9/);
+});
+
+test('retro-stats --trust: a stricter effective target turns a measured tier into the maximum panel', () => {
+  const p = trustProject();
+  const r = trust(p, { panelsFile: path.join(p, 'panels.json'), targets: { T0: 0.01 } });
+  assert.equal(r.tiers.T0.panel, null);
+  assert.equal(r.tiers.T0.calibratedBound, null);
+  assert.equal(r.tiers.T0.bestBound, 0.0488);
+  assert.match(renderTrust(r), /\| T0 \| \d+ \| unmeasured, maximum panel \| unmeasured \(best 4\.9%\) \| 1\.0% \|/);
+});
+
+test('retro-stats --trust: OVER TARGET counts only stories merged since the calibration in force', () => {
+  const p = trustProject();
+  const later = { ...PANELS, stamp: { ...PANELS.stamp, calibratedAt: '2026-10-10T00:00:00.000Z' } };
+  fs.writeFileSync(path.join(p, 'later.json'), JSON.stringify(later));
+  const r = trust(p, { panelsFile: path.join(p, 'later.json') });
+  assert.deepEqual(r.tiers.T1.observed, { since: '2026-10-10T00:00:00.000Z', shipped: 0, escapedStories: 0, escapeCommits: 0, bound: 1, overTarget: false });
+  assert.equal(r.tiers.T1.observedToDate.overTarget, true, 'the to-date figure is still shown');
+});
+
+// commitAt(p, message, iso): an empty commit whose committer time is iso.
+const commitAt = (p, message, iso) => execFileSync('git', ['-C', p, 'commit', '-q', '--allow-empty', '-m', message], { env: { ...process.env, GIT_COMMITTER_DATE: iso, GIT_AUTHOR_DATE: iso }, stdio: 'ignore' });
+
+test('retro-stats --trust: the window uses the merged commit time, exactly, and counts a story with no time', () => {
+  const p = proj();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '- Integration branch: main\n');
+  trustStory(p, 'S1-1', ex('T1', 0, 0, { updated: '2026-10-20 23:00' }));
+  trustStory(p, 'S1-2', ex('T1', 0, 0, { updated: '2026-10-01 08:00' }));
+  const { updated, ...noTime } = ex('T1');
+  trustStory(p, 'S1-3', noTime);
+  trustStory(p, 'S1-4', ex('T1', 0, 0, { updated: '2026-10-10 12:00' }));
+  gitProj(p);
+  // S1-1 merged in the morning of the calibration day; its `updated` field says otherwise.
+  commitAt(p, 'chore(S1-1): merged', '2026-10-10T09:00:00Z');
+  commitAt(p, 'chore(S1-1): merged', '2026-10-10T18:00:00Z');
+  // S1-2 merged that evening, after the calibration, recorded in another time zone.
+  commitAt(p, 'chore(S1-2): merged', '2026-10-10T17:00:00+02:00');
+  commitAt(p, 'fix: x\n\nEscaped-From: S1-1', '2026-10-11T09:00:00Z');
+  fs.writeFileSync(path.join(p, 'p.json'), JSON.stringify({ ...PANELS, stamp: { ...PANELS.stamp, calibratedAt: '2026-10-10T14:30:00.000Z' } }));
+  const r = trust(p, { panelsFile: path.join(p, 'p.json') });
+  // In the window: S1-2 (15:00 UTC from git) and S1-3 (no time at all, counted). Out: S1-1 (09:00
+  // UTC from its first merged commit) and S1-4 (`updated` 12:00, read as UTC).
+  assert.equal(r.tiers.T1.observed.shipped, 2);
+  assert.equal(r.tiers.T1.observed.escapedStories, 0, 'S1-1 merged that morning, before the calibration');
+  assert.equal(r.tiers.T1.observedToDate.escapedStories, 1);
+});
+
+test('retro-stats --trust: shipped stories come from the same ref as the trailers', () => {
+  const p = trustProject();
+  gitIn(p, ['checkout', '-q', 'side']);
+  for (let i = 10; i < 40; i += 1) trustStory(p, `S3-${i}`, ex('T1'));
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'side stories']);
+  const main = trust(p, { branch: 'main', panelsFile: path.join(p, 'panels.json') });
+  assert.equal(main.tiers.T1.observed.shipped, 4, 'stories only on the checked-out side branch do not count for main');
+  const side = trust(p, { branch: 'side', panelsFile: path.join(p, 'panels.json') });
+  assert.equal(side.tiers.T1.observed.shipped, 34);
+});
+
+test('retro-stats --trust: a stale or missing calibration runs every tier at the maximum panel', () => {
+  const p = trustProject();
+  const write = (name, doc) => { fs.writeFileSync(path.join(p, name), JSON.stringify(doc)); return path.join(p, name); };
+  const stale = trust(p, { panelsFile: write('stale.json', { ...PANELS, stamp: { ...PANELS.stamp, lenses: { 'code-integrity-reviewer': { promptSha256: 'old' } } } }) });
+  assert.match(stale.panels.stale.join(), /code-integrity-reviewer prompt changed/);
+  assert.equal(stale.tiers.T0.panel, null);
+  assert.equal(stale.tiers.T0.bestBound, null, 'a stale calibration shows no bound at all');
+  assert.equal(stale.tiers.T1.bestBound, null);
+  assert.match(renderTrust(stale), /panels\.json is stale/);
+  assert.match(renderTrust(stale), /\| T0 \| \d+ \| unmeasured, maximum panel \| - \|/);
+  const corpus = trust(p, { panelsFile: write('corpus.json', { ...PANELS, stamp: { ...PANELS.stamp, corpusSha256: 'old' } }) });
+  assert.match(corpus.panels.stale.join(), /corpus changed/);
+  assert.equal(corpus.tiers.T0.panel, null);
+  const bare = trust(p, { panelsFile: write('bare.json', { tiers: PANELS.tiers }) });
+  assert.equal(bare.tiers.T0.panel, null, 'no stamp is no calibration');
+  const none = trust(p, { panelsFile: path.join(p, 'missing.json') });
+  assert.equal(none.panels.found, false);
+  assert.match(renderTrust(none), /\| T0 \| \d+ \| unmeasured, maximum panel \| - \|/);
+  assert.match(renderTrust(none), /every merged story to date/);
+});
+
+test('retro-stats --trust: notes stop at the next heading', () => {
+  const p = proj();
+  trustStory(p, 'S1-1', ex('T2'), ['- 2026-10-01 holdout: 2 failures', '- 2026-10-01 holdout: 0 failed on the rerun', '- 2026-10-01 holdout pass, no failures', '', '## Later', '- integrity: fail, quoted from elsewhere', '- holdout FAIL quoted']);
+  gitProj(p);
+  const r = trust(p, { panelsFile: path.join(p, 'none.json') });
+  assert.equal(r.tiers.T2.holdoutFailures, 1);
+  assert.equal(r.tiers.T2.integrityBlocks, 0);
+});
+
+test('retro-stats --trust: CLI, JSON, a branch override, targets, refused refs, and no git history', () => {
+  const p = trustProject();
+  const panels = path.join(p, 'panels.json');
+  const r = run(p, '--trust', '--sprint', '1', '--panels', panels);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^Trust report, sprint 1\./);
+  const side = JSON.parse(run(p, '--trust', '--json', '--branch', 'side', '--panels', panels).stdout);
+  assert.equal(side.tiers.T0.observed.escapedStories, 1);
+  const loose = JSON.parse(run(p, '--trust', '--json', '--targets', 'T1=0.9', '--panels', panels).stdout);
+  assert.equal(loose.tiers.T1.observed.overTarget, false);
+  assert.equal(run(p, '--trust', '--targets', 'T1=lots').status, 64);
+  assert.equal(run(p, '--trust', '--branch', '--all').status, 64);
+  assert.throws(() => trust(p, { branch: '--output=x' }), /refusing ref/);
+  assert.equal(run(p, '--audit', '--trust').status, 64);
+  assert.equal(run(p, '--branch', 'main').status, 64);
+  const bare = proj();
+  trustStory(bare, 'S1-1', ex('T1'));
+  const nogit = run(bare, '--trust');
+  assert.equal(nogit.status, 0, nogit.stderr);
+  assert.match(nogit.stdout, /Observed escapes: unknown, could not read history/);
+  assert.match(nogit.stdout, /\| T1 \| 1 \|/, 'without git the working tree still gives the stories');
 });
