@@ -59,4 +59,9 @@ On resume from the main checkout, reconcile `git worktree list` against the Exec
   than moving on silently. Only work committed to the branch survived, so check it before assuming
   the story is intact.
 - A `blocked` story: present the blocker and re-enter the continuation its notes call for.
-- Then `git worktree prune` true orphans and continue the tail.
+- Then clear stale entries and continue the tail. Never run a repo-wide `git worktree prune`: it
+  also drops the entry of a host-owned worktree whose directory is only temporarily missing.
+  `node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" worktrees .` lists `deliver` and `host` entries,
+  each with `prunable` when its directory is gone. Run `git worktree remove <path>` on each
+  prunable `deliver` entry; git drops the entry and keeps the branch. Leave `host` entries alone.
+  If the command exits non-zero, it prints why on stderr; skip the cleanup and say so.

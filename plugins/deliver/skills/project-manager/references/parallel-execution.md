@@ -26,10 +26,11 @@ larger sets in waves.
   owner, builder, branch, and `status: claimed`, and commit them together as
   `chore(<ids>): claim batch`. Set every block to `building` in one more commit right before the
   dispatch, while no builder is running yet.
-- Give each story its own branch and worktree. Prefer the host's native worktree isolation if it
-  offers any; otherwise
+- Give each story its own branch and worktree. By default,
   `git worktree add tmp/worktrees/<slug> -b pm/S<sprint>-<n>-<slug> <integration_branch>`, having
-  first confirmed `tmp/` is gitignored. Every dispatch for that story gets its worktree path.
+  first confirmed `tmp/` is gitignored. Use the host's native worktree isolation, T3's for example,
+  only when the user opts in, and still on a `pm/*` branch so deliver counts it as its own. Every
+  dispatch for that story gets its worktree path.
 - Run `--mode build --preflight` against every Codex worktree and story pair first. A failed
   preflight drops that story from the batch without consuming task quota.
 - Dispatch the batch's builders together, as concurrent subagent calls in one step, each with its
@@ -70,6 +71,8 @@ since git refuses to check the integration branch out twice.
 A partial batch still checkpoints at the sprint boundary.
 
 ## Cleanup preconditions
+- These apply only to worktrees deliver created: under `tmp/worktrees/` or on a `pm/*` branch.
+  Any other worktree belongs to the host or the user; report it and **never** remove or prune it.
 - **Never** remove or prune a worktree that still holds uncommitted work. A stopped or `blocked`
   story keeps its worktree for inspection.
 - Remove only with `git worktree remove`, **never** `rm -rf` and **never** `--force`. Check

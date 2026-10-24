@@ -251,7 +251,10 @@ prefer them where useful.
 
 - The `poteto` companion plugin from this marketplace. [Install](#install) step 3 lists its skills.
   The PM's references name them as optional examples, and nothing breaks without them.
-- A dedicated planning or TDD skill suite for richer discovery and planning.
+- A dedicated planning or TDD skill suite for richer discovery and planning. With Superpowers
+  installed, deliver's phases replace its brainstorming, writing-plans, and
+  subagent-driven-development while deliver is active; its TDD, systematic-debugging, and
+  verification-before-completion skills still apply.
 - An external code-review tool, an OpenAI Codex-based reviewer or another model's CLI for example,
   for the optional independent review step.
 - The OpenAI Codex CLI for `codex-builder`, `codex-researcher`, `codex-reviewer`, `codex-advisor`,
@@ -270,6 +273,16 @@ The spec, clarify, analyze, and constitution steps add spec-driven rigor, inspir
 development tools, and `pm-verifier` adds an independent final check. All of them are built in and
 self-contained. The deliver plugin does not depend on `spec-kit`, and there is no external verifier process in
 this workflow: `pm-verifier` is an ordinary read-only Claude Code subagent the PM dispatches.
+
+### Running inside T3 Code
+
+The PM detects T3 Code at session start and then follows
+[`host-t3.md`](plugins/deliver/skills/project-manager/references/host-t3.md). It still dispatches
+its own agents through `Agent`, so reviewers stay read-only. It counts only its own worktrees and
+never prunes T3's. A blocked story no longer stops the sprint while independent stories remain.
+A 30-minute heartbeat runs `/deliver:resume --heartbeat`, and PR CI wakes trigger a local re-gate.
+Start the PM in the root workspace, not a T3 worktree thread. `/deliver:doctor` checks the T3
+setup. Sign-off, gates, verification, and merges are unchanged.
 
 ## License
 

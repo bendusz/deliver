@@ -201,7 +201,11 @@ test('session: uncommitted paths, worktrees, and the plan digest drift line', ()
   assert.match(session({ cwd: s }), /^uncommitted: 2 paths \(git status\)$/m);
   const wt = path.join(tmpDir('wt-'), 'w');
   gitIn(s, ['worktree', 'add', '-q', wt, '-b', 'pm/S9-9-x']);
-  assert.match(session({ cwd: s }), /^worktrees: 1 besides the main checkout/m);
+  assert.match(session({ cwd: s }), /^deliver worktrees: 1 \(git worktree list\)$/m);
+  assert.doesNotMatch(session({ cwd: s }), /^host worktrees:/m);
+  gitIn(s, ['worktree', 'add', '-q', path.join(tmpDir('wt-'), 'h'), '-b', 'host-thread']);
+  assert.match(session({ cwd: s }), /^deliver worktrees: 1 \(git worktree list\)$/m);
+  assert.match(session({ cwd: s }), /^host worktrees: 1 not created by deliver; report them, never prune them$/m);
   fs.writeFileSync(path.join(s, 'docs', 'plan.md'), '# plan v1\n');
   const digest = gitIn(s, ['hash-object', 'docs/plan.md']).trim();
   fs.writeFileSync(marker(s), JSON.stringify({ ...APPROVED, plan_digest: digest }));

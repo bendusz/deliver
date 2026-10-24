@@ -4,7 +4,8 @@
 // Fires on startup, resume, /clear, and post-compaction; stdout becomes context for the
 // new session. Renders lib.mjs's inspectState(): the approval status, the derived phase
 // and the reference to load, the checked-out story and its Execution block, other claimed
-// stories, worktrees, the uncommitted path count, handoff freshness, and the wiki line.
+// stories, deliver's and host-owned worktrees, the uncommitted path count, handoff
+// freshness, and the wiki line.
 // SILENT (exit 0, no output) outside a managed project. Fail-open throughout: any git or
 // file failure drops that one line, never the session.
 import fs from 'node:fs';
@@ -64,7 +65,8 @@ if (st.story) {
 const CLAIM_LINES = 5;
 for (const c of st.claims.slice(0, CLAIM_LINES)) say(`claimed: ${c.id} by ${v(c.owner, '?')} status=${v(c.status, '?')} branch=${v(c.branch, '-')}`);
 if (st.claims.length > CLAIM_LINES) say(`claimed: ${st.claims.length - CLAIM_LINES} more`);
-if (st.worktrees > 0) say(`worktrees: ${st.worktrees} besides the main checkout (git worktree list)`);
+if (st.worktrees > 0) say(`deliver worktrees: ${st.worktrees} (git worktree list)`);
+if (st.hostWorktrees > 0) say(`host worktrees: ${st.hostWorktrees} not created by deliver; report them, never prune them`);
 if (st.uncommitted) say(`uncommitted: ${st.uncommitted} ${st.uncommitted === 1 ? 'path' : 'paths'} (git status)`);
 if (st.handoff) {
   if (st.handoff.current) say(`handoff: ${st.handoff.path} is current; read it first.`);
