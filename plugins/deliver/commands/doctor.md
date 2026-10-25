@@ -49,10 +49,18 @@ Inspect (whichever apply):
   (`OK`) only when the `reference-transaction` shim in `git rev-parse --git-path hooks` (on git
   older than 2.28, `pre-merge-commit` and `pre-commit`) carries `# deliver-merge-gate v2` on line
   2, is executable, points to a `git-merge-gate.mjs` that exists, runs a node that starts, and
-  names the current integration branches. It prints the git version against 2.28. On any failure,
-  run the same command without `--check`, which installs or repairs it, and report what it could
-  not fix: a hook it will not overwrite, or a hooks directory in the working tree or from global
-  `core.hooksPath`, each with the line to add to the hook manager. `--uninstall` removes it.
+  names the current integration branches. It prints the git version against 2.28, and below git
+  2.38 the line "merged-tree check needs git 2.38; merges are not compared with the verified
+  automatic merge" (the verdicts are still checked; below 2.28 the fallback also misses
+  fast-forwards and compares a merge's staged result only where git needs no content merge). It
+  reports `merge gate: disabled` and exits 1 when `git config deliver.mergeGate` is `off`, which
+  `--uninstall` sets; ask before re-enabling, since the user turned it off. It also reports a
+  deliver shim it cannot remove, such as a v1 shim in an in-tree `core.hooksPath`. On any other
+  failure, run the same command without `--check`, which installs or repairs it (and clears
+  `deliver.mergeGate off`), and report what it could not fix: a hook it will not overwrite, or a
+  hooks directory in the working tree, behind a symlink outside the git directory, or from global
+  `core.hooksPath`, each with the lines to add right after that hook's `#!` line. `--uninstall`
+  removes it and keeps it off; `--check` and `--uninstall` together are refused.
 - **State health.** When `docs/approval.json` or a legacy `pm/` exists, run the checks in
   `references/state-health.md` and report `OK` or `DRIFT` for each.
 

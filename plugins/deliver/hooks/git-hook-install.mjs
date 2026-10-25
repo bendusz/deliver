@@ -10,27 +10,33 @@
 // merge commits only, reported as "git < 2.28: fast-forward updates are not gated".
 //
 // A private copy of each shim lives in `<git-common-dir>/deliver/`, a stable path a hook manager
-// can call (`sh "<copy>" "$@"`). The hooks directory is written only when it sits inside the git
-// directory and core.hooksPath, if set, comes from the repository's own config; a hooks directory
-// in the working tree, from global or system config, or elsewhere is reported with the line to add.
+// can call. The hooks directory is written only when its real path (symlinked directories
+// resolved) sits inside the git directory and core.hooksPath, if set, comes from the repository's
+// own config; a hooks directory in the working tree, from global or system config, or elsewhere is
+// reported with the lines to add to the existing hook (addLine: they stop with the gate's status on
+// a refusal, and for reference-transaction hand the same stdin records to the rest of the hook).
 // An existing hook without the marker on line 2, a symlink, or a file that cannot be read is
 // foreign: never overwritten, only reported. Writes go to a temporary file renamed into place.
 // Idempotent: a current shim is left alone and a marked one that differs (a plugin update, a new
 // integration branch) is refreshed. 0.29.0 before this sets no merge options; a shim from the
 // earlier v1 install is replaced, and the `branch.<integration>.mergeoptions --no-ff` it set is
-// removed.
+// removed; a deliver shim that cannot be removed (in a hooks directory deliver may not write) is
+// reported. Where git cannot run `git merge-tree --write-tree` (older than 2.38), it reports that
+// merges are not compared with the verified automatic merge.
 //
 // session-context.mjs calls installGitHook() at session start; /deliver:doctor runs the CLI:
 //   node git-hook-install.mjs [--check | --uninstall] <project-root>
 // --check reports without writing, and also checks that the shim is executable, that its gate
 // script exists, that its node runs, and the git version. --uninstall removes only deliver's marked
-// shims. Exit 0 when the gate is in place (or removed), 1 otherwise.
+// shims and sets the local `git config deliver.mergeGate off`, which session start honours; the
+// CLI with no flag installs and clears it. --check with --uninstall is refused (exit 2). Exit 0
+// when the gate is in place (or removed), 1 otherwise (disabled counts as not in place).
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { git, chomp, isMain, oneLine } from './lib.mjs';
-import { discover, projectAt, project, planName } from './require-verified.mjs';
+import { discover, projectAt, project, planName, mergeTreeWorks } from './require-verified.mjs';
 
 export const MARKER = '# deliver-merge-gate v2';
 const OURS = /^# deliver-merge-gate v\d+$/;
@@ -126,12 +132,19 @@ function readHook(file) {
   return OURS.test(second) ? { state: 'ours', text, mode: st.mode, v1: second === V1 } : { state: 'foreign', why: "is not deliver's" };
 }
 
-function writeAtomic(file, text) {
+// writeAtomic(file, text): write through a temporary file renamed into place; the temporary file
+// is removed when the write or the rename fails.
+export function writeAtomic(file, text) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = path.join(path.dirname(file), `.${path.basename(file)}.deliver-${process.pid}`);
-  fs.writeFileSync(tmp, text, { mode: 0o755 });
-  fs.chmodSync(tmp, 0o755);
-  fs.renameSync(tmp, file);
+  try {
+    fs.writeFileSync(tmp, text, { mode: 0o755 });
+    fs.chmodSync(tmp, 0o755);
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
+    throw e;
+  }
 }
 
 const isInside = (child, parent) => {
@@ -139,8 +152,24 @@ const isInside = (child, parent) => {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 };
 
+// realPath(p): p with every existing directory component resolved through symlinks; the missing
+// tail is kept as written.
+function realPath(p) {
+  const abs = path.resolve(p);
+  let head = abs;
+  const tail = [];
+  while (!fs.existsSync(head)) {
+    const up = path.dirname(head);
+    if (up === head) return abs;
+    tail.unshift(path.basename(head));
+    head = up;
+  }
+  try { return path.join(fs.realpathSync.native?.(head) ?? fs.realpathSync(head), ...tail); } catch { return abs; }
+}
+
 // layout(top): where the hooks go: { dir, common, privateDir, writable, why }. The hooks directory
-// is writable only inside the git directory, with core.hooksPath (if set) from the repo's config.
+// is writable only when its real path (symlinked directories resolved) is inside the git
+// directory, with core.hooksPath (if set) from the repo's config.
 function layout(top) {
   const dir = path.resolve(top, chomp(git(top, ['rev-parse', '--git-path', 'hooks']) || '.git/hooks'));
   const common = path.resolve(top, chomp(git(top, ['rev-parse', '--git-common-dir']) || '.git'));
@@ -149,41 +178,67 @@ function layout(top) {
   if (configured !== null && git(top, ['config', '--local', '--get', 'core.hooksPath']) === null && git(top, ['config', '--worktree', '--get', 'core.hooksPath']) === null) {
     return { ...out, writable: false, why: `core.hooksPath (${oneLine(chomp(configured))}) comes from your global or system git config` };
   }
-  if (!isInside(dir, common)) {
-    return { ...out, writable: false, why: isInside(dir, top) ? `the hooks directory ${slash(dir)} is in the working tree` : `the hooks directory ${slash(dir)} is outside this repository` };
+  const real = realPath(dir);
+  const realCommon = realPath(common);
+  if (!isInside(real, realCommon)) {
+    const shown = real === dir ? slash(dir) : `${slash(dir)} (really ${slash(real)})`;
+    return { ...out, writable: false, why: isInside(real, realPath(top)) ? `the hooks directory ${shown} is in the working tree` : `the hooks directory ${shown} is outside this repository's git directory` };
   }
   return out;
 }
 
-const addLine = (copy) => `sh ${shQuote(slash(copy))} "$@"`;
+// addLine(name, copy): the lines to put right after the #! line of an existing `name` hook, so it
+// runs deliver's gate first and stops with the gate's status when the gate refuses. The
+// reference-transaction form saves stdin once, feeds it to the gate, and then gives the same
+// records to the rest of the hook.
+export const addLine = (name, copy) => (name === RT_HOOK
+  ? `deliver_in=$(mktemp) || exit 1; cat > "$deliver_in"; sh ${shQuote(slash(copy))} "$@" < "$deliver_in" || { deliver_rc=$?; rm -f "$deliver_in"; exit $deliver_rc; }; exec < "$deliver_in"; rm -f "$deliver_in"`
+  : `sh ${shQuote(slash(copy))} "$@" || exit $?`);
 
-// hookFiles(top, { names, wanted, check, uninstall }): install, inspect, or remove the hook files.
-// Returns { hooks: { name: state }, notes, sawV1 }.
+// hookFiles(top, { wanted, check, uninstall }): install, inspect, or remove the hook files.
+// Returns { hooks: { name: state }, notes, sawV1 }. A deliver shim that is not wanted (an earlier
+// install's, or every one when uninstalling) is removed; where it cannot be (check mode, a hooks
+// directory deliver may not write, a failed removal) it is reported: `obsolete` in check mode,
+// else `not-removed` or `error`.
 function hookFiles(top, { wanted, check = false, uninstall = false }) {
   const res = { hooks: {}, notes: [], sawV1: false, layout: layout(top) };
   const { dir, privateDir, writable, why } = res.layout;
+  const chain = (name, copy) => `add these as the lines right after its #! line: ${addLine(name, copy)}`;
   for (const name of ALL_HOOKS) {
     const file = path.join(dir, name);
     const copy = path.join(privateDir, name);
-    const want = wanted[name] ?? null;
+    const want = uninstall ? null : wanted[name] ?? null;
     const cur = readHook(file);
     if (cur.v1) res.sawV1 = true;
+    const whose = cur.v1 ? "an earlier deliver install's" : "deliver's";
     try {
-      if (uninstall || want === null) {
+      if (want === null) {
         // Not wanted in this mode (or uninstalling): remove only what is ours.
-        if (!check && cur.state === 'ours' && writable) { fs.rmSync(file); res.hooks[name] = 'removed'; }
+        if (cur.state === 'ours') {
+          if (check) {
+            res.hooks[name] = 'obsolete';
+            res.notes.push(`merge gate: ${slash(file)} is ${whose} ${name} shim, which this mode does not use; ${writable ? 'installing removes it' : 'delete it'}`);
+          } else if (!writable) {
+            res.hooks[name] = 'not-removed';
+            res.notes.push(`merge gate: ${slash(file)} is ${whose} ${name} shim, and ${why}, so deliver did not remove it; delete it`);
+          } else {
+            fs.rmSync(file);
+            res.hooks[name] = 'removed';
+          }
+        }
         if (!check && fs.existsSync(copy)) fs.rmSync(copy);
         continue;
       }
       if (!check) writeAtomic(copy, want);
       if (!writable) {
         res.hooks[name] = 'skipped';
-        res.notes.push(`merge gate: ${why}, so deliver did not write its ${name} hook there; add deliver's gate to your hook manager, as the first line of its ${name} hook: ${addLine(copy)}`);
+        res.notes.push(`merge gate: ${why}, so deliver did not write its ${name} hook there; add deliver's gate to your hook manager's ${name} hook: ${chain(name, copy)}`);
+        if (cur.state === 'ours' && cur.text !== want) res.notes.push(`merge gate: ${slash(file)} is ${whose} ${name} shim and out of date; delete it, or replace it with the line above`);
         continue;
       }
       if (cur.state === 'foreign') {
         res.hooks[name] = 'foreign';
-        res.notes.push(`merge gate: ${slash(file)} ${cur.why}, so it was left alone and deliver's git-level gate is not installed; add this as its first line: ${addLine(copy)} (and run /deliver:doctor after plugin updates)`);
+        res.notes.push(`merge gate: ${slash(file)} ${cur.why}, so it was left alone and deliver's git-level gate is not installed; ${chain(name, copy)} (and run /deliver:doctor after plugin updates)`);
         continue;
       }
       if (check) {
@@ -199,7 +254,7 @@ function hookFiles(top, { wanted, check = false, uninstall = false }) {
       }
     } catch (e) {
       res.hooks[name] = 'error';
-      res.notes.push(`merge gate: cannot write ${slash(file)} (${e.code || oneLine(e.message)})`);
+      res.notes.push(`merge gate: cannot ${want === null ? 'remove' : 'write'} ${slash(file)} (${e.code || oneLine(e.message)})`);
     }
   }
   return res;
@@ -234,12 +289,20 @@ function dropV1MergeOptions(top, branches) {
   return dropped;
 }
 
-// installGitHook(root, { gate, node, check, uninstall, version }): install (or inspect, or remove)
-// the gate for the deliver project at root. Returns { project, ok, mode, git, branches, hooks,
-// notes }. mode is reference-transaction, or fallback below git 2.28; ok is true when every hook
-// the mode needs is in place (current, installed, or refreshed), or, uninstalling, when ours are gone.
-export function installGitHook(root, { gate = GATE, node = process.execPath, check = false, uninstall = false, version } = {}) {
-  const res = { project: false, ok: false, mode: null, git: null, branches: [], hooks: {}, notes: [] };
+export const OPT_OUT = 'deliver.mergeGate';
+const optedOut = (top) => chomp(git(top, ['config', '--local', '--get', OPT_OUT]) || '').toLowerCase() === 'off';
+export const TREE_NOTE = 'merge gate: merged-tree check needs git 2.38; merges are not compared with the verified automatic merge';
+
+// installGitHook(root, { gate, node, check, uninstall, explicit, version, treeCheck }): install (or
+// inspect, or remove) the gate for the deliver project at root. Returns { project, ok, mode, git,
+// branches, hooks, notes, disabled }. mode is reference-transaction, or fallback below git 2.28; ok
+// is true when every hook the mode needs is in place (current, installed, or refreshed), or,
+// uninstalling, when every deliver shim found is gone. --uninstall also sets the local
+// `deliver.mergeGate off`, which session start (no `explicit`) honours by installing nothing and
+// check reports as disabled; an explicit install (the CLI with no flag) clears it. treeCheck,
+// optional, overrides the probe of `git merge-tree --write-tree`.
+export function installGitHook(root, { gate = GATE, node = process.execPath, check = false, uninstall = false, explicit = false, version, treeCheck } = {}) {
+  const res = { project: false, ok: false, mode: null, git: null, branches: [], hooks: {}, notes: [], disabled: false };
   const abs = path.resolve(root);
   if (!fs.existsSync(path.join(abs, 'docs', 'approval.json'))) return res;
   const top = chomp(git(abs, ['rev-parse', '--show-toplevel']) || '');
@@ -249,6 +312,12 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   res.git = v ? v.join('.') : 'unknown';
   res.mode = atLeast(v, MIN_GIT) ? RT_HOOK : 'fallback';
   res.branches = integrationBranches(abs, top);
+  if (!uninstall && !check && explicit && optedOut(top)) git(top, ['config', '--local', '--unset', OPT_OUT]);
+  if (!uninstall && optedOut(top)) {
+    res.disabled = true;
+    res.notes.push(`merge gate: disabled in this repository (git config ${OPT_OUT} off, set by git-hook-install.mjs --uninstall); run node <plugin>/hooks/git-hook-install.mjs <project> to install it again`);
+    if (!check) return res;
+  }
   const wanted = {};
   if (res.mode === RT_HOOK) wanted[RT_HOOK] = shim({ name: RT_HOOK, gate, node, branches: res.branches });
   else for (const name of FALLBACK_HOOKS) wanted[name] = shim({ name, gate, node, branches: res.branches });
@@ -261,11 +330,16 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   }
   if (uninstall) {
     res.ok = Object.values(res.hooks).every((s) => s === 'removed');
+    if (git(top, ['config', '--local', OPT_OUT, 'off']) === null) {
+      res.ok = false;
+      res.notes.push(`merge gate: cannot set git config ${OPT_OUT} off, so session start will install the gate again`);
+    }
     return res;
   }
-  if (res.mode === 'fallback') res.notes.push(`merge gate: git < 2.28 (this is ${res.git}): fast-forward updates are not gated; upgrade git`);
+  if (res.mode === 'fallback') res.notes.push(`merge gate: git < 2.28 (this is ${res.git}): fast-forward updates are not gated, and a merge commit's result is compared with the automatic merge only where git needs no content merge, else only the verdicts are checked; upgrade git`);
+  else if (!(treeCheck ?? mergeTreeWorks(top))) res.notes.push(TREE_NOTE);
   const good = new Set(['installed', 'refreshed', 'current']);
-  res.ok = Object.keys(wanted).every((n) => good.has(res.hooks[n]));
+  res.ok = !res.disabled && Object.keys(wanted).every((n) => good.has(res.hooks[n]));
   return res;
 }
 
@@ -273,8 +347,12 @@ if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const check = args.includes('--check');
   const uninstall = args.includes('--uninstall');
+  if (check && uninstall) {
+    fs.writeSync(2, 'git-hook-install.mjs: --check and --uninstall cannot be combined; run one of them\n');
+    process.exit(2);
+  }
   const root = args.find((a) => !a.startsWith('--')) || process.cwd();
-  const r = installGitHook(root, { check, uninstall });
+  const r = installGitHook(root, { check, uninstall, explicit: !check && !uninstall });
   if (!r.project) {
     fs.writeSync(2, `${path.resolve(root)} is not a deliver project (no docs/approval.json in a git checkout)\n`);
     process.exit(1);
@@ -282,6 +360,7 @@ if (isMain(import.meta.url)) {
   const lines = [
     `git ${r.git}: ${r.mode === RT_HOOK ? 'reference-transaction gate (2.28 or newer)' : 'older than 2.28, pre-merge-commit fallback'}`,
     `integration branches: ${r.branches.join(', ')}`,
+    ...(r.disabled ? ['merge gate: disabled'] : []),
     ...Object.entries(r.hooks).map(([n, s]) => `hook ${n}: ${s}`),
     ...r.notes,
     `gate script: ${slash(GATE)}${fs.existsSync(GATE) ? '' : ' (MISSING)'}`,

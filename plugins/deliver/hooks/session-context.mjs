@@ -6,8 +6,11 @@
 // and the reference to load, the checked-out story and its Execution block, other claimed
 // stories, deliver's and host-owned worktrees, the uncommitted path count, handoff
 // freshness, and the wiki line. In a deliver project (docs/approval.json) it also installs, or
-// refreshes, deliver's git-level merge gate through git-hook-install.mjs, and reports only what it
-// could not install: a foreign hook, a hooks directory it may not write, or git older than 2.28.
+// refreshes, deliver's git-level merge gate through git-hook-install.mjs, unless
+// `git config deliver.mergeGate off` (set by --uninstall) disables it, and reports only what it
+// could not install or check: a foreign hook, a hooks directory it may not write, a deliver shim it
+// could not remove, the gate disabled, git older than 2.28, or git older than 2.38 (no merged-tree
+// check).
 // SILENT (exit 0, no output) outside a managed project. Fail-open throughout: any git or
 // file failure drops that one line, never the session.
 import fs from 'node:fs';

@@ -8,8 +8,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { newProj, runHook, gitIn, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
-const { installGitHook, shim, MARKER, GATE, RT_HOOK } = await import(path.join(HOOKS_DIR, 'git-hook-install.mjs'));
-const { judgeMerge, judgeRefUpdate } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+const { installGitHook, shim, writeAtomic, MARKER, GATE, RT_HOOK, TREE_NOTE } = await import(path.join(HOOKS_DIR, 'git-hook-install.mjs'));
+const { judgeMerge, judgeRefUpdate, ONE_AT_A_TIME } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
 
 const BRANCH = 'pm/S1-1-fix';
 const STORY = 'docs/stories/S1-1-fix.md';
@@ -128,6 +128,8 @@ test('git gate: an unverified story reaching main by any route is refused', () =
     ['update-ref', (p) => gitRun(p, ['update-ref', 'refs/heads/main', BRANCH])],
     ['branch -f from elsewhere', (p) => { gitIn(p, ['checkout', '-q', BRANCH]); return gitRun(p, ['branch', '-f', 'main', BRANCH]); }],
     ['rebase', (p) => { commitFile(p, 'docs/notes.md', 'n\n', 'docs: notes'); return gitRun(p, ['rebase', BRANCH]); }],
+    ['cherry-pick', (p) => { commitFile(p, 'docs/notes.md', 'n\n', 'docs: notes'); return gitRun(p, ['cherry-pick', `${BRANCH}~1`]); }],
+    ['merge --squash, git commit', (p) => { commitFile(p, 'docs/notes.md', 'n\n', 'docs: notes'); assert.equal(gitRun(p, ['merge', '--squash', BRANCH]).status, 0); return gitRun(p, ['commit', '-m', 'squash']); }],
     ['conflicted merge, git commit', (p) => {
       commitFile(p, 'src/fix.js', lines('base').replace('line 1 base', 'line 1 other'), 'other');
       assert.notEqual(gitRun(p, ['merge', BRANCH, '-m', 'm']).status, 0);
@@ -145,9 +147,24 @@ test('git gate: an unverified story reaching main by any route is refused', () =
   ];
   for (const [label, run] of routes) {
     const p = project();
-    const before = label === 'rebase' || label.startsWith('conflicted') ? null : head(p);
+    const before = ['rebase', 'cherry-pick', 'merge --squash, git commit'].includes(label) || label.startsWith('conflicted') ? null : head(p);
     const r = run(p);
     refused(p, before ?? head(p), r, label);
+    if (label === 'cherry-pick' || label.startsWith('merge --squash')) assert.match(r.stderr, /as a copy \(a cherry-pick or a squash merge\), and .*no verifier verdict.*after verification, merge the story branch itself with git merge --no-ff pm\/S1-1-fix/, label);
+  }
+});
+
+test('git gate: a verified story copied by cherry-pick or squash is refused; merge the branch itself', () => {
+  for (const [label, run] of [
+    ['cherry-pick', (p) => gitRun(p, ['cherry-pick', `${BRANCH}~1`])],
+    ['merge --squash, git commit', (p) => { assert.equal(gitRun(p, ['merge', '--squash', BRANCH]).status, 0); return gitRun(p, ['commit', '-m', 'squash']); }],
+  ]) {
+    const p = verified();
+    commitFile(p, 'docs/notes.md', 'n\n', 'docs: notes');
+    const before = head(p);
+    const r = run(p);
+    refused(p, before, r, label);
+    assert.match(r.stderr, /as a copy .*bypasses the check that the merge is the verified automatic merge; merge the story branch itself with git merge --no-ff pm\/S1-1-fix/, label);
   }
 });
 
@@ -158,6 +175,26 @@ test('git gate: an octopus merge with one unverified head is refused', () => {
   refused(p, before, r, 'octopus');
   assert.match(r.stderr, /pm\/S1-2-y/);
   assert.match(r.stderr, /Run git merge --abort, fix the cause, and merge again/);
+});
+
+test('git gate: an octopus merge of verified stories is refused, one story at a time, by git, the Bash hook, and judgeMerge alike', () => {
+  const p = project([{ id: 'S1-1-fix', verified: true }, { id: 'S1-2-y', verified: true }]);
+  const before = head(p);
+  const b = bash(p, 'git merge --no-ff pm/S1-1-fix pm/S1-2-y -m m');
+  assert.equal(b.status, 2, b.stderr);
+  assert.ok(b.stderr.includes(ONE_AT_A_TIME), b.stderr);
+  const j = judgeMerge(p, { target: 'main', commits: [head(p, 'pm/S1-1-fix'), head(p, 'pm/S1-2-y')] });
+  assert.equal(j.allow, false);
+  assert.ok(j.reason.includes(ONE_AT_A_TIME), j.reason);
+  const r = gitRun(p, ['merge', '--no-ff', 'pm/S1-1-fix', 'pm/S1-2-y', '-m', 'm']);
+  refused(p, before, r, 'octopus of verified stories');
+  assert.ok(r.stderr.includes(ONE_AT_A_TIME), r.stderr);
+  assert.doesNotMatch(r.stderr, /re-verify/);
+  clean(p);
+  // One at a time, both ship.
+  assert.equal(gitRun(p, ['merge', '--no-ff', 'pm/S1-1-fix', '-m', 'a']).status, 0);
+  const second = gitRun(p, ['merge', '--no-ff', 'pm/S1-2-y', '-m', 'b']);
+  assert.equal(second.status, 0, second.stderr);
 });
 
 test('git gate: an update-ref refusal says to fix the cause and retry', () => {
@@ -223,6 +260,146 @@ test('git gate: code committed on top of a story merge and fast-forwarded in one
   const r = gitRun(p, ['merge', '--ff-only', 'stage']);
   refused(p, before, r, 'code on top');
   assert.match(r.stderr, /more than the story file and handoff notes on top of a story merge/);
+});
+
+test('git gate: amending a verified story merge to change code is refused', () => {
+  const p = verified();
+  assert.equal(gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']).status, 0);
+  const before = head(p);
+  fs.writeFileSync(path.join(p, 'src', 'fix.js'), 'amended\n');
+  const r = gitRun(p, ['commit', '-a', '--amend', '--no-edit']);
+  refused(p, before, r, 'amend');
+  assert.match(r.stderr, /differs from the verified automatic merge/);
+});
+
+test('git gate: below git 2.38 the merged-tree check alone fails open, and is reported once', { skip: WIN && 'POSIX git wrapper' }, () => {
+  const bin = tmpDir('pmoldgit-');
+  const real = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
+  fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\ntree=; write=\nfor a in "$@"; do\n  case "$a" in merge-tree) tree=1;; --write-tree) write=1;; esac\ndone\n[ -n "$tree" ] && [ -n "$write" ] && { echo "usage: git merge-tree" >&2; exit 129; }\nexec "${real}" "$@"\n`, { mode: 0o755 });
+  const PATH = `${bin}${path.delimiter}${process.env.PATH}`;
+  // A verified story merged with extra code staged into the merge: refused when merge-tree works.
+  // Built on a side branch, so main stays where the hook would see it.
+  const p = verified();
+  gitIn(p, ['checkout', '-qb', 'stage', 'main']);
+  assert.equal(gitRun(p, ['merge', '--no-commit', '--no-ff', BRANCH]).status, 0);
+  fs.writeFileSync(path.join(p, 'src', 'extra.js'), 'extra\n');
+  gitIn(p, ['add', 'src/extra.js']);
+  assert.equal(gitRun(p, ['commit', '-m', 'm']).status, 0);
+  gitIn(p, ['checkout', '-q', 'main']);
+  const update = { target: 'main', old: head(p), new: head(p, 'stage') };
+  assert.equal(judgeRefUpdate(p, update).allow, false, 'refused where merge-tree --write-tree works');
+  const u = project();
+  const saved = process.env.PATH;
+  process.env.PATH = PATH;
+  try {
+    const v = judgeRefUpdate(p, update);
+    assert.equal(v.allow, true, v.reason);
+    // The verdicts still apply.
+    gitIn(u, ['checkout', '-qb', 'stage', 'main']);
+    assert.equal(gitRun(u, ['merge', '-q', '--no-ff', BRANCH, '-m', 'm']).status, 0);
+    assert.equal(judgeRefUpdate(u, { target: 'main', old: head(u), new: head(u, 'stage') }).allow, false);
+  } finally {
+    process.env.PATH = saved;
+  }
+  const check = spawnSync(process.execPath, [INSTALL, '--check', p], { encoding: 'utf8', env: env({ PATH }) });
+  assert.equal(check.stdout.split(TREE_NOTE).length - 1, 1, check.stdout);
+  assert.equal(check.status, 0, check.stdout);
+  const s = runHook('session-context.mjs', { cwd: p }, { PATH });
+  assert.equal(s.stdout.split(TREE_NOTE).length - 1, 1, s.stdout);
+  assert.ok(TREE_NOTE.includes('merged-tree check needs git 2.38; merges are not compared with the verified automatic merge'));
+  assert.doesNotMatch(spawnSync(process.execPath, [INSTALL, '--check', p], { encoding: 'utf8', env: env() }).stdout, /needs git 2\.38/);
+});
+
+test('git gate: a story stacked on a verified story does not make its merge a partial', () => {
+  const p = verified();
+  gitIn(p, ['checkout', '-qb', 'pm/S1-2-y', `${BRANCH}~1`]);
+  commitFile(p, 'src/y.js', 'y\n', 'build(S1-2-y): code');
+  gitIn(p, ['checkout', '-q', 'main']);
+  const r = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: an unparseable FETCH_HEAD line does not block a merge of a non-story branch', () => {
+  const p = project();
+  gitIn(p, ['checkout', '-qb', 'feature', 'main']);
+  commitFile(p, 'src/feature.js', 'f\n', 'feature');
+  gitIn(p, ['checkout', '-q', 'main']);
+  const file = path.resolve(p, gitIn(p, ['rev-parse', '--git-path', 'FETCH_HEAD']).trim());
+  fs.writeFileSync(file, 'not a line\n');
+  const r = gitRun(p, ['merge', '--no-ff', 'feature', '-m', 'm']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: a stale remote-tracking snapshot of a verified story does not refuse its merge', () => {
+  const p = verified();
+  // Pushed before the verdict was recorded: origin's copy is the code commit alone.
+  gitIn(p, ['update-ref', `refs/remotes/origin/${BRANCH}`, `${BRANCH}~1`]);
+  assert.equal(judgeMerge(p, { target: 'main', commits: [head(p, BRANCH)] }).allow, true);
+  const r = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']);
+  assert.equal(r.status, 0, r.stderr);
+  // Merging the unverified snapshot itself stays refused.
+  const q = verified();
+  gitIn(q, ['update-ref', `refs/remotes/origin/${BRANCH}`, `${BRANCH}~1`]);
+  const before = head(q);
+  refused(q, before, gitRun(q, ['merge', '--no-ff', `origin/${BRANCH}`, '-m', 'm']), 'stale snapshot');
+});
+
+test('git gate: git push . of a story into the integration branch is refused', () => {
+  const p = project();
+  gitIn(p, ['checkout', '-q', BRANCH]);
+  const before = head(p);
+  const r = gitRun(p, ['push', '.', `${BRANCH}:main`]);
+  assert.notEqual(r.status, 0, r.stderr);
+  assert.equal(head(p), before);
+  assert.match(r.stderr, /deliver blocked/);
+  // receive-pack runs the hook inside the git directory: the gate finds the working tree from there.
+  gitIn(p, ['checkout', '-q', 'main']);
+  const g = spawnSync(process.execPath, [GATE, RT_HOOK], { cwd: path.join(p, '.git'), env: env(), encoding: 'utf8', input: `${head(p)} ${head(p, BRANCH)} refs/heads/main\n` });
+  assert.equal(g.status, 1, g.stderr);
+  assert.match(g.stderr, /deliver blocked the update of refs\/heads\/main/);
+});
+
+test('git gate: pack-refs, gc, and a transaction that moves nothing after a verified merge are allowed', () => {
+  const p = verified();
+  assert.equal(gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']).status, 0);
+  for (const args of [['pack-refs', '--all'], ['gc', '-q'], ['reflog', 'expire', '--all'], ['update-ref', 'refs/heads/main', head(p)]]) {
+    const r = gitRun(p, args);
+    assert.equal(r.status, 0, `${args.join(' ')}: ${r.stderr}`);
+  }
+  const v = judgeRefUpdate(p, { target: 'main', old: '0'.repeat(40), new: head(p) });
+  assert.equal(v.allow, true, v.reason);
+});
+
+test('git gate: a refused fast-forward says how to restore the working tree, and that restores it', () => {
+  const p = project();
+  fs.writeFileSync(path.join(p, 'local.txt'), 'mine\n');
+  const before = head(p);
+  const r = gitRun(p, ['merge', '--ff-only', BRANCH]);
+  refused(p, before, r, 'ff');
+  assert.doesNotMatch(r.stderr, /merge --abort/);
+  assert.match(r.stderr, /git reset --merge/);
+  assert.equal(gitRun(p, ['reset', '--merge']).status, 0);
+  assert.equal(gitIn(p, ['status', '--porcelain']), '?? local.txt\n');
+  assert.equal(fs.readFileSync(path.join(p, 'src', 'fix.js'), 'utf8'), lines('base'));
+  // update-ref leaves the tree alone, so nothing to restore.
+  const u = gitRun(p, ['update-ref', 'refs/heads/main', BRANCH]);
+  assert.match(u.stderr, /Fix the cause and retry/);
+});
+
+test('git gate: the fallback refuses extra code staged into a merge, and allows a clean verified merge', () => {
+  const p = verified({ install: false });
+  const r0 = installGitHook(p, { version: [2, 27, 0] });
+  assert.match(r0.notes.join('\n'), /fast-forward updates are not gated, and a merge commit's result is compared with the automatic merge only where git needs no content merge/);
+  const before = head(p);
+  assert.equal(gitRun(p, ['merge', '--no-commit', '--no-ff', BRANCH]).status, 0);
+  fs.writeFileSync(path.join(p, 'src', 'extra.js'), 'extra\n');
+  gitIn(p, ['add', 'src/extra.js']);
+  const r = gitRun(p, ['commit', '-m', 'm']);
+  refused(p, before, r, 'fallback extra code');
+  assert.match(r.stderr, /staged merge result differs from the automatic merge/);
+  clean(p);
+  const ok = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']);
+  assert.equal(ok.status, 0, ok.stderr);
 });
 
 // --- what must keep working ---
@@ -321,6 +498,102 @@ test('git gate: below git 2.28 the pre-merge-commit and pre-commit fallback is i
 });
 
 // --- installer safety ---
+
+test('git gate: the chaining lines keep a foreign reference-transaction hook working and stop on a refusal', { skip: NO_SH }, () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  const f = path.join(p, '.git', 'hooks', RT_HOOK);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  const body = '[ "$1" = prepared ] || exit 0\nwhile read -r old new ref; do\n  [ "$ref" = refs/heads/release ] && { echo "no release updates" >&2; exit 1; }\ndone\nexit 0\n';
+  fs.writeFileSync(f, `#!/bin/sh\n${body}`, { mode: 0o755 });
+  const r = installGitHook(p);
+  assert.equal(r.hooks[RT_HOOK], 'foreign');
+  const note = r.notes.find((n) => n.includes('right after its #! line'));
+  const add = note.split('right after its #! line: ')[1].replace(/ \(and run \/deliver:doctor after plugin updates\)$/, '');
+  fs.writeFileSync(f, `#!/bin/sh\n${add}\n${body}`, { mode: 0o755 });
+  const before = head(p);
+  refused(p, before, gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']), 'chained gate');
+  clean(p);
+  const rel = gitRun(p, ['branch', 'release']);
+  assert.notEqual(rel.status, 0);
+  assert.match(rel.stderr, /no release updates/);
+  assert.equal(gitRun(p, ['branch', 'other']).status, 0, 'an unrelated update passes both');
+});
+
+test('git gate: a symlinked hooks directory outside the git directory is not written', { skip: WIN && 'symlinks' }, () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  const shared = tmpDir('shared-hooks-');
+  fs.rmSync(path.join(p, '.git', 'hooks'), { recursive: true, force: true });
+  fs.symlinkSync(shared, path.join(p, '.git', 'hooks'));
+  const r = installGitHook(p);
+  assert.equal(r.ok, false);
+  assert.equal(r.hooks[RT_HOOK], 'skipped');
+  assert.equal(fs.existsSync(path.join(shared, RT_HOOK)), false);
+  assert.match(r.notes.join('\n'), /outside this repository's git directory/);
+  fs.writeFileSync(path.join(shared, RT_HOOK), shim({ branches: ['main'] }), { mode: 0o755 });
+  const u = installGitHook(p, { uninstall: true });
+  assert.equal(u.ok, false);
+  assert.equal(u.hooks[RT_HOOK], 'not-removed');
+  assert.ok(fs.existsSync(path.join(shared, RT_HOOK)), 'the shared hook is untouched');
+});
+
+test('git gate: --uninstall persists across session start until an explicit install', () => {
+  const p = project();
+  const cli = (...args) => spawnSync(process.execPath, [INSTALL, ...args, p], { encoding: 'utf8', env: env() });
+  assert.equal(cli('--uninstall').status, 0);
+  assert.equal(gitIn(p, ['config', '--local', '--get', 'deliver.mergeGate']).trim(), 'off');
+  const s = runHook('session-context.mjs', { cwd: p });
+  assert.equal(s.status, 0);
+  assert.equal(fs.existsSync(path.join(p, '.git', 'hooks', RT_HOOK)), false, 'session start did not reinstall');
+  assert.match(s.stdout, /merge gate: disabled/);
+  const c = cli('--check');
+  assert.equal(c.status, 1);
+  assert.match(c.stdout, /^merge gate: disabled$/m);
+  const i = cli();
+  assert.equal(i.status, 0, i.stdout);
+  assert.equal(gitRun(p, ['config', '--local', '--get', 'deliver.mergeGate']).status, 1);
+  assert.equal(fs.readFileSync(path.join(p, '.git', 'hooks', RT_HOOK), 'utf8').split('\n')[1], MARKER);
+});
+
+test('git gate: --check with --uninstall is refused, and an uninstall that cannot remove a shim fails', () => {
+  const p = project();
+  const both = spawnSync(process.execPath, [INSTALL, '--check', '--uninstall', p], { encoding: 'utf8', env: env() });
+  assert.equal(both.status, 2);
+  assert.match(both.stderr, /cannot be combined/);
+  assert.ok(fs.existsSync(path.join(p, '.git', 'hooks', RT_HOOK)));
+  if (!WIN && process.getuid?.() !== 0) {
+    const dir = path.join(p, '.git', 'hooks');
+    fs.chmodSync(dir, 0o555);
+    try {
+      const u = spawnSync(process.execPath, [INSTALL, '--uninstall', p], { encoding: 'utf8', env: env() });
+      assert.equal(u.status, 1, u.stdout);
+      assert.match(u.stdout, /hook reference-transaction: error/);
+    } finally {
+      fs.chmodSync(dir, 0o755);
+    }
+  }
+});
+
+test('git gate: a v1 shim left in an in-tree core.hooksPath is reported by install, --check, and session start', () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  gitIn(p, ['config', 'core.hooksPath', '.githooks']);
+  fs.mkdirSync(path.join(p, '.githooks'));
+  const v1 = path.join(p, '.githooks', 'pre-merge-commit');
+  fs.writeFileSync(v1, '#!/bin/sh\n# deliver-merge-gate v1\nexec node "/x/git-merge-gate.mjs" "$@"\n', { mode: 0o755 });
+  const want = /\.githooks\/pre-merge-commit is an earlier deliver install's pre-merge-commit shim/;
+  assert.match(installGitHook(p).notes.join('\n'), want);
+  assert.ok(fs.existsSync(v1), 'not removed from the working tree');
+  assert.match(spawnSync(process.execPath, [INSTALL, '--check', p], { encoding: 'utf8', env: env() }).stdout, want);
+  assert.match(runHook('session-context.mjs', { cwd: p }).stdout, want);
+});
+
+test('git gate: writeAtomic removes its temporary file when the rename fails', () => {
+  const d = tmpDir('atomic-');
+  const target = path.join(d, 'hook');
+  fs.mkdirSync(path.join(target, 'inside'), { recursive: true });
+  assert.equal(typeof writeAtomic, 'function');
+  assert.throws(() => writeAtomic(target, 'x'));
+  assert.deepEqual(fs.readdirSync(d), ['hook']);
+});
 
 test('git gate: a core.hooksPath in the working tree is not written; the line to add is reported', () => {
   const p = project([{ id: 'S1-1-fix' }], { install: false });
