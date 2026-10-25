@@ -21,6 +21,7 @@ import crypto from 'node:crypto';
 import { execFile, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { REVIEW_DEFAULTS } from './codex/lib/args.mjs';
+import { isMain } from '../hooks/lib.mjs';
 
 export { REVIEW_DEFAULTS };
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -130,6 +131,8 @@ function walk(dir, base = dir) {
     const full = path.join(dir, e.name);
     const rel = path.relative(base, full).split(path.sep).join('/');
     if (dir === base && (UNFROZEN.has(e.name) || e.name === MANIFEST)) continue;
+    // Dotfiles are host litter (.DS_Store and the like), never corpus content.
+    if (e.name.startsWith('.')) continue;
     if (e.isDirectory()) out.push(...walk(full, base));
     else out.push(rel);
   }
@@ -293,7 +296,7 @@ export async function witness(root = CORPUS_ROOT, { id = null } = {}) {
     seen.add(c.id);
   }
   const listed = new Set(all.map((c) => c.id));
-  const fixtures = fs.existsSync(path.join(root, 'fixtures')) ? fs.readdirSync(path.join(root, 'fixtures')) : [];
+  const fixtures = fs.existsSync(path.join(root, 'fixtures')) ? fs.readdirSync(path.join(root, 'fixtures')).filter((f) => !f.startsWith('.')) : [];
   if (!id) for (const f of fixtures) if (!listed.has(f)) results.push({ id: f, kind: null, problems: ['fixture directory not listed in cases.json'] });
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'assurance-'));
   try {
@@ -757,7 +760,8 @@ export function renderCalc(result) {
 
 // ---------- CLI ----------
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// isMain compares real paths, so a symlinked path to this file still runs it.
+if (isMain(import.meta.url)) {
   const die = (message, code) => { fs.writeSync(2, `${message}\n`); process.exit(code); };
   const usage = () => die('usage: assurance.mjs list [--class c] [--kind seeded|clean] [--split select|certify] | witness [--id x] | prepare --id x --variant defect|clean | manifest --check|--write | trial-record --lens l --model m --effort e --case id --trial 1|2 --caught true|false --false-positive true|false [--phase select|certify] [--tokens n] [--out f] | calc [--in f] [--targets T0=0.10,T1=0.05,T2=0.02] [--write] [--json]  (all take --corpus d, --agents d)', 64);
   const [cmd, ...rest] = process.argv.slice(2);

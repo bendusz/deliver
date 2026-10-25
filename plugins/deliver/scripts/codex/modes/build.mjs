@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { pmRelpath, realpath, readJson, legacyState } from '../../../hooks/lib.mjs';
 import { RunnerError } from '../lib/result.mjs';
 import { toplevel, isTracked, checkIgnore, gitOk, gitOut } from '../lib/git.mjs';
-import { parseStory } from '../lib/story.mjs';
+import { parseStory, parseProtected } from '../lib/story.mjs';
 import { requireCodex, BUILD_FLAGS } from '../lib/preflight.mjs';
 import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch, runtimeTmp, assertRuntimeRootReal } from '../lib/scratch.mjs';
@@ -21,7 +21,7 @@ const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stori
 const allowed = (rel, scopes) => scopes.some((s) => rel === s || rel.startsWith(`${s}/`));
 const tomlString = (s) => JSON.stringify(s);
 
-function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
+function buildPrompt({ worktree, storyRel, scopes, protectedPaths = [], mode, evidenceRel }) {
   const lines = [
     `You are implementing one build-ready PM story in the git worktree at ${worktree}.`,
     `Story: ${storyRel}. Read it first; AGENTS.md is already loaded. If CLAUDE.md holds more than the @AGENTS.md pointer, read it too. Mode: ${mode}.`,
@@ -37,6 +37,7 @@ function buildPrompt({ worktree, storyRel, scopes, mode, evidenceRel }) {
     'Never:',
     '- change a tracked or unignored file outside the allowed paths. The runner diffs the worktree after you finish and rejects the whole run if any such path changed. Git-ignored artifacts your build or tests write, such as caches or build output, are reported, not rejected.',
     '- edit docs/stories/, docs/wiki/, docs/handoff/, docs/approval.json, docs/spec.md, docs/plan.md, docs/constitution.md, .specdd/, or a root .sdd. These are the PM\'s records.',
+    ...(protectedPaths.length ? [`- edit these protected acceptance paths, which the test engineer wrote before the build: ${protectedPaths.join(', ')}. They are the oracle for this story, even inside the allowed paths; the runner rejects the whole run if any of them changed. Report blocked if one is wrong.`] : []),
     '- run a git command that changes state. The PM owns history.',
     '',
     mode === 'fix'
@@ -81,7 +82,7 @@ export async function runBuild(o) {
   if (!gitRoot) throw rejected('cannot resolve git root');
   if (gitRoot !== worktree) throw rejected('--worktree must name the git worktree root exactly');
 
-  let storyRel = ''; let scopes = []; let builder = '';
+  let storyRel = ''; let scopes = []; let builder = ''; let protectedPaths = [];
   if (o.story) {
     storyRel = pmRelpath(worktree, o.story);
     if (storyRel === null) throw rejected('story path escapes the worktree or cannot be resolved');
@@ -89,6 +90,7 @@ export async function runBuild(o) {
     if (!fs.existsSync(path.join(worktree, storyRel)) || !fs.statSync(path.join(worktree, storyRel)).isFile()) throw rejected('story file does not exist');
     if (!isTracked(worktree, storyRel)) throw blocked('story must be tracked before codex-builder can write');
     ({ builder, scopes } = parseStory(worktree, storyRel));
+    protectedPaths = parseProtected(worktree, storyRel);
   }
 
   let evidenceRel = '';
@@ -153,7 +155,7 @@ export async function runBuild(o) {
   // The model pair and model_fallback appear only after a fallback, so a failure names what ran.
   const diag = (codexExit, actual, ignoredChanged) => ({ scratch_dir: scratch, codex_version: version, codex_exit: codexExit, ...(fallback ? { model, effort, model_fallback: fallback } : {}), actual_files_changed: actual, ignored_files_changed: ignoredChanged });
 
-  const prompt = buildPrompt({ worktree, storyRel, scopes, mode: o.mode, evidenceRel });
+  const prompt = buildPrompt({ worktree, storyRel, scopes, protectedPaths, mode: o.mode, evidenceRel });
   try { fs.writeFileSync(files.prompt, prompt); } catch { cleanupRuntime(); throw new RunnerError('failed', 'could not write the prompt', { scratch_dir: scratch, codex_version: version }); }
 
   let before;
@@ -188,6 +190,10 @@ export async function runBuild(o) {
   if (beforeMeta !== afterMeta) throw safety('Codex changed protected git state (HEAD, refs, index contents and flags, local config, hooks, info/exclude, or worktree registrations); preserve the worktree and inspect it before continuing');
   for (const rel of [...actual, ...ignoredChanged]) {
     if (isProtected(rel)) throw safety(`Codex changed a protected PM artifact: ${rel}`);
+  }
+  // The story's protected acceptance paths are enforced, ignored or not, even inside touches.
+  for (const rel of [...actual, ...ignoredChanged]) {
+    if (allowed(rel, protectedPaths)) throw safety(`Codex changed a protected path from the story's Execution block: ${rel}`);
   }
   for (const rel of actual) {
     if (!allowed(rel, scopes)) throw safety(`Codex changed a path outside the story's pm-meta.touches: ${rel}`);

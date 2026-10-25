@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { tmpDir, gitIn, PLUGIN_ROOT } from './helpers.mjs';
 import { collect, render, auditLessons, renderAudit, trust, renderTrust } from '../retro-stats.mjs';
-import { upperBound, CORPUS_ROOT } from '../assurance.mjs';
+import { upperBound, CORPUS_ROOT, REVIEW_DEFAULTS } from '../assurance.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'retro-stats.mjs');
 const proj = () => {
@@ -134,7 +134,15 @@ const PANELS = {
     T2: { status: 'unmeasured', panel: [], bound: 0.08, certifyBound: null, target: 0.02, fpRate: null, tokens: 30000 },
   },
 };
-const ex = (tier, rounds = 0, retries = 0, extra = {}) => ({ ...exec('expert-builder', rounds, retries), tier, updated: '2026-10-05 10:00', ...extra });
+// The maximum panel an expert-builder story runs: every lens plus the opposite family.
+const MAX = ['code-integrity-reviewer', 'architecture-reviewer', 'security-auditor', 'performance-reviewer', 'codex-reviewer'];
+// ex(tier, ...): an Execution block in the documented 0.29 format: verdicts at a commit, the
+// failure counters, the panel that ran on the first review, and `updated` in UTC.
+const ex = (tier, rounds = 0, retries = 0, extra = {}) => ({
+  ...exec('expert-builder', rounds, retries), tier, deliver: '0.29.0', updated: '2026-10-05 10:00',
+  verifier: 'PASS 1a2b3c4d', ...(tier === 'T0' ? {} : { integrity: 'pass 1a2b3c4d' }),
+  integrity_fails: 0, holdout_fails: 0, panel: tier === 'T2' ? [...MAX, 'code-integrity-reviewer'] : MAX, ...extra,
+});
 const gitProj = (p) => {
   gitIn(p, ['init', '-q']);
   gitIn(p, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
@@ -147,8 +155,8 @@ const trustProject = () => {
   const p = proj();
   fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n');
   trustStory(p, 'S1-1', ex('T1'));
-  trustStory(p, 'S1-2', ex('T1', 2, 0, { integrity: 'pass' }), ['- 2026-10-01 10:00 integrity: fail, an assertion was removed from test/a.test.mjs.', '- 2026-10-01 11:00 integrity: pass after the fix.']);
-  trustStory(p, 'S1-3', ex('T2', 1, 1, { holdout: 'pass' }), ['- 2026-10-02 09:00 holdout FAIL: tmp/holdout/S1-3/limits.test.mjs.', '- 2026-10-02 10:00 holdout: 0 failures after the fix.']);
+  trustStory(p, 'S1-2', ex('T1', 2, 0, { integrity_fails: 1 }), ['- 2026-10-01 10:00 integrity: fail, an assertion was removed from test/a.test.mjs.', '- 2026-10-01 11:00 integrity: pass after the fix.']);
+  trustStory(p, 'S1-3', ex('T2', 1, 1, { holdout_fails: 1 }), ['- 2026-10-02 09:00 holdout FAIL: tmp/holdout/S1-3/limits.test.mjs.', '- 2026-10-02 10:00 holdout: 0 failures after the fix.']);
   trustStory(p, 'S1-4', ex('T0'));
   trustStory(p, 'S1-5', ex('T1'));
   trustStory(p, 'S2-1', ex('T1'));
@@ -169,7 +177,7 @@ test('retro-stats --trust: per tier shipped, panel, bound, first pass, rounds, i
   assert.equal(r.branch, 'main');
   assert.deepEqual(r.panels.stale, []);
   assert.deepEqual(r.tiers.T1, {
-    shipped: 3, panel: null, calibratedBound: null, bestBound: 0.0617, target: 0.05, firstPass: 2, fixRounds: 2, integrityBlocks: 1, holdoutFailures: null,
+    shipped: 3, panel: null, calibratedBound: null, bestBound: 0.0617, target: 0.05, belowPanel: 0, withheld: null, maximumForced: false, firstPass: 2, fixRounds: 2, integrityBlocks: 1, holdoutFailures: null,
     observed: { since: '2026-10-01T00:00:00.000Z', shipped: 4, escapedStories: 1, escapeCommits: 2, bound: upperBound(1, 4), overTarget: true },
     observedToDate: { shipped: 4, escapedStories: 1, escapeCommits: 2, bound: upperBound(1, 4), overTarget: true },
   });
@@ -268,13 +276,92 @@ test('retro-stats --trust: a stale or missing calibration runs every tier at the
   assert.match(renderTrust(none), /every merged story to date/);
 });
 
-test('retro-stats --trust: notes stop at the next heading', () => {
+test('retro-stats --trust: integrity blocks and holdout failures come from the committed counters', () => {
   const p = proj();
-  trustStory(p, 'S1-1', ex('T2'), ['- 2026-10-01 holdout: 2 failures', '- 2026-10-01 holdout: 0 failed on the rerun', '- 2026-10-01 holdout pass, no failures', '', '## Later', '- integrity: fail, quoted from elsewhere', '- holdout FAIL quoted']);
+  // Prose notes no longer count: only the counters and a recorded verdict do.
+  trustStory(p, 'S1-1', ex('T2', 0, 0, { integrity_fails: 2, holdout_fails: 3 }), ['- 2026-10-01 holdout FAIL quoted', '- integrity: fail, quoted']);
+  trustStory(p, 'S1-2', ex('T2', 0, 0, { holdout_fails: 0 }));
+  const { integrity_fails, holdout_fails, ...noCounters } = ex('T1', 0, 0, { integrity: 'fail 1a2b3c4d' });
+  trustStory(p, 'S1-3', noCounters);
+  trustStory(p, 'S1-4', { ...noCounters, tier: 'T0', integrity: 'failing? no: pass 1a2b3c4d' });
+  trustStory(p, 'S1-5', ex('T1', 0, 0, { integrity_fails: 1, integrity: 'fail 1a2b3c4d' }));
   gitProj(p);
   const r = trust(p, { panelsFile: path.join(p, 'none.json') });
-  assert.equal(r.tiers.T2.holdoutFailures, 1);
-  assert.equal(r.tiers.T2.integrityBlocks, 0);
+  assert.equal(r.tiers.T2.integrityBlocks, 2);
+  assert.equal(r.tiers.T2.holdoutFailures, 3);
+  assert.equal(r.tiers.T1.integrityBlocks, 2, 'a fail verdict counts once without a counter; the counter wins when present');
+  assert.equal(r.tiers.T0.integrityBlocks, 0, 'only a verdict that starts with the word fail counts');
+  assert.equal(r.tiers.T1.holdoutFailures, null, 'no T2 story, so holdouts are not recorded');
+  const zero = proj();
+  trustStory(zero, 'S1-1', ex('T2'));
+  gitProj(zero);
+  const z = trust(zero, { panelsFile: path.join(zero, 'none.json') });
+  assert.equal(z.tiers.T2.holdoutFailures, 0, 'a 0.29 T2 story with no failures records zero, not "not recorded"');
+  assert.match(renderTrust(z), /\| T2 \| 1 \| .* \| 0 \| 0 \|$/m);
+});
+
+test('retro-stats --trust: a story whose recorded panel lacks a member of the panel in force runs below panel', () => {
+  const p = trustProject();
+  const panels = path.join(p, 'panels.json');
+  const base = trust(p, { panelsFile: panels });
+  assert.equal(base.tiers.T0.belowPanel, 0);
+  assert.equal(base.tiers.T0.calibratedBound, 0.0488);
+  // T0 is calibrated on code-integrity-reviewer: a story without it is below panel.
+  trustStory(p, 'S1-6', ex('T0', 0, 0, { panel: ['codex-reviewer'] }));
+  // T1 is unmeasured, so the maximum panel is in force: a missing lens is below panel.
+  trustStory(p, 'S1-7', ex('T1', 0, 0, { panel: MAX.filter((l) => l !== 'performance-reviewer') }));
+  // A codex-builder story's opposite family is code-integrity-reviewer, so it needs no codex-reviewer.
+  trustStory(p, 'S1-8', ex('T1', 0, 0, { builder: 'codex-builder', panel: MAX.filter((l) => l !== 'codex-reviewer') }));
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'more stories']);
+  const r = trust(p, { panelsFile: panels });
+  assert.equal(r.tiers.T0.belowPanel, 1);
+  assert.equal(r.tiers.T0.calibratedBound, null, 'the bound is withheld');
+  assert.equal(r.tiers.T0.withheld, '1 story ran below panel');
+  assert.equal(r.tiers.T1.belowPanel, 1);
+  const text = renderTrust(r);
+  assert.match(text, /\| T0 \| \d+ \| code-integrity-reviewer \| - \(1 story ran below panel\) \|/);
+  assert.match(text, /^T0 below panel: 1$/m);
+  assert.match(text, /^T1 below panel: 1$/m);
+  assert.match(text, /^T2 below panel: 0$/m);
+  // A 0.29 story with no panel recorded at all is below panel too; a pre-0.29 one is not judged.
+  const { panel, ...noPanel } = ex('T0');
+  trustStory(p, 'S1-6', noPanel);
+  trustStory(p, 'S1-9', { ...noPanel, deliver: '0.28.1' });
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'no panel']);
+  const m = trust(p, { panelsFile: panels });
+  assert.equal(m.tiers.T0.belowPanel, 1);
+  assert.equal(m.tiers.T0.withheld, '1 story ran below panel');
+});
+
+test('retro-stats --trust: the panel column shows the maximum panel for a tier OVER TARGET forced', () => {
+  const p = trustProject();
+  const r = trust(p, { branch: 'side', panelsFile: path.join(p, 'panels.json') });
+  assert.equal(r.tiers.T0.observed.overTarget, true);
+  assert.equal(r.tiers.T0.maximumForced, true);
+  assert.match(renderTrust(r), /\| T0 \| \d+ \| maximum panel \(OVER TARGET\) \|/);
+  const main = trust(p, { panelsFile: path.join(p, 'panels.json') });
+  assert.equal(main.tiers.T0.maximumForced, false);
+});
+
+test('retro-stats --trust: project targets come from the plan or the defaults, never from panels.json', () => {
+  const p = trustProject();
+  // panels.json calibrated T1 at 20% against its own target of 20%.
+  const loose = { ...PANELS, tiers: { ...PANELS.tiers, T1: { status: 'measured', panel: [{ lens: 'code-integrity-reviewer', trials: 1 }], bound: 0.2, certifyBound: 0.2, target: 0.2, fpRate: 0.1, tokens: 9000 } } };
+  fs.writeFileSync(path.join(p, 'loose.json'), JSON.stringify(loose));
+  const r = trust(p, { panelsFile: path.join(p, 'loose.json') });
+  assert.equal(r.tiers.T1.target, 0.05, 'the project default, not the panels.json target');
+  assert.equal(r.tiers.T1.calibratedBound, null, '20% does not meet the project\'s 5%');
+  // The plan's Delivery mode names its own targets.
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n- Assurance targets: T0=0.10, T1=0.25, T2=0.02\n');
+  gitIn(p, ['commit', '-qam', 'plan targets']);
+  const planned = trust(p, { panelsFile: path.join(p, 'loose.json') });
+  assert.equal(planned.tiers.T1.target, 0.25);
+  assert.equal(planned.tiers.T1.calibratedBound, 0.2);
+  const override = trust(p, { panelsFile: path.join(p, 'loose.json'), targets: { T1: 0.1 } });
+  assert.equal(override.tiers.T1.target, 0.1, '--targets overrides the plan');
+  assert.equal(override.tiers.T1.calibratedBound, null);
 });
 
 test('retro-stats --trust: CLI, JSON, a branch override, targets, refused refs, and no git history', () => {
@@ -326,4 +413,176 @@ test('retro-stats --trust: a calibratedAt that is not a strict ISO UTC time make
     assert.match(r.panels.stale.join(), /calibratedAt/, at);
     assert.equal(r.tiers.T0.calibratedBound, null, at);
   }
+});
+
+test('retro-stats: a symlinked path to the script still runs the CLI', (t) => {
+  const link = path.join(tmpDir('pmlinkbin-'), 'retro-stats.mjs');
+  try { fs.symlinkSync(SCRIPT, link, 'file'); } catch { t.skip('symlinks are unavailable here'); return; }
+  const r = spawnSync(process.execPath, [link], { encoding: 'utf8', windowsHide: true });
+  assert.equal(r.status, 64, r.stderr);
+});
+
+// --- fix round 1 ---
+
+// A calibration whose T0 panel is codex-reviewer alone, stamped as the runner runs it now.
+const CODEX_T0 = {
+  ...PANELS,
+  stamp: { ...PANELS.stamp, lenses: { ...PANELS.stamp.lenses, 'codex-reviewer': { model: REVIEW_DEFAULTS.model, effort: REVIEW_DEFAULTS.effort, promptSha256: fileSha(path.join(PLUGIN_ROOT, 'agents', 'codex-reviewer.md')) } } },
+  tiers: { ...PANELS.tiers, T0: { ...PANELS.tiers.T0, panel: [{ lens: 'codex-reviewer', trials: 1 }] } },
+};
+const soloProject = (stories) => {
+  const p = proj();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n');
+  for (const [id, e] of stories) trustStory(p, id, e);
+  gitProj(p);
+  return p;
+};
+
+test('retro-stats --trust: the panel in force always adds the builder\'s opposite-family lens', () => {
+  const p = soloProject([['S1-1', ex('T0', 0, 0, { builder: 'codex-builder', panel: ['codex-reviewer'] })]]);
+  fs.writeFileSync(path.join(p, 'codex.json'), JSON.stringify(CODEX_T0));
+  const r = trust(p, { panelsFile: path.join(p, 'codex.json') });
+  assert.deepEqual(r.panels.stale, []);
+  assert.equal(r.tiers.T0.belowPanel, 1, 'a codex-builder story also needs code-integrity-reviewer');
+  assert.equal(r.tiers.T0.calibratedBound, null);
+  assert.equal(r.tiers.T0.withheld, '1 story ran below panel');
+  const ok = soloProject([['S1-1', ex('T0', 0, 0, { builder: 'codex-builder', panel: ['codex-reviewer', 'code-integrity-reviewer'] })]]);
+  const o = trust(ok, { panelsFile: path.join(p, 'codex.json') });
+  assert.equal(o.tiers.T0.belowPanel, 0);
+  assert.equal(o.tiers.T0.calibratedBound, 0.0488);
+});
+
+test('retro-stats --trust: a member at two trials needs two occurrences in the recorded panel', () => {
+  const twice = { ...PANELS, tiers: { ...PANELS.tiers, T0: { ...PANELS.tiers.T0, panel: [{ lens: 'code-integrity-reviewer', trials: 2 }] } } };
+  const once = soloProject([['S1-1', ex('T0', 0, 0, { panel: ['code-integrity-reviewer', 'codex-reviewer'] })]]);
+  fs.writeFileSync(path.join(once, 'twice.json'), JSON.stringify(twice));
+  const r = trust(once, { panelsFile: path.join(once, 'twice.json') });
+  assert.equal(r.tiers.T0.belowPanel, 1);
+  assert.equal(r.tiers.T0.calibratedBound, null);
+  const both = soloProject([['S1-1', ex('T0', 0, 0, { panel: ['code-integrity-reviewer', 'codex-reviewer', 'code-integrity-reviewer'] })]]);
+  assert.equal(trust(both, { panelsFile: path.join(once, 'twice.json') }).tiers.T0.belowPanel, 0);
+  // The maximum panel at T2 runs code-integrity-reviewer twice.
+  const t2 = soloProject([['S1-1', ex('T2', 0, 0, { panel: MAX })]]);
+  assert.equal(trust(t2, { panelsFile: path.join(t2, 'none.json') }).tiers.T2.belowPanel, 1);
+});
+
+test('retro-stats --trust: OVER TARGET requires the maximum panel from the sprint after the first escape', () => {
+  const measuredPlus = ['code-integrity-reviewer', 'codex-reviewer'];
+  const p = soloProject([['S1-1', ex('T0', 0, 0, { panel: measuredPlus })], ['S1-2', ex('T0', 0, 0, { panel: measuredPlus })], ['S2-1', ex('T0', 0, 0, { panel: measuredPlus })], ['S2-2', ex('T0', 0, 0, { panel: MAX })]]);
+  commitAt(p, 'chore(S1-1): merged', '2026-10-05T10:00:00Z');
+  commitAt(p, 'fix: x\n\nEscaped-From: S1-1', '2026-10-06T10:00:00Z');
+  // Same sprint as the escape: the measured panel was still in force.
+  commitAt(p, 'chore(S1-2): merged', '2026-10-07T10:00:00Z');
+  // The next sprint runs the maximum panel.
+  commitAt(p, 'chore(S2-1): merged', '2026-10-09T10:00:00Z');
+  commitAt(p, 'chore(S2-2): merged', '2026-10-09T11:00:00Z');
+  fs.writeFileSync(path.join(p, 'p.json'), JSON.stringify(PANELS));
+  const t = trust(p, { panelsFile: path.join(p, 'p.json') });
+  assert.equal(t.tiers.T0.observed.overTarget, true);
+  assert.equal(t.tiers.T0.belowPanel, 1, 'only S2-1, in the sprint after the escape, fell short of the maximum panel');
+  assert.equal(t.tiers.T0.calibratedBound, null);
+  const one = trust(p, { panelsFile: path.join(p, 'p.json'), sprint: 1 });
+  assert.equal(one.tiers.T0.belowPanel, 0, 'sprint 1 kept the measured panel');
+});
+
+test('retro-stats --trust: an expert-builder story running codex-reviewer meets a codex-reviewer calibration', () => {
+  const p = soloProject([['S1-1', ex('T0', 0, 0, { panel: ['codex-reviewer'] })]]);
+  fs.writeFileSync(path.join(p, 'codex.json'), JSON.stringify(CODEX_T0));
+  const r = trust(p, { panelsFile: path.join(p, 'codex.json') });
+  assert.equal(r.tiers.T0.belowPanel, 0);
+  assert.equal(r.tiers.T0.calibratedBound, 0.0488);
+});
+
+test('retro-stats --trust: the targets line is found by its label whatever it holds; duplicates keep the minimum', () => {
+  const at = (line) => {
+    const p = trustProject();
+    fs.writeFileSync(path.join(p, 'docs', 'plan.md'), `# Plan\n\n## Delivery mode\n- Integration branch: main\n- Assurance targets: ${line}\n`);
+    gitIn(p, ['commit', '-qam', 'targets']);
+    return trust(p, { panelsFile: path.join(p, 'panels.json') });
+  };
+  const ticked = at('T0=0.01, T1=`5%`');
+  assert.deepEqual([ticked.tiers.T0.target, ticked.tiers.T1.target, ticked.tiers.T2.target], [0.01, 0.05, 0.02]);
+  assert.match(ticked.targetsProblem, /T1=5%/);
+  const wrapped = at('`T0=0.10, T1=0.25, T2=0.02`');
+  assert.equal(wrapped.targetsProblem, null);
+  assert.equal(wrapped.tiers.T1.target, 0.25);
+  const dup = at('T0=0.10, T0=0.01, T1=0.05, T2=0.02');
+  assert.equal(dup.tiers.T0.target, 0.01);
+  assert.match(dup.targetsProblem, /T0/);
+});
+
+test('retro-stats --trust: an Assurance targets line that does not parse fails closed per tier and says so', () => {
+  const p = trustProject();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n- Assurance targets: T0=0.20, T1=5%, T2=0.01\n');
+  gitIn(p, ['commit', '-qam', 'odd targets']);
+  const r = trust(p, { panelsFile: path.join(p, 'panels.json') });
+  assert.deepEqual([r.tiers.T0.target, r.tiers.T1.target, r.tiers.T2.target], [0.1, 0.05, 0.01]);
+  assert.match(r.targetsProblem, /T1=5%/);
+  assert.match(renderTrust(r), /Assurance targets line in docs\/plan\.md does not parse \(T1=5%\)/);
+  const good = trustProject();
+  assert.equal(trust(good, { panelsFile: path.join(good, 'panels.json') }).targetsProblem, null);
+});
+
+test('retro-stats --trust: a missing counter is not recorded, never zero', () => {
+  const { holdout_fails, ...noHoldout } = ex('T2');
+  const p = soloProject([['S1-1', ex('T2', 0, 0, { holdout_fails: 1 })], ['S1-2', noHoldout]]);
+  const r = trust(p, { panelsFile: path.join(p, 'none.json') });
+  assert.equal(r.tiers.T2.holdoutFailures, null, 'one T2 story did not record its holdout counter');
+  const { integrity_fails, ...noIntegrity } = ex('T1');
+  const q = soloProject([['S1-1', ex('T1', 0, 0, { integrity_fails: 1 })], ['S1-2', noIntegrity], ['S1-3', { ...noIntegrity, tier: 'T0', integrity: undefined }]]);
+  const t = trust(q, { panelsFile: path.join(q, 'none.json') });
+  assert.equal(t.tiers.T1.integrityBlocks, null, 'a T1 pass verdict without the counter cannot say how many failures came first');
+  assert.equal(t.tiers.T0.integrityBlocks, 0, 'T0 runs no integrity gate');
+  assert.match(renderTrust(t), /\| T1 \| 2 \| .* \| not recorded \| not recorded \|$/m);
+});
+
+// --- fix round 3 ---
+
+const measuredPlus = ['code-integrity-reviewer', 'codex-reviewer'];
+const t0 = (updated, panel = measuredPlus) => ex('T0', 0, 0, { updated, panel });
+
+test('retro-stats --trust: maximum panels start the sprint after OVER TARGET first fires, not after the first escape', () => {
+  const stories = [];
+  for (let i = 1; i <= 50; i += 1) stories.push([`S1-${i}`, t0('2026-10-05 10:00')]);
+  for (let i = 1; i <= 10; i += 1) stories.push([`S2-${i}`, t0('2026-10-12 10:00')]);
+  stories.push(['S3-1', t0('2026-10-20 10:00')], ['S3-2', t0('2026-10-20 10:00')]);
+  const p = soloProject(stories);
+  // 1 escape in 50 stays under 10%; the second, over 60 stories, tips it in sprint 2.
+  commitAt(p, 'fix: one\n\nEscaped-From: S1-1', '2026-10-06T10:00:00Z');
+  commitAt(p, 'fix: two\n\nEscaped-From: S2-1', '2026-10-13T10:00:00Z');
+  fs.writeFileSync(path.join(p, 'p.json'), JSON.stringify(PANELS));
+  const all = trust(p, { panelsFile: path.join(p, 'p.json') });
+  assert.equal(all.tiers.T0.belowPanel, 2, 'only sprint 3 needed the maximum panel');
+  assert.equal(all.tiers.T0.maximumForced, true, 'once fired, the tier stays forced until recalibration');
+  const two = trust(p, { panelsFile: path.join(p, 'p.json'), sprint: 2 });
+  assert.equal(two.tiers.T0.belowPanel, 0);
+  assert.equal(two.tiers.T0.maximumForced, false, 'sprint 2 still ran the measured panel');
+  assert.doesNotMatch(renderTrust(two), /maximum panel \(OVER TARGET\)/);
+  assert.equal(trust(p, { panelsFile: path.join(p, 'p.json'), sprint: 3 }).tiers.T0.maximumForced, true);
+});
+
+test('retro-stats --trust: the sprint OVER TARGET fired in is the latest of the escaped story, the fix scope, merges, and claims by then', () => {
+  const check = (label, build) => {
+    const p = build();
+    fs.writeFileSync(path.join(p, 'p.json'), JSON.stringify(PANELS));
+    const r = trust(p, { panelsFile: path.join(p, 'p.json') });
+    assert.equal(r.tiers.T0.belowPanel, 1, `${label}: only the sprint 3 story falls short`);
+    assert.equal(trust(p, { panelsFile: path.join(p, 'p.json'), sprint: 2 }).tiers.T0.maximumForced, false, label);
+  };
+  check('fix scope', () => {
+    const p = soloProject([['S1-1', t0('2026-10-05 10:00')], ['S2-1', t0('2026-10-12 10:00')], ['S3-1', t0('2026-10-20 10:00')]]);
+    commitAt(p, 'fix(S2-3): x\n\nEscaped-From: S1-1', '2026-10-06T10:00:00Z');
+    return p;
+  });
+  check('merged by then', () => {
+    const p = soloProject([['S1-1', t0('2026-10-05 10:00')], ['S2-1', t0('2026-10-05 12:00')], ['S2-2', t0('2026-10-12 10:00')], ['S3-1', t0('2026-10-20 10:00')]]);
+    commitAt(p, 'fix: x\n\nEscaped-From: S1-1', '2026-10-06T10:00:00Z');
+    return p;
+  });
+  check('claimed by then', () => {
+    const p = soloProject([['S1-1', t0('2026-10-05 10:00')], ['S2-1', t0('2026-10-12 10:00')], ['S3-1', t0('2026-10-20 10:00')]]);
+    commitAt(p, 'chore(S2-1): claim', '2026-10-05T12:00:00Z');
+    commitAt(p, 'fix: x\n\nEscaped-From: S1-1', '2026-10-06T10:00:00Z');
+    return p;
+  });
 });

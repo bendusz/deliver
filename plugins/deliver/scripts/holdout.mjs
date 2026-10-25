@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../hooks/lib.mjs';
 
 class Exit extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -161,6 +161,5 @@ async function main() {
   }
 }
 
-const real = (p) => { try { return fs.realpathSync.native(p); } catch { return null; } };
-const invoked = process.argv[1] ? real(process.argv[1]) : null;
-if (invoked && invoked === real(fileURLToPath(import.meta.url))) main();
+// isMain compares real paths, so a symlinked path to this file still runs it.
+if (isMain(import.meta.url)) main();

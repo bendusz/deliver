@@ -107,3 +107,10 @@ test('agent-evals: the CLI scores and compares files, exiting 1 on REJECT', () =
   assert.equal(run('score', path.join(d, 'missing.json')).status, 66);
   assert.equal(run('compare', blank).status, 64);
 });
+
+test('agent-evals: a symlinked path to the script still runs the CLI', (t) => {
+  const link = path.join(tmpDir('pmlinkbin-'), 'agent-evals.mjs');
+  try { fs.symlinkSync(SCRIPT, link, 'file'); } catch { t.skip('symlinks are unavailable here'); return; }
+  const r = spawnSync(process.execPath, [link, 'no-such-command'], { encoding: 'utf8', windowsHide: true });
+  assert.equal(r.status, 64, r.stderr);
+});

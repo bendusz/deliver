@@ -9,7 +9,7 @@ import { tmpDir, PLUGIN_ROOT } from './helpers.mjs';
 import {
   CORPUS_ROOT, CLASSES, upperBound, incBeta, loadCases, listCases, manifest, enumeratePanels,
   calc, selectTier, parseTargets, panelsDoc, staleness, readTrials, checkCase, MAX_SLOTS, ceil4,
-  certifyCasesNeeded, certifyPlan, renderCalc, REVIEW_DEFAULTS, boundStaleness, parseUtc,
+  certifyCasesNeeded, certifyPlan, renderCalc, REVIEW_DEFAULTS, boundStaleness, parseUtc, witness,
 } from '../assurance.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'assurance.mjs');
@@ -536,4 +536,26 @@ test('assurance: a tier bound shows only when every lens behind it, measured pan
   assert.match(boundStaleness(doc, 'T1').join(), /codex-reviewer.*model/);
   assert.match(boundStaleness(doc, 'T2').join(), /no lens/);
   assert.match(boundStaleness({ ...doc, stamp: { ...stamp, corpusSha256: 'old' } }, 'T0').join(), /corpus/);
+});
+
+// --- release integration (WP-E1) ---
+
+test('assurance: a symlinked path to the script still runs the CLI, so a tampered corpus fails the check', (t) => {
+  const copy = exampleCorpus('pmlink-');
+  fs.appendFileSync(path.join(copy, 'fixtures', EXAMPLES[0], 'story.md'), '\ntampered\n');
+  const link = path.join(tmpDir('pmlinkbin-'), 'assurance.mjs');
+  try { fs.symlinkSync(SCRIPT, link, 'file'); } catch { t.skip('symlinks are unavailable here'); return; }
+  const r = spawnSync(process.execPath, [link, 'manifest', '--check', '--corpus', copy], { encoding: 'utf8', windowsHide: true });
+  assert.notEqual(r.status, 0, 'the symlinked invocation must run the check, not exit silently');
+  assert.match(r.stderr, /differs from MANIFEST/);
+});
+
+test('assurance: stray dotfiles such as .DS_Store are outside the manifest and the fixture listing', async () => {
+  const copy = exampleCorpus('pmdot-');
+  const pristine = fs.readFileSync(path.join(copy, 'MANIFEST.sha256'), 'utf8');
+  for (const dir of [copy, path.join(copy, 'fixtures'), path.join(copy, 'fixtures', EXAMPLES[0])]) fs.writeFileSync(path.join(dir, '.DS_Store'), 'finder\n');
+  assert.equal(manifest(copy), pristine);
+  assert.equal(run('manifest', '--check', '--corpus', copy).status, 0);
+  const results = await witness(copy);
+  assert.deepEqual(results.filter((r) => r.problems.length), [], 'no fixture directory named .DS_Store is reported');
 });
