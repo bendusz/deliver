@@ -89,7 +89,11 @@ anything.
 | Decomposition | Sprints, then self-contained story files under `docs/stories/`, each a thin end-to-end slice tracing to requirement IDs. |
 | Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. A bug fix lands with a regression test, and a failed attempt is retried at higher effort. At the sprint boundary, a cross-story review and a retrospective that reads fix rounds and retries per builder, turns mechanical mistakes into checks, and feeds the rest into `AGENTS.md`. |
 | Parallel stories | Independent `[P]` stories can build at once in isolated git worktrees, then integrate one at a time. Opt-in, with a safe fallback to sequential. |
-| Review and verification | A separate read-only reviewer, the project's real test, lint, and build gates, and a final `pm-verifier` PASS, with bounded fix loops. |
+| Review and verification | A read-only review panel that always includes a lens from the family opposite the builder's, the project's real test, lint, and build gates, a test-integrity check, and a final `pm-verifier` PASS, with bounded fix loops. |
+| Tiers and measured assurance | Each story is `T0`, `T1`, or `T2` by risk. A tier runs the cheapest panel whose measured escape bound meets its target (10%, 5%, 2% by default), calibrated on a seeded-defect corpus with `/deliver:calibrate`. A tier without a measured bound runs the maximum panel. |
+| Protected oracles | At `T1` and up, `test-engineer` writes the acceptance tests before the build and no builder may change them. At `T2`, extra holdout checks live on a private git ref the builder is never shown. |
+| Ship gate | The `require-verified.mjs` hook blocks merging a story branch without a recorded verifier `PASS` for its tip and, at `T1` and up, a passing integrity verdict. |
+| Trust report | Instead of a diff, each sprint checkpoint shows `retro-stats.mjs --trust`: stories per tier, the panel each ran, its bound, fix rounds, integrity blocks, holdout failures, and observed escapes. An escape bound over target forces the maximum panel. |
 | State | Git carries it. The claim is the story branch, each build and fix round is a commit, and the `--no-ff` merge body is the story record. Only an approval marker, a per-story Execution block, and an optional handoff are written, so concurrent sessions never overwrite each other and any lost session resumes from git. |
 
 Bundled specialist agents do the work:
@@ -109,8 +113,9 @@ Bundled specialist agents do the work:
 | External research, reports under `docs/research/` | `researcher` (web), `codex-researcher` |
 | Second opinion on code and on decisions | `codex-reviewer`, `codex-advisor` |
 
-With Codex installed, the PM asks `codex-advisor` before a consequential technical decision and
-runs `codex-reviewer` once on every story at `small` scale and above. The advisor defaults to
+With Codex installed, the PM asks `codex-advisor` before a consequential technical decision.
+Review is opposite-family: an `expert-builder` story gets `codex-reviewer`, and a `codex-builder`
+story gets the Claude `code-integrity-reviewer`. The advisor defaults to
 `gpt-6-astra` and the reviewer to `gpt-6.1-sol`, both at `high`.
 `codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`, and `codex-advisor`
 relays its answer in chat. Every Codex invocation goes through one of these thin Sonnet wrappers and
@@ -143,6 +148,7 @@ workflow. Tiny work stays lightweight, and regulated work makes every gate manda
 | `/deliver:correct-course` | Handle a mid-flight scope change: re-plan at the right level, re-sign-off if material. |
 | `/deliver:retro` | At a sprint boundary, a bounded cross-story review and a retrospective that proposes `AGENTS.md` learnings as a diff. Each learned line carries its evidence and a review-by sprint, three at most per retro, and is retired when no later retro cites it. |
 | `/deliver:agent-evals` | Maintainers only. Run one agent's prompt over the frozen eval fixtures, three trials per case, and score it. |
+| `/deliver:calibrate` | Maintainers only. Run the review lenses over the frozen assurance corpus, select then certify, and write each tier's calibrated panel to `panels.json`. |
 | `/deliver:improve` | Maintainers only. Propose one small, evidence-backed edit to one agent or reference, test it against the frozen evals, and leave the decision to you. |
 | `/deliver:handoff` | End a session cleanly by writing a token-efficient `docs/handoff/<id>.md` briefing for the next agent. |
 | `/deliver:resume` | Read git, the approval marker, the story Execution blocks, and the handoff, then continue where you left off. |
@@ -236,8 +242,9 @@ under `tmp/`; the report directories sit at the repository root:
   bundled hardening guide uses Claude Code permissions and hooks. Its verifier Bash allowlist
   requires `jq`.
 
-Two of the three bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
-tools; the third runs at session start and only reads. None is a security boundary. Bash
+Two of the four bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
+tools. The third, `require-verified.mjs`, gates story merges made through Bash, and the fourth runs
+at session start and only reads. None is a security boundary. Bash
 coverage is the optional hardening allowlist described in
 `plugins/deliver/skills/project-manager/references/hardening.md`.
 
@@ -278,7 +285,8 @@ this workflow: `pm-verifier` is an ordinary read-only Claude Code subagent the P
 
 The PM detects T3 Code at session start and then follows
 [`host-t3.md`](plugins/deliver/skills/project-manager/references/host-t3.md). It still dispatches
-its own agents through `Agent`, so reviewers stay read-only. It counts only its own worktrees and
+its own agents through `Agent`, so reviewers stay read-only, and uses T3's `delegate_task` only
+for Codex advisory and research opinions. It counts only its own worktrees and
 never prunes T3's. A blocked story no longer stops the sprint while independent stories remain.
 A 30-minute heartbeat runs `/deliver:resume --heartbeat`, and PR CI wakes trigger a local re-gate.
 Start the PM in the root workspace, not a T3 worktree thread. `/deliver:doctor` checks the T3

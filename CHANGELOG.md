@@ -2,6 +2,81 @@
 
 All notable changes to this project are documented here.
 
+## 0.29.0 - 2026-10-25
+
+Autonomous trust: review strength is measured per risk tier instead of assumed, the builder can no
+longer move its own oracle, and deliver runs a project on its own inside T3 Code.
+
+- **Assurance is measured per risk tier.** Each story's `Risk` maps to `T0` (docs, comments, copy,
+  configuration with no behaviour change), `T1` (ordinary behaviour change), or `T2` (auth, crypto,
+  secrets, money, migrations or deletion, public API or schema, untrusted input, dependencies).
+  The default targets are 10%, 5%, and 2%, each a 95% one-sided Clopper–Pearson upper bound on the
+  rate at which a seeded defect escapes the whole panel. The user can change them in the plan's
+  Delivery mode. Calibration selects each tier's cheapest panel on a `select` split and certifies
+  its bound on a separate `certify` split, so picking among many panels does not break the 95%
+  claim. No review is reduced without a measured bound. A tier the corpus cannot measure runs the
+  maximum panel: every lens, the opposite-family reviewer on the first review and every fix round,
+  and two trials of `code-integrity-reviewer` at `T2`.
+- **An assurance corpus and `/deliver:calibrate`.** `benchmarks/assurance` holds batch 1: 100
+  seeded cases (35 select, 65 certify) across eight defect classes and 25 clean cases (10 select,
+  15 certify), written by Claude and Codex authors and pinned by its own `MANIFEST.sha256`. Each
+  seeded case has a witness test that fails with the defect applied and passes with the clean
+  patch, and `validate.sh` runs every witness both ways. `/deliver:calibrate`, for maintainers,
+  runs the lenses over the corpus, records each trial with `scripts/assurance.mjs`, and writes
+  `panels.json`. A panel goes stale when a lens's model, effort, or prompt changes, or the corpus
+  changes. At this corpus size `T2` stays unmeasured; it needs about 150 certify cases.
+- **The trust report replaces reading the diff.** At each sprint checkpoint,
+  `retro-stats.mjs --trust` prints stories shipped per tier, the panel each tier ran, the
+  calibrated bound or "unmeasured, maximum panel", first-pass gate rate, fix rounds, integrity
+  blocks, holdout failures, and observed escapes. A fix for a defect an earlier story shipped
+  carries an `Escaped-From: <story-id>` trailer. A tier is OVER TARGET when at least one escape
+  was observed since the calibration in force and the escape bound over those stories exceeds the
+  target; the next sprint then runs that tier at the maximum panel until `/deliver:calibrate`
+  re-runs.
+- **Protected acceptance tests and holdout checks.** At `T1` and `T2`, `test-engineer` writes the
+  red acceptance tests before the build, and the Execution block lists them under `protected`. Any
+  change to a protected path fails the scope check. At `T2`, `test-engineer` also writes extra
+  acceptance checks, which the PM stores with `scripts/holdout.mjs` on the private ref
+  `refs/deliver/holdout/<story-id>`. The ref is never checked out or pushed, and no builder brief
+  names it. The PM runs the checks beside the verifier, and a failure is a `FAIL`.
+- **New `scripts/test-integrity.mjs`.** The PM runs it after every writer run. It fails on a
+  deleted or renamed test file, added skip or focus markers, a net drop in assertions in a
+  modified test, weakened coverage thresholds, lint rules, `tsconfig` strict flags, or toolchain
+  versions, and any change to a protected path. A story that needs one of these declares it in
+  `pm-meta` as `integrity_allow`.
+- **A mechanical ship gate.** The new `require-verified.mjs` hook blocks a `git merge` of a `pm/*`
+  branch into the integration branch unless the Execution block records `verifier: PASS <sha>`
+  and, at `T1` and `T2`, `integrity: pass <sha>`, for the branch tip or an ancestor followed only
+  by story-file and handoff commits. It reads `tier`, `deliver`, and `protected` from the
+  integration branch's copy, never the story branch's. It catches a PM's honest mistakes, such as
+  a forgotten verification or a stale verdict. It is not a boundary against an agent that evades
+  it on purpose. `DELIVER_NO_ENFORCE=1` turns it off.
+- **Review is opposite-family.** The panel always includes a lens from a family other than the
+  builder's: an `expert-builder` story gets `codex-reviewer`, and a `codex-builder` story gets the
+  Claude `code-integrity-reviewer`. A fix round written by the other family brings in the
+  opposite lens for that round. Fix rounds are re-reviewed by the tier's panel.
+- **Running inside T3 Code.** The PM probes `orchestrator_capabilities` at start and, when it
+  answers, follows the new `host-t3.md`. Named `deliver:*` agents still go through `Agent`, so
+  reviewers keep their read-only tools, Codex build, fix, and review stay on the bundled runner,
+  and T3's `delegate_task` is used only for Codex advisory and research opinions. Deliver counts
+  and prunes only its own worktrees. A blocked story no longer stops the sprint while independent
+  stories remain. A heartbeat runs `/deliver:resume --heartbeat` every 30 minutes, remote PR mode
+  watches the PR and re-gates locally on a CI wake, and `/deliver:doctor` checks the T3 setup.
+- **Superpowers precedence is stated.** While deliver is active, its phases replace Superpowers'
+  brainstorming, writing-plans, and subagent-driven-development. TDD, debugging, and
+  verification-before-completion still apply.
+- **A size guard for `SKILL.md`.** `validate.sh` fails when any `SKILL.md` exceeds 16,000
+  characters, which leaves room under Claude Code's 20,000-character re-attachment limit after
+  compaction.
+- **Changed rules.** Relaxed: executable witnesses admit corpus fixtures instead of a person
+  reading them, Codex advisory and research may run through T3's `delegate_task`, and worktree
+  cleanup covers only deliver's own worktrees. Tightened: acceptance tests are mandatory at `T1`
+  and up, the ship gate is mechanical, and review is opposite-family by construction.
+- **Upgrading.** A story claimed before 0.29, with neither `deliver` nor `tier` in its Execution
+  block, passes the ship gate on the old rules. Without `panels.json`, every tier runs the maximum
+  panel.
+- **Calibration result.** <filled in after /deliver:calibrate>
+
 ## 0.28.1 - 2026-10-11
 
 - **The log is no longer committed.** The PM's running narrative moves from the tracked
