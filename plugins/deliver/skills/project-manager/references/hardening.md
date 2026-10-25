@@ -58,8 +58,9 @@ real path (symlinks resolved) leaves the git directory, or one set by global or 
 (session start names the command that prints them, and never cuts a note). They stop with status 1
 only on a refusal, do nothing once deliver's copy is gone, and, for `reference-transaction`, hand
 the same stdin records to the rest of the hook; `--uninstall` says to remove them. A hook whose
-interpreter is not sh (Python, Node, ...) gets an sh wrapper to install instead: rename the hook
-to `<hook>.local` and write the printed wrapper as `<hook>`. A hook that runs deliver's lines, in
+interpreter is not sh (Python, Node, ..., or unknown, such as a symlink whose target cannot be
+read) gets an sh wrapper to install instead: rename the hook to `<hook>.local` and write the
+printed wrapper as `<hook>`; it skips a missing `<hook>.local` rather than block updates. A hook that runs deliver's lines, in
 any hooks directory, is `chained` once it is executable (else `chained-inactive`) and its private
 copy is current. `/deliver:doctor` checks and repairs the install.
 `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --uninstall <project>` removes it and sets
@@ -72,9 +73,11 @@ on code alone, story files and handoff notes left out, so a squash whose story r
 still found; a commit merged from a non-story branch that a story only cherry-picked is not a copy.
 Rewriting shipped story history (amending or rebasing over a commit that recorded a verifier) must
 keep the code diff byte for byte, apart from line numbers: "rewriting shipped story history changes
-code; ship the change as a story". `git pull --rebase=merges` over an unpushed story merge passes;
-a linear `git pull --rebase` replays the merge's commits and is refused with "a rebase is replaying
-a shipped story merge; use git pull --rebase=merges (or git pull --no-rebase)".
+code; ship the change as a story". An amend must keep the code tree exactly; a rebase must equal
+the rebased result. `git pull --rebase=merges` over an unpushed story merge passes, the story's
+commits recreated under the merge included; a linear `git pull --rebase` that drops the merge is
+refused with "a rebase is replaying a shipped story merge; use git pull --rebase=merges (or git
+pull --no-rebase)".
 
 Both catch a PM's honest mistakes, such as a forgotten or stale verdict, a careless command chain,
 or a mis-stated tier. Out of the git-level gate's reach are deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, the merged-result comparison on git older than 2.38 (the verdicts still apply), and pushing straight to the remote. Neither is a

@@ -126,11 +126,18 @@ export function integrationBranches(root, top) {
 }
 
 // readHook(file): an existing hook as { state: 'missing' | 'ours' | 'foreign', text, why }. A
-// symlink, a non-file, a file that cannot be read, and a file without a marker on line 2 are foreign.
+// symlink, a non-file, a file that cannot be read, and a file without a marker on line 2 are
+// foreign; a symlink's text is its target's, when that can be read.
 function readHook(file) {
   let st;
   try { st = fs.lstatSync(file); } catch (e) { return e.code === 'ENOENT' ? { state: 'missing' } : { state: 'foreign', why: `cannot be read (${e.code})` }; }
-  if (st.isSymbolicLink()) return { state: 'foreign', why: 'is a symlink' };
+  if (st.isSymbolicLink()) {
+    // Never written through; its target is read, read-only, only to tell its interpreter (and
+    // whether it already runs deliver's lines). An unreadable target leaves text unset.
+    let target;
+    try { target = fs.readFileSync(file, 'utf8'); } catch { target = undefined; }
+    return { state: 'foreign', why: 'is a symlink', text: target };
+  }
   if (!st.isFile()) return { state: 'foreign', why: 'is not a regular file' };
   let text;
   try { text = fs.readFileSync(file, 'utf8'); } catch (e) { return { state: 'foreign', why: `cannot be read (${e.code})` }; }
@@ -193,48 +200,54 @@ function layout(top) {
   return out;
 }
 
-// addLine(name, copy): the lines to put right after the #! line of an existing `name` hook, so it
-// runs deliver's gate first and stops with status 1 only when the gate refuses. They fail open:
-// with the private copy gone (after --uninstall, or a git upgrade that drops a fallback hook), or
-// without mktemp, they do nothing. The reference-transaction form saves stdin once, feeds it to the
-// gate, and then gives the same records to the rest of the hook.
-export const addLine = (name, copy) => {
+// gateLines(name, copy): the sh statements that run deliver's gate from another hook, one template
+// for addLine and wrapper. They stop with status 1 only when the gate refuses, and fail open: with
+// the private copy gone (after --uninstall, or a git upgrade that drops a fallback hook), or
+// without mktemp, they do nothing. The reference-transaction form saves stdin once, feeds it to
+// the gate, and then gives the same records to whatever runs next.
+function gateLines(name, copy) {
   const c = shQuote(slash(copy));
   return name === RT_HOOK
-    ? `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then cat > "$deliver_in"; sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; }; exec < "$deliver_in"; rm -f "$deliver_in"; fi`
-    : `if [ -f ${c} ]; then sh ${c} "$@"; [ $? = 1 ] && exit 1; fi`;
-};
+    ? [
+      `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
+      '  cat > "$deliver_in";',
+      `  sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; };`,
+      '  exec < "$deliver_in"; rm -f "$deliver_in";',
+      'fi',
+    ]
+    : [`if [ -f ${c} ]; then sh ${c} "$@"; [ $? = 1 ] && exit 1; fi`];
+}
+
+// addLine(name, copy): gateLines as one line, to put right after the #! line of an existing
+// sh-compatible `name` hook.
+export const addLine = (name, copy) => gateLines(name, copy).map((l) => l.trim()).join(' ');
 
 // shCompatible(text): an existing hook's interpreter runs POSIX sh lines: a #! naming sh, bash,
-// dash, zsh, or ksh (directly or through env), or no #! at all.
-const SH_LIKE = new Set(['sh', 'bash', 'dash', 'zsh', 'ksh']);
+// dash, zsh, ksh, ash, mksh, yash, or posh, directly or through env or busybox, or no #! at all.
+const SH_LIKE = new Set(['sh', 'bash', 'dash', 'zsh', 'ksh', 'ash', 'mksh', 'yash', 'posh']);
 export function shCompatible(text) {
   const first = String(text ?? '').split(/\r?\n/)[0];
   if (!first.startsWith('#!')) return true;
   const words = first.slice(2).trim().split(/\s+/).filter(Boolean);
   const base = (w) => (w ?? '').split('/').at(-1);
-  const prog = base(words[0]) === 'env' ? base(words.find((w, i) => i > 0 && !w.startsWith('-'))) : base(words[0]);
+  const prog = ['env', 'busybox'].includes(base(words[0])) ? base(words.find((w, i) => i > 0 && !w.startsWith('-'))) : base(words[0]);
   return SH_LIKE.has(prog);
 }
 
 // wrapper(name, copy): an sh script to stand in for a `name` hook whose interpreter is not sh
-// (python, node, ...), renamed to `<name>.local`: it runs deliver's gate as addLine does (failing
-// open the same way), then execs `<name>.local` with the same arguments and, for
-// reference-transaction, the same stdin.
+// (python, node, ...), renamed to `<name>.local`: it runs gateLines, then execs `<name>.local` with
+// the same arguments and, for reference-transaction, the same stdin. A missing or non-executable
+// `<name>.local` is reported and skipped (exit 0), so the wrapper never wedges ref updates.
 export function wrapper(name, copy) {
-  const c = shQuote(slash(copy));
-  const local = `"$(dirname "$0")/${name}.local"`;
-  const body = name === RT_HOOK
-    ? [
-      'deliver_in=$(mktemp 2>/dev/null) || deliver_in=',
-      'if [ -n "$deliver_in" ]; then',
-      '  cat > "$deliver_in"',
-      `  if [ -f ${c} ]; then sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; }; fi`,
-      '  exec < "$deliver_in"; rm -f "$deliver_in"',
-      'fi',
-    ]
-    : [`if [ -f ${c} ]; then sh ${c} "$@"; [ $? = 1 ] && exit 1; fi`];
-  return ['#!/bin/sh', `# deliver's merge gate, then the original hook, ${name}.local.`, ...body, `exec ${local} "$@"`, ''].join('\n');
+  return [
+    '#!/bin/sh',
+    `# deliver's merge gate, then the original hook, ${name}.local.`,
+    ...gateLines(name, copy),
+    `deliver_local="$(dirname "$0")/${name}.local"`,
+    '[ -x "$deliver_local" ] || { echo "deliver: $deliver_local missing; restore it or remove this wrapper" >&2; exit 0; }',
+    'exec "$deliver_local" "$@"',
+    '',
+  ].join('\n');
 }
 
 // hookFiles(top, { wanted, check, uninstall, doctor }): install, inspect, or remove the hook
@@ -252,7 +265,9 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
   const res = { hooks: {}, notes: [], brief: [], sawV1: false, layout: layout(top) };
   const { dir, privateDir, writable, why } = res.layout;
   const note = (full, brief = full) => { res.notes.push(full); res.brief.push(brief); };
-  const chain = (name, copy, text) => (text !== undefined && !shCompatible(text)
+  // A foreign hook whose interpreter is not sh, or cannot be read (a dangling or unreadable
+  // symlink target), gets the wrapper, which is always safe; a missing hook gets the lines.
+  const chain = (name, copy, cur) => (cur.state === 'foreign' && (cur.text === undefined || !shCompatible(cur.text))
     ? `its interpreter is not sh, so deliver's lines cannot go inside it; rename it to ${name}.local in the same directory, and write this sh wrapper as ${name}, executable:\n${wrapper(name, copy)}`
     : `add these as the lines right after its #! line: ${addLine(name, copy)}`);
   const pointer = `for what to add to it, run ${doctor}`;
@@ -296,14 +311,14 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
       }
       if (!writable) {
         res.hooks[name] = 'skipped';
-        note(`merge gate: ${why}, so deliver did not write its ${name} hook there; add deliver's gate to your hook manager's ${name} hook: ${chain(name, copy, cur.text)}`,
+        note(`merge gate: ${why}, so deliver did not write its ${name} hook there; add deliver's gate to your hook manager's ${name} hook: ${chain(name, copy, cur)}`,
           `merge gate: ${why}, so deliver did not write its ${name} hook there; add deliver's gate to your hook manager's ${name} hook (${pointer})`);
         if (cur.state === 'ours' && cur.text !== want) note(`merge gate: ${slash(file)} is ${whose} ${name} shim and out of date; delete it, or replace it with deliver's lines`);
         continue;
       }
       if (cur.state === 'foreign') {
         res.hooks[name] = 'foreign';
-        note(`merge gate: ${slash(file)} ${cur.why}, so it was left alone and deliver's git-level gate is not installed; ${chain(name, copy, cur.text)} (and run /deliver:doctor after plugin updates)`,
+        note(`merge gate: ${slash(file)} ${cur.why}, so it was left alone and deliver's git-level gate is not installed (run /deliver:doctor after plugin updates); ${chain(name, copy, cur)}`,
           `merge gate: ${slash(file)} ${cur.why}, so it was left alone and deliver's git-level gate is not installed; ${pointer}`);
         continue;
       }
