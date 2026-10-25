@@ -45,13 +45,14 @@ Inspect (whichever apply):
     equal from anywhere in the root checkout and differ in a linked worktree. Without
     `--path-format`, the plain output differs in a subdirectory too.
 - **Git-level merge gate.** In a deliver project, run
-  `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --check <project-root>`. It reports `OK`
-  (exit 0) when `pre-merge-commit` and `pre-commit` in `git rev-parse --git-path hooks` carry the
-  `# deliver-merge-gate v1` marker and point to an existing `git-merge-gate.mjs`, and
-  `branch.<integration>.mergeoptions` includes `--no-ff` for each integration branch the committed
-  plan names. Otherwise run the same command without `--check`, which installs or refreshes them,
-  and report what it could not fix: a foreign hook it will not overwrite, or a `mergeoptions` value
-  you set without `--no-ff`.
+  `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --check <project-root>`. It exits 0
+  (`OK`) only when the `reference-transaction` shim in `git rev-parse --git-path hooks` (on git
+  older than 2.28, `pre-merge-commit` and `pre-commit`) carries `# deliver-merge-gate v2` on line
+  2, is executable, points to a `git-merge-gate.mjs` that exists, runs a node that starts, and
+  names the current integration branches. It prints the git version against 2.28. On any failure,
+  run the same command without `--check`, which installs or repairs it, and report what it could
+  not fix: a hook it will not overwrite, or a hooks directory in the working tree or from global
+  `core.hooksPath`, each with the line to add to the hook manager. `--uninstall` removes it.
 - **State health.** When `docs/approval.json` or a legacy `pm/` exists, run the checks in
   `references/state-health.md` and report `OK` or `DRIFT` for each.
 

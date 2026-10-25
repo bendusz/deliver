@@ -92,7 +92,7 @@ anything.
 | Review and verification | A read-only review panel that includes a lens from the family opposite the builder's whenever that family is available, the project's real test, lint, and build gates, a test-integrity check, and a final `pm-verifier` PASS, with bounded fix loops. |
 | Tiers and measured assurance | Each story is `T0`, `T1`, or `T2` by what it changes. A tier runs the cheapest panel whose measured escape bound meets its target (10%, 5%, 2% by default), calibrated on a seeded-defect corpus with `/deliver:calibrate`. A tier without a measured bound runs the maximum panel. |
 | Protected oracles | At `T1` and up, `test-engineer` writes the acceptance tests before the build and no builder may change them. At `T2`, extra holdout checks live on a private git ref the builder is never shown. |
-| Ship gate | The `require-verified.mjs` hook blocks merging a story branch without a recorded verifier `PASS` for its tip and, at `T1` and up, a passing integrity verdict, and a git `pre-merge-commit` hook it installs refuses the same merge whatever shell command made it. |
+| Ship gate | The `require-verified.mjs` hook blocks merging a story branch without a recorded verifier `PASS` for its tip and, at `T1` and up, a passing integrity verdict, and a git `reference-transaction` hook installed at session start refuses any update of the integration branch that brings in such a story, whatever command made it. |
 | Trust report | Instead of a diff, every checkpoint at every scale opens with `retro-stats.mjs --trust`: stories per tier, the panel each ran, stories reviewed below panel, its bound, fix rounds, integrity blocks, holdout failures, and observed escapes. An escape bound over target forces the maximum panel. |
 | State | Git carries it. The claim is the story branch, each build and fix round is a commit, and the `--no-ff` merge body is the story record. Only an approval marker, a per-story Execution block, and an optional handoff are written, so concurrent sessions never overwrite each other and any lost session resumes from git. |
 
@@ -247,12 +247,16 @@ under `tmp/`; the report directories sit at the repository root:
 
 Two of the four bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
 tools. The third, `require-verified.mjs`, gates story merges made through Bash, and the fourth runs
-at session start. In a deliver project it also installs a git hook: `pre-merge-commit` and
-`pre-commit` shims, marked `# deliver-merge-gate v1`, that run `git-merge-gate.mjs` on every merge
-commit into the integration branch, whatever shell command made it, with
-`branch.<integration>.mergeoptions --no-ff` so each such merge creates a commit. It never
-overwrites a hook you wrote; it reports it, and `/deliver:doctor` checks the install. None is a
-security boundary. Bash
+at session start. **In a deliver project, session start installs a git hook**: a
+`reference-transaction` shim, marked `# deliver-merge-gate v2`, that runs `git-merge-gate.mjs`
+whenever the integration branch moves (a merge, fast-forward, pull, rebase, or reset), whatever
+command made it. Git 2.28 or newer is needed for that; older git gets `pre-merge-commit` and
+`pre-commit` hooks, which miss fast-forwards. It never overwrites a hook you wrote, and never
+writes a hooks directory you manage through `core.hooksPath`; it reports either, with the line to
+add. `/deliver:doctor` checks the install, and
+`node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes it. None is a security
+boundary; deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, and pushing
+straight to the remote all bypass it. Bash
 coverage is the optional hardening allowlist described in
 `plugins/deliver/skills/project-manager/references/hardening.md`.
 

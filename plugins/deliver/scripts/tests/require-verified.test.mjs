@@ -1702,7 +1702,7 @@ test('verified: --no-verify on a story merge or pull is blocked, since it skips 
   const v = project();
   record(v.p, { verifier: `PASS ${v.code}` });
   toMain(v.p);
-  for (const cmd of [`git merge --no-verify --no-ff ${BRANCH}`, `git merge -n --no-ff ${BRANCH}`, `git merge --no-ff ${BRANCH} --no-verify`, `git -c core.hooksPath=/dev/null merge --no-ff ${BRANCH}`, `git pull --no-verify . ${BRANCH}`]) {
+  for (const cmd of [`git merge --no-verify --no-ff ${BRANCH}`, `git merge --no-ff ${BRANCH} --no-verify`, `git -c core.hooksPath=/dev/null merge --no-ff ${BRANCH}`, `git pull --no-verify . ${BRANCH}`]) {
     const r = merge(v.p, cmd);
     assert.equal(r.status, 2, cmd);
     assert.match(r.stderr, /--no-verify skips deliver's merge gate|hooksPath/, cmd);
@@ -1710,4 +1710,13 @@ test('verified: --no-verify on a story merge or pull is blocked, since it skips 
   // A non-story merge may skip hooks.
   gitIn(v.p, ['branch', 'feature', 'main']);
   assert.equal(merge(v.p, 'git merge --no-verify --no-ff feature').status, 0);
+});
+
+test('verified: merge -n is --no-stat, not --no-verify, so a verified story merges with it; commit -n skips hooks', () => {
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  toMain(v.p);
+  const r = merge(v.p, `git merge -n ${BRANCH}`);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(merge(v.p, `git merge -n --no-ff ${BRANCH} -m m`).status, 0);
 });
