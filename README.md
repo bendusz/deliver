@@ -115,9 +115,10 @@ Bundled specialist agents do the work:
 
 With Codex installed, the PM asks `codex-advisor` before a consequential technical decision.
 Review is opposite-family: an `expert-builder` story gets `codex-reviewer`, and a `codex-builder`
-story gets the Claude `code-integrity-reviewer`. When Codex is absent, `T0` and `T1` stories
-continue without it and the trust report counts them as below panel; `T2` stories escalate. The
-advisor defaults to `gpt-6-astra` and the reviewer to `gpt-6.1-sol`, both at `high`.
+story gets the Claude `code-integrity-reviewer`. When the panel in force needs a Codex lens and
+Codex is unavailable, `T0` and `T1` stories continue without it and the trust report counts them
+as below panel; `T2` stories escalate. A `codex-builder` story's maximum panel is Claude-only, so
+its review runs without a Codex lens. The advisor defaults to `gpt-6-astra` and the reviewer to `gpt-6.1-sol`, both at `high`.
 `codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`, and `codex-advisor`
 relays its answer in chat. Outside T3 Code's `delegate_task` advisory and research path, every Codex
 invocation goes through one of these thin Sonnet wrappers and the bundled Node runner; the PM never runs
