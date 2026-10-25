@@ -245,3 +245,15 @@ test('holdout: a root project still reads the legacy unnamespaced ref, with a no
   assert.equal(cli(['run', 'S1-2', '--target', d, '--root', d]).status, 0);
   assert.equal(cli(['check', 'S1-2', '--root', b]).status, 66);
 });
+
+test('holdout: a project directory whose name starts with .. is still inside the repository', () => {
+  const d = repo();
+  const odd = path.join(d, '..odd');
+  fs.mkdirSync(path.join(odd, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(odd, 'src', 'x.txt'), 'ok\n');
+  const r = cli(['store', 'S1-2', checks(), '--root', odd]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.out.ref, /^refs\/deliver\/holdout\/odd_[0-9a-f]{8}\/S1-2$/);
+  const run = cli(['run', 'S1-2', '--target', odd, '--root', odd]);
+  assert.equal(run.status, 0, run.stderr);
+});

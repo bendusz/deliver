@@ -34,7 +34,7 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   panel each tier ran, the stories reviewed below panel, the calibrated bound or "unmeasured,
   maximum panel", first-pass stories (no fix rounds, no retries), fix rounds, integrity blocks,
   holdout failures, and observed escapes. A tier with any story below panel has its bound
-  withheld. A fix for a defect an earlier story shipped carries an `Escaped-From: <story-id>` trailer, or `Escaped-From: <project>/<story-id>` to name one of several projects in a repository; a bare trailer counts only for the project whose files the fix changes. A tier is OVER TARGET when at least one escape
+  withheld. A fix for a defect an earlier story shipped carries an `Escaped-From: <story-id>` trailer, or `Escaped-From: <project-path>/<story-id>`, with the project's path from the git top level, to name one of several projects in a repository; a bare trailer counts only for the project whose files the fix changes. A tier is OVER TARGET when at least one escape
   was observed since the calibration in force and the escape bound over those stories exceeds the
   target; the PM reads the report at sprint start and runs that tier at the maximum panel until
   `/deliver:calibrate` re-runs.

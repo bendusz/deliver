@@ -151,7 +151,8 @@ function skipSubst(cmd, i) {
 // tokenize(cmd): word segments and the subshell brackets between them. Segments split on
 // unquoted ; & | ( ) and newlines; `(` and `)` also come back as { op }. A word carries `dynamic`
 // when the shell computes part of it: `$`, `$(...)`, or backticks outside single quotes. A
-// substitution and any heredoc body are swallowed whole into their word or skipped.
+// substitution and any heredoc body are swallowed whole into their word or skipped. An unquoted
+// comment, a # starting a word up to the end of its line, is skipped as the shell skips it.
 function tokenize(cmd) {
   const items = [];
   let seg = [];
@@ -162,7 +163,12 @@ function tokenize(cmd) {
   const end = () => { push(); if (seg.length) items.push(seg); seg = []; };
   for (let i = 0; i < cmd.length; i++) {
     const c = cmd[i];
-    if (c === "'") {
+    if (c === '#' && word === null) {
+      // An unquoted # at the start of a word comments out the rest of the line; the newline
+      // still ends the segment.
+      const nl = cmd.indexOf('\n', i);
+      i = (nl < 0 ? cmd.length : nl) - 1;
+    } else if (c === "'") {
       const close = cmd.indexOf("'", i + 1);
       add(cmd.slice(i + 1, close < 0 ? cmd.length : close));
       i = close < 0 ? cmd.length : close;

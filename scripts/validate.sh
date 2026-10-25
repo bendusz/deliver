@@ -257,6 +257,8 @@ suite "ship gate tests failed (node --test plugins/deliver/scripts/tests/require
   node --test plugins/deliver/scripts/tests/require-verified.test.mjs
 suite "holdout tests failed (node --test plugins/deliver/scripts/tests/holdout.test.mjs)" \
   node --test plugins/deliver/scripts/tests/holdout.test.mjs
+suite "T3 host reference tests failed (node --test plugins/deliver/scripts/tests/host-t3.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/host-t3.test.mjs
 # Every node test file must be run by a suite in this script.
 for t in plugins/deliver/scripts/tests/*.test.mjs; do
   grep -q "^  node --test .*$t" "$0" || err "$t is not run by any suite in scripts/validate.sh"

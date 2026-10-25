@@ -9,7 +9,7 @@ import { tmpDir, PLUGIN_ROOT } from './helpers.mjs';
 import {
   CORPUS_ROOT, CLASSES, upperBound, incBeta, loadCases, listCases, manifest, enumeratePanels,
   calc, selectTier, parseTargets, panelsDoc, staleness, readTrials, checkCase, MAX_SLOTS, ceil4,
-  certifyCasesNeeded, certifyPlan, renderCalc, REVIEW_DEFAULTS, boundStaleness, parseUtc, witness,
+  certifyCasesNeeded, certifyPlan, renderCalc, REVIEW_DEFAULTS, boundStaleness, parseUtc, witness, agentPins,
 } from '../assurance.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'assurance.mjs');
@@ -610,4 +610,12 @@ test('assurance: the committed trials and panels.json still validate against the
   const doc = JSON.parse(fs.readFileSync(path.join(CORPUS_ROOT, 'panels.json'), 'utf8'));
   assert.deepEqual(staleness(doc), []);
   for (const t of ['T0', 'T1']) assert.deepEqual(boundStaleness(doc, t), [], t);
+});
+
+test('assurance: agent frontmatter pins read the same with CRLF line endings', () => {
+  const dir = tmpDir('assure-crlf-');
+  fs.writeFileSync(path.join(dir, 'lens-a.md'), '---\r\nname: lens-a\r\nmodel: claude-opus-5-5\r\neffort: high\r\n---\r\nbody\r\n');
+  fs.writeFileSync(path.join(dir, 'lens-b.md'), '---\nname: lens-b\nmodel: "claude-opus-5-5"  # pinned\neffort: medium\n---\nbody\n');
+  assert.deepEqual(agentPins('lens-a', dir), { model: 'claude-opus-5-5', effort: 'high' });
+  assert.deepEqual(agentPins('lens-b', dir), { model: 'claude-opus-5-5', effort: 'medium' });
 });

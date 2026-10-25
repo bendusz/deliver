@@ -31,7 +31,8 @@ or 2, the calibrated escape `bound`, and the `target`.
 - **Over target.** At sprint start, read the latest `retro-stats.mjs --trust` output, or the Trust
   section of the latest `docs/retros/sprint-<n>.md`. Any tier flagged `OVER TARGET` runs the
   maximum panel until `/deliver:calibrate` re-runs; for that tier the maximum panel is the panel
-  in force.
+  in force, and it keeps every measured member at its trial count, so a member measured at two
+  trials still runs twice.
 - The tier's `target` comes from the plan's Delivery mode line
   `- Assurance targets: T0=0.10, T1=0.05, T2=0.02`; without it the defaults are 10%, 5%, and 2%.
 
