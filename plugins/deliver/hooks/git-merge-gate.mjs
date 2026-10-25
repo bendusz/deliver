@@ -15,11 +15,19 @@
 //     The fallback for git older than 2.28, which has no reference-transaction hook: the current
 //     branch (`git symbolic-ref -q HEAD`) is the target, and the merged commits are every SHA in
 //     MERGE_HEAD and every `GITHEAD_<sha>` variable git merge exports (git writes MERGE_HEAD only
-//     after pre-merge-commit runs). judgeMerge() gives the verdict. Fast-forwards are not gated.
+//     after pre-merge-commit runs). judgeMerge() gives the verdict, strict on an unreadable
+//     FETCH_HEAD line only when the merge may be of FETCH_HEAD (fetchedMerge). A story merged
+//     with any other head is refused: merge one story at a time. Fast-forwards, squash merges, and
+//     cherry-picks make no merge commit and are not gated.
 //     Such git has no `merge-tree --write-tree`, so the staged result is compared with the merge
 //     only where git merges without a content merge: the index must equal `git read-tree -m` of
 //     the merge base and the two heads, apart from the story file. Where a file needs a content
 //     merge, only the verdicts are checked.
+//
+// A refusal prints what to run: `git merge --abort`, `git rebase --abort`, or
+// `git cherry-pick --abort` for an operation in progress; `git reset --merge` only when the index is
+// exactly the refused commit's tree (a refused fast-forward, reset, or squash commit), never over
+// staged work of the user's own (recovery).
 //
 // Exits 0 with DELIVER_NO_ENFORCE=1, outside a deliver project, for a ref that is no project's
 // integration branch, and on an internal error unless a story merge into an integration branch is
@@ -27,17 +35,18 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 if (process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
 
 let verdict;
 let inMerge = false;
 let lib;
+let rv;
 let top = '';
 try {
   lib = await import('./lib.mjs');
-  const { judgeMerge, judgeRefUpdate, mergeHeads } = await import('./require-verified.mjs');
+  rv = await import('./require-verified.mjs');
+  const { judgeMerge, judgeRefUpdate, mergeHeads, ONE_AT_A_TIME } = rv;
   top = worktreeTop();
   if (!top) process.exit(0);
   const heads = mergeHeads(top) ?? [];
@@ -49,7 +58,7 @@ try {
       const [old, next, ref] = line.trim().split(/\s+/);
       if (!ref?.startsWith('refs/heads/')) continue;
       verdict = judgeRefUpdate(top, { target: ref.slice('refs/heads/'.length), old, new: next });
-      if (!verdict.allow) { verdict.ref = ref; break; }
+      if (!verdict.allow) { verdict.ref = ref; verdict.next = next; break; }
     }
   } else {
     const merged = new Set(heads);
@@ -61,8 +70,9 @@ try {
     const head = lib.chomp(lib.git(top, ['symbolic-ref', '-q', 'HEAD']) || '');
     // A merge onto a detached HEAD ships nothing.
     if (!head.startsWith('refs/heads/') || !merged.size) process.exit(0);
-    verdict = judgeMerge(top, { target: head.slice('refs/heads/'.length), commits: [...merged] });
-    if (verdict.allow && verdict.story && merged.size === 1 && verdict.judged[0]?.file && stagedDiffers(top, [...merged][0], verdict.judged[0].file)) {
+    verdict = judgeMerge(top, { target: head.slice('refs/heads/'.length), commits: [...merged], strictFetch: fetchedMerge(top, merged) });
+    if (verdict.allow && verdict.story && merged.size > 1) verdict = { allow: false, reason: ONE_AT_A_TIME };
+    else if (verdict.allow && verdict.story && verdict.judged[0]?.file && stagedDiffers(top, [...merged][0], verdict.judged[0].file)) {
       verdict = { allow: false, reason: 'the staged merge result differs from the automatic merge of the story; re-verify' };
     }
   }
@@ -72,7 +82,7 @@ try {
 
 if (verdict && !verdict.allow) {
   const what = verdict.ref ? `the update of ${verdict.ref}` : 'this merge commit';
-  fs.writeSync(2, `deliver blocked ${what}: ${lib.oneLine(verdict.reason)}.\n${recovery()}\n`);
+  fs.writeSync(2, `deliver blocked ${what}: ${lib.oneLine(verdict.reason)}.\n${recovery({ inMerge, top, next: verdict.next })}\n`);
   process.exit(1);
 }
 process.exit(0);
@@ -95,36 +105,59 @@ function worktreeTop() {
   return chomp(git(parent, ['rev-parse', '--show-toplevel']) || '');
 }
 
-// recovery(): what to run after a refusal, for the state git leaves. An in-progress merge
-// (MERGE_HEAD) is aborted. A refused fast-forward, reset, or rebase step can leave the refused
-// changes in the index and working tree with the branch unmoved; `git reset --merge` puts them
-// back to HEAD and keeps unrelated local changes.
-function recovery() {
-  if (inMerge) return 'Run git merge --abort, fix the cause, and merge again.';
-  const dirty = top && lib.git(top, ['diff', '--cached', '--quiet', 'HEAD', '--']) === null;
-  if (dirty) return 'The refused changes may be left staged: run git reset --merge to return the index and working tree to HEAD, then fix the cause and retry.';
+// fetchedMerge(top, merged): the merge may be of FETCH_HEAD: a merged SHA appears in FETCH_HEAD's
+// raw text, or GIT_REFLOG_ACTION or MERGE_MSG names FETCH_HEAD. Only then does an unreadable
+// FETCH_HEAD line refuse the merge, since that line could be the story.
+function fetchedMerge(top, merged) {
+  const read = (name) => {
+    const where = lib.chomp(lib.git(top, ['rev-parse', '--git-path', name]) || '');
+    try { return where ? fs.readFileSync(path.resolve(top, where), 'utf8') : ''; } catch { return ''; }
+  };
+  const raw = read('FETCH_HEAD');
+  if ([...merged].some((sha) => raw.includes(sha))) return true;
+  return /FETCH_HEAD/.test(process.env.GIT_REFLOG_ACTION ?? '') || /FETCH_HEAD/.test(read('MERGE_MSG'));
+}
+
+// recovery({ inMerge, top, next }): what to run after a refusal, for the state git leaves. An
+// in-progress merge (MERGE_HEAD), rebase, or cherry-pick is aborted. A refused fast-forward,
+// reset, or squash commit leaves the refused tree staged with the branch unmoved: when the index
+// is exactly the refused new commit's tree, `git reset --merge` puts it back to HEAD and keeps
+// unrelated local changes. Any other staged work is the user's own, so nothing is suggested
+// that would drop it.
+function recovery({ inMerge: merging, top: root, next }) {
+  if (merging) return 'Run git merge --abort, fix the cause, and merge again.';
+  if (!root) return 'Fix the cause and retry.';
+  const exists = (name) => {
+    const where = lib.chomp(lib.git(root, ['rev-parse', '--git-path', name]) || '');
+    return Boolean(where) && fs.existsSync(path.resolve(root, where));
+  };
+  if (exists('rebase-merge') || exists('rebase-apply')) return 'Run git rebase --abort, fix the cause, and rebase again.';
+  if (exists('CHERRY_PICK_HEAD')) return 'Run git cherry-pick --abort, fix the cause, and retry.';
+  const staged = lib.git(root, ['diff', '--cached', '--quiet', 'HEAD', '--']) === null;
+  const isRefused = typeof next === 'string' && /^[0-9a-f]{40,64}$/.test(next) && lib.git(root, ['diff', '--cached', '--quiet', next, '--']) !== null;
+  if (staged && isRefused) return 'The refused changes are staged: run git reset --merge to return the index and working tree to HEAD, then fix the cause and retry.';
   return 'Fix the cause and retry.';
 }
 
 // stagedDiffers(top, mergeHead, file): true when the staged merge result differs, beyond the story
 // file, from `git read-tree -m` of the merge base, HEAD, and mergeHead in a temporary index, where
 // that merge needs no content merge; false when it matches or cannot be compared.
-function stagedDiffers(top, mergeHead, file) {
+function stagedDiffers(root, mergeHead, file) {
   const { git, chomp } = lib;
-  const base = chomp(git(top, ['merge-base', 'HEAD', mergeHead]) || '');
+  const base = chomp(git(root, ['merge-base', 'HEAD', mergeHead]) || '');
   if (!base) return false;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deliver-gate-'));
   const env = { ...process.env, GIT_INDEX_FILE: path.join(dir, 'index') };
-  const run = (args) => spawnSync('git', ['-C', top, ...args], { env, encoding: 'utf8', windowsHide: true, timeout: 10000, maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+  const run = (args) => rv.spawnGit(root, args, { env });
   try {
     if (run(['read-tree', '-m', '-i', '--aggressive', base, 'HEAD', mergeHead]).status !== 0) return false;
     const unmerged = new Set((run(['ls-files', '-u', '-z']).stdout || '').split('\0').filter(Boolean).map((l) => l.split('\t')[1]));
     if ([...unmerged].some((p) => p !== file)) return false;
     if (unmerged.size && run(['update-index', '--force-remove', '--', file]).status !== 0) return false;
     const clean = chomp(run(['write-tree']).stdout || '');
-    const staged = chomp(git(top, ['write-tree']) || '');
+    const staged = chomp(git(root, ['write-tree']) || '');
     if (!clean || !staged) return false;
-    const r = spawnSync('git', ['-C', top, 'diff', '-z', '--name-only', clean, staged, '--'], { encoding: 'utf8', windowsHide: true, timeout: 10000, maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+    const r = rv.spawnGit(root, ['diff', '-z', '--name-only', clean, staged, '--']);
     if (r.status !== 0) return false;
     return r.stdout.split('\0').filter(Boolean).some((p) => p !== file);
   } finally {

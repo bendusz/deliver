@@ -174,7 +174,7 @@ from the project directory or with `git -C <project>`, after at most a plain `gi
 `show`, or `rev-parse`, and name the story branch literally. A checkout that might not run (inside
 `if` or a loop, after `||`, or behind another command in its chain) leaves the target unknown for
 any merge outside that `&&` chain, and the hook blocks the story merge there. The merge's own
-directory identifies the project; from a directory that is in no deliver project (for example a
+directory identifies the project (a story several projects claim must be verified in each); from a directory that is in no deliver project (for example a
 monorepo root), a story-like merge blocks, unless the checked-out target is a non-base branch that no project integrates on.
 
 ```
@@ -193,8 +193,8 @@ commit, a fast-forward, a reset, a rebase, a cherry-pick, or a squash merge, and
 must be git's automatic merge apart from the story file (git 2.38 or newer). A cherry-pick or squash
 of a story is refused even when verified, and so is an octopus merge: merge each story branch itself
 with `--no-ff`, one at a time. When git refuses a merge, it stays in progress: run
-`git merge --abort`, fix the cause, and merge again; after a refused fast-forward or reset, run
-`git reset --merge` if the refused changes were left staged. The hook catches honest mistakes such as a
+`git merge --abort`, fix the cause, and merge again; for anything else, run what git's refusal
+message names (`git rebase --abort`, `git cherry-pick --abort`, or `git reset --merge`). The hook catches honest mistakes such as a
 missed or stale verdict, a careless chain, or a wrong tier; it is not a boundary against an agent
 set on evading it, which is the 0.30 sandbox's job. A block means a state was skipped: go back to
 it, and never set `DELIVER_NO_ENFORCE` to get past it.
