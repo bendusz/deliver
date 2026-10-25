@@ -5,20 +5,31 @@
 // chaining commands carelessly, a mis-stated tier. It is not a boundary against a deliberately
 // evasive agent with Bash; that protection is the 0.30 sandbox. So it reads every form a PM could
 // plausibly write, stays fail-closed once a story merge is certain, and never blocks the
-// documented merge, but it does not parse exotic evasion.
+// documented merge, but a text parser cannot be complete. The authoritative check is the git-level
+// gate: git-merge-gate.mjs, run by git's pre-merge-commit hook, judges the merge git is actually
+// committing with judgeMerge() below, the same verdict logic, whatever the shell form. This hook
+// gives the friendly early message, and blocks `--no-verify` (and merge's `-n`, or a
+// `core.hooksPath` override) on a story merge or pull, or on a commit of an in-progress story
+// merge, since that skips the git-level gate.
 //
 // It reads the command's `git merge` and `git pull` calls, through `cd` chains, subshells,
 // control words (if, then, do, !, {), wrappers (env, nice, command, exec, sudo, time, nohup),
 // `-C` forms, and any path to the git binary. Option values, command substitutions, and heredoc
 // bodies are opaque, so the documented `-m "$(cat <<'EOF' ... EOF)"` message is never read as
 // operands; a backslash-newline joins lines; an unquoted `#` comment is skipped, and so are
-// redirections (`>`, `2>&1`, `&>`, `<<<`, ...) with their targets. `--work-tree`, or a
-// `--git-dir` naming a checkout's own `.git`, locates the repository like `-C`. A merge or pull
+// redirections (`>`, `2>&1`, `&>`, `<<<`, ...) with their targets; a process substitution
+// (`<(...)`, `>(...)`) is one computed word. A `--git-dir` naming a checkout's own `.git`, with
+// any `--work-tree`, locates the repository like `-C`, resolved after every `-C`; `--work-tree`
+// alone leaves discovery at the current directory. A merge or pull
 // with no operand stands for the target's configured upstream, and on an integration branch with
-// none it blocks. FETCH_HEAD stands for every head it lists for merging. status, log, diff, show,
+// none it blocks. FETCH_HEAD stands for every head it lists for merging, and a head whose line
+// names `branch 'pm/...'` is that story even with no local or remote ref. status, log, diff, show,
 // and rev-parse before a merge move no ref and do not count as earlier ref changes. A merge into a `pm/*` branch is not a ship and is
 // ignored; the target is the branch a `checkout` or `switch` earlier in the command selects, else
-// HEAD's, and unknown (so gated) when that checkout names a computed or unresolvable branch. An
+// HEAD's, and unknown when that checkout names a computed or unresolvable branch, or might not run
+// (inside if, case, or a loop, after ||, or behind any command but a checkout in a && chain;
+// later calls in its own && chain still see its branch). A story merge into an unknown target
+// blocks. An
 // operand is a story branch when it names `pm/*` locally or on a remote, or resolves to the tip
 // of, or a commit inside, a `pm/*` branch that neither the integration branch nor its configured
 // upstream already holds. Merging a named story the integration branch holds into that branch is
@@ -84,11 +95,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-if (process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
+// Run as the PreToolUse hook, or imported by git-merge-gate.mjs for judgeMerge().
+const MAIN = (() => {
+  try { return Boolean(process.argv[1]) && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+})();
+
+if (MAIN && process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
 
 let lib;
-try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
+try { lib = await import('./lib.mjs'); } catch (e) { if (MAIN) process.exit(0); throw e; }
 const { readHookInput, parseExec, git, chomp, deliverVersion, versionAtLeast } = lib;
 
 const UNKNOWN = Symbol('unknown');
@@ -160,17 +177,21 @@ function skipSubst(cmd, i) {
 // when the shell computes part of it: `$`, `$(...)`, or backticks outside single quotes. A
 // substitution and any heredoc body are swallowed whole into their word or skipped. An unquoted
 // comment, a # starting a word up to the end of its line, is skipped as the shell skips it, and so
-// are redirections with their targets, wherever they sit in the command.
+// are redirections with their targets, wherever they sit in the command. A process substitution,
+// `<(...)` or `>(...)`, is one computed word. Each segment carries `before`, the separator text
+// that precedes it (`&&`, `||`, `;`, `|`, a newline, a bracket), so a caller can tell whether it
+// runs only when an earlier command succeeded or failed.
 function tokenize(cmd) {
   const items = [];
   let seg = [];
   let word = null;
   let pending = [];
+  let sep = '';
   // dropNext: the next whole word is a redirection's target, never an argument.
   let dropNext = false;
   const add = (s, dyn = false) => { word = word ?? { text: '', dynamic: false }; word.text += s; word.dynamic ||= dyn; };
   const push = () => { if (word !== null) { if (dropNext) dropNext = false; else seg.push(word); word = null; } };
-  const end = () => { push(); dropNext = false; if (seg.length) items.push(seg); seg = []; };
+  const end = () => { push(); dropNext = false; if (seg.length) { seg.before = sep; sep = ''; items.push(seg); } seg = []; };
   for (let i = 0; i < cmd.length; i++) {
     const c = cmd[i];
     if (c === '#' && word === null) {
@@ -205,6 +226,11 @@ function tokenize(cmd) {
       push();
       pending.push(h);
       i = h.end - 1;
+    } else if ((c === '<' || c === '>') && cmd[i + 1] === '(') {
+      // A process substitution is a computed word (a file name), never a redirection.
+      const close = skipSubst(cmd, i + 1);
+      add(cmd.slice(i, close + 1), true);
+      i = close;
     } else if (c === '<' || c === '>' || (c === '&' && cmd[i + 1] === '>')) {
       // A redirection, with any file descriptor glued before it (`2>`), and its target are not
       // words of the command: `>`, `>>`, `>|`, `<`, `<>`, `&>`, `&>>`, `N>&M`, `N<&-`, `<<<`.
@@ -216,6 +242,7 @@ function tokenize(cmd) {
       dropNext = true;
     } else if (/[;&|()\n]/.test(c)) {
       end();
+      sep += c;
       if (c === '(' || c === ')') items.push({ op: c });
       if (c === '\n' && pending.length) { i = skipBodies(cmd, i, pending); pending = []; }
     } else if (/\s/.test(c)) {
@@ -271,24 +298,49 @@ function commandStart(seg) {
   }
 }
 
-// gitCalls(cmd, cwd): every git invocation in order, as { dir, gitDir, sub, args, ops, bare }.
-// dir is where git runs after any preceding cd and its -C, --work-tree, and --git-dir options, or
-// UNKNOWN; gitDir the --git-dir given, or null; ops the operands that merge, for `merge` and
-// `pull` only; bare when such a call names none and is no control form.
+// Words that open and close a compound command whose body may not run.
+const BLOCK_OPEN = new Set(['if', 'while', 'until']);
+const BLOCK_HEAD = new Set(['for', 'case', 'select']);
+const BLOCK_CLOSE = new Set(['fi', 'done', 'esac']);
+
+// gitCalls(cmd, cwd): every git invocation in order, as { dir, gitDir, sub, args, ops, bare,
+// noVerify, cond, chainOk, chain }. dir is where git runs after any preceding cd and its -C,
+// --work-tree, and --git-dir options, or UNKNOWN; gitDir the --git-dir given, or null; ops the
+// operands that merge, for `merge` and `pull` only; bare when such a call names none and is no
+// control form; noVerify when the call skips git hooks (--no-verify, merge's -n, or a
+// core.hooksPath override). cond is set when the call might not run: inside if, case, while,
+// until, for, or select, after ||, or in a && chain behind a command other than an unconditional
+// checkout or switch. chain numbers the && chain the call sits in; chainOk, for a conditional call,
+// says a later call in the same chain runs only when this one did (false after ||).
 function gitCalls(cmd, cwd) {
   const out = [];
   const stack = [];
   let cur = cwd;
+  let depth = 0;
+  let chain = 0;
+  // prev: the previous segment in the current chain, as { checkout, cond }.
+  let prev = null;
   for (const item of tokenize(cmd)) {
-    if (item.op === '(') { stack.push(cur); continue; }
-    if (item.op === ')') {
+    if (item.op) {
+      chain++;
+      prev = null;
+      if (item.op === '(') { stack.push(cur); continue; }
       // A cd inside a subshell or substitution is not tracked past its close.
       if (stack.length && stack.pop() !== cur) cur = UNKNOWN;
       continue;
     }
     const seg = item;
+    const before = seg.before ?? '';
+    if (before !== '&&') { chain++; prev = null; }
+    for (let k = 0; k < seg.length && CONTROL.has(seg[k].text); k++) if (BLOCK_OPEN.has(seg[k].text)) depth++;
     let i = commandStart(seg);
     const head = seg[i]?.text;
+    if (BLOCK_HEAD.has(head)) depth++;
+    if (BLOCK_CLOSE.has(head)) depth = Math.max(0, depth - 1);
+    const orCond = before.includes('||');
+    const cond = depth > 0 || orCond || (before === '&&' && (!prev || !prev.checkout || prev.cond));
+    const isCheckout = Boolean(head && isGit(head) && /^(checkout|switch)$/.test(seg[gitSubIndex(seg, i)]?.text ?? ''));
+    prev = { checkout: isCheckout, cond };
     if (head === 'cd' || head === 'pushd') {
       const args = seg.slice(i + 1).filter((w) => !/^-[PLe@]$/.test(w.text) && w.text !== '--');
       if (!args.length) cur = os.homedir();
@@ -299,28 +351,67 @@ function gitCalls(cmd, cwd) {
     if (head === 'popd') { cur = UNKNOWN; continue; }
     if (!head || !isGit(head)) continue;
     let dir = cur;
+    // --git-dir and --work-tree are read after every -C: git resolves a relative one against the
+    // directory it ends up in.
     const repo = {};
+    let hooksOff = false;
     for (i++; i < seg.length && seg[i].text.startsWith('-'); i++) {
       const w = seg[i].text;
       const eq = w.indexOf('=');
       const opt = eq < 0 ? w : w.slice(0, eq);
       if (w === '-C') { const v = seg[++i]; dir = v ? into(dir, v) : UNKNOWN; } else if (w.startsWith('-C')) dir = into(dir, { text: w.slice(2), dynamic: seg[i].dynamic });
-      else if (GIT_REPO_OPTS.has(opt)) {
-        const v = eq < 0 ? seg[++i] : { text: w.slice(eq + 1), dynamic: seg[i].dynamic };
-        repo[opt] = v ? into(dir, v) : UNKNOWN;
+      else if (GIT_REPO_OPTS.has(opt)) repo[opt] = eq < 0 ? seg[++i] ?? null : { text: w.slice(eq + 1), dynamic: seg[i].dynamic };
+      else if (w === '-c' || opt === '--config-env') {
+        // A core.hooksPath override points git away from the installed merge gate.
+        const v = w === '-c' || eq < 0 ? seg[++i] : { text: w.slice(eq + 1) };
+        if (v && /^core\.hookspath(=|$)/i.test(v.text)) hooksOff = true;
       } else if (GIT_OPTS_WITH_VALUE.has(w)) i++;
     }
-    // --work-tree names the checkout; --git-dir alone names one only as its .git directory. The
-    // main loop checks that the checkout's own git directory is the one named.
-    const gitDir = repo['--git-dir'] ?? null;
-    if (repo['--work-tree'] !== undefined) dir = repo['--work-tree'];
+    const at = (v) => (v ? into(dir, v) : UNKNOWN);
+    // --work-tree names the checkout only beside --git-dir; alone, git still discovers the
+    // repository from the current directory. --git-dir alone names a checkout only as its .git
+    // directory. The main loop checks that the checkout's own git directory is the one named.
+    const gitDir = Object.hasOwn(repo, '--git-dir') ? at(repo['--git-dir']) : null;
+    if (gitDir !== null && Object.hasOwn(repo, '--work-tree')) dir = at(repo['--work-tree']);
     else if (gitDir !== null) dir = gitDir !== UNKNOWN && path.basename(gitDir) === '.git' ? path.dirname(gitDir) : UNKNOWN;
     const sub = seg[i]?.text ?? '';
     const args = seg.slice(i + 1);
     const merging = sub === 'merge' || sub === 'pull' ? operands(sub, args) : null;
-    out.push({ dir, gitDir, sub, args, ops: merging && merging.ops, bare: Boolean(merging && merging.bare) });
+    const noVerify = hooksOff || ((sub === 'merge' || sub === 'pull' || sub === 'commit') && skipsHooks(sub, args));
+    out.push({ dir, gitDir, sub, args, ops: merging && merging.ops, bare: Boolean(merging && merging.bare), noVerify, cond, chainOk: !orCond, chain });
   }
   return out;
+}
+
+// gitSubIndex(seg, i): the index of the subcommand of the git call whose command word is at i.
+function gitSubIndex(seg, i) {
+  for (i++; i < seg.length && seg[i].text.startsWith('-'); i++) {
+    const w = seg[i].text;
+    if (w === '-C' || GIT_OPTS_WITH_VALUE.has(w) || GIT_REPO_OPTS.has(w)) i++;
+  }
+  return i;
+}
+
+// skipsHooks(sub, args): the call skips the pre-merge-commit or pre-commit hook: --no-verify, or
+// -n for merge and commit (alone or in a cluster of short flags), unless a later --verify undoes it.
+function skipsHooks(sub, args) {
+  const withValue = sub === 'merge' ? MERGE_OPTS_WITH_VALUE : sub === 'pull' ? PULL_OPTS_WITH_VALUE : new Set(['-m', '-F', '-C', '-c', '-t', '--message', '--file', '--author', '--date', '--template', '--reuse-message', '--reedit-message', '--fixup', '--squash', '--cleanup']);
+  let skip = false;
+  for (let k = 0; k < args.length; k++) {
+    const w = args[k].text;
+    if (w === '--') break;
+    if (w === '--no-verify') skip = true;
+    else if (w === '--verify') skip = false;
+    else if (withValue.has(w)) k++;
+    else if (sub !== 'pull' && /^-[A-Za-z]+$/.test(w)) {
+      // In a cluster, a letter that takes a value swallows the rest: -nm msg skips, -mn is a message.
+      for (const ch of w.slice(1)) {
+        if (ch === 'n') { skip = true; break; }
+        if (withValue.has(`-${ch}`)) break;
+      }
+    }
+  }
+  return skip;
 }
 
 // operands(sub, args): { ops, bare }: the words that merge, none for a merge --abort and its kin,
@@ -395,13 +486,13 @@ function refFor(root, name) {
   return null;
 }
 
-const planName = (text) => (String(text ?? '').match(/^\s*-\s*Integration branch:\s*`?<?([A-Za-z0-9._/-]+)>?`?/m) || [])[1] || null;
+export const planName = (text) => (String(text ?? '').match(/^\s*-\s*Integration branch:\s*`?<?([A-Za-z0-9._/-]+)>?`?/m) || [])[1] || null;
 
 // project(root, prefixes): the deliver project at the deepest of `prefixes` (each "" or a
 // "dir/" path below the top level) that a trusted branch marks; null when none does. Else the
 // integration branch as { name, ref, prefix }, ref null when it resolves nowhere, or
-// { error, prefix } when the plans disagree.
-function project(root, prefixes = ['']) {
+// { error, names, prefix } when the plans disagree.
+export function project(root, prefixes = ['']) {
   for (const prefix of prefixes) {
     const found = projectAt(root, prefix);
     if (found) return { ...found, prefix };
@@ -411,7 +502,7 @@ function project(root, prefixes = ['']) {
 
 // baseBranches(root): the branch names every project may trust without its plan's say-so: main,
 // master, origin/HEAD's target, and init.defaultBranch.
-function baseBranches(root) {
+export function baseBranches(root) {
   const originHead = chomp(git(root, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']) || '');
   return ['main', 'master', originHead.startsWith('refs/remotes/origin/') ? originHead.slice('refs/remotes/origin/'.length) : '', chomp(git(root, ['config', '--get', 'init.defaultBranch']) || '')]
     .filter((n) => n && !n.startsWith('pm/'));
@@ -419,7 +510,7 @@ function baseBranches(root) {
 
 const localBranches = (root) => (git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']) || '').split(/\r?\n/).filter(Boolean);
 
-function projectAt(root, prefix) {
+export function projectAt(root, prefix) {
   const cands = [];
   const add = (name) => {
     if (!name || name.startsWith('pm/')) return;
@@ -438,7 +529,7 @@ function projectAt(root, prefix) {
   const approved = cands.filter((c) => c.approved);
   if (!approved.length) return null;
   const names = [...new Set(approved.map((c) => c.plan).filter(Boolean))];
-  if (names.length > 1) return { error: `the committed plans on ${approved.filter((c) => c.plan).map((c) => c.name).join(', ')} disagree on the integration branch (${names.join(', ')}); make ${prefix}docs/plan.md agree` };
+  if (names.length > 1) return { names, error: `the committed plans on ${approved.filter((c) => c.plan).map((c) => c.name).join(', ')} disagree on the integration branch (${names.join(', ')}); make ${prefix}docs/plan.md agree` };
   const name = names[0] ?? approved[0].name;
   return { name, ref: refFor(root, name) };
 }
@@ -487,31 +578,57 @@ function operandOf(root, op) {
   return { bare, name, commit: resolve(root, op) };
 }
 
-// fetchHeads(root): the commits FETCH_HEAD lists for merging, every line not marked
-// not-for-merge, as `git merge FETCH_HEAD` merges them all; null when it cannot be read.
-function fetchHeads(root) {
+// fetchHeads(root): the heads FETCH_HEAD lists for merging, every line not marked not-for-merge,
+// as `git merge FETCH_HEAD` merges them all: { heads: [{ sha, name }], bad }, name the branch the
+// line's `branch '<name>' of <url>` part names, or null; bad when a line marked for merge does not
+// parse. null when FETCH_HEAD cannot be read.
+export function fetchHeads(root) {
   const where = chomp(git(root, ['rev-parse', '--git-path', 'FETCH_HEAD']) || '');
   if (!where) return null;
   let text;
   try { text = fs.readFileSync(path.resolve(root, where), 'utf8'); } catch { return null; }
-  const out = [];
+  const heads = [];
+  let bad = false;
   for (const line of text.split(/\r?\n/)) {
-    const [sha, mark = ''] = line.split('\t');
-    if (/^[0-9a-f]{40,64}$/.test(sha || '') && mark !== 'not-for-merge') out.push(sha);
+    if (!line) continue;
+    const [sha, mark = '', desc = ''] = line.split('\t');
+    if (mark === 'not-for-merge') continue;
+    if (!/^[0-9a-f]{40,64}$/.test(sha || '') || mark !== '') { bad = true; continue; }
+    heads.push({ sha, name: (desc.match(/^branch '(.+)' of /) || [])[1] ?? null });
   }
-  return out;
+  return { heads, bad };
+}
+
+// mergeHeads(root): the commits MERGE_HEAD lists, the ones an in-progress merge brings in; [] when
+// no merge is in progress, null when it cannot be read.
+export function mergeHeads(root) {
+  const where = chomp(git(root, ['rev-parse', '--git-path', 'MERGE_HEAD']) || '');
+  if (!where) return null;
+  let text;
+  try { text = fs.readFileSync(path.resolve(root, where), 'utf8'); } catch (e) { return e.code === 'ENOENT' ? [] : null; }
+  return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
 
 function storyBranches(root, op, integ, target) {
-  // FETCH_HEAD resolves to its first line alone, but git merges every head marked for merge.
+  // FETCH_HEAD resolves to its first line alone, but git merges every head marked for merge. A
+  // head whose line names a pm/* branch is that story, with or without a local or remote ref.
   if (op === 'FETCH_HEAD') {
-    const heads = fetchHeads(root);
-    if (heads === null) return pmTips(root).length ? { reason: 'FETCH_HEAD cannot be read, so the heads it merges cannot be checked; merge the fetched branch by name' } : { branches: [] };
+    const fetched = fetchHeads(root);
+    if (fetched === null) return pmTips(root).length ? { reason: 'FETCH_HEAD cannot be read, so the heads it merges cannot be checked; merge the fetched branch by name' } : { branches: [] };
+    if (fetched.bad) return { reason: 'FETCH_HEAD has a line the gate cannot read, so the heads it merges cannot be checked; merge the fetched branch by name' };
     const branches = [];
-    for (const sha of heads) {
+    const addBranch = (b) => { if (!branches.some((x) => x.name === b.name)) branches.push(b); };
+    for (const { sha, name } of fetched.heads) {
+      if (name && name.startsWith('pm/')) {
+        const commit = resolve(root, sha);
+        if (!commit) return { reason: `FETCH_HEAD lists ${name} at ${sha.slice(0, 12)}, which this repository does not hold, so it cannot be judged; fetch it again` };
+        if (integ.ref && integrationRefs(root, integ).some((r) => contains(root, commit, r))) continue;
+        addBranch({ name, tip: commit });
+        continue;
+      }
       const found = storyBranches(root, sha, integ, target);
       if (found.reason) return found;
-      for (const b of found.branches || []) if (!branches.some((x) => x.name === b.name)) branches.push(b);
+      for (const b of found.branches || []) addBranch(b);
     }
     return { branches };
   }
@@ -686,24 +803,12 @@ function verdictFor(root, branch, tip, integ) {
   return null;
 }
 
-function block(what, reason) {
-  fs.writeSync(2, `deliver blocked git merge ${sanitize(what)}: ${oneLine(reason)}.\n`);
-  process.exit(2);
+// A block ends the judgement: the PreToolUse entry point reports it and exits 2.
+class Blocked {
+  constructor(what, reason) { this.what = what; this.reason = reason; }
 }
-
-let calls;
-// The session's project directory: CLAUDE_PROJECT_DIR when it names a directory, else the cwd.
-let sessionDir;
-try {
-  const input = readHookInput();
-  const cmd = input?.tool_input?.command;
-  if (typeof cmd !== 'string' || !/\b(merge|pull)\b/.test(cmd)) process.exit(0);
-  const cwd = typeof input.cwd === 'string' && path.isAbsolute(input.cwd) ? input.cwd : process.cwd();
-  const env = process.env.CLAUDE_PROJECT_DIR;
-  sessionDir = env && path.isAbsolute(env) && fs.existsSync(env) && fs.statSync(env).isDirectory() ? path.resolve(env) : cwd;
-  calls = gitCalls(cmd, cwd);
-} catch {
-  process.exit(0);
+function block(what, reason) {
+  throw new Blocked(what, reason);
 }
 
 const commonDir = (dir) => {
@@ -736,7 +841,7 @@ const baseRefs = (root) => [...new Set(baseBranches(root).flatMap((name) => {
 // true when a listing could not be read. Projects are read from the trusted base refs, from each
 // local non-`pm/*` branch whose committed plan there names that branch, and from the working tree.
 // Listings are NUL-delimited, so no path is quoted.
-function discover(root) {
+export function discover(root) {
   const tail = 'docs/approval.json';
   const found = new Set();
   const integrations = new Set();
@@ -826,10 +931,17 @@ const candidates = (...lists) => [...new Set([...lists.flat(), ''])];
 const DYNAMIC = 'the shell computes this operand, so the gate cannot see which branch merges; name the branch literally';
 const SEPARATE = 'an earlier git command in the same call can move the refs this merge reads; run the merge as its own command';
 
-// git calls return null on failure, so nothing below should throw; if something does, the hook
+const NO_VERIFY = "--no-verify skips deliver's merge gate; run the merge without it (a core.hooksPath override does the same)";
+const UNKNOWN_TARGET = 'the branch this merge goes into is unknown: a checkout before it might not run, or names a computed or unresolvable branch; check out the integration branch as its own command, or in the same && chain as the merge';
+
+// judgeCommand(calls, sessionDir): throws Blocked for the first call that must not run. git calls
+// return null on failure, so nothing here should otherwise throw; if something does, the caller
 // fails open like every deliver hook rather than wedging the session.
-try {
+function judgeCommand(calls, sessionDir) {
   const targets = new Map();
+  // chainTargets: per repository, a conditional checkout's branch, which holds for later calls in
+  // its own && chain, as { chain, value }.
+  const chainTargets = new Map();
   const rootOf = (dir) => {
     if (dir === UNKNOWN) return null;
     const top = chomp(git(dir, ['rev-parse', '--show-toplevel']) || '');
@@ -862,17 +974,35 @@ try {
       const root = rootOf(dir);
       if (!root || co.paths) continue;
       // A computed or unresolvable branch leaves the target unknown, and a story merge under an
-      // unknown target is gated as a ship.
-      if (co.dynamic) targets.set(root, UNKNOWN);
-      else if (co.create) targets.set(root, co.create);
-      else if (co.detach) targets.set(root, null);
-      else if (co.prev) targets.set(root, UNKNOWN);
-      else if (co.name && (resolve(root, `refs/heads/${co.name}`) || resolve(root, `refs/remotes/origin/${co.name}`))) targets.set(root, co.name);
-      else if (co.name && resolve(root, co.name)) targets.set(root, null);
-      else if (co.name) targets.set(root, UNKNOWN);
+      // unknown target blocks.
+      let value;
+      if (co.dynamic) value = UNKNOWN;
+      else if (co.create) value = co.create;
+      else if (co.detach) value = null;
+      else if (co.prev) value = UNKNOWN;
+      else if (co.name && (resolve(root, `refs/heads/${co.name}`) || resolve(root, `refs/remotes/origin/${co.name}`))) value = co.name;
+      else if (co.name && resolve(root, co.name)) value = null;
+      else if (co.name) value = UNKNOWN;
+      if (value === undefined) continue;
+      // A checkout that might not run leaves the target unknown, except for later calls in its own
+      // && chain, which run only when it did.
+      if (call.cond) {
+        targets.set(root, UNKNOWN);
+        if (call.chainOk) chainTargets.set(root, { chain: call.chain, value });
+        else chainTargets.delete(root);
+      } else {
+        targets.set(root, value);
+        chainTargets.delete(root);
+      }
       continue;
     }
     if (!ops) {
+      // A commit of an in-progress story merge that skips hooks skips the git-level gate.
+      if (sub === 'commit' && call.noVerify && dir !== UNKNOWN) {
+        const root = rootOf(dir);
+        const heads = root ? mergeHeads(root) : null;
+        if (heads?.length && judgeMerge(root, { target: currentBranch(root), commits: heads }).story) block('(commit of an in-progress merge)', NO_VERIFY);
+      }
       // status, log, diff, show, and rev-parse move no ref, so a merge after them is judged as
       // if alone.
       if (READ_ONLY.has(sub)) continue;
@@ -899,7 +1029,8 @@ try {
       if (suspect && inDeliverSession()) block(suspect.text, `${dir} is not a git repository, so the story cannot be checked; run the merge from the project`);
       continue;
     }
-    const target = targets.has(root) ? targets.get(root) : currentBranch(root);
+    const ct = chainTargets.get(root);
+    const target = ct && ct.chain === call.chain ? ct.value : targets.has(root) ? targets.get(root) : currentBranch(root);
     // Merging into a story branch, such as the integration tip into it, is not a ship.
     if (typeof target === 'string' && target.startsWith('pm/')) continue;
     // A bare merge or pull merges the target's configured upstream: judge that. With none to
@@ -944,6 +1075,7 @@ try {
       continue;
     }
     if (dyn) block(dyn.text || '(computed)', DYNAMIC);
+    if (call.noVerify && ops.some(namedStory)) block(ops.find(namedStory).text, NO_VERIFY);
     if (sub === 'pull') {
       // A local upstream (remote `.`) is read now and judged like a merge; a remote one can move
       // in the pull's own fetch.
@@ -957,7 +1089,9 @@ try {
       if (found.noop && !prior) continue;
       const story = Boolean(found.reason || found.branches.length || namedStory(op));
       if (!story) continue;
+      if (call.noVerify) block(op.text, NO_VERIFY);
       if (prior) block(op.text, SEPARATE);
+      if (target === UNKNOWN) block(op.text, UNKNOWN_TARGET);
       if (integ.error) block(op.text, integ.error);
       if (found.reason) block(op.text, found.reason);
       for (const { name, tip } of found.branches) {
@@ -966,7 +1100,102 @@ try {
       }
     }
   }
-} catch {
+}
+
+// ---- the merge git is making ----
+
+const ALLOW = (reason, story = false) => ({ allow: true, reason, story });
+const DENY = (reason) => ({ allow: false, reason, story: true });
+
+// storiesOf(root, commit, integ): the pm/* branches a merged commit stands for, as
+// { branches: [{ name, tip }] }, or { reason } when it must be refused: the tip of a pm/* branch
+// here or on a remote, or a head FETCH_HEAD names as a pm/* branch; refused when it sits inside a
+// pm/* tip short of it. A commit the integration branch or a trusted copy of it holds is no story.
+function storiesOf(root, commit, integ) {
+  const full = resolve(root, commit);
+  if (!full) return { reason: `${sanitize(commit)} does not resolve to a commit, so the merge cannot be judged` };
+  if (integ.ref && integrationRefs(root, integ).some((r) => contains(root, full, r))) return { branches: [] };
+  const tips = pmTips(root);
+  const names = new Set(tips.filter((t) => t.tip === full).map((t) => t.name));
+  for (const h of fetchHeads(root)?.heads ?? []) if (h.sha === full && h.name?.startsWith('pm/')) names.add(h.name);
+  if (names.size) return { branches: [...names].map((name) => ({ name, tip: full })) };
+  const holder = tips.find((t) => contains(root, full, t.tip));
+  if (holder) return { reason: `${full.slice(0, 12)} is part of ${holder.name} short of its tip, which carries the verdict; merge the branch itself` };
+  return { branches: [] };
+}
+
+// judgeMerge(root, { target, commits }): the verdict on a merge git is about to commit, as
+// { allow, reason, story }: target is the branch merged into, commits the merged SHAs (MERGE_HEAD).
+// root is the repository's top level. The projects judged are the deliver projects anywhere in the
+// repository (discover) whose trusted integration branch is target; a merge into any other branch
+// is not a ship. Each merged commit that is a story (storiesOf) is judged by verdictFor against the
+// project whose integration branch claims it, so the claim, tier, verifier and integrity SHAs, the
+// after-verdict rules, the legacy rule, and the merge-tree check are the PreToolUse hook's own.
+// story is true once a story merge into an integration branch is certain. Fails open on an internal
+// error before that, and closed after it, like the PreToolUse hook. DELIVER_NO_ENFORCE=1 allows.
+export function judgeMerge(root, { target, commits }) {
+  if (process.env.DELIVER_NO_ENFORCE === '1') return ALLOW('DELIVER_NO_ENFORCE=1 is set');
+  let certain = false;
+  try {
+    const branch = typeof target === 'string' ? target.replace(/^refs\/heads\//, '') : '';
+    if (!branch || branch.startsWith('pm/')) return ALLOW('not a merge into an integration branch');
+    const list = (commits || []).filter(Boolean);
+    if (!list.length) return ALLOW('nothing is being merged');
+    const disc = discover(root);
+    const projects = [];
+    for (const dir of disc.found) {
+      const prefix = dir === '.' ? '' : `${dir}/`;
+      const p = projectAt(root, prefix);
+      if (p && (p.name === branch || p.names?.includes(branch))) projects.push({ ...p, prefix });
+    }
+    if (!projects.length && !(disc.failed && baseBranches(root).includes(branch))) return ALLOW(`${branch} is no deliver project's integration branch`);
+    const integ = { name: branch, ref: refFor(root, branch), prefix: '' };
+    for (const commit of list) {
+      const found = storiesOf(root, commit, integ);
+      if (found.reason) { certain = true; return DENY(found.reason); }
+      for (const { name, tip } of found.branches) {
+        certain = true;
+        if (!projects.length) return DENY(`cannot establish which deliver project ships ${name}: the repository listing failed`);
+        const owners = projects.filter((p) => !p.error && p.ref && claimOf(root, p.ref, name, p.prefix));
+        for (const p of owners.length ? owners : [projects[0]]) {
+          if (p.error) return DENY(`${name}: ${p.error}`);
+          const reason = verdictFor(root, name, tip, p);
+          if (reason) return DENY(`${name}: ${reason}`);
+        }
+      }
+    }
+    return ALLOW(certain ? 'every story merged records the verdicts it needs' : 'no story is merged', certain);
+  } catch (e) {
+    return certain ? DENY(`cannot establish the verdict for this story merge (${oneLine(e?.message ?? e)})`) : ALLOW('the gate could not read the merge');
+  }
+}
+
+// ---- the PreToolUse entry point ----
+
+function main() {
+  let calls;
+  // The session's project directory: CLAUDE_PROJECT_DIR when it names a directory, else the cwd.
+  let sessionDir;
+  try {
+    const input = readHookInput();
+    const cmd = input?.tool_input?.command;
+    if (typeof cmd !== 'string' || !/\b(merge|pull|commit)\b/.test(cmd)) process.exit(0);
+    const cwd = typeof input.cwd === 'string' && path.isAbsolute(input.cwd) ? input.cwd : process.cwd();
+    const env = process.env.CLAUDE_PROJECT_DIR;
+    sessionDir = env && path.isAbsolute(env) && fs.existsSync(env) && fs.statSync(env).isDirectory() ? path.resolve(env) : cwd;
+    calls = gitCalls(cmd, cwd);
+  } catch {
+    process.exit(0);
+  }
+  try {
+    judgeCommand(calls, sessionDir);
+  } catch (e) {
+    if (e instanceof Blocked) {
+      fs.writeSync(2, `deliver blocked git merge ${sanitize(e.what)}: ${oneLine(e.reason)}.\n`);
+      process.exit(2);
+    }
+  }
   process.exit(0);
 }
-process.exit(0);
+
+if (MAIN) main();

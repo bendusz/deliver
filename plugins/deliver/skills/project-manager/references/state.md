@@ -79,8 +79,8 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
   commit SHA it judged, recorded after every writer run at `T1` and `T2`. It is `n/a` at `T0`.
 - `verifier` is `"<PASS|FAIL|UNKNOWN> <sha>"`: the latest `pm-verifier` verdict and the full
   commit SHA it judged, recorded at state 5 and absent before the first verification. The
-  `require-verified.mjs` hook blocks a merge of the story branch unless this reads `PASS` and,
-  at `T1` and `T2`, `integrity` reads `pass`. Each SHA must be the branch head, or a commit after
+  `require-verified.mjs` hook, and the git-level merge gate behind it, block a merge of the story
+  branch unless this reads `PASS` and, at `T1` and `T2`, `integrity` reads `pass`. Each SHA must be the branch head, or a commit after
   which the branch gained only commits to the story file or `docs/handoff/*.md` and merges whose
   tree equals the automatic merge of their parents outside the story file.
 - **Claim fields.** `tier`, `deliver`, `branch`, `protected`, `protected_base`, and pm-meta

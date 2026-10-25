@@ -1,5 +1,5 @@
 {
-  "description": "Fail-open Node 20+ guards for plan approval, secret-shaped content under docs/, the verifier PASS before a story merge, and session context. Set DELIVER_NO_ENFORCE=1 to disable them.",
+  "description": "Fail-open Node 20+ guards for plan approval, secret-shaped content under docs/, the verifier PASS before a story merge, and session context, which also installs deliver's git-level merge gate (hooks/git-merge-gate.mjs) in a deliver project's repository. Set DELIVER_NO_ENFORCE=1 to disable them.",
   "hooks": {
     "SessionStart": [
       {
