@@ -106,11 +106,13 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   unmeasured and runs the maximum panel until the corpus reaches 149 certify cases. The bound holds
   for defects a careful reviewer can catch from the story and the diff; observed escapes correct it
   on real projects.
-- **Known issues.** At the root of a repository holding deliver projects, a merge into a base
-  branch that is chained after another git command can be blocked with "run the merge as its own
-  command", even when it merges no story. This happens after a ref-writing command or a fetch.
-  Once any `pm/*` branch exists, it happens after any git command other than a plain checkout or
-  switch, unless the merge names a base branch. Run such a merge as its own command. The corpus README says batch 1's 65 certify cases prove 4.5042%. That
+- **Known issues.** At the root of a repository holding deliver projects, a merge chained after
+  another git command can be blocked with "run the merge as its own command", even when it merges
+  no story, when the checked-out target is a base branch, an integration branch, or unknown. After a
+  command that can write refs it always blocks. After a fetch, or after any other git command except
+  a plain checkout or switch once a `pm/*` branch exists, it blocks unless the merge names a base
+  branch. Run such a merge as its own command.
+  The corpus README says batch 1's 65 certify cases prove 4.5042%. That
   is true of batch 1 alone; the calibrated set is 66 certify cases including batch 0, at 4.4%. The README
   is in the corpus manifest, so editing it would invalidate the calibration; the next corpus batch
   fixes it. The corpus identity also hashes the whole manifest, README included; a later release

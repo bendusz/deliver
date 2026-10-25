@@ -1298,6 +1298,7 @@ test('directory rule: with no pm/* tips known, a merge after a fetch still reach
   gitIn(s.top, ['update-ref', '-d', `refs/remotes/origin/${BRANCH}`]);
   const r = hook(s.top, `git fetch origin && git merge --no-ff ${tip}`);
   assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /run the merge as its own command/);
   const g = gitLog();
   for (const cmd of ['git merge --abort', 'git pull']) {
     g.reset();
