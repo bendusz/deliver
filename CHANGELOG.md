@@ -103,7 +103,9 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   stories remain: its tree is committed to its branch as `wip(<story-id>): blocked` and the PM
   moves on from the integration branch. A heartbeat runs `/deliver:resume --heartbeat` every 30
   minutes, remote PR mode watches the PR and re-gates locally on a CI wake, and `/deliver:doctor`
-  checks the T3 setup.
+  checks the T3 setup. T3 stays optional: when the probe fails, deliver runs unchanged under plain
+  Claude Code, and the new `host-neutral` test fails if a T3-only step leaves `host-t3.md` or loses its
+  condition.
 - **Superpowers precedence is stated.** While deliver is active, its phases replace Superpowers'
   brainstorming, writing-plans, and subagent-driven-development. TDD, debugging, and
   verification-before-completion still apply.
