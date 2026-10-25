@@ -72,7 +72,7 @@ try {
     if (!head.startsWith('refs/heads/') || !merged.size) process.exit(0);
     verdict = judgeMerge(top, { target: head.slice('refs/heads/'.length), commits: [...merged], strictFetch: fetchedMerge(top, merged) });
     if (verdict.allow && verdict.story && merged.size > 1) verdict = { allow: false, reason: ONE_AT_A_TIME };
-    else if (verdict.allow && verdict.story && verdict.judged[0]?.file && stagedDiffers(top, [...merged][0], verdict.judged[0].file)) {
+    else if (verdict.allow && verdict.story && verdict.judged[0]?.file && stagedDiffers(top, [...merged][0], verdict.judged[0].files ?? [verdict.judged[0].file])) {
       verdict = { allow: false, reason: 'the staged merge result differs from the automatic merge of the story; re-verify' };
     }
   }
@@ -139,10 +139,11 @@ function recovery({ inMerge: merging, top: root, next }) {
   return 'Fix the cause and retry.';
 }
 
-// stagedDiffers(top, mergeHead, file): true when the staged merge result differs, beyond the story
-// file, from `git read-tree -m` of the merge base, HEAD, and mergeHead in a temporary index, where
+// stagedDiffers(top, mergeHead, files): true when the staged merge result differs, beyond the story
+// files (every claimant's, for a story several projects claim), from `git read-tree -m` of the merge base, HEAD, and mergeHead in a temporary index, where
 // that merge needs no content merge; false when it matches or cannot be compared.
-function stagedDiffers(root, mergeHead, file) {
+function stagedDiffers(root, mergeHead, files) {
+  const record = (p) => files.includes(p);
   const { git, chomp } = lib;
   const base = chomp(git(root, ['merge-base', 'HEAD', mergeHead]) || '');
   if (!base) return false;
@@ -152,14 +153,14 @@ function stagedDiffers(root, mergeHead, file) {
   try {
     if (run(['read-tree', '-m', '-i', '--aggressive', base, 'HEAD', mergeHead]).status !== 0) return false;
     const unmerged = new Set((run(['ls-files', '-u', '-z']).stdout || '').split('\0').filter(Boolean).map((l) => l.split('\t')[1]));
-    if ([...unmerged].some((p) => p !== file)) return false;
-    if (unmerged.size && run(['update-index', '--force-remove', '--', file]).status !== 0) return false;
+    if ([...unmerged].some((p) => !record(p))) return false;
+    if (unmerged.size && run(['update-index', '--force-remove', '--', ...unmerged]).status !== 0) return false;
     const clean = chomp(run(['write-tree']).stdout || '');
     const staged = chomp(git(root, ['write-tree']) || '');
     if (!clean || !staged) return false;
     const r = rv.spawnGit(root, ['diff', '-z', '--name-only', clean, staged, '--']);
     if (r.status !== 0) return false;
-    return r.stdout.split('\0').filter(Boolean).some((p) => p !== file);
+    return r.stdout.split('\0').filter(Boolean).some((p) => !record(p));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
