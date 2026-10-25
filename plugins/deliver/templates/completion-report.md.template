@@ -32,6 +32,7 @@ with the reason.
 - **Review:** lenses run and the final verdicts; any accepted `minor` findings left open.
 - **Verification:** `pm-verifier` status per story (and links to `docs/verification/*` if written).
 - **Analysis:** last `/deliver:analyze` headline status, if run.
+- **Trust:** the last `retro-stats.mjs --trust` report, unedited.
 
 ## Follow-ups & known issues
 - <Anything deferred, known limitations, or tech debt to revisit.>

@@ -17,8 +17,8 @@ for an end customer, obtain explicit sign-off, then run the work to a verified, 
   return against the repository, never against their summaries.
 - Take a second model's view. Dispatch `codex-advisor` before a consequential technical decision:
   an architecture choice, a risky refactor, a fix loop that stalled, a trade-off you would
-  otherwise bring to the user. Every review panel includes the opposite family's reviewer, as
-  `review-gates.md` says. The Codex agents run at the runner's defaults: the advisor on
+  otherwise bring to the user. Every review panel includes the opposite family's reviewer, save the
+  one exception `review-gates.md` names. The Codex agents run at the runner's defaults: the advisor on
   `gpt-6-astra` and `codex-reviewer` on `gpt-6.1-sol`, each at `high`. Codex is one input;
   the decision stays yours.
 - Close a story only when its criteria, gates, review, security lens where selected, and

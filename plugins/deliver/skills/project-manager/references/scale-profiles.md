@@ -9,8 +9,8 @@ The default is `standard`. This file is authoritative for which phases a scale s
 
 | Scale | Use for | Difference from `standard` |
 | --- | --- | --- |
-| `standard` (default) | most projects | The baseline: `docs/spec.md`, `docs/plan.md`, `/deliver:analyze`, story files, a risk-selected review panel, and the project wiki maintained by `librarian`. |
-| `tiny` | a one-off fix or tiny script | A minimal `docs/plan.md` and one story file. No spec, `/deliver:analyze`, checklists, verification reports, wiki, or sprint retrospective. One reviewer rather than a panel. |
+| `standard` (default) | most projects | The baseline: `docs/spec.md`, `docs/plan.md`, `/deliver:analyze`, story files, the tier panel per `review-gates.md`, and the project wiki maintained by `librarian`. |
+| `tiny` | a one-off fix or tiny script | A minimal `docs/plan.md` and one story file. No spec, `/deliver:analyze`, checklists, verification reports, wiki, or sprint retrospective. Review is still the tier panel per `review-gates.md`. |
 | `small` | a small feature | A light spec, plan, and stories. No `/deliver:analyze`, wiki, or sprint retrospective. |
 | `large` | multi-sprint or multi-author | Adds `docs/constitution.md` (`/deliver:constitution`), quality checklists (`/deliver:checklist`), durable verification reports, a traceability table, and `Skeleton: specdd`. |
 | `regulated` | compliance and high-assurance | Everything `large` has, all mandatory, plus a required security review, full requirement to story to verification traceability, and a clean wiki lint before the completion report. Nothing is waived. |

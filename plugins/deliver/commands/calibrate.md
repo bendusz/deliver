@@ -6,13 +6,13 @@ Measure how often each review lens, alone and in combination, lets a seeded defe
 write `plugins/deliver/benchmarks/assurance/panels.json`. This runs only inside a checkout of the
 deliver source, and it spends model usage on both providers.
 
-**Cost for batch 1** (100 seeded and 25 clean cases):
-- The select phase is about 310 runs: two trials of each lens on its classes' 35 select seeded cases
-  plus the 10 select clean cases.
-- The certify phase is 80 runs (65 certify seeded plus 15 certify clean) for each lens trial in the
-  certify plan. A plan of two lenses at one trial is 160 runs; the six-slot ceiling is 480. T2 is
-  skipped at this corpus size.
-- The total is about 470 runs for a two-lens plan, and at most about 790.
+**Cost for batch 1 with batch 0's three cases** (102 seeded and 26 clean cases):
+- The select phase is 320 runs: two trials of each lens on its classes' 36 select seeded cases
+  plus the 11 select clean cases.
+- The certify phase is 81 runs (66 certify seeded plus 15 certify clean) for each lens trial in the
+  certify plan. The calibrated one-lens plan took 81; the six-slot ceiling is 486. 66 certify cases
+  with no escapes give 4.4%, which meets T0 and T1. T2 is skipped at this corpus size.
+- The total was 401 runs for the one-lens plan, and is at most about 806.
 
 Arguments: $ARGUMENTS  (optional: `--targets T0=0.10,T1=0.05,T2=0.02` to pass through to `calc`)
 

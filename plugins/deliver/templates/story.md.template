@@ -25,6 +25,6 @@ name the exact search that finds it.>
 ## Execution
 <!-- Never written at decomposition; the claim commit adds this section (references/state.md).
      One JSON comment on its own line, then optional dated notes for events with no commit.
-     Shape: pm-exec: {"owner":"<actor-id>","builder":"<expert-builder|codex-builder>","branch":"pm/S<sprint>-<n>-<slug>","status":"<claimed|building|built|in-review|merged|blocked>","tier":"<T0|T1|T2>","protected":["<acceptance test paths>"],"protected_base":"<sha of the acceptance commit>","integrity":"<pass|fail> <sha>, or n/a at T0","verifier":"<PASS|FAIL|UNKNOWN> <sha>","rounds":0,"retries":0,"deliver":"<plugin version>","updated":"<YYYY-MM-DD HH:MM>"}
-     `verifier` is absent until the first verification; `pm-meta` may add "integrity_allow":["<kind>"].
+     Shape: pm-exec: {"owner":"<actor-id>","builder":"<expert-builder|codex-builder>","branch":"pm/S<sprint>-<n>-<slug>","status":"<claimed|building|built|in-review|merged|blocked>","tier":"<T0|T1|T2>","protected":["<acceptance test paths>"],"protected_base":"<sha of the acceptance commit>","integrity":"<pass|fail> <sha>, or n/a at T0","verifier":"<PASS|FAIL|UNKNOWN> <sha>","panel":["<lenses that ran on every review round>"],"rounds":0,"retries":0,"integrity_fails":0,"holdout_fails":0,"deliver":"<plugin version>","updated":"<YYYY-MM-DD HH:MM, UTC>"}
+     `verifier` is absent until the first verification, `panel` until the first review; `pm-meta` may add "integrity_allow":["<kind>"].
      Then lines such as: - <YYYY-MM-DD HH:MM> external review skipped: codex CLI absent. -->

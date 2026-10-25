@@ -32,7 +32,8 @@ header. These fields carry rules:
   contract: `<!-- pm-meta: {"builder":"codex-builder","touches":["src/parser","tests/parser"]} -->`.
   The object has `builder` and `touches`, and `integrity_allow` only when the story must do
   something `test-integrity.mjs` flags, such as deleting an obsolete test: a list of the kinds it
-  may trip, with the reason in Context. `touches` names the files and directory roots this
+  may trip, with the reason in Context. The kinds are `test-deleted`, `skip-added`,
+  `assertions-dropped`, `config-weakened`, `pragma-added`, and `protected-changed`. `touches` names the files and directory roots this
   story will change, used for `[P]` safety and enforced by the Codex runner: unique repo-relative
   paths without globs, placeholders, `.`, or traversal. It is required, must be bounded, and must
   cover the implementation and test paths; a story whose scope you cannot name yet is not
@@ -57,9 +58,10 @@ header. These fields carry rules:
   - `T2`: auth or authz, crypto, secrets, money, data migrations or deletion, a public API or
     schema, untrusted input, or a dependency change.
 
-  A `T2` story is `Risk: high`. The tier sets the review panel (`review-gates.md`), whether
-  acceptance tests are mandatory and protected, and whether holdout checks run
-  (`implementation-loop.md`). The claim copies it into the Execution block.
+  The tier sets review depth only: the review panel (`review-gates.md`), whether acceptance
+  tests are mandatory and protected, and whether holdout checks run (`implementation-loop.md`).
+  `Risk` stays your separate judgement of whether a merge escalates under the checkpoint policy.
+  The claim copies the tier into the Execution block.
 
 - **Execution.** The template's final `## Execution` section is never written at decomposition.
   The claim commit adds it; `state.md` owns its fields.

@@ -88,8 +88,11 @@ With a wiki, dispatch the first `librarian ingest` per `knowledge.md` and commit
 - Default sprint-level: run all the sprint's stories, then `/deliver:retro` per
   `retrospective.md`, then pause for the user's review at the sprint boundary. A project may set story-level, pausing before each merge, or fully autonomous.
 - Between checkpoints, `tmp/log.md` carries the progress. Message the user when they ask, when
-  you escalate, and at the checkpoint. The checkpoint report names what shipped, the retro's
-  numbers, the decisions you took without asking, and anything waiting on the user.
+  you escalate, and at the checkpoint. At every scale, the checkpoint report opens with the
+  `retro-stats.mjs --trust` report (`retrospective.md` 0b), then names what shipped, the retro's
+  numbers, the decisions you took without asking, and anything waiting on the user. Under the fully
+  autonomous policy, run the trust report at each sprint boundary into `tmp/log.md`, and put the
+  last one in the completion report.
 - Whatever the mode, **escalate** immediately before a high-risk merge or one that changes several
   dependent components.
 - Offer `/deliver:handoff` at natural stops: a sprint checkpoint, a long pause, or a session whose

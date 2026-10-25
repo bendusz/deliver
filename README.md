@@ -89,11 +89,11 @@ anything.
 | Decomposition | Sprints, then self-contained story files under `docs/stories/`, each a thin end-to-end slice tracing to requirement IDs. |
 | Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. A bug fix lands with a regression test, and a failed attempt is retried at higher effort. At the sprint boundary, a cross-story review and a retrospective that reads fix rounds and retries per builder, turns mechanical mistakes into checks, and feeds the rest into `AGENTS.md`. |
 | Parallel stories | Independent `[P]` stories can build at once in isolated git worktrees, then integrate one at a time. Opt-in, with a safe fallback to sequential. |
-| Review and verification | A read-only review panel that always includes a lens from the family opposite the builder's, the project's real test, lint, and build gates, a test-integrity check, and a final `pm-verifier` PASS, with bounded fix loops. |
-| Tiers and measured assurance | Each story is `T0`, `T1`, or `T2` by risk. A tier runs the cheapest panel whose measured escape bound meets its target (10%, 5%, 2% by default), calibrated on a seeded-defect corpus with `/deliver:calibrate`. A tier without a measured bound runs the maximum panel. |
+| Review and verification | A read-only review panel that includes a lens from the family opposite the builder's whenever that family is available, the project's real test, lint, and build gates, a test-integrity check, and a final `pm-verifier` PASS, with bounded fix loops. |
+| Tiers and measured assurance | Each story is `T0`, `T1`, or `T2` by what it changes. A tier runs the cheapest panel whose measured escape bound meets its target (10%, 5%, 2% by default), calibrated on a seeded-defect corpus with `/deliver:calibrate`. A tier without a measured bound runs the maximum panel. |
 | Protected oracles | At `T1` and up, `test-engineer` writes the acceptance tests before the build and no builder may change them. At `T2`, extra holdout checks live on a private git ref the builder is never shown. |
 | Ship gate | The `require-verified.mjs` hook blocks merging a story branch without a recorded verifier `PASS` for its tip and, at `T1` and up, a passing integrity verdict. |
-| Trust report | Instead of a diff, each sprint checkpoint shows `retro-stats.mjs --trust`: stories per tier, the panel each ran, its bound, fix rounds, integrity blocks, holdout failures, and observed escapes. An escape bound over target forces the maximum panel. |
+| Trust report | Instead of a diff, every checkpoint at every scale opens with `retro-stats.mjs --trust`: stories per tier, the panel each ran, stories reviewed below panel, its bound, fix rounds, integrity blocks, holdout failures, and observed escapes. An escape bound over target forces the maximum panel. |
 | State | Git carries it. The claim is the story branch, each build and fix round is a commit, and the `--no-ff` merge body is the story record. Only an approval marker, a per-story Execution block, and an optional handoff are written, so concurrent sessions never overwrite each other and any lost session resumes from git. |
 
 Bundled specialist agents do the work:
@@ -115,12 +115,14 @@ Bundled specialist agents do the work:
 
 With Codex installed, the PM asks `codex-advisor` before a consequential technical decision.
 Review is opposite-family: an `expert-builder` story gets `codex-reviewer`, and a `codex-builder`
-story gets the Claude `code-integrity-reviewer`. The advisor defaults to
-`gpt-6-astra` and the reviewer to `gpt-6.1-sol`, both at `high`.
+story gets the Claude `code-integrity-reviewer`. When Codex is absent, `T0` and `T1` stories
+continue without it and the trust report counts them as below panel; `T2` stories escalate. The
+advisor defaults to `gpt-6-astra` and the reviewer to `gpt-6.1-sol`, both at `high`.
 `codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`, and `codex-advisor`
-relays its answer in chat. Every Codex invocation goes through one of these thin Sonnet wrappers and
-the bundled Node runner; the PM never runs `codex` itself. The PM stays an orchestrator and protects
-its own context by handing each agent only what it needs.
+relays its answer in chat. Outside T3 Code's `delegate_task` advisory and research path, every Codex
+invocation goes through one of these thin Sonnet wrappers and the bundled Node runner; the PM never runs
+`codex` itself. The PM stays an orchestrator and protects its own context by handing each agent
+only what it needs.
 
 Each story carries a one-line `pm-meta` JSON comment naming its builder (`expert-builder`,
 `codex-builder`, or `auto`) and its machine-readable touch paths. Opus remains the default for broad
