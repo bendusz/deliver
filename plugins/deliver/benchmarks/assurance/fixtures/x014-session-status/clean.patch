@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 11f44ee..c59535f 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Session status helpers.
++
++export function sessionActive(session, now) {
++  return session.revokedAt === null && now < session.expiresAt;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..d324b1b
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { sessionActive } from '../src/feature.mjs';
++test('active and later revoked', () => { assert.equal(sessionActive({expiresAt:100,revokedAt:null},10),true); assert.equal(sessionActive({expiresAt:100,revokedAt:5},10),false); });

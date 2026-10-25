@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index a6620d2..cd11fdc 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Locale cookie helpers.
++
++export function localeCookie(locale) {
++  return `locale=${encodeURIComponent(locale)}; Path=/; HttpOnly; SameSite=Lax`;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..9a9c8f2
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,9 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { localeCookie } from '../src/feature.mjs';
++test('cookie value is encoded', () => {
++  assert.equal(localeCookie('en-GB'),'locale=en-GB; Path=/; HttpOnly; SameSite=Lax');
++  assert.equal(localeCookie('x;admin=true\r\nSet-Cookie:evil'),'locale=x%3Badmin%3Dtrue%0D%0ASet-Cookie%3Aevil; Path=/; HttpOnly; SameSite=Lax');
++  assert.equal(localeCookie('日本'),'locale=%E6%97%A5%E6%9C%AC; Path=/; HttpOnly; SameSite=Lax');
++  assert.equal(localeCookie(''),'locale=; Path=/; HttpOnly; SameSite=Lax');
++});

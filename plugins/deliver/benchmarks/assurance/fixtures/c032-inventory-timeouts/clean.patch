@@ -1,0 +1,62 @@
+diff --git a/src/remote.mjs b/src/remote.mjs
+index 1c25f3b..f6e0463 100644
+--- a/src/remote.mjs
++++ b/src/remote.mjs
+@@ -6,3 +6,20 @@ export class TimeoutError extends Error {
+     this.code = 'ETIMEDOUT';
+   }
+ }
++
++// withTimeout(promise, ms, timers): promise, or a TimeoutError if it takes longer than ms.
++export function withTimeout(promise, ms, timers = globalThis) {
++  return new Promise((resolve, reject) => {
++    const timer = timers.setTimeout(() => reject(new TimeoutError(ms)), ms);
++    Promise.resolve(promise).then(
++      (value) => {
++        timers.clearTimeout(timer);
++        resolve(value);
++      },
++      (err) => {
++        timers.clearTimeout(timer);
++        reject(err);
++      },
++    );
++  });
++}
+diff --git a/test/remote.test.mjs b/test/remote.test.mjs
+new file mode 100644
+index 0000000..174e265
+--- /dev/null
++++ b/test/remote.test.mjs
+@@ -0,0 +1,31 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { withTimeout, TimeoutError } from '../src/remote.mjs';
++
++function fakeTimers() {
++  const pending = new Map();
++  let next = 1;
++  return {
++    pending,
++    setTimeout(fn) { const id = next++; pending.set(id, fn); return id; },
++    clearTimeout(id) { pending.delete(id); },
++    fireAll() { for (const [id, fn] of pending) { pending.delete(id); fn(); } },
++  };
++}
++
++test('a fast call passes its value through and clears the timer', async () => {
++  const timers = fakeTimers();
++  assert.equal(await withTimeout(Promise.resolve(7), 100, timers), 7);
++  assert.equal(timers.pending.size, 0);
++});
++
++test('a slow call times out', async () => {
++  const timers = fakeTimers();
++  const call = withTimeout(new Promise(() => {}), 100, timers);
++  timers.fireAll();
++  await assert.rejects(call, TimeoutError);
++});
++
++test('a failing call rejects with its own error', async () => {
++  await assert.rejects(withTimeout(Promise.reject(new Error('unknown sku')), 100, fakeTimers()), /unknown sku/);
++});

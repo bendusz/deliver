@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 78ffd56..1a4ac0d 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Server options helpers.
++
++export function loadOptions(input) {
++  return {host: input.host ?? 'localhost', port: input.port ?? 8080};
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..5aa6836
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { loadOptions } from '../src/feature.mjs';
++test('defaults and overrides', () => { assert.deepEqual(loadOptions({}),{host:'localhost',port:8080}); assert.deepEqual(loadOptions({port:0,extra:1}),{host:'localhost',port:0}); });

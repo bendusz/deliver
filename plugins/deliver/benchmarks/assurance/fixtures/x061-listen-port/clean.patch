@@ -1,0 +1,30 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 7ae1ad7..d035ba1 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,9 @@
+ // Listen port helpers.
++
++export function listenPort(raw) {
++  if (raw === undefined) return 8080;
++  if (raw.length === 0 || /\D/.test(raw)) throw new RangeError('invalid port');
++  const port = Number(raw);
++  if (port > 65535) throw new RangeError('invalid port');
++  return port;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..1fc4b48
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,10 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { listenPort } from '../src/feature.mjs';
++test('default and supported port boundaries', () => {
++  assert.equal(listenPort(undefined),8080); assert.equal(listenPort('0'),0);
++  assert.equal(listenPort('65535'),65535); assert.equal(listenPort('0080'),80);
++});
++test('invalid ports fail explicitly', () => {
++  for(const value of ['', ' ', '-1', '+80', '1.5', '0x50', '65536', '1e3', '80\n', '80\r', '99999999999999999999999999']) assert.throws(()=>listenPort(value),RangeError);
++});

@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index f79bdaf..1500727 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,10 @@
+ // Release order helpers.
++
++export function compareVersions(a, b) {
++  const left = a.split('.').map(Number);
++  const right = b.split('.').map(Number);
++  for (let i = 0; i < 3; i++) {
++    if (left[i] !== right[i]) return Math.sign(left[i] - right[i]);
++  }
++  return 0;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..9e06b8d
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { compareVersions } from '../src/feature.mjs';
++test('major releases', () => { assert.equal(compareVersions('2.0.0','1.9.0'),1); assert.equal(compareVersions('1.0.0','1.0.0'),0); });

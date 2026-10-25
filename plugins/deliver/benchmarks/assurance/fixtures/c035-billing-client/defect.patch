@@ -1,0 +1,41 @@
+diff --git a/src/client.mjs b/src/client.mjs
+index c7c5421..0040e60 100644
+--- a/src/client.mjs
++++ b/src/client.mjs
+@@ -7,3 +7,12 @@ export class HttpError extends Error {
+     this.body = body;
+   }
+ }
++
++// getJson(fetch, url): the parsed JSON body of a 2xx response; an HttpError for any other status.
++export async function getJson(fetch, url) {
++  const res = await fetch(url, { headers: { accept: 'application/json' } });
++  const text = await res.text();
++  const data = text ? JSON.parse(text) : null;
++  if (!res.ok) throw new HttpError(res.status, text);
++  return data;
++}
+diff --git a/test/client.test.mjs b/test/client.test.mjs
+new file mode 100644
+index 0000000..9dd6952
+--- /dev/null
++++ b/test/client.test.mjs
+@@ -0,0 +1,18 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { getJson, HttpError } from '../src/client.mjs';
++
++const respond = (status, text) => async () => ({ ok: status >= 200 && status < 300, status, text: async () => text });
++
++test('a 2xx body is parsed and an empty one is null', async () => {
++  assert.deepEqual(await getJson(respond(200, '{"balance":120}'), '/b'), { balance: 120 });
++  assert.equal(await getJson(respond(204, ''), '/b'), null);
++});
++
++test('a JSON error response is an HttpError', async () => {
++  await assert.rejects(getJson(respond(404, '{"error":"no such invoice"}'), '/b'), (e) => e instanceof HttpError && e.status === 404 && e.body.includes('no such invoice'));
++});
++
++test('a 2xx with a broken body is a SyntaxError', async () => {
++  await assert.rejects(getJson(respond(200, '{"bal'), '/b'), SyntaxError);
++});

@@ -18,6 +18,19 @@ tree, or the kill switch `DELIVER_NO_ENFORCE=1`), and never sees a write made th
   legacy `pm/`, whose content matches a high-confidence secret shape. It is a tripwire for
   accidents, not a scanner, so prose about secrets never trips it.
 
+**Ship gate.** A third `PreToolUse` hook, `require-verified.mjs`, matches `Bash`. It blocks a
+`git merge` of a `pm/*` branch unless that branch's story records `verifier: PASS <sha>` for the
+code at the branch head and, at `T1` and `T2`, `integrity: pass <sha>`. It reads the claim from the
+integration branch, never from the working tree. It fails open on unreadable hook input, with the
+kill switch set, or outside a deliver project; the hook header lists the remaining known limits.
+Once a story merge is certain, whatever it cannot establish blocks. The merge's own directory,
+after `cd` or `git -C`, identifies the project. Run from a directory that is in no deliver project
+(for example a monorepo root), a story-like merge blocks with "run the merge from the project
+directory, or with git -C <project>", unless the checked-out target is a non-base branch that no project integrates on. `implementation-loop.md` state 6
+describes it. It catches a PM's honest mistakes,
+such as a forgotten or stale verdict, a careless command chain, or a mis-stated tier. It is not a
+boundary against a deliberately evasive agent with Bash; that protection is the 0.30 sandbox.
+
 **Session context.** `session-context.mjs` reads the marker, the story files, and git, and adds
 the current position to new and compacted sessions. It is a `SessionStart` hook and only reads.
 

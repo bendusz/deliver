@@ -1,0 +1,61 @@
+diff --git a/src/import.mjs b/src/import.mjs
+index 12902fe..d2c9704 100644
+--- a/src/import.mjs
++++ b/src/import.mjs
+@@ -1,2 +1,33 @@
+ // Bulk contact import. Every contact must carry these keys.
+ export const REQUIRED = ['email'];
++
++// parseJsonl(text): the valid contact records and a per-line list of rejected lines.
++export function parseJsonl(text) {
++  const records = [];
++  const errors = [];
++  String(text)
++    .replace(/^\uFEFF/, '')
++    .split(/\r?\n/)
++    .forEach((raw, i) => {
++      const line = i + 1;
++      if (raw.trim() === '') return;
++      let value;
++      try {
++        value = JSON.parse(raw);
++      } catch (err) {
++        errors.push({ line, message: `invalid JSON: ${err.message}` });
++        return;
++      }
++      if (value === null || typeof value !== 'object' || Array.isArray(value)) {
++        errors.push({ line, message: 'not a JSON object' });
++        return;
++      }
++      const missing = REQUIRED.filter((k) => value[k] === undefined || value[k] === null || value[k] === '');
++      if (missing.length) {
++        errors.push({ line, message: `missing ${missing.join(', ')}` });
++        return;
++      }
++      records.push(value);
++    });
++  return { records, errors };
++}
+diff --git a/test/import.test.mjs b/test/import.test.mjs
+new file mode 100644
+index 0000000..526a75e
+--- /dev/null
++++ b/test/import.test.mjs
+@@ -0,0 +1,17 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { parseJsonl } from '../src/import.mjs';
++
++test('good lines become records and bad lines are reported by number', () => {
++  const text = '\uFEFF{"email":"a@x.test"}\r\n\r\n{"email":\r\n[1,2]\r\n{"name":"no email"}\r\n{"email":""}\r\n{"email":"b@x.test","name":"B"}\r\n';
++  const { records, errors } = parseJsonl(text);
++  assert.deepEqual(records, [{ email: 'a@x.test' }, { email: 'b@x.test', name: 'B' }]);
++  assert.deepEqual(errors.map((e) => e.line), [3, 4, 5, 6]);
++  assert.match(errors[0].message, /invalid JSON/);
++  assert.equal(errors[1].message, 'not a JSON object');
++  assert.equal(errors[2].message, 'missing email');
++});
++
++test('an empty upload has nothing in it', () => {
++  assert.deepEqual(parseJsonl(''), { records: [], errors: [] });
++});

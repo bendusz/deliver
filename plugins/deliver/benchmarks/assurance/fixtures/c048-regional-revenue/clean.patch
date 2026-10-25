@@ -1,0 +1,41 @@
+diff --git a/src/report.mjs b/src/report.mjs
+index f18fc07..98139ef 100644
+--- a/src/report.mjs
++++ b/src/report.mjs
+@@ -2,3 +2,15 @@
+ export function sumCents(values) {
+   return values.reduce((a, b) => a + b, 0);
+ }
++
++// revenueByRegion(orders, customers): paid order totals per customer region.
++export function revenueByRegion(orders, customers) {
++  const regionOf = new Map(customers.map((c) => [c.id, c.region]));
++  const totals = {};
++  for (const o of orders) {
++    if (o.status !== 'paid') continue;
++    const region = regionOf.get(o.customerId) ?? 'unknown';
++    totals[region] = (totals[region] ?? 0) + o.totalCents;
++  }
++  return totals;
++}
+diff --git a/test/report.test.mjs b/test/report.test.mjs
+new file mode 100644
+index 0000000..a30f57c
+--- /dev/null
++++ b/test/report.test.mjs
+@@ -0,0 +1,15 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { revenueByRegion } from '../src/report.mjs';
++
++test('paid orders are summed per region', () => {
++  const customers = [{ id: 1, region: 'emea' }, { id: 2, region: 'apac' }, { id: 3, region: 'emea' }];
++  const orders = [
++    { id: 'a', customerId: 1, status: 'paid', totalCents: 1000 },
++    { id: 'b', customerId: 3, status: 'paid', totalCents: 500 },
++    { id: 'c', customerId: 2, status: 'refunded', totalCents: 700 },
++    { id: 'd', customerId: 9, status: 'paid', totalCents: 50 },
++  ];
++  assert.deepEqual(revenueByRegion(orders, customers), { emea: 1500, unknown: 50 });
++  assert.deepEqual(revenueByRegion([], customers), {});
++});

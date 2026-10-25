@@ -1,0 +1,44 @@
+diff --git a/src/catalog.mjs b/src/catalog.mjs
+index b231eb6..05be77f 100644
+--- a/src/catalog.mjs
++++ b/src/catalog.mjs
+@@ -2,3 +2,14 @@
+ export function byName(a, b) {
+   return a.name.localeCompare(b.name);
+ }
++
++// searchProducts(products, query): products matching every given filter, sorted by name.
++//   q: case-insensitive substring of the name; minPrice/maxPrice: inclusive bounds in cents.
++export function searchProducts(products, { q, minPrice, maxPrice } = {}) {
++  const needle = q ? q.trim().toLowerCase() : '';
++  return products
++    .filter((p) => !needle || p.name.toLowerCase().includes(needle))
++    .filter((p) => minPrice === undefined || p.priceCents >= minPrice)
++    .filter((p) => maxPrice === undefined || p.priceCents <= maxPrice)
++    .sort(byName);
++}
+diff --git a/test/catalog.test.mjs b/test/catalog.test.mjs
+new file mode 100644
+index 0000000..7fe26d4
+--- /dev/null
++++ b/test/catalog.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { searchProducts } from '../src/catalog.mjs';
++
++const products = [
++  { sku: 'b', name: 'Blue Mug', priceCents: 1200, stock: 3 },
++  { sku: 'a', name: 'Arabica Beans', priceCents: 1800, stock: 0 },
++  { sku: 'c', name: 'Mug Lid', priceCents: 400, stock: 9 },
++];
++
++test('q matches names case-insensitively and results sort by name', () => {
++  assert.deepEqual(searchProducts(products, { q: '  mug ' }).map((p) => p.sku), ['b', 'c']);
++  assert.deepEqual(searchProducts(products).map((p) => p.sku), ['a', 'b', 'c']);
++  assert.equal(products[0].sku, 'b');
++});
++
++test('price bounds are inclusive', () => {
++  assert.deepEqual(searchProducts(products, { minPrice: 1200, maxPrice: 1800 }).map((p) => p.sku), ['a', 'b']);
++});

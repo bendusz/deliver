@@ -22,6 +22,44 @@ Then run it again with `--audit --sprint <n+1>`. It lists every learned line in 
 ones tagged `[L<sprint>-<n>]`, with the sprint it is due for review and the last retro that cited
 it. Step 2 decides each `due` and `orphan` line.
 
+## 0b. The trust report
+The user does not read the code. The trust report is what they read instead, so it opens every
+checkpoint report at every scale (`planning-and-signoff.md`). At `tiny` and `small`, which skip
+the rest of this file, run this step alone at every sprint boundary and checkpoint, with no record
+file.
+
+Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/retro-stats.mjs" . --trust --sprint <n>`. It takes each
+tier's target from the plan's `- Assurance targets:` line in Delivery mode, defaulting to 10%, 5%,
+and 2%. Per tier, it prints:
+- the stories shipped this sprint;
+- the panel the tier ran, from `benchmarks/assurance/panels.json`, or "unmeasured, maximum panel";
+- the calibrated bound, the certify-split bound, which counts only when it meets the tier's
+  target;
+- `below panel: N`, the stories whose recorded `panel` fell short of the tier panel; while N is
+  above 0 the report withholds the tier's bound;
+- first-pass stories, fix rounds, integrity blocks, and holdout failures;
+- observed escapes for the stories merged since the calibration in force, with their one-sided 95%
+  bound against the tier's target, and the same figure for every story to date beside it.
+
+It reads the stories and the trailers from the integration branch named in the plan, not from the
+working tree. Paste the report into the record unedited.
+
+**Observed escapes.** A commit that fixes a defect in code an earlier story shipped carries the
+trailer `Escaped-From: <story-id>` in its message body, naming the story that shipped the defect,
+one line per story. The fix's own story, review, or fix round adds it when the cause is known; a
+defect whose origin is unclear gets no trailer. The report maps each trailer to that story's tier.
+
+**Over target.** A tier flagged `OVER TARGET` runs the maximum panel from the next sprint on, as an
+unmeasured tier does (`review-gates.md`), until `/deliver:calibrate` re-runs and the report no
+longer flags it. The flag counts only stories merged at or after the calibration's `calibratedAt`
+time, so a recalibration starts a fresh window. A story's merge time is the committer time of the
+first `chore(<story-id>): merged` commit on the integration branch, compared in UTC; without one
+the report falls back to the Execution block's `updated`, and a story with neither is counted. Record the switch in the record's Trust section and in the
+checkpoint message. A tier with no escapes whose bound is still wide only lacks stories; that is
+not a flag. A stale `panels.json`, one whose lens stamp no longer matches an agent file or whose
+corpus changed, means every tier runs the maximum panel; say so and propose `/deliver:calibrate`
+to the user.
+
 ## 1. Sprint review, cross-story only
 Find the sprint's range on the integration branch: the parent of the first story's merge commit to
 the last story's merge commit (`git log --first-parent --merges`). Produce
@@ -68,7 +106,7 @@ is paid on every dispatch (`instruction-layers.md`).
 
 ## 3. Record
 Write `docs/retros/sprint-<n>.md` from `${CLAUDE_PLUGIN_ROOT}/templates/retro.md.template`: the
-numbers, the review verdict, the three answers, the proposed checks, the Lessons table with the
+numbers, the trust report and any tier forced to the maximum panel, the review verdict, the three answers, the proposed checks, the Lessons table with the
 accepted and retired `AGENTS.md` lines, and the carried-over items.
 Commit it together with the `AGENTS.md` change as `chore(retro): sprint <n>`. With a wiki,
 `librarian ingest` the record per `knowledge.md`. Then the checkpoint pause, per

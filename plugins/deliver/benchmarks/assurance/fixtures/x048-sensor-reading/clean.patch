@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 722b75f..385a66b 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Sensor reading helpers.
++
++export function parseMetric(value) {
++  return value === '' ? null : Number(value);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..3725752
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { parseMetric } from '../src/feature.mjs';
++test('missing and positive readings', () => { assert.equal(parseMetric(''),null); assert.equal(parseMetric('12.5'),12.5); });

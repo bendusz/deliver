@@ -1,0 +1,50 @@
+diff --git a/src/webhooks.mjs b/src/webhooks.mjs
+index 8ce68b6..80f6097 100644
+--- a/src/webhooks.mjs
++++ b/src/webhooks.mjs
+@@ -2,3 +2,22 @@
+ export function deliveryId(headers) {
+   return headers['x-delivery-id'] ?? null;
+ }
++
++// createDeduper(windowMs): remembers delivery ids for windowMs so retries can be dropped.
++export function createDeduper(windowMs) {
++  const firstSeen = new Map();
++  return {
++    seen(id, now) {
++      for (const [key, at] of firstSeen) {
++        if (now - at < windowMs) break;
++        firstSeen.delete(key);
++      }
++      if (firstSeen.has(id)) return true;
++      firstSeen.set(id, now);
++      return false;
++    },
++    get size() {
++      return firstSeen.size;
++    },
++  };
++}
+diff --git a/test/webhooks.test.mjs b/test/webhooks.test.mjs
+new file mode 100644
+index 0000000..6bb7f8d
+--- /dev/null
++++ b/test/webhooks.test.mjs
+@@ -0,0 +1,17 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { createDeduper } from '../src/webhooks.mjs';
++
++test('a retry inside the window is a duplicate', () => {
++  const d = createDeduper(1000);
++  assert.equal(d.seen('a', 0), false);
++  assert.equal(d.seen('a', 999), true);
++  assert.equal(d.seen('b', 999), false);
++});
++
++test('after the window an id is new again', () => {
++  const d = createDeduper(1000);
++  d.seen('a', 0);
++  assert.equal(d.seen('a', 1000), false);
++  assert.equal(d.seen('a', 1500), true);
++});

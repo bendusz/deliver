@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 34325d9..49103d3 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,10 @@
+ // Api response helpers.
++
++export async function readApiResponse(response) {
++  if (response.status >= 500) {
++    const error = new Error(`HTTP ${response.status}`);
++    error.status = response.status;
++    throw error;
++  }
++  return response.json();
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..29c2d30
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readApiResponse } from '../src/feature.mjs';
++test('success and server failure', async () => { assert.deepEqual(await readApiResponse({status:200,json:async()=>({ok:true})}),{ok:true}); await assert.rejects(readApiResponse({status:500,json:async()=>null}),{status:500}); });

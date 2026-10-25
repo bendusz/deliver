@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 27f6c9b..9ee98ed 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Retry schedule helpers.
++
++export function retryDelay(attempt, initial, cap) {
++  return Math.min(cap, initial * 2 ** (attempt - 1));
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..9caa15b
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { retryDelay } from '../src/feature.mjs';
++test('at cap', () => assert.equal(retryDelay(1, 100, 100), 100));

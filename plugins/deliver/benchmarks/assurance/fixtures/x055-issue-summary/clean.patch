@@ -1,0 +1,28 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 0054610..6b20039 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Issue summary helpers.
++
++export function issueSummary(issue, {link = false, baseUrl = 'https://tracker.example/issues/'} = {}) {
++  const summary = `${issue.id}: ${issue.title}`;
++  return link ? `${summary}\n${baseUrl}${encodeURIComponent(issue.id)}` : summary;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..5799309
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,11 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { issueSummary } from '../src/feature.mjs';
++test('plain and linked issue summaries', () => {
++  const issue={id:'OPS/1',title:'Restore backups'};
++  assert.equal(issueSummary(issue),'OPS/1: Restore backups');
++  assert.equal(issueSummary(issue,{link:true}),'OPS/1: Restore backups\nhttps://tracker.example/issues/OPS%2F1');
++  assert.equal(issueSummary(issue,{link:true,baseUrl:'https://bugs.example/'}),'OPS/1: Restore backups\nhttps://bugs.example/OPS%2F1');
++  assert.equal(issueSummary(issue,{link:false,baseUrl:'https://bugs.example/'}),'OPS/1: Restore backups');
++  assert.equal(issueSummary({id:'',title:''}),': ');
++});

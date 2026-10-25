@@ -1,0 +1,22 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index dab8105..dc5b0bb 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,7 @@
+ // Tabular export helpers.
++
++export function exportRows(rows, columns) {
++  const lines = rows.map(row => columns.map(key => row[key]).join(','));
++  lines.unshift(columns.join(','));
++  return lines.join('\n');
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..84c1cad
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { exportRows } from '../src/feature.mjs';
++test('default export', () => assert.equal(exportRows([{name:'Ada',team:'Ops'}],['team','name']),'team,name\nOps,Ada'));

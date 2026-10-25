@@ -1,0 +1,63 @@
+diff --git a/src/push.mjs b/src/push.mjs
+index b153055..30dfe02 100644
+--- a/src/push.mjs
++++ b/src/push.mjs
+@@ -1,2 +1,29 @@
+ // Push notification priorities, most important first.
+ export const PRIORITY_ORDER = ['urgent', 'normal', 'low'];
++
++const MINUTE = 60000;
++const toMinutes = (hhmm) => {
++  const [h, m] = hhmm.split(':').map(Number);
++  return h * 60 + m;
++};
++
++// quietUntil(prefs, now): when the user's quiet period ends, or `now` outside it.
++function quietUntil(prefs, now) {
++  if (!prefs.quietStart || !prefs.quietEnd) return now;
++  const start = toMinutes(prefs.quietStart);
++  const end = toMinutes(prefs.quietEnd);
++  if (start === end) return now;
++  const minuteStart = now - (((now % MINUTE) + MINUTE) % MINUTE);
++  const local = (((minuteStart / MINUTE + (prefs.utcOffsetMinutes ?? 0)) % 1440) + 1440) % 1440;
++  const quiet = start < end ? local >= start && local < end : local >= start || local < end;
++  if (!quiet) return now;
++  return minuteStart + ((((end - local) % 1440) + 1440) % 1440) * MINUTE;
++}
++
++// schedule(notifications, prefs, now): each notification with its delivery time.
++export function schedule(notifications, prefs, now) {
++  const rank = (n) => PRIORITY_ORDER.indexOf(n.priority);
++  return notifications
++    .map((n) => ({ ...n, deliverAt: quietUntil(prefs, now) }))
++    .sort((a, b) => a.deliverAt - b.deliverAt || rank(a) - rank(b));
++}
+diff --git a/test/push.test.mjs b/test/push.test.mjs
+new file mode 100644
+index 0000000..d217812
+--- /dev/null
++++ b/test/push.test.mjs
+@@ -0,0 +1,23 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { schedule } from '../src/push.mjs';
++
++const at = (iso) => Date.parse(iso);
++const prefs = { quietStart: '22:00', quietEnd: '07:00', utcOffsetMinutes: 60 };
++
++test('outside quiet hours everything goes now', () => {
++  const now = at('2024-05-01T12:00:30Z');
++  const out = schedule([{ id: 1, priority: 'low' }, { id: 2, priority: 'normal' }], prefs, now);
++  assert.deepEqual(out.map((n) => [n.id, n.deliverAt]), [[2, now], [1, now]]);
++});
++
++test('inside a period that wraps midnight, delivery waits for its end', () => {
++  const out = schedule([{ id: 1, priority: 'normal' }], prefs, at('2024-05-01T22:15:42Z'));
++  assert.equal(out[0].deliverAt, at('2024-05-02T06:00:00Z'));
++});
++
++test('no quiet period configured', () => {
++  const now = at('2024-05-01T23:00:00Z');
++  assert.equal(schedule([{ id: 1, priority: 'low' }], { quietStart: '08:00', quietEnd: '08:00' }, now)[0].deliverAt, now);
++  assert.equal(schedule([{ id: 1, priority: 'low' }], {}, now)[0].deliverAt, now);
++});

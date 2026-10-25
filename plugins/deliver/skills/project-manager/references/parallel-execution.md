@@ -22,14 +22,23 @@ larger sets in waves.
 
 ## 2. Claim the whole batch, then build in parallel
 - Resolve every `auto` builder by loop state 0 before dispatch. Then, in the clean integration
-  checkout, claim **every** batch story at once: append each story's Execution block with its
-  owner, builder, branch, and `status: claimed`, and commit them together as
-  `chore(<ids>): claim batch`. Set every block to `building` in one more commit right before the
-  dispatch, while no builder is running yet.
-- Give each story its own branch and worktree. Prefer the host's native worktree isolation if it
-  offers any; otherwise
+  checkout, claim **every** batch story at once: append each story's Execution block per `state.md`,
+  with its `owner`, the resolved `builder`, the branch name, `status: claimed`, the story's `tier`,
+  every counter at `0`, and the `deliver` version, and commit them together as
+  `chore(<ids>): claim batch`.
+- Give each story its own branch and worktree. By default,
   `git worktree add tmp/worktrees/<slug> -b pm/S<sprint>-<n>-<slug> <integration_branch>`, having
-  first confirmed `tmp/` is gitignored. Every dispatch for that story gets its worktree path.
+  first confirmed `tmp/` is gitignored. Use the host's native worktree isolation, T3's for example,
+  only when the user opts in, and still on a `pm/*` branch so deliver counts it as its own. Every
+  dispatch for that story gets its worktree path.
+- **Before the wave, serially, for each `T1` or `T2` story:** dispatch `test-engineer` for its
+  acceptance tests in its worktree; at `T2` also give it a new temporary directory outside every
+  checkout for holdout checks, and store them with `holdout.mjs store`. Commit the tests on the
+  story branch from its worktree as `test(<story-id>): acceptance`. Commit `protected` and
+  `protected_base` on the integration branch from the main checkout as `chore(<story-id>): protect`.
+  Then merge the integration branch into the story branch from its worktree.
+  `implementation-loop.md` state 1 owns the details. When every story is protected, set each batch
+  story to `building` on its own branch, in its worktree, while no builder is running yet.
 - Run `--mode build --preflight` against every Codex worktree and story pair first. A failed
   preflight drops that story from the batch without consuming task quota.
 - Dispatch the batch's builders together, as concurrent subagent calls in one step, each with its
@@ -57,8 +66,10 @@ since git refuses to check the integration branch out twice.
 
 1. Run loop states 2 to 5 in the worktree, in order, against the committed diff
    `git diff <integration>...HEAD`. Each fix round commits to the story branch before the gates
-   re-run, as in the loop. If the worktree lacks runtime deps such as `node_modules` or `.env`,
-   install them first, **never** committing those artifacts.
+   re-run, as in the loop. The integrity gate runs as
+   `test-integrity.mjs … --root <worktree>`, and the SHA it records comes from
+   `git -C <worktree> rev-parse HEAD`. If the worktree lacks runtime deps such as `node_modules` or
+   `.env`, install them first, **never** committing those artifacts.
 2. On `pm-verifier` `PASS`, merge the latest integration tip into the story branch, then re-gate
    the merged result per loop state 6. A failure re-enters loop state 4 in this worktree. If the
    merge conflicts and you cannot resolve it cleanly, **stop** rather than forcing it: escalate to
@@ -70,6 +81,8 @@ since git refuses to check the integration branch out twice.
 A partial batch still checkpoints at the sprint boundary.
 
 ## Cleanup preconditions
+- These apply only to worktrees deliver created: under `tmp/worktrees/` or on a `pm/*` branch.
+  Any other worktree belongs to the host or the user; report it and **never** remove or prune it.
 - **Never** remove or prune a worktree that still holds uncommitted work. A stopped or `blocked`
   story keeps its worktree for inspection.
 - Remove only with `git worktree remove`, **never** `rm -rf` and **never** `--force`. Check

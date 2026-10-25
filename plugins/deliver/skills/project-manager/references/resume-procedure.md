@@ -34,7 +34,8 @@ lists under `sprints_without_retro`, lowest first, before any claim. An `approve
 with no story files means decomposition, or the skeleton when the plan asks for one. Stories with
 no Execution block at all mean the first claim. Only then continue from a story's Execution block `status`,
 using its persisted `builder` and counters rather than re-deciding from memory:
-- `claimed`: dispatch the build, loop state 1.
+- `claimed`: with no acceptance tests, dispatch the build, loop state 1. With acceptance tests,
+  see where that step stopped, below.
 - `building`: a builder was dispatched and may have left uncommitted output. Re-run the scope
   check, commit what passes, then gate, state 2.
 - `built`: gate, then review, states 2 and 3.
@@ -49,9 +50,25 @@ block names another owner is theirs. A story with no block whose `pm/<id>-*` bra
 merged into the integration branch is done, not unclaimed: give it a `merged` block, commit, and
 move on.
 
+## A `claimed` story with acceptance tests
+Acceptance tests are mandatory at `T1` and `T2` and optional at `T0`. That work happens while the
+story is `claimed`, so check its commits before any builder runs:
+- No `test(<story-id>): acceptance` commit on the story branch: discard any uncommitted acceptance
+  files and run loop state 1 from the start.
+- An acceptance commit but no `chore(<story-id>): protect` commit on the integration branch: commit
+  the protect pair there.
+- A protect commit not yet merged into the story branch: merge the integration branch into it.
+- Uncommitted changes in a `claimed` checkout are unprotected acceptance work, never builder
+  output. Never commit them as a build.
+
+Then set `status: building` and continue with loop state 1's build.
+
 ## Parallel batches
 On resume from the main checkout, reconcile `git worktree list` against the Execution blocks whose
-`branch` is unmerged:
+`branch` is unmerged. Batch stories become `building` on their own branches, so read each one's
+status at its branch tip with `git -C <worktree> show HEAD:<story file>`, not on the integration
+branch. A story that reads `claimed` at its branch tip and has a worktree with uncommitted
+changes holds unprotected acceptance work, never builder output: follow the section above.
 - A worktree with uncommitted changes and status `building` is the expected state before the
   tail commits. Re-run the scope check, then re-enter `parallel-execution.md`'s integration tail
   at its step 1.
@@ -59,4 +76,9 @@ On resume from the main checkout, reconcile `git worktree list` against the Exec
   than moving on silently. Only work committed to the branch survived, so check it before assuming
   the story is intact.
 - A `blocked` story: present the blocker and re-enter the continuation its notes call for.
-- Then `git worktree prune` true orphans and continue the tail.
+- Then clear stale entries and continue the tail. Never run a repo-wide `git worktree prune`: it
+  also drops the entry of a host-owned worktree whose directory is only temporarily missing.
+  `node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" worktrees .` lists `deliver` and `host` entries,
+  each with `prunable` when its directory is gone. Run `git worktree remove <path>` on each
+  prunable `deliver` entry; git drops the entry and keeps the branch. Leave `host` entries alone.
+  If the command exits non-zero, it prints why on stderr; skip the cleanup and say so.

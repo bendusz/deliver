@@ -1,0 +1,51 @@
+diff --git a/src/reset.mjs b/src/reset.mjs
+new file mode 100644
+index 0000000..3a42b34
+--- /dev/null
++++ b/src/reset.mjs
+@@ -0,0 +1,21 @@
++import crypto from 'node:crypto';
++
++const TTL_MS = 60 * 60 * 1000;
++
++// issueResetToken(store, userId, now): a random token that lets userId reset their password for one hour.
++export async function issueResetToken(store, userId, now) {
++  const token = crypto.randomBytes(32).toString('base64url');
++  await store.set(`reset:${token}`, { userId, expiresAt: now + TTL_MS });
++  return token;
++}
++
++// redeemResetToken(store, token, now): the user id the token was issued for, or null when the
++// token is unknown or expired.
++export async function redeemResetToken(store, token, now) {
++  const key = `reset:${token}`;
++  const entry = await store.get(key);
++  if (!entry) return null;
++  await store.delete(key);
++  if (now >= entry.expiresAt) return null;
++  return entry.userId;
++}
+diff --git a/test/reset.test.mjs b/test/reset.test.mjs
+new file mode 100644
+index 0000000..093ca06
+--- /dev/null
++++ b/test/reset.test.mjs
+@@ -0,0 +1,18 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { MemoryStore } from '../src/store.mjs';
++import { issueResetToken, redeemResetToken } from '../src/reset.mjs';
++
++test('a fresh token redeems for its user', async () => {
++  const store = new MemoryStore();
++  const token = await issueResetToken(store, 'u1', 1000);
++  assert.ok(token.length >= 32);
++  assert.equal(await redeemResetToken(store, token, 2000), 'u1');
++});
++
++test('unknown and expired tokens are rejected', async () => {
++  const store = new MemoryStore();
++  const token = await issueResetToken(store, 'u1', 0);
++  assert.equal(await redeemResetToken(store, 'nope', 10), null);
++  assert.equal(await redeemResetToken(store, token, 3600000), null);
++});

@@ -1,0 +1,38 @@
+diff --git a/src/flags.mjs b/src/flags.mjs
+index cd7d76b..fcce0d8 100644
+--- a/src/flags.mjs
++++ b/src/flags.mjs
+@@ -6,3 +6,10 @@ export function bucketOf(flagName, userId) {
+   const digest = crypto.createHash('sha256').update(`${flagName}:${userId}`).digest();
+   return digest.readUInt32BE(0) % 100;
+ }
++
++// isEnabled(flag, userId): whether the flag is on for this user.
++export function isEnabled(flag, userId) {
++  if (!flag.enabled) return false;
++  if (flag.allowUsers?.includes(userId)) return true;
++  return bucketOf(flag.name, userId) < flag.rolloutPercent;
++}
+diff --git a/test/flags.test.mjs b/test/flags.test.mjs
+new file mode 100644
+index 0000000..f16a033
+--- /dev/null
++++ b/test/flags.test.mjs
+@@ -0,0 +1,17 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { isEnabled } from '../src/flags.mjs';
++
++const users = Array.from({ length: 1000 }, (_, i) => `user-${i}`);
++const share = (flag) => users.filter((u) => isEnabled(flag, u)).length / users.length;
++
++test('the kill switch beats the allow list', () => {
++  assert.equal(isEnabled({ name: 'f', enabled: false, rolloutPercent: 100, allowUsers: ['a'] }, 'a'), false);
++  assert.equal(isEnabled({ name: 'f', enabled: true, rolloutPercent: 0, allowUsers: ['a'] }, 'a'), true);
++});
++
++test('rollout percentages are roughly honoured', () => {
++  assert.equal(share({ name: 'f', enabled: true, rolloutPercent: 100 }), 1);
++  const half = share({ name: 'f', enabled: true, rolloutPercent: 50 });
++  assert.ok(half > 0.4 && half < 0.6, String(half));
++});

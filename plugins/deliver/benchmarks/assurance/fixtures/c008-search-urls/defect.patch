@@ -1,0 +1,46 @@
+diff --git a/src/urls.mjs b/src/urls.mjs
+index 0cff8db..f9a5976 100644
+--- a/src/urls.mjs
++++ b/src/urls.mjs
+@@ -1,2 +1,19 @@
+ // URL helpers for the search page.
+ export const SEARCH_PATH = '/search';
++
++// toQueryString(params): a sorted, encoded query string; arrays repeat their key.
++export function toQueryString(params) {
++  const parts = [];
++  for (const key of Object.keys(params).sort()) {
++    const value = params[key];
++    if (value === undefined || value === null) continue;
++    const values = Array.isArray(value) ? [value.join(',')] : [value];
++    for (const v of values) parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
++  }
++  return parts.length ? `?${parts.join('&')}` : '';
++}
++
++// searchUrl(params): the search page URL for these filters.
++export function searchUrl(params) {
++  return SEARCH_PATH + toQueryString(params);
++}
+diff --git a/test/urls.test.mjs b/test/urls.test.mjs
+new file mode 100644
+index 0000000..650cf17
+--- /dev/null
++++ b/test/urls.test.mjs
+@@ -0,0 +1,16 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { toQueryString, searchUrl } from '../src/urls.mjs';
++
++test('keys are sorted and values encoded', () => {
++  assert.equal(toQueryString({ q: 'red & blue', page: 2 }), '?page=2&q=red%20%26%20blue');
++});
++
++test('arrays repeat their key and empty values are skipped', () => {
++  assert.match(toQueryString({ tag: ['a', 'b c'], color: null, size: undefined }), /^\?tag=a/);
++  assert.equal(toQueryString({}), '');
++});
++
++test('searchUrl prefixes the search path', () => {
++  assert.equal(searchUrl({ q: 'lamp' }), '/search?q=lamp');
++});

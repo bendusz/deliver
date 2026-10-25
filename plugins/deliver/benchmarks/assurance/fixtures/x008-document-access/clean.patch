@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index cd14f15..46efc72 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Document access helpers.
++
++export function canRead(user, document) {
++  return user.tenantId === document.tenantId &&
++    (user.role === 'admin' || document.ownerId === user.id);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..39e7e79
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { canRead } from '../src/feature.mjs';
++test('owner access', () => assert.equal(canRead({id:'u',tenantId:'a',role:'member'}, {ownerId:'u',tenantId:'a'}),true));

@@ -1,0 +1,49 @@
+diff --git a/src/locks.mjs b/src/locks.mjs
+index 5d2858f..2a0bcde 100644
+--- a/src/locks.mjs
++++ b/src/locks.mjs
+@@ -14,3 +14,17 @@ export class LockManager {
+     this.held.delete(name);
+   }
+ }
++
++// withLock(locks, name, fn): runs fn while holding lock `name`; ELOCKED when it is taken.
++export async function withLock(locks, name, fn) {
++  if (!(await locks.acquire(name))) {
++    const err = new Error(`lock ${name} is held`);
++    err.code = 'ELOCKED';
++    throw err;
++  }
++  try {
++    return await fn();
++  } finally {
++    await locks.release(name);
++  }
++}
+diff --git a/test/locks.test.mjs b/test/locks.test.mjs
+new file mode 100644
+index 0000000..fd7c92f
+--- /dev/null
++++ b/test/locks.test.mjs
+@@ -0,0 +1,21 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { LockManager, withLock } from '../src/locks.mjs';
++
++test('withLock returns the job result and frees the lock', async () => {
++  const locks = new LockManager();
++  assert.equal(await withLock(locks, 'nightly', async () => 42), 42);
++  assert.equal(locks.held.has('nightly'), false);
++});
++
++test('a held lock refuses a second runner', async () => {
++  const locks = new LockManager();
++  await locks.acquire('nightly');
++  let ran = false;
++  await assert.rejects(withLock(locks, 'nightly', async () => { ran = true; }), { code: 'ELOCKED' });
++  assert.equal(ran, false);
++});
++
++test('a failing job reports its error', async () => {
++  await assert.rejects(withLock(new LockManager(), 'nightly', async () => { throw new Error('upstream timeout'); }), /upstream timeout/);
++});

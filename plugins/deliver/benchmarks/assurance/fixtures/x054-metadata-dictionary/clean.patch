@@ -1,0 +1,33 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index f75c46f..afa586b 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,7 @@
+ // Metadata dictionary helpers.
++
++export function metadataDictionary(input) {
++  const result = Object.create(null);
++  for (const [key, value] of Object.entries(input)) result[key] = value;
++  return result;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..07cb35a
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,15 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { metadataDictionary } from '../src/feature.mjs';
++test('untrusted keys remain data', () => {
++  const input=JSON.parse('{"__proto__":{"flag":1},"constructor":"custom","prototype":2,"name":"Ada"}');
++  const result=metadataDictionary(input);
++  assert.equal(Object.getPrototypeOf(result),null); assert.deepEqual(Object.keys(result),Object.keys(input));
++  assert.equal(result.__proto__,input.__proto__); assert.equal(result.constructor,'custom'); assert.equal(result.prototype,2);
++  assert.equal(Object.prototype.flag,undefined); assert.equal(Object.getPrototypeOf(input),Object.prototype);
++});
++test('empty and inherited metadata', () => {
++  assert.deepEqual(Object.keys(metadataDictionary({})),[]);
++  const input=Object.create({hidden:1}); input.own=2;
++  assert.deepEqual(Object.keys(metadataDictionary(input)),['own']);
++});

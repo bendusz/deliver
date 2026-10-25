@@ -1,0 +1,41 @@
+diff --git a/src/expenses.mjs b/src/expenses.mjs
+index e640ac1..f306777 100644
+--- a/src/expenses.mjs
++++ b/src/expenses.mjs
+@@ -2,3 +2,10 @@
+ export function totalCents(expenses) {
+   return expenses.reduce((sum, e) => sum + e.amountCents, 0);
+ }
++
++// splitEvenly(amountCents, people): one share per person, in cents, adding up to amountCents.
++export function splitEvenly(amountCents, people) {
++  if (!Number.isInteger(amountCents) || amountCents < 0) throw new RangeError('amountCents must be a non-negative integer');
++  if (!Number.isInteger(people) || people < 1) throw new RangeError('people must be a positive integer');
++  return Array.from({ length: people }, () => Math.round(amountCents / people));
++}
+diff --git a/test/expenses.test.mjs b/test/expenses.test.mjs
+new file mode 100644
+index 0000000..d1e8d03
+--- /dev/null
++++ b/test/expenses.test.mjs
+@@ -0,0 +1,20 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { splitEvenly } from '../src/expenses.mjs';
++
++test('an even amount splits into equal shares', () => {
++  assert.deepEqual(splitEvenly(900, 3), [300, 300, 300]);
++});
++
++test('shares of an uneven amount stay within a cent of each other', () => {
++  for (const [amount, people] of [[1000, 3], [200, 3], [999, 7], [12345, 6]]) {
++    const shares = splitEvenly(amount, people);
++    assert.equal(shares.length, people);
++    assert.ok(shares.every((s) => Number.isInteger(s) && Math.abs(s - amount / people) < 1));
++  }
++});
++
++test('bad input throws', () => {
++  assert.throws(() => splitEvenly(10.5, 2), RangeError);
++  assert.throws(() => splitEvenly(10, 0), RangeError);
++});

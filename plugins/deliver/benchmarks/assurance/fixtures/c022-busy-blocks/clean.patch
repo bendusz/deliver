@@ -1,0 +1,54 @@
+diff --git a/src/calendar.mjs b/src/calendar.mjs
+index e7a29c9..fd87a3d 100644
+--- a/src/calendar.mjs
++++ b/src/calendar.mjs
+@@ -2,3 +2,24 @@
+ export function blockLength([start, end]) {
+   return end - start;
+ }
++
++// mergeBlocks(blocks): the union of the blocks as a sorted list of non-overlapping blocks.
++export function mergeBlocks(blocks) {
++  const sorted = [...blocks].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
++  const merged = [];
++  for (const [start, end] of sorted) {
++    const last = merged[merged.length - 1];
++    if (last && start <= last[1]) last[1] = Math.max(last[1], end);
++    else merged.push([start, end]);
++  }
++  return merged;
++}
++
++// freeMinutes(blocks, dayStart, dayEnd): minutes between dayStart and dayEnd covered by no block.
++export function freeMinutes(blocks, dayStart, dayEnd) {
++  let busy = 0;
++  for (const [start, end] of mergeBlocks(blocks)) {
++    busy += Math.max(0, Math.min(end, dayEnd) - Math.max(start, dayStart));
++  }
++  return dayEnd - dayStart - busy;
++}
+diff --git a/test/calendar.test.mjs b/test/calendar.test.mjs
+new file mode 100644
+index 0000000..481b3d4
+--- /dev/null
++++ b/test/calendar.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { mergeBlocks, freeMinutes } from '../src/calendar.mjs';
++
++test('overlapping blocks merge and come back sorted', () => {
++  const input = [[600, 660], [540, 620], [800, 830]];
++  assert.deepEqual(mergeBlocks(input), [[540, 660], [800, 830]]);
++  assert.deepEqual(input[0], [600, 660]);
++});
++
++test('a block inside another disappears', () => {
++  assert.deepEqual(mergeBlocks([[500, 700], [550, 560]]), [[500, 700]]);
++  assert.deepEqual(mergeBlocks([]), []);
++});
++
++test('freeMinutes clips blocks to the working day', () => {
++  assert.equal(freeMinutes([[480, 600], [1000, 1100]], 540, 1020), 480 - 60 - 20);
++  assert.equal(freeMinutes([], 540, 1020), 480);
++});

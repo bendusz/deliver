@@ -1,0 +1,47 @@
+diff --git a/src/settings.mjs b/src/settings.mjs
+new file mode 100644
+index 0000000..ffecd81
+--- /dev/null
++++ b/src/settings.mjs
+@@ -0,0 +1,17 @@
++import fs from 'node:fs/promises';
++
++export const DEFAULT_SETTINGS = Object.freeze({ syncIntervalSec: 300, paused: false, excluded: [] });
++
++// readSettings(file): the saved settings over the defaults; the defaults alone on a fresh install.
++export async function readSettings(file) {
++  let saved;
++  try {
++    saved = JSON.parse(await fs.readFile(file, 'utf8'));
++  } catch {
++    return { ...DEFAULT_SETTINGS };
++  }
++  if (saved === null || typeof saved !== 'object' || Array.isArray(saved)) {
++    throw new TypeError(`${file}: settings must be a JSON object`);
++  }
++  return { ...DEFAULT_SETTINGS, ...saved };
++}
+diff --git a/test/settings.test.mjs b/test/settings.test.mjs
+new file mode 100644
+index 0000000..732f841
+--- /dev/null
++++ b/test/settings.test.mjs
+@@ -0,0 +1,18 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import { readSettings, DEFAULT_SETTINGS } from '../src/settings.mjs';
++
++const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'settings-'));
++
++test('saved keys override the defaults', async () => {
++  const file = path.join(dir, 'a.json');
++  fs.writeFileSync(file, JSON.stringify({ paused: true }));
++  assert.deepEqual(await readSettings(file), { ...DEFAULT_SETTINGS, paused: true });
++});
++
++test('a fresh install gets the defaults', async () => {
++  assert.deepEqual(await readSettings(path.join(dir, 'missing.json')), DEFAULT_SETTINGS);
++});

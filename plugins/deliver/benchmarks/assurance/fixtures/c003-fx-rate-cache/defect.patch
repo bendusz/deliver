@@ -1,0 +1,49 @@
+diff --git a/src/rate-cache.mjs b/src/rate-cache.mjs
+new file mode 100644
+index 0000000..98a73c5
+--- /dev/null
++++ b/src/rate-cache.mjs
+@@ -0,0 +1,14 @@
++// createRateCache(fetchRates, options): exchange rates per base currency, cached for ttlMs.
++export function createRateCache(fetchRates, { ttlMs = 60000, now = Date.now } = {}) {
++  const entries = new Map();
++  return {
++    async get(base) {
++      const hit = entries.get(base);
++      if (hit && hit.expiresAt > now()) return hit.rates;
++      const startedAt = now();
++      const rates = await fetchRates(base);
++      entries.set(base, { rates, expiresAt: startedAt + ttlMs });
++      return rates;
++    },
++  };
++}
+diff --git a/test/rate-cache.test.mjs b/test/rate-cache.test.mjs
+new file mode 100644
+index 0000000..7d66b1d
+--- /dev/null
++++ b/test/rate-cache.test.mjs
+@@ -0,0 +1,23 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { createRateCache } from '../src/rate-cache.mjs';
++
++test('rates are reused until the ttl passes', async () => {
++  let t = 0;
++  let calls = 0;
++  const cache = createRateCache(async (base) => ({ base, n: ++calls }), { ttlMs: 1000, now: () => t });
++  assert.equal((await cache.get('EUR')).n, 1);
++  t = 999;
++  assert.equal((await cache.get('EUR')).n, 1);
++  t = 1000;
++  assert.equal((await cache.get('EUR')).n, 2);
++  assert.equal((await cache.get('USD')).n, 3);
++});
++
++test('a failed fetch is not cached', async () => {
++  let fail = true;
++  const cache = createRateCache(async () => { if (fail) throw new Error('provider down'); return { ok: true }; }, { now: () => 0 });
++  await assert.rejects(cache.get('EUR'), /provider down/);
++  fail = false;
++  assert.deepEqual(await cache.get('EUR'), { ok: true });
++});

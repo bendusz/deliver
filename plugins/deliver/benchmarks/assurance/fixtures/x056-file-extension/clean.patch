@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 04f5767..2b912d5 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1,4 +1,4 @@
+ export function extension(name) {
+-  const dot = name.indexOf('.');
+-  return dot >= 0 ? name.slice(dot + 1) : '';
++  const dot = name.lastIndexOf('.');
++  return dot > 0 ? name.slice(dot + 1) : '';
+ }
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..2ebef13
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,8 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { extension } from '../src/feature.mjs';
++test('last filename component determines extension', () => {
++  assert.equal(extension('archive.tar.gz'),'gz'); assert.equal(extension('REPORT.PDF'),'PDF');
++  assert.equal(extension('.profile'),''); assert.equal(extension('.settings.json'),'json');
++  assert.equal(extension('name.'),''); assert.equal(extension('name'),''); assert.equal(extension(''),'');
++});

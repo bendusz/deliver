@@ -18,19 +18,42 @@ references are enough on their own.
 ## Remote PRs, opt-in
 The loop merges locally by default. Open a real PR only when the user has explicitly asked for
 pushes or PRs, `gh auth status` succeeds, and a GitHub remote exists. Then push the story branch,
-open the PR with the message format in `implementation-loop.md`, and merge it. Never push to a
-remote without an explicit request.
+open the PR with the message format in `implementation-loop.md`, and merge it. Before
+`gh pr merge` or a merge in the UI, confirm the recorded `verifier: PASS <sha>` and, at `T1` and
+`T2`, `integrity: pass <sha>` name the PR head, or an ancestor of it followed only by story-file
+and handoff commits or by merges of the integration branch that git would make automatically.
+This is the rule the hook applies to a local merge. Check it for each recorded `<sha>`:
+
+1. `git merge-base --is-ancestor <sha> <head>` succeeds.
+2. `git log --stat <sha>..<head> --not origin/<integration>` shows only the story file and
+   `docs/handoff/*.md` in its non-merge commits.
+3. For each merge commit that `git rev-list --merges <sha>..<head> --not origin/<integration>`
+   lists, run `git merge-tree --write-tree --name-only <merge>^1 <merge>^2`. Its first line is the
+   result tree; on a conflict it exits 1 and lists the conflicted paths after that line. The merge
+   passes when every conflicted path it lists, and every path that
+   `git diff --name-only <result-tree> <merge>^{tree}` lists, is the story file. The story file is
+   the project-prefixed `docs/stories/…` path (`<project>/docs/stories/<story-id>.md` for a
+   project below the git top level), or the file whose Execution block names the branch. A
+   conflict-free merge whose only difference is the story file passes too. This is exactly the
+   rule the hook applies to a merge commit.
+
+   `git show --remerge-diff <merge>` shows the same difference as a diff.
+
+If any step fails, re-verify before merging. The `require-verified.mjs` hook does not see this
+path, so the check is yours alone; treat it as a residual risk. Never push to a remote without an
+explicit request.
 
 ## Agents you orchestrate
-Run reviewers as a risk-selected **panel** (see `review-gates.md`), not always all of them.
+Run reviewers as the tier panel `review-gates.md` sets, plus the lenses the story's risk adds.
 
-The PM never assembles a `codex` command line. It may call the bundled runner
-`scripts/codex/run.mjs`, the `--preflight` probe for example, and every model run goes through a
-Sonnet wrapper agent. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
-prompt. When the OpenAI Codex CLI is installed, the loop adds an independent second-model review
-to each story's first review, alongside the panel and never as a replacement for it, and
-`codex-advisor` gives a second opinion on a consequential decision; `SKILL.md` and
-`implementation-loop.md` state 3 own when. `/deliver:codex-review` and `/deliver:codex-help` are
+The PM never assembles a `codex` command line. Outside T3 Code's `delegate_task` advisory and
+research path, every Codex invocation goes through the bundled runner `scripts/codex/run.mjs`: the PM may call it
+directly, the `--preflight` probe for example, and every model run goes through a Sonnet wrapper
+agent. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
+prompt. When the OpenAI Codex CLI is installed, `codex-reviewer` is the opposite-family lens for
+work Claude wrote, alongside the panel and never as a replacement for it, and
+`codex-advisor` gives a second opinion on a consequential decision. `review-gates.md` owns when
+`codex-reviewer` runs, and `SKILL.md` when `codex-advisor` does. `/deliver:codex-review` and `/deliver:codex-help` are
 the user-run forms. The
 `codex-researcher` agent plays the same independent-second-model role for research questions.
 `codex-builder` is different: it is write-capable inside one fixed worktree and may replace

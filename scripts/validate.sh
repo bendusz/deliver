@@ -122,8 +122,33 @@ grep -rlE 'codex exec' plugins/deliver/agents plugins/deliver/commands >/dev/nul
 # 6) the installed plugin must stay generic (no third-party *plugin* names).
 # The OpenAI Codex CLI is an intentional, documented external dependency of the
 # codex-review/codex-help commands, so bare 'codex' is allowed since v0.10.0.
-if grep -riE 'superpowers|skill-codex' plugins/deliver/ >/dev/null 2>&1; then
+# One exemption since v0.29: SKILL.md's precedence line, which names the Superpowers phases deliver
+# replaces, so both skills loaded together do not fight over the session.
+if grep -rniE 'superpowers|skill-codex' plugins/deliver/ 2>/dev/null \
+  | grep -vE "^plugins/deliver/skills/project-manager/SKILL\.md:[0-9]+:- \*\*Superpowers\.\*\* While deliver is active, its phases replace Superpowers' brainstorming,$" \
+  | grep -q .; then
   err "third-party plugin name found under plugins/deliver/ (keep the artifact generic)"
+fi
+
+# 6b) every SKILL.md stays under 16000 characters, leaving headroom under Claude Code's 20000-
+# character re-attachment cut after compaction.
+# Node counts UTF-16 code units of the UTF-8 text, independent of the shell's locale.
+# No match, or a node error, fails the check rather than passing it silently.
+skills=(plugins/*/skills/*/SKILL.md)
+# shellcheck disable=SC2016  # the ${...} is a JavaScript template literal, not shell
+if [ ! -f "${skills[0]}" ]; then
+  err "skill-size guard: no plugins/*/skills/*/SKILL.md matched"
+elif ! sizes="$(node -e '
+  const fs = require("fs");
+  for (const f of process.argv.slice(1)) {
+    const n = fs.readFileSync(f, "utf8").length;
+    if (n > 16000) console.log(`${f} is ${n} characters (limit 16000)`);
+  }' "${skills[@]}" 2>&1)"; then
+  err "skill-size guard: node failed: $sizes"
+else
+  while IFS= read -r line; do
+    [ -n "$line" ] && err "$line"
+  done <<< "$sizes"
 fi
 
 # 7) every references/<x>.md named in SKILL.md exists
@@ -226,6 +251,26 @@ suite "agent eval fixtures differ from MANIFEST.sha256 (the eval set is frozen)"
   node plugins/deliver/scripts/agent-evals.mjs manifest --check
 suite "builder benchmark tests failed (scripts/test-builder-benchmark.sh)" \
   bash "$(dirname "$0")/test-builder-benchmark.sh"
+suite "test-integrity tests failed (node --test plugins/deliver/scripts/tests/test-integrity.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/test-integrity.test.mjs
+suite "ship gate tests failed (node --test plugins/deliver/scripts/tests/require-verified.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/require-verified.test.mjs
+suite "holdout tests failed (node --test plugins/deliver/scripts/tests/holdout.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/holdout.test.mjs
+# Every node test file must be run by a suite in this script.
+for t in plugins/deliver/scripts/tests/*.test.mjs; do
+  grep -q "^  node --test .*$t" "$0" || err "$t is not run by any suite in scripts/validate.sh"
+done
+
+# 15b) assurance corpus: frozen by its own manifest (results/ and panels.json excluded), and
+# every seeded witness fails with its defect and passes clean.
+jq empty plugins/deliver/benchmarks/assurance/cases.json 2>/dev/null || err "invalid JSON: plugins/deliver/benchmarks/assurance/cases.json"
+suite "assurance tests failed (node --test plugins/deliver/scripts/tests/assurance.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/assurance.test.mjs
+suite "assurance corpus differs from MANIFEST.sha256 (the corpus is frozen; a batch re-runs manifest --write alone)" \
+  node plugins/deliver/scripts/assurance.mjs manifest --check
+suite "assurance witness check failed (node plugins/deliver/scripts/assurance.mjs witness)" \
+  node plugins/deliver/scripts/assurance.mjs witness
 
 # 16) poteto companion plugin (plugins/poteto): manifest, attribution, skills, no Cursor residue
 pp=plugins/poteto

@@ -1,0 +1,42 @@
+diff --git a/src/list.mjs b/src/list.mjs
+index d040b93..2478bc1 100644
+--- a/src/list.mjs
++++ b/src/list.mjs
+@@ -2,3 +2,16 @@
+ export function sortByTitle(items) {
+   return [...items].sort((a, b) => a.title.localeCompare(b.title));
+ }
++
++// pageCount(total, size): the number of pages needed to show `total` items, `size` per page.
++export function pageCount(total, size) {
++  if (!Number.isInteger(size) || size < 1) throw new RangeError('size must be a positive integer');
++  return Math.floor(total / size);
++}
++
++// pageOf(items, page, size): the items on 1-based page `page`, or [] past the last page.
++export function pageOf(items, page, size) {
++  if (!Number.isInteger(page) || page < 1 || page > pageCount(items.length, size)) return [];
++  const start = (page - 1) * size;
++  return items.slice(start, start + size);
++}
+diff --git a/test/list.test.mjs b/test/list.test.mjs
+new file mode 100644
+index 0000000..0c21acd
+--- /dev/null
++++ b/test/list.test.mjs
+@@ -0,0 +1,15 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { pageCount, pageOf } from '../src/list.mjs';
++
++const items = Array.from({ length: 10 }, (_, i) => ({ title: `t${i}` }));
++
++test('pageCount splits a full list into pages', () => {
++  assert.equal(pageCount(10, 5), 2);
++  assert.throws(() => pageCount(10, 0), RangeError);
++});
++
++test('pageOf returns one page of items', () => {
++  assert.deepEqual(pageOf(items, 2, 5).map((x) => x.title), ['t5', 't6', 't7', 't8', 't9']);
++  assert.deepEqual(pageOf(items, 3, 5), []);
++});

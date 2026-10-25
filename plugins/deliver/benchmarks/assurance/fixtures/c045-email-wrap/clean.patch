@@ -1,0 +1,54 @@
+diff --git a/src/format.mjs b/src/format.mjs
+index 20e5980..4d0509a 100644
+--- a/src/format.mjs
++++ b/src/format.mjs
+@@ -2,3 +2,26 @@
+ export function indent(text, prefix) {
+   return text.split('\n').map((line) => prefix + line).join('\n');
+ }
++
++// wrapText(text, width): text re-flowed so no line is longer than `width`, breaking at spaces.
++// Existing line breaks are kept; a single word longer than `width` stays whole on its own line.
++export function wrapText(text, width) {
++  if (!Number.isInteger(width) || width < 1) throw new RangeError('width must be a positive integer');
++  return text
++    .split('\n')
++    .map((line) => {
++      const out = [];
++      let current = '';
++      for (const word of line.split(' ').filter(Boolean)) {
++        if (!current) current = word;
++        else if (current.length + 1 + word.length <= width) current += ` ${word}`;
++        else {
++          out.push(current);
++          current = word;
++        }
++      }
++      out.push(current);
++      return out.join('\n');
++    })
++    .join('\n');
++}
+diff --git a/test/format.test.mjs b/test/format.test.mjs
+new file mode 100644
+index 0000000..6baa33c
+--- /dev/null
++++ b/test/format.test.mjs
+@@ -0,0 +1,17 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { wrapText } from '../src/format.mjs';
++
++test('wrapText packs words up to the width', () => {
++  assert.equal(wrapText('the quick brown fox jumps', 10), 'the quick\nbrown fox\njumps');
++  assert.equal(wrapText('exactly ten', 11), 'exactly ten');
++});
++
++test('wrapText keeps paragraphs and collapses spaces', () => {
++  assert.equal(wrapText('  a   b  \n\nc', 5), 'a b\n\nc');
++});
++
++test('long words stand alone and bad widths throw', () => {
++  assert.equal(wrapText('see https://example.com/very/long now', 10), 'see\nhttps://example.com/very/long\nnow');
++  assert.throws(() => wrapText('x', 0), RangeError);
++});

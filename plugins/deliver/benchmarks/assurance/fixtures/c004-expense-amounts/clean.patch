@@ -1,0 +1,39 @@
+diff --git a/src/money.mjs b/src/money.mjs
+index cbd6957..b7398c1 100644
+--- a/src/money.mjs
++++ b/src/money.mjs
+@@ -4,3 +4,14 @@ export function formatCents(cents) {
+   const abs = Math.abs(cents);
+   return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+ }
++
++// parseAmount(text): integer cents for an amount such as "12", "12.5", "1,234.56" or "-0.29",
++// or null when the text is not an amount.
++export function parseAmount(text) {
++  const s = String(text).trim();
++  if (!/^-?(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/.test(s)) return null;
++  const negative = s.startsWith('-');
++  const [whole, frac = ''] = s.replace(/^-/, '').replace(/,/g, '').split('.');
++  const cents = Number(whole) * 100 + Number(frac.padEnd(2, '0'));
++  return negative && cents > 0 ? -cents : cents;
++}
+diff --git a/test/money.test.mjs b/test/money.test.mjs
+new file mode 100644
+index 0000000..c62d876
+--- /dev/null
++++ b/test/money.test.mjs
+@@ -0,0 +1,14 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { parseAmount } from '../src/money.mjs';
++
++test('parseAmount reads whole, decimal and grouped amounts', () => {
++  assert.equal(parseAmount('12'), 1200);
++  assert.equal(parseAmount(' 12.5 '), 1250);
++  assert.equal(parseAmount('1,234.56'), 123456);
++  assert.equal(parseAmount('-7.25'), -725);
++});
++
++test('parseAmount rejects text that is not an amount', () => {
++  for (const bad of ['abc', '1,23', '1.234', '', '12.', '--1']) assert.equal(parseAmount(bad), null, bad);
++});

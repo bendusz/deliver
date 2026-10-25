@@ -1,0 +1,5 @@
+{
+  "name": "service-token",
+  "private": true,
+  "type": "module"
+}

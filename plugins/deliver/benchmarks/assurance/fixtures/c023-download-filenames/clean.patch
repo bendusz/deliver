@@ -1,0 +1,44 @@
+diff --git a/src/downloads.mjs b/src/downloads.mjs
+index 49d10f6..544e84f 100644
+--- a/src/downloads.mjs
++++ b/src/downloads.mjs
+@@ -1,2 +1,15 @@
+ // File download responses.
+ export const DEFAULT_TYPE = 'application/octet-stream';
++
++// contentDisposition(filename): an attachment header value carrying a safe version of filename.
++export function contentDisposition(filename) {
++  const name = String(filename)
++    .split(/[\\/]/)
++    .pop()
++    .replace(/[\u0000-\u001f\u007f]/g, '')
++    .trim()
++    .toWellFormed() || 'download';
++  const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
++  const encoded = encodeURIComponent(name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
++  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
++}
+diff --git a/test/downloads.test.mjs b/test/downloads.test.mjs
+new file mode 100644
+index 0000000..99c9fbb
+--- /dev/null
++++ b/test/downloads.test.mjs
+@@ -0,0 +1,18 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { contentDisposition } from '../src/downloads.mjs';
++
++test('plain names pass through', () => {
++  assert.equal(contentDisposition('report.pdf'), `attachment; filename="report.pdf"; filename*=UTF-8''report.pdf`);
++});
++
++test('directories, quotes and line breaks are removed or replaced', () => {
++  assert.equal(contentDisposition('C:\\Users\\x\\a "b".txt'), `attachment; filename="a _b_.txt"; filename*=UTF-8''a%20%22b%22.txt`);
++  assert.equal(contentDisposition('../../evil\r\nSet-Cookie: x=1'), `attachment; filename="evilSet-Cookie: x=1"; filename*=UTF-8''evilSet-Cookie%3A%20x%3D1`);
++  assert.equal(contentDisposition('uploads/'), `attachment; filename="download"; filename*=UTF-8''download`);
++});
++
++test('unicode keeps its full name in filename*', () => {
++  assert.equal(contentDisposition("Café (1)'s.pdf"), `attachment; filename="Caf_ (1)'s.pdf"; filename*=UTF-8''Caf%C3%A9%20%281%29%27s.pdf`);
++  assert.ok(contentDisposition('a\uD800b').includes("filename*=UTF-8''a%EF%BF%BDb"));
++});

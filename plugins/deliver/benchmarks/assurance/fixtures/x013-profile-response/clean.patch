@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 4b3666e..81e146e 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Profile response helpers.
++
++export function publicProfile(record) {
++  const {id, displayName} = record;
++  return {id, displayName};
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..c26848d
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { publicProfile } from '../src/feature.mjs';
++test('public fields', () => assert.deepEqual(publicProfile({id:'u',displayName:'Sam'}),{id:'u',displayName:'Sam'}));

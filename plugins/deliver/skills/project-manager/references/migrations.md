@@ -63,6 +63,11 @@ verifier when the position needs them.
 Add the story's `pm-meta` comment with the builder and touch paths, and commit that story migration
 before you dispatch a builder.
 
+## Stories created before 0.29 (no `Tier`)
+
+At loop state 0, set the story's `Tier` on its header line by `decomposition.md`'s rules and commit
+that change on the integration branch before the claim commit. The claim then copies it.
+
 ## Stories created before 0.17 (visible `Builder`, `Touches`, and sensitivity fields)
 
 No migration is needed. `pm-meta` is authoritative; the runner still checks that a visible `Builder`

@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 9ef4967..678dbd9 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Job priority helpers.
++
++export function prioritize(jobs) {
++  return [...jobs].sort((a, b) => b.priority - a.priority);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..555c716
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,9 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { prioritize } from '../src/feature.mjs';
++test('stable priority order without input mutation', () => {
++  const a={id:'a',priority:0},b={id:'b',priority:5},c={id:'c',priority:5},d={id:'d',priority:-1};
++  const jobs=[a,b,c,d]; const result=prioritize(jobs);
++  assert.deepEqual(result,[b,c,a,d]); assert.deepEqual(jobs,[a,b,c,d]); assert.notEqual(result,jobs);
++  assert.equal(result[0],b); assert.deepEqual(prioritize([]),[]); assert.deepEqual(prioritize([a]),[a]);
++});

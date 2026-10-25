@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 01eb2d3..45525b5 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Print queue helpers.
++
++export function dequeue(queue) {
++  if (queue.length === 0) return null;
++  return queue.pop();
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..404bb07
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { dequeue } from '../src/feature.mjs';
++test('one job and no jobs', () => { const q=[{id:1}]; assert.deepEqual(dequeue(q), {id:1}); assert.equal(dequeue(q), null); });

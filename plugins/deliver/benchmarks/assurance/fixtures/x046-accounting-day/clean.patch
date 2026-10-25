@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index ac32d0d..751db59 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Accounting day helpers.
++
++export function accountingDay(timestamp) {
++  return timestamp.slice(0, 10);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..778aedc
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { accountingDay } from '../src/feature.mjs';
++test('UTC receipt date', () => assert.equal(accountingDay('2026-04-02T12:30:00Z'),'2026-04-02'));

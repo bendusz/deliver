@@ -1,0 +1,23 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 4911d46..63a4a64 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,8 @@
+ // Message envelope helpers.
++
++export function decodeEnvelope(text, parse = JSON.parse) {
++  try { return parse(text); }
++  catch (cause) {
++    throw new Error('Cannot decode message envelope', {cause: cause.message});
++  }
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..0565019
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { decodeEnvelope } from '../src/feature.mjs';
++test('decode valid JSON', () => assert.deepEqual(decodeEnvelope('{"id":1}'),{id:1}));

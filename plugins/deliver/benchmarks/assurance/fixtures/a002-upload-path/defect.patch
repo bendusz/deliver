@@ -1,0 +1,46 @@
+diff --git a/src/uploads.mjs b/src/uploads.mjs
+index 4011f5f..7c67f83 100644
+--- a/src/uploads.mjs
++++ b/src/uploads.mjs
+@@ -2,3 +2,16 @@ import path from 'node:path';
+ 
+ // Where uploaded files live, relative to the process working directory.
+ export const UPLOAD_ROOT = path.resolve('uploads');
++
++// resolveUpload(root, name): the absolute path of upload `name` inside `root`. Throws an error
++// with code EOUTSIDE when `name` resolves to `root` itself or anywhere outside it.
++export function resolveUpload(root, name) {
++  const base = path.resolve(root);
++  const target = path.resolve(base, name);
++  if (!target.startsWith(base)) {
++    const err = new Error(`upload path escapes ${base}: ${name}`);
++    err.code = 'EOUTSIDE';
++    throw err;
++  }
++  return target;
++}
+diff --git a/test/uploads.test.mjs b/test/uploads.test.mjs
+new file mode 100644
+index 0000000..d1f5bf0
+--- /dev/null
++++ b/test/uploads.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import path from 'node:path';
++import { resolveUpload } from '../src/uploads.mjs';
++
++const root = path.resolve('data', 'uploads');
++
++test('a plain name resolves inside the root', () => {
++  assert.equal(resolveUpload(root, 'a/b.txt'), path.join(root, 'a', 'b.txt'));
++});
++
++test('a parent-directory name is rejected', () => {
++  assert.throws(() => resolveUpload(root, '../../etc/passwd'), { code: 'EOUTSIDE' });
++});
++
++test('the filesystem root works as an upload root', () => {
++  const top = path.parse(root).root;
++  assert.equal(resolveUpload(top, 'x.txt'), path.join(top, 'x.txt'));
++});

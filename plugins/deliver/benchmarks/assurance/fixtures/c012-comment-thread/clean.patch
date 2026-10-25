@@ -1,0 +1,57 @@
+diff --git a/src/comments.mjs b/src/comments.mjs
+new file mode 100644
+index 0000000..9eef8cf
+--- /dev/null
++++ b/src/comments.mjs
+@@ -0,0 +1,22 @@
++import { escapeHtml } from './html.mjs';
++
++// renderComment(comment): one comment as an <li>; the author links to their website when it is http(s).
++export function renderComment({ author, website, body, createdAt }) {
++  const name = website && /^https?:\/\//i.test(website)
++    ? `<a href="${escapeHtml(website)}" rel="nofollow">${escapeHtml(author)}</a>`
++    : escapeHtml(author);
++  const paragraphs = String(body)
++    .split(/\n\s*\n/)
++    .filter((p) => p.trim())
++    .map((p) => `<p>${escapeHtml(p.trim())}</p>`)
++    .join('');
++  const day = createdAt.slice(0, 10);
++  return `<li class="comment"><header>${name} <time datetime="${escapeHtml(createdAt)}">${escapeHtml(day)}</time></header>${paragraphs}</li>`;
++}
++
++// renderThread(comments): the comments oldest first in a <ul>, or an empty-state paragraph.
++export function renderThread(comments) {
++  if (comments.length === 0) return '<p class="empty">No comments yet.</p>';
++  const sorted = [...comments].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
++  return `<ul class="comments">${sorted.map(renderComment).join('')}</ul>`;
++}
+diff --git a/test/comments.test.mjs b/test/comments.test.mjs
+new file mode 100644
+index 0000000..02c98ab
+--- /dev/null
++++ b/test/comments.test.mjs
+@@ -0,0 +1,23 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { renderComment, renderThread } from '../src/comments.mjs';
++
++const base = { author: 'Ann', website: '', body: 'Hi', createdAt: '2024-05-01T10:00:00Z' };
++
++test('a comment without a website escapes the author and body', () => {
++  const html = renderComment({ ...base, author: '<b>Ann</b>', body: 'a <script>x</script>\n\nsecond' });
++  assert.ok(html.includes('&lt;b&gt;Ann&lt;/b&gt;'));
++  assert.ok(html.includes('<p>a &lt;script&gt;x&lt;/script&gt;</p><p>second</p>'));
++  assert.ok(html.includes('<time datetime="2024-05-01T10:00:00Z">2024-05-01</time>'));
++});
++
++test('an http website links the author; other schemes are ignored', () => {
++  assert.ok(renderComment({ ...base, website: 'https://ann.example' }).includes('<a href="https://ann.example" rel="nofollow">Ann</a>'));
++  assert.ok(!renderComment({ ...base, website: 'javascript:alert(1)' }).includes('<a '));
++});
++
++test('renderThread sorts oldest first and handles no comments', () => {
++  const html = renderThread([{ ...base, author: 'B', createdAt: '2024-05-02T00:00:00Z' }, { ...base, author: 'A' }]);
++  assert.ok(html.indexOf('>A ') < html.indexOf('>B '));
++  assert.equal(renderThread([]), '<p class="empty">No comments yet.</p>');
++});

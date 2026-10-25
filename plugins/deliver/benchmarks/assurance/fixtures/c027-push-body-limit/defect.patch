@@ -1,0 +1,53 @@
+diff --git a/src/payload.mjs b/src/payload.mjs
+index c29e888..349e7a5 100644
+--- a/src/payload.mjs
++++ b/src/payload.mjs
+@@ -1,2 +1,21 @@
+ // Push payload limits: the provider rejects bodies whose UTF-8 encoding is longer than this.
+ export const MAX_BODY_BYTES = 178;
++
++const encoder = new TextEncoder();
++const ELLIPSIS = '…';
++
++// truncateUtf8(text, maxBytes): text cut to fit maxBytes of UTF-8, marked with an ellipsis.
++export function truncateUtf8(text, maxBytes) {
++  if (!(maxBytes >= 3)) throw new RangeError('maxBytes must be at least 3');
++  if (text.length <= maxBytes) return text;
++  const budget = maxBytes - encoder.encode(ELLIPSIS).length;
++  let out = '';
++  let used = 0;
++  for (const ch of text) {
++    const size = encoder.encode(ch).length;
++    if (used + size > budget) break;
++    out += ch;
++    used += size;
++  }
++  return out + ELLIPSIS;
++}
+diff --git a/test/payload.test.mjs b/test/payload.test.mjs
+new file mode 100644
+index 0000000..c7516cf
+--- /dev/null
++++ b/test/payload.test.mjs
+@@ -0,0 +1,21 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { truncateUtf8 } from '../src/payload.mjs';
++
++const bytes = (s) => new TextEncoder().encode(s).length;
++
++test('short text is unchanged', () => {
++  assert.equal(truncateUtf8('See you at 8', 178), 'See you at 8');
++});
++
++test('long text is cut on a code point with an ellipsis', () => {
++  assert.equal(truncateUtf8('abcdefghij', 8), 'abcde…');
++  const cut = truncateUtf8('héllo wörld '.repeat(30), 20);
++  assert.ok(bytes(cut) <= 20);
++  assert.ok(cut.endsWith('…'));
++  assert.equal(truncateUtf8('😀😀😀😀', 7), '😀…');
++});
++
++test('a budget below the ellipsis is refused', () => {
++  assert.throws(() => truncateUtf8('abc', 2), RangeError);
++});

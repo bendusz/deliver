@@ -1,10 +1,12 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cksum, pmActorId, pmRoot, pmRelpath, readJson, pmSecretScan, hookFile } from '../../hooks/lib.mjs';
+import { cksum, pmActorId, pmRoot, pmRelpath, readJson, pmSecretScan, hookFile, inspectState } from '../../hooks/lib.mjs';
+import * as lib from '../../hooks/lib.mjs';
 import { newProj, gitIn, canSymlink, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
 test('cksum matches POSIX cksum vectors', () => {
@@ -258,4 +260,99 @@ test('hookFile returns the write target with its project root, else null', () =>
   // A payload with no usable cwd falls back to the process cwd, as each hook used to.
   assert.equal(hookFile({ tool_input: { file_path: file } }).root, pmRoot(process.cwd()));
   assert.equal(hookFile({ cwd: '', tool_input: { file_path: file } }).root, pmRoot(process.cwd()));
+});
+
+test('lib.mjs CLI: state counts only deliver worktrees; the rest are host-owned', () => {
+  const lib = path.join(HOOKS_DIR, 'lib.mjs');
+  const p = newProj(true);
+  const state = () => { const r = spawnSync(process.execPath, [lib, 'state', p], { encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout); };
+  assert.equal(state().worktrees, 0);
+  assert.equal(state().hostWorktrees, 0);
+  // Deliver's own: under <root>/tmp/worktrees/ whatever the branch, or on a pm/* branch anywhere.
+  gitIn(p, ['worktree', 'add', '-q', path.join(p, 'tmp', 'worktrees', 'a'), '-b', 'feature-a']);
+  gitIn(p, ['worktree', 'add', '-q', path.join(tmpDir('wt-'), 'b'), '-b', 'pm/S1-1-b']);
+  // Host-owned: a T3-style worktree elsewhere, and a detached one.
+  gitIn(p, ['worktree', 'add', '-q', path.join(tmpDir('wt-'), 'c'), '-b', 't3code/thread-1']);
+  gitIn(p, ['worktree', 'add', '-q', '--detach', path.join(tmpDir('wt-'), 'd')]);
+  const st = state();
+  assert.equal(st.worktrees, 2);
+  assert.equal(st.hostWorktrees, 2);
+});
+
+test('worktree counting: a symlinked tmp/ still marks tmp/worktrees/ as deliver-owned', (t) => {
+  const p = newProj(true);
+  if (!canSymlink(tmpDir('tmpreal-'), path.join(p, 'tmp'))) return t.skip('symlinks unavailable');
+  gitIn(p, ['worktree', 'add', '-q', path.join(p, 'tmp', 'worktrees', 'a'), '-b', 'feature-a']);
+  const st = inspectState(p);
+  assert.equal(st.worktrees, 1);
+  assert.equal(st.hostWorktrees, 0);
+});
+
+test('worktree counting: an unresolved root (darwin /var vs /private/var) still matches', (t) => {
+  if (process.platform !== 'darwin') return t.skip('darwin-only path aliasing');
+  // Git records realpaths, so the main checkout's base is always canonical. Only a root that is
+  // itself a linked worktree, given in its unresolved form, exercises the root's own base.
+  const p = newProj(true);
+  const parent = tmpDir('wt-');
+  const unresolved = path.join(os.tmpdir(), path.basename(parent), 'l');
+  if (!unresolved.startsWith('/var/')) return t.skip('os.tmpdir() is already canonical');
+  gitIn(p, ['worktree', 'add', '-q', path.join(parent, 'l'), '-b', 'pm/S1-1-l']);
+  gitIn(p, ['worktree', 'add', '-q', path.join(parent, 'l', 'tmp', 'worktrees', 'a'), '-b', 'feature-a']);
+  const st = inspectState(unresolved);
+  assert.equal(st.worktrees, 2);
+  assert.equal(st.hostWorktrees, 0);
+});
+
+test('resume cleanup drops a stale deliver worktree entry and keeps a stale host-owned one', () => {
+  const p = newProj(true);
+  const mine = path.join(p, 'tmp', 'worktrees', 'a');
+  const host = path.join(tmpDir('wt-'), 'h');
+  gitIn(p, ['worktree', 'add', '-q', mine, '-b', 'pm/S1-1-a']);
+  gitIn(p, ['worktree', 'add', '-q', host, '-b', 't3code/thread-1']);
+  // Both directories vanish; a T3 thread's may be only temporarily missing.
+  fs.rmSync(mine, { recursive: true, force: true });
+  fs.rmSync(host, { recursive: true, force: true });
+  // The recipe resume-procedure.md documents: classify, then remove each stale deliver entry.
+  const r = spawnSync(process.execPath, [path.join(HOOKS_DIR, 'lib.mjs'), 'worktrees', p], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const wt = JSON.parse(r.stdout);
+  // Git prints forward slashes on Windows; path.resolve normalizes both sides.
+  assert.deepEqual(wt.host.map((w) => [path.resolve(w.path), w.prunable]), [[host, true]]);
+  for (const w of wt.deliver.filter((x) => x.prunable)) gitIn(p, ['worktree', 'remove', w.path]);
+  const listed = gitIn(p, ['worktree', 'list', '--porcelain']).split(/\r?\n/)
+    .filter((l) => l.startsWith('worktree ')).map((l) => path.resolve(l.slice('worktree '.length)));
+  assert.ok(!listed.includes(mine), 'the stale deliver entry is gone');
+  assert.ok(listed.includes(host), 'the stale host-owned entry survives');
+  assert.equal(gitIn(p, ['branch', '--list', 'pm/S1-1-a']).trim(), 'pm/S1-1-a');
+});
+
+test('worktree counting: a stale non-pm worktree under a symlinked tmp/ stays deliver-owned after tmp/worktrees goes', (t) => {
+  const p = newProj(true);
+  const real = tmpDir('tmpreal-');
+  if (!canSymlink(real, path.join(p, 'tmp'))) return t.skip('symlinks unavailable');
+  gitIn(p, ['worktree', 'add', '-q', path.join(p, 'tmp', 'worktrees', 'a'), '-b', 'feature-a']);
+  fs.rmSync(path.join(real, 'worktrees'), { recursive: true, force: true });
+  const wt = lib.classifyWorktrees(p);
+  assert.equal(wt.deliver.length, 1);
+  assert.equal(wt.deliver[0].prunable, true);
+  assert.equal(wt.host.length, 0);
+});
+
+test('parseWorktrees reads CRLF porcelain output', () => {
+  const text = 'worktree /r\r\nHEAD 1\r\nbranch refs/heads/main\r\n\r\n'
+    + 'worktree /r/tmp/worktrees/a\r\nHEAD 2\r\nbranch refs/heads/pm/S1-1-a\r\nprunable gitdir file points to non-existent location\r\n\r\n'
+    + 'worktree /elsewhere/d\r\nHEAD 3\r\ndetached\r\n';
+  assert.deepEqual(lib.parseWorktrees(text), [
+    { path: '/r', branch: 'refs/heads/main', prunable: false },
+    { path: '/r/tmp/worktrees/a', branch: 'refs/heads/pm/S1-1-a', prunable: true },
+    { path: '/elsewhere/d', branch: '', prunable: false },
+  ]);
+  assert.deepEqual(lib.parseWorktrees(''), []);
+});
+
+test('lib.mjs CLI: worktrees exits 1 with a reason outside a repository', () => {
+  const r = spawnSync(process.execPath, [path.join(HOOKS_DIR, 'lib.mjs'), 'worktrees', tmpDir('norepo-')], { encoding: 'utf8' });
+  assert.equal(r.status, 1);
+  assert.equal(r.stdout, '');
+  assert.match(r.stderr, /git worktree list failed/);
 });

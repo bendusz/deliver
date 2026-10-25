@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index ea8501a..3276495 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1,3 +1,4 @@
+ export function parseDuration(value) {
+-  return Number.parseInt(value, 10);
++  if (value.length === 0 || /\D/.test(value)) throw new TypeError('invalid duration');
++  return Number(value);
+ }
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..6d82c9f
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,5 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { parseDuration } from '../src/feature.mjs';
++test('whole decimal duration', () => assert.equal(parseDuration('15'),15));
++test('reject duration suffix', () => assert.throws(() => parseDuration('15ms'), TypeError));

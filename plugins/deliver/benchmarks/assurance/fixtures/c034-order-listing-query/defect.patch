@@ -1,0 +1,57 @@
+diff --git a/src/orders-query.mjs b/src/orders-query.mjs
+new file mode 100644
+index 0000000..16be6ab
+--- /dev/null
++++ b/src/orders-query.mjs
+@@ -0,0 +1,26 @@
++import { placeholders } from './sql.mjs';
++
++const SORTABLE = ['created_at', 'total_cents', 'status', 'customer_name'];
++
++// listOrdersQuery(options): { text, values } for the admin order list.
++export function listOrdersQuery({ status, sort = 'created_at', dir = 'desc', limit = 50, offset = 0 } = {}) {
++  if (!SORTABLE.includes(sort)) throw new Error(`cannot sort by ${sort}`);
++  const direction = String(dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
++  const values = [];
++  let where = '';
++  if (Array.isArray(status)) {
++    if (status.length > 0) {
++      values.push(...status);
++      where = ` WHERE status IN (${placeholders(status.length)})`;
++    }
++  } else if (status !== undefined) {
++    where = ` WHERE status = '${status}'`;
++  }
++  values.push(Math.min(200, Math.max(1, Math.trunc(Number(limit)) || 50)));
++  values.push(Math.max(0, Math.trunc(Number(offset)) || 0));
++  const n = values.length;
++  return {
++    text: `SELECT id, customer_name, status, total_cents, created_at FROM orders${where} ORDER BY ${sort} ${direction} LIMIT $${n - 1} OFFSET $${n}`,
++    values,
++  };
++}
+diff --git a/test/orders-query.test.mjs b/test/orders-query.test.mjs
+new file mode 100644
+index 0000000..49b5254
+--- /dev/null
++++ b/test/orders-query.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { listOrdersQuery } from '../src/orders-query.mjs';
++
++test('defaults sort newest first with a page of 50', () => {
++  const q = listOrdersQuery();
++  assert.match(q.text, /FROM orders ORDER BY created_at DESC LIMIT \$1 OFFSET \$2$/);
++  assert.deepEqual(q.values, [50, 0]);
++});
++
++test('a list of statuses becomes an IN filter', () => {
++  const q = listOrdersQuery({ status: ['paid', 'shipped'], sort: 'total_cents', dir: 'ASC', limit: 1000, offset: 40 });
++  assert.match(q.text, /WHERE status IN \(\$1, \$2\) ORDER BY total_cents ASC LIMIT \$3 OFFSET \$4$/);
++  assert.deepEqual(q.values, ['paid', 'shipped', 200, 40]);
++});
++
++test('unknown sort columns are refused', () => {
++  assert.throws(() => listOrdersQuery({ sort: 'id; DROP TABLE orders' }), Error);
++});

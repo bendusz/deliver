@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 081fc51..bd4b428 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Login return helpers.
++
++export function redirectTarget(input) {
++  if (!input.startsWith('/') || input.startsWith('//') || /[\\\r\n]/.test(input)) return '/home';
++  return input;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..59ef25f
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { redirectTarget } from '../src/feature.mjs';
++test('local and absolute targets', () => { assert.equal(redirectTarget('/settings?q=x'),'/settings?q=x'); assert.equal(redirectTarget('https://other.test'),'/home'); });

@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { pmRelpath } from '../../../hooks/lib.mjs';
+import { pmRelpath, parseExec } from '../../../hooks/lib.mjs';
 import { RunnerError } from './result.mjs';
 
 const BUILDERS = new Set(['expert-builder', 'codex-builder', 'auto']);
+// Kinds a story may exempt from scripts/test-integrity.mjs through pm-meta `integrity_allow`.
+const INTEGRITY_KINDS = new Set(['test-deleted', 'skip-added', 'assertions-dropped', 'config-weakened', 'pragma-added', 'protected-changed']);
+const validAllow = (a) => a === undefined
+  || (Array.isArray(a) && new Set(a).size === a.length && a.every((k) => INTEGRITY_KINDS.has(k)));
 const hasControl = (s) => [...s].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
 const blocked = (reason) => new RunnerError('blocked', reason);
 
@@ -16,12 +20,13 @@ export function parseStory(root, storyRel) {
   let meta;
   try { meta = JSON.parse(metas[0]); } catch { meta = null; }
   const valid = meta && typeof meta === 'object' && !Array.isArray(meta)
-    && JSON.stringify(Object.keys(meta).sort()) === '["builder","touches"]'
+    && ['["builder","touches"]', '["builder","integrity_allow","touches"]'].includes(JSON.stringify(Object.keys(meta).sort()))
+    && validAllow(meta.integrity_allow)
     && BUILDERS.has(meta.builder)
     && Array.isArray(meta.touches) && meta.touches.length > 0
     && new Set(meta.touches).size === meta.touches.length
     && meta.touches.every((t) => typeof t === 'string' && t.length > 0 && !hasControl(t));
-  if (!valid) throw blocked('story pm-meta must contain only a valid builder and non-empty unique touches array');
+  if (!valid) throw blocked('story pm-meta must contain only a valid builder, a non-empty unique touches array, and optionally an integrity_allow list of test-integrity kinds');
 
   const scopes = [];
   for (const item of meta.touches) {
@@ -60,4 +65,27 @@ export function parseStory(root, storyRel) {
     if (JSON.stringify([...new Set(visible)].sort()) !== JSON.stringify(machine)) throw blocked('story pm-meta touches does not match the visible Touches field');
   }
   return { builder: meta.builder, scopes: machine };
+}
+
+// parseProtected(root, storyRel): the Execution block's `protected` acceptance paths, normalised
+// lexically to worktree-relative form, the way the post-run delta names paths, never through a
+// symlink; [] when the story has no Execution block (legacy) or no `protected` field. The builder
+// may never change them, so a block or list the runner cannot read blocks the run.
+export function parseProtected(root, storyRel) {
+  const text = fs.readFileSync(path.join(root, storyRel), 'utf8');
+  const exec = parseExec(text);
+  if (!exec && /<!--\s*pm-exec:/.test(text)) throw blocked('story Execution block (pm-exec) does not parse, so its protected paths cannot be read; fix the JSON before codex-builder can write');
+  if (!exec || exec.protected === undefined) return [];
+  const list = exec.protected;
+  if (!Array.isArray(list) || !list.every((t) => typeof t === 'string' && t.length > 0 && !hasControl(t))) throw blocked('story Execution protected must be an array of non-empty paths');
+  const out = [];
+  for (const item of list) {
+    // A leading ./ names the same path from the worktree root; any other . or .. segment is refused.
+    const slashed = item.replace(/\\/g, '/').replace(/^(?:\.\/+)+/, '');
+    if (slashed.startsWith('/') || /^[A-Za-z]:/.test(slashed) || /[*?\[\]<>]/.test(slashed) || /\/\.\.?\//.test(`/${slashed}/`)) throw blocked('story Execution protected must use repo-relative paths without globs or traversal');
+    const rel = path.posix.normalize(slashed).replace(/\/+$/, '');
+    if (!rel || rel === '.') throw blocked('story Execution protected may not name the whole worktree');
+    out.push(rel);
+  }
+  return [...new Set(out)].sort();
 }

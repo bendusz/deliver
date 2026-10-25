@@ -34,6 +34,16 @@ Inspect (whichever apply):
   is under 200 lines and under 32 KiB, the Codex budget, and report both numbers; list any
   `AGENTS.md` lines that restate skill rules (sign-off before implementation, the PM writes no code,
   commit as you go, verifier PASS before ship, traceability to FR and AC ids) as trim candidates.
+- **T3 Code host.** Only when the probe in `references/host-t3.md` succeeds:
+  - T3 accepts a custom Claude `homePath`, which can hide this plugin. Confirm the `deliver`
+    agents and `/deliver:*` commands are visible in this session.
+  - `node` and `codex` resolve on the PATH T3 gives the session (`command -v`, or `where` on
+    Windows).
+  - `claude --version` meets the minimum above, `v2.1.292`.
+  - The PM thread runs in the root workspace, not a host worktree. The two lines of
+    `git rev-parse --path-format=absolute --git-dir --git-common-dir` (git 2.31 or newer) are
+    equal from anywhere in the root checkout and differ in a linked worktree. Without
+    `--path-format`, the plain output differs in a subdirectory too.
 - **State health.** When `docs/approval.json` or a legacy `pm/` exists, run the checks in
   `references/state-health.md` and report `OK` or `DRIFT` for each.
 

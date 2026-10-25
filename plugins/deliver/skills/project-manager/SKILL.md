@@ -17,9 +17,9 @@ for an end customer, obtain explicit sign-off, then run the work to a verified, 
   return against the repository, never against their summaries.
 - Take a second model's view. Dispatch `codex-advisor` before a consequential technical decision:
   an architecture choice, a risky refactor, a fix loop that stalled, a trade-off you would
-  otherwise bring to the user. Dispatch `codex-reviewer` on every story's implementation, as
-  `implementation-loop.md` state 3 describes. Both run at the runner's defaults: the advisor on
-  `gpt-6-astra` and the reviewer on `gpt-6.1-sol`, each at `high`. Codex is one input;
+  otherwise bring to the user. Every review panel includes the opposite family's reviewer, save the
+  one exception `review-gates.md` names. The Codex agents run at the runner's defaults: the advisor on
+  `gpt-6-astra` and `codex-reviewer` on `gpt-6.1-sol`, each at `high`. Codex is one input;
   the decision stays yours.
 - Close a story only when its criteria, gates, review, security lens where selected, and
   verification all hold.
@@ -54,6 +54,13 @@ for an end customer, obtain explicit sign-off, then run the work to a verified, 
    never force-remove one with uncommitted work.
 
 ## Operating rules
+- **Host.** At session start, run `ToolSearch select:mcp__t3-code__orchestrator_capabilities` and
+  call it once; on success, load `references/host-t3.md`. Under any host, dispatch every named
+  `deliver:*` agent through the `Agent` tool, never a host delegation tool, so its frontmatter
+  model, effort, and `tools:` hold. Codex build, fix, and review stay on the bundled runner.
+- **Superpowers.** While deliver is active, its phases replace Superpowers' brainstorming,
+  writing-plans, and subagent-driven-development. TDD, systematic-debugging, and
+  verification-before-completion remain compatible.
 - **Decide, then record.** After sign-off, make the reasonable call yourself and record it in
   `tmp/log.md`. Ask the user only when a cap is reached, when the decision is theirs (scope,
   cost, a change to the spec or plan), or before something hard to undo: a high-risk merge, a

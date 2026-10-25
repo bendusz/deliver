@@ -16,3 +16,5 @@ file, or command; correct the Execution notes for any that does not. **No secret
 
 Finish: commit the handoff alone, as `chore(handoff): <you>`, so it is the last commit of the
 session. It stays current while nothing but the handoff file has changed since `BASE_COMMIT`.
+
+Under T3 Code, also delete the heartbeat scheduled task, as `references/host-t3.md` describes.
