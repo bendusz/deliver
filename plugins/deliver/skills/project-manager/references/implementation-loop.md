@@ -101,8 +101,10 @@ subagent's word.
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/test-integrity.mjs" <integration> HEAD --protected <paths>
 --protected-base <protected_base>`, adding `--allow <kind>` for each `pm-meta.integrity_allow`
 entry, and `--root <worktree>` in parallel mode. Take `protected`, `protected_base`, and
-`integrity_allow` from the integration branch's copy of the story
-(`git show <integration>:docs/stories/<file>`), never from the story branch. Record its verdict and
+`integrity_allow` from the integration branch's copy of the story, never from the story branch:
+`git show <integration>:./docs/stories/<file>` run from the project directory (the `./` makes the
+path relative to it), or `git show <integration>:<project-prefix>/docs/stories/<file>` from
+anywhere in the repository. Record its verdict and
 the commit it judged as `integrity: "<pass|fail> <sha>"`, the full `git rev-parse HEAD`, or
 `git -C <worktree> rev-parse HEAD` in parallel mode, and commit it. Exit 1 is `fail`: increment
 `integrity_fails` in the same commit. Exit 64 means the command could not judge the diff: fix the
@@ -168,7 +170,10 @@ after either `<sha>` may only record state in the story file and `docs/handoff/*
 integration tip exactly as git would automatically, which the re-gate covers. Any other change, a
 conflict resolution in code included, needs a fresh verdict. Run the merge as its own Bash command,
 from the project directory or with `git -C <project>`, after at most a plain `git checkout` or
-`git switch` of the integration branch, and name the story branch literally. The merge's own
+`git switch` of the integration branch in the same `&&` chain, or a `git status`, `log`, `diff`,
+`show`, or `rev-parse`, and name the story branch literally. A checkout that might not run (inside
+`if` or a loop, after `||`, or behind another command in the chain) leaves the target unknown, and
+the hook blocks the story merge after it. The merge's own
 directory identifies the project; from a directory that is in no deliver project (for example a
 monorepo root), a story-like merge blocks, unless the checked-out target is a non-base branch that no project integrates on.
 
@@ -181,8 +186,12 @@ EOF
 ```
 
 The hook refuses a shell variable or substitution, `-` or `@{-1}`, a `git pull` of a story branch, a
-commit short of the branch tip, and a tag that shadows the branch; the quoted heredoc message is
-fine. The hook catches honest mistakes such as a
+commit short of the branch tip, a tag that shadows the branch, and `--no-verify`; the quoted heredoc
+message is fine. Behind it, a git `pre-merge-commit` hook that session start installs judges the
+merge git is actually committing by the same rules, whatever the shell form, and
+`branch.<integration>.mergeoptions --no-ff` makes every merge into the integration branch a merge
+commit it sees. When git refuses the merge commit, the merge stays in progress: `git merge --abort`,
+then go back to the skipped state. The hook catches honest mistakes such as a
 missed or stale verdict, a careless chain, or a wrong tier; it is not a boundary against an agent
 set on evading it, which is the 0.30 sandbox's job. A block means a state was skipped: go back to
 it, and never set `DELIVER_NO_ENFORCE` to get past it.

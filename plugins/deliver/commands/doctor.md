@@ -3,7 +3,7 @@ description: Check environment readiness before implementation, covering tooling
 ---
 
 Use the `project-manager` skill to run a pre-implementation environment readiness check. Inspect and
-probe only; the readiness report is the only file you may write.
+probe only; the readiness report is the only file you may write, apart from the merge gate install below.
 
 Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo)
 
@@ -44,10 +44,18 @@ Inspect (whichever apply):
     `git rev-parse --path-format=absolute --git-dir --git-common-dir` (git 2.31 or newer) are
     equal from anywhere in the root checkout and differ in a linked worktree. Without
     `--path-format`, the plain output differs in a subdirectory too.
+- **Git-level merge gate.** In a deliver project, run
+  `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --check <project-root>`. It reports `OK`
+  (exit 0) when `pre-merge-commit` and `pre-commit` in `git rev-parse --git-path hooks` carry the
+  `# deliver-merge-gate v1` marker and point to an existing `git-merge-gate.mjs`, and
+  `branch.<integration>.mergeoptions` includes `--no-ff` for each integration branch the committed
+  plan names. Otherwise run the same command without `--check`, which installs or refreshes them,
+  and report what it could not fix: a foreign hook it will not overwrite, or a `mergeoptions` value
+  you set without `--no-ff`.
 - **State health.** When `docs/approval.json` or a legacy `pm/` exists, run the checks in
   `references/state-health.md` and report `OK` or `DRIFT` for each.
 
-Do **not** install or upgrade anything. Delegate heavy reading to a read-only subagent if that
+Do **not** install or upgrade anything, except deliver's own git-level merge gate as above. Delegate heavy reading to a read-only subagent if that
 helps.
 
 Write the findings to `tmp/environment-check.md` (runtime-only): each check as `OK`, `MISSING`, or

@@ -5,7 +5,9 @@
 // new session. Renders lib.mjs's inspectState(): the approval status, the derived phase
 // and the reference to load, the checked-out story and its Execution block, other claimed
 // stories, deliver's and host-owned worktrees, the uncommitted path count, handoff
-// freshness, and the wiki line.
+// freshness, and the wiki line. In a deliver project (docs/approval.json) it also installs, or
+// refreshes, deliver's git-level merge gate through git-hook-install.mjs, and reports only what it
+// could not install: a foreign pre-merge-commit or pre-commit hook, or a conflicting mergeoptions.
 // SILENT (exit 0, no output) outside a managed project. Fail-open throughout: any git or
 // file failure drops that one line, never the session.
 import fs from 'node:fs';
@@ -32,6 +34,13 @@ let st = null;
 try { st = inspectState(cwd); } catch { st = null; }
 if (!st) finish();
 try { render(st); } catch { /* a malformed field must never take the session down */ }
+if (!st.legacy) {
+  // The git-level ship gate. Any failure drops it silently, like every line here.
+  try {
+    const { installGitHook } = await import('./git-hook-install.mjs');
+    for (const note of installGitHook(cwd).notes) out.splice(Math.max(0, out.length - 1), 0, String(note).replace(/[\x00-\x1f\x7f]+/g, ' ').slice(0, 400));
+  } catch { /* fail open */ }
+}
 finish();
 
 function render(st) {
