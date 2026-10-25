@@ -1,0 +1,57 @@
+diff --git a/src/files.mjs b/src/files.mjs
+index 80b8523..22ed6df 100644
+--- a/src/files.mjs
++++ b/src/files.mjs
+@@ -1,2 +1,24 @@
+ // Uploaded file records: { path, size, sha256 }.
+ export const displayPath = (p) => p.replace(/^\/+/, '');
++
++// duplicateGroups(files): paths grouped by content hash, for hashes shared by several files.
++export function duplicateGroups(files) {
++  const byHash = new Map();
++  for (const f of files) {
++    const group = byHash.get(f.sha256);
++    if (group) group.push(f.path);
++    else byHash.set(f.sha256, [f.path]);
++  }
++  return [...byHash.values()].filter((group) => group.length > 1);
++}
++
++// wastedBytes(files): bytes held by copies beyond the first of each content hash.
++export function wastedBytes(files) {
++  const seen = new Set();
++  let wasted = 0;
++  for (const f of files) {
++    if (seen.has(f.sha256)) wasted += f.size;
++    else seen.add(f.sha256);
++  }
++  return wasted;
++}
+diff --git a/test/files.test.mjs b/test/files.test.mjs
+new file mode 100644
+index 0000000..d788cba
+--- /dev/null
++++ b/test/files.test.mjs
+@@ -0,0 +1,22 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { duplicateGroups, wastedBytes } from '../src/files.mjs';
++
++const files = [
++  { path: '/a.png', size: 10, sha256: 'h1' },
++  { path: '/b.pdf', size: 99, sha256: 'h2' },
++  { path: '/c.png', size: 10, sha256: 'h1' },
++  { path: '/d.txt', size: 5, sha256: 'h3' },
++  { path: '/e.pdf', size: 99, sha256: 'h2' },
++  { path: '/f.png', size: 10, sha256: 'h1' },
++];
++
++test('duplicate groups in order of first appearance', () => {
++  assert.deepEqual(duplicateGroups(files), [['/a.png', '/c.png', '/f.png'], ['/b.pdf', '/e.pdf']]);
++  assert.deepEqual(duplicateGroups([]), []);
++});
++
++test('wasted bytes count every extra copy', () => {
++  assert.equal(wastedBytes(files), 10 + 99 + 10);
++  assert.equal(wastedBytes(files.slice(0, 2)), 0);
++});

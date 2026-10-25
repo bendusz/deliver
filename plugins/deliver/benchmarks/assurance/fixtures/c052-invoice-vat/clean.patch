@@ -1,0 +1,33 @@
+diff --git a/src/invoice.mjs b/src/invoice.mjs
+index 3950023..5587492 100644
+--- a/src/invoice.mjs
++++ b/src/invoice.mjs
+@@ -1,2 +1,9 @@
+ // Invoice lines: { description, quantity, unitCents }. Amounts are integer cents.
+ export const lineSubtotal = (line) => line.quantity * line.unitCents;
++
++// invoiceTotals(lines, vatRateBp): subtotal, VAT on the subtotal, and total, in cents.
++export function invoiceTotals(lines, vatRateBp) {
++  const subtotalCents = lines.reduce((sum, line) => sum + lineSubtotal(line), 0);
++  const vatCents = Math.round((subtotalCents * vatRateBp) / 10000);
++  return { subtotalCents, vatCents, totalCents: subtotalCents + vatCents };
++}
+diff --git a/test/invoice.test.mjs b/test/invoice.test.mjs
+new file mode 100644
+index 0000000..57727bf
+--- /dev/null
++++ b/test/invoice.test.mjs
+@@ -0,0 +1,13 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { invoiceTotals } from '../src/invoice.mjs';
++
++test('VAT is added to the subtotal', () => {
++  const lines = [{ description: 'Hosting', quantity: 1, unitCents: 10000 }, { description: 'Seats', quantity: 3, unitCents: 1500 }];
++  assert.deepEqual(invoiceTotals(lines, 2100), { subtotalCents: 14500, vatCents: 3045, totalCents: 17545 });
++});
++
++test('half a cent rounds up and an empty invoice is zero', () => {
++  assert.deepEqual(invoiceTotals([{ description: 'Pen', quantity: 1, unitCents: 50 }], 900), { subtotalCents: 50, vatCents: 5, totalCents: 55 });
++  assert.deepEqual(invoiceTotals([], 2100), { subtotalCents: 0, vatCents: 0, totalCents: 0 });
++});

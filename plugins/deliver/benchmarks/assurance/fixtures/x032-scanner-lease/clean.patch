@@ -1,0 +1,33 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 24fe865..e22d716 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,18 @@
+ // Scanner lease helpers.
++
++export function createLease(open) {
++  let active = false;
++  return {
++    async acquire() {
++      if (active) return null;
++      active = true;
++      try {
++        return await open();
++      } catch (error) {
++        active = false;
++        throw error;
++      }
++    },
++    release() { active = false; }
++  };
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..8a702d2
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { createLease } from '../src/feature.mjs';
++test('held scanner', async () => { const lease=createLease(async()=>({id:1})); assert.deepEqual(await lease.acquire(),{id:1}); assert.equal(await lease.acquire(),null); lease.release(); assert.deepEqual(await lease.acquire(),{id:1}); });

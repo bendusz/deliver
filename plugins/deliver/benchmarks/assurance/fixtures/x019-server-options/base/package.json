@@ -1,0 +1,5 @@
+{
+  "name": "server-options",
+  "private": true,
+  "type": "module"
+}

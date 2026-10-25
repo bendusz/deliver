@@ -1,0 +1,50 @@
+diff --git a/src/logger.mjs b/src/logger.mjs
+index 540cf39..21e3526 100644
+--- a/src/logger.mjs
++++ b/src/logger.mjs
+@@ -2,3 +2,20 @@
+ export function formatLine(level, msg, fields = {}) {
+   return JSON.stringify({ level, msg, ...fields });
+ }
++
++const SECRET_KEYS = /^(password|passwd|secret|token|api[_-]?key|authorization|cookie)$/i;
++
++// redact(value): a copy of value with every secret-looking property replaced by '[REDACTED]'.
++export function redact(value) {
++  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
++  const proto = Object.getPrototypeOf(value);
++  if (proto !== Object.prototype && proto !== null) return value;
++  const out = {};
++  for (const [key, v] of Object.entries(value)) out[key] = SECRET_KEYS.test(key) ? '[REDACTED]' : redact(v);
++  return out;
++}
++
++// logLine(level, msg, fields): a log line with secrets removed from the fields.
++export function logLine(level, msg, fields = {}) {
++  return formatLine(level, msg, redact(fields));
++}
+diff --git a/test/logger.test.mjs b/test/logger.test.mjs
+new file mode 100644
+index 0000000..ff8109e
+--- /dev/null
++++ b/test/logger.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { redact, logLine } from '../src/logger.mjs';
++
++test('secret keys are redacted at any depth, ignoring case', () => {
++  const input = { user: 'ann', Password: 'p', headers: { Authorization: 'Bearer x', accept: 'json' } };
++  assert.deepEqual(redact(input), { user: 'ann', Password: '[REDACTED]', headers: { Authorization: '[REDACTED]', accept: 'json' } });
++  assert.equal(input.Password, 'p');
++});
++
++test('scalars, dates and lists of scalars pass through', () => {
++  const when = new Date(0);
++  assert.deepEqual(redact({ when, ids: [1, 2], note: null }), { when, ids: [1, 2], note: null });
++  assert.equal(redact('token'), 'token');
++});
++
++test('logLine writes redacted JSON', () => {
++  assert.equal(logLine('info', 'login', { api_key: 'k' }), '{"level":"info","msg":"login","api_key":"[REDACTED]"}');
++});

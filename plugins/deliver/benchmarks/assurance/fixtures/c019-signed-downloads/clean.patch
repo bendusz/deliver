@@ -1,0 +1,73 @@
+diff --git a/src/cdn.mjs b/src/cdn.mjs
+index 67c7d2a..9af4c79 100644
+--- a/src/cdn.mjs
++++ b/src/cdn.mjs
+@@ -1,2 +1,31 @@
++import crypto from 'node:crypto';
++
+ // Private file downloads go through the CDN at this origin.
+ export const CDN_ORIGIN = 'https://files.example.com';
++
++const signature = (secret, path, expires) => crypto.createHmac('sha256', secret).update(`${path}\n${expires}`).digest('base64url');
++
++// signUrl(secret, path, expiresAt): a download URL for path that is valid until expiresAt.
++export function signUrl(secret, path, expiresAt) {
++  if (!path.startsWith('/') || /[?#]/.test(path)) throw new Error(`not a plain absolute path: ${path}`);
++  const pathname = new URL(path, CDN_ORIGIN).pathname;
++  return `${CDN_ORIGIN}${pathname}?expires=${expiresAt}&sig=${signature(secret, pathname, expiresAt)}`;
++}
++
++// verifyUrl(secret, url, now): whether url carries a valid, unexpired signature for its path.
++export function verifyUrl(secret, url, now) {
++  let u;
++  try {
++    u = new URL(url);
++  } catch {
++    return false;
++  }
++  if (u.origin !== CDN_ORIGIN) return false;
++  const expires = u.searchParams.get('expires');
++  const sig = u.searchParams.get('sig');
++  if (!expires || !/^\d+$/.test(expires) || !sig) return false;
++  if (now >= Number(expires)) return false;
++  const expected = Buffer.from(signature(secret, u.pathname, Number(expires)));
++  const given = Buffer.from(sig);
++  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
++}
+diff --git a/test/cdn.test.mjs b/test/cdn.test.mjs
+new file mode 100644
+index 0000000..7375913
+--- /dev/null
++++ b/test/cdn.test.mjs
+@@ -0,0 +1,31 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { signUrl, verifyUrl } from '../src/cdn.mjs';
++
++const secret = 'test-secret';
++
++test('a signed URL verifies until it expires', () => {
++  const url = signUrl(secret, '/invoices/2024/0042.pdf', 1000);
++  assert.match(url, /^https:\/\/files\.example\.com\/invoices\/2024\/0042\.pdf\?expires=1000&sig=[\w-]+$/);
++  assert.equal(verifyUrl(secret, url, 999), true);
++  assert.equal(verifyUrl(secret, url, 1000), false);
++});
++
++test('tampering and junk are rejected', () => {
++  const url = signUrl(secret, '/a/report.pdf', 1000);
++  assert.equal(verifyUrl(secret, url.replace('/a/report', '/b/report'), 1), false);
++  assert.equal(verifyUrl(secret, url.replace('expires=1000', 'expires=9999'), 1), false);
++  assert.equal(verifyUrl(secret, url.replace(/sig=.*/, 'sig=abc'), 1), false);
++  assert.equal(verifyUrl('other-secret', url, 1), false);
++  assert.equal(verifyUrl(secret, url.replace('files.example.com', 'evil.test'), 1), false);
++  assert.equal(verifyUrl(secret, 'not a url', 1), false);
++  assert.equal(verifyUrl(secret, 'https://files.example.com/a/report.pdf?expires=soon&sig=x', 1), false);
++});
++
++test('paths are normalised before signing and odd paths refused', () => {
++  const url = signUrl(secret, '/a/../b/my file.pdf', 1000);
++  assert.ok(url.startsWith('https://files.example.com/b/my%20file.pdf?'));
++  assert.equal(verifyUrl(secret, url, 1), true);
++  assert.throws(() => signUrl(secret, 'a.pdf', 1000));
++  assert.throws(() => signUrl(secret, '/a.pdf?x=1', 1000));
++});

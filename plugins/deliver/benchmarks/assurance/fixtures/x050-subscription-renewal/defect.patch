@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 0d617fd..1df2312 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Subscription renewal helpers.
++
++export function renewalDate(date) {
++  const [year, month, day] = date.split('-').map(Number);
++  return new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..60433d0
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { renewalDate } from '../src/feature.mjs';
++test('regular month and year rollover', () => { assert.equal(renewalDate('2026-04-12'),'2026-05-12'); assert.equal(renewalDate('2026-12-10'),'2027-01-10'); });

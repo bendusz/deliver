@@ -1,0 +1,5 @@
+{
+  "name": "payment-amount",
+  "private": true,
+  "type": "module"
+}

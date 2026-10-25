@@ -1,0 +1,61 @@
+diff --git a/src/order-status.mjs b/src/order-status.mjs
+index 6ea64f9..2bc9400 100644
+--- a/src/order-status.mjs
++++ b/src/order-status.mjs
+@@ -1,2 +1,27 @@
+ // Order lifecycle states.
+ export const STATES = ['cart', 'placed', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'];
++
++const NEXT = {
++  cart: ['placed', 'cancelled'],
++  placed: ['paid', 'cancelled'],
++  paid: ['shipped', 'refunded'],
++  shipped: ['delivered'],
++  delivered: ['refunded'],
++  cancelled: [],
++  refunded: [],
++};
++
++// canTransition(from, to): whether an order may move from one status to another.
++export function canTransition(from, to) {
++  return Object.hasOwn(NEXT, from) && NEXT[from].includes(to);
++}
++
++// transition(order, to, at): a copy of the order in status `to`, with the move recorded.
++export function transition(order, to, at) {
++  if (!canTransition(order.status, to)) {
++    const err = new Error(`order ${order.id} cannot move from ${order.status} to ${to}`);
++    err.code = 'EINVALIDSTATE';
++    throw err;
++  }
++  return { ...order, status: to, history: [...(order.history ?? []), { from: order.status, to, at }] };
++}
+diff --git a/test/order-status.test.mjs b/test/order-status.test.mjs
+new file mode 100644
+index 0000000..3c2c6d3
+--- /dev/null
++++ b/test/order-status.test.mjs
+@@ -0,0 +1,23 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { canTransition, transition, STATES } from '../src/order-status.mjs';
++
++test('exactly the documented moves are allowed', () => {
++  const allowed = new Set(['cart>placed', 'cart>cancelled', 'placed>paid', 'placed>cancelled', 'paid>shipped', 'paid>refunded', 'shipped>delivered', 'delivered>refunded']);
++  for (const from of STATES) for (const to of STATES) assert.equal(canTransition(from, to), allowed.has(`${from}>${to}`), `${from}>${to}`);
++  assert.equal(canTransition('toString', 'placed'), false);
++  assert.equal(canTransition('lost', 'placed'), false);
++});
++
++test('transition records history without touching the input', () => {
++  const order = { id: 7, status: 'placed' };
++  const paid = transition(order, 'paid', '2024-05-01T10:00:00Z');
++  assert.deepEqual(paid, { id: 7, status: 'paid', history: [{ from: 'placed', to: 'paid', at: '2024-05-01T10:00:00Z' }] });
++  assert.deepEqual(order, { id: 7, status: 'placed' });
++  assert.equal(transition(paid, 'shipped', 't2').history.length, 2);
++  assert.equal(paid.history.length, 1);
++});
++
++test('an impossible move is refused', () => {
++  assert.throws(() => transition({ id: 7, status: 'cancelled' }, 'paid', 't'), (e) => e.code === 'EINVALIDSTATE' && /7/.test(e.message) && /cancelled/.test(e.message) && /paid/.test(e.message));
++});

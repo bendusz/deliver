@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 573c8ba..7e0b018 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Attachment sizes helpers.
++
++export function fileSizes(paths, stat) {
++  return paths.map(path => stat(path).size);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..e60581c
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { fileSizes } from '../src/feature.mjs';
++test('attachment sizes', () => assert.deepEqual(fileSizes(['a','b'],p=>({size:p==='a'?4:0})),[4,0]));

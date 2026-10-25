@@ -1,0 +1,40 @@
+diff --git a/src/series.mjs b/src/series.mjs
+index 8aa4fe3..43b3599 100644
+--- a/src/series.mjs
++++ b/src/series.mjs
+@@ -4,3 +4,15 @@ export function total(series) {
+   for (const v of series) sum += v;
+   return sum;
+ }
++
++// movingAverage(series, window): the mean of every run of `window` consecutive points.
++export function movingAverage(series, window) {
++  if (!Number.isInteger(window) || window < 1) throw new RangeError('window must be a positive integer');
++  const out = [];
++  for (let i = window - 1; i < series.length; i++) {
++    let sum = 0;
++    for (let j = i - window + 1; j <= i; j++) sum += series[j];
++    out.push(sum / window);
++  }
++  return out;
++}
+diff --git a/test/series.test.mjs b/test/series.test.mjs
+new file mode 100644
+index 0000000..b822c15
+--- /dev/null
++++ b/test/series.test.mjs
+@@ -0,0 +1,14 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { movingAverage } from '../src/series.mjs';
++
++test('movingAverage averages each window', () => {
++  assert.deepEqual(movingAverage([1, 2, 3, 4, 5], 2), [1.5, 2.5, 3.5, 4.5]);
++  assert.deepEqual(movingAverage([4, 8, 6], 3), [6]);
++  assert.deepEqual(movingAverage([4, 8, 6], 1), [4, 8, 6]);
++});
++
++test('short series and bad windows', () => {
++  assert.deepEqual(movingAverage([1, 2], 3), []);
++  assert.throws(() => movingAverage([1], 0), RangeError);
++});

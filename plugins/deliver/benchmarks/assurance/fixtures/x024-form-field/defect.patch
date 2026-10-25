@@ -1,0 +1,23 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index ca51063..5cc3a4e 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1,3 +1,3 @@
+ export function decodeField(value) {
+-  return decodeURIComponent(value);
++  return decodeURIComponent(value.replace('+', ' '));
+ }
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..51ea942
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,8 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { decodeField } from '../src/feature.mjs';
++test('multiple form spaces', () => {
++  const decode = () => 'a b c';
++  assert.equal(decode('a+b+c'), 'a b c');
++});
++test('encoded plus remains plus', () => assert.equal(decodeField('a%2Bb'),'a+b'));

@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 3b83ad9..5f0ba72 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,10 @@
+ // Report fetch helpers.
++
++export async function fetchReport(fetch, attempts = 3) {
++  for (let attempt = 1; ; attempt++) {
++    try { return await fetch(); }
++    catch (error) {
++      if (attempt >= attempts) throw error;
++    }
++  }
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..ff58476
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { fetchReport } from '../src/feature.mjs';
++test('reset then success', async () => { let calls=0; assert.equal(await fetchReport(async()=>{if(++calls===1)throw Object.assign(new Error('reset'),{code:'ECONNRESET'}); return 7;}),7); assert.equal(calls,2); });

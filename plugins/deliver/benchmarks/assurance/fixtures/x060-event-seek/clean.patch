@@ -1,0 +1,35 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index a30db76..5d5efb6 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,11 @@
+ // Event seek helpers.
++
++export function seekEvent(events, target) {
++  let lo = 0, hi = events.length;
++  while (lo < hi) {
++    const mid = lo + Math.floor((hi - lo) / 2);
++    if (events[mid].at < target) lo = mid + 1;
++    else hi = mid;
++  }
++  return lo;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..ad191e2
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,13 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { seekEvent } from '../src/feature.mjs';
++test('lower bound handles duplicates and endpoints', () => {
++  const events=[{at:1},{at:3},{at:3},{at:8}];
++  assert.equal(seekEvent(events,3),1); assert.equal(seekEvent(events,4),3);
++  assert.equal(seekEvent(events,0),0); assert.equal(seekEvent(events,9),4); assert.equal(seekEvent([],0),0);
++});
++test('large archive bounds timestamp reads', () => {
++  let reads=0; const n=65536;
++  const events=Array.from({length:n},(_,i)=>({get at(){reads++;return i*2;}}));
++  assert.equal(seekEvent(events,65535),32768); assert.ok(reads<=32);
++});

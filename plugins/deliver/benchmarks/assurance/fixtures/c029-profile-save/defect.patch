@@ -1,0 +1,49 @@
+diff --git a/src/profiles.mjs b/src/profiles.mjs
+new file mode 100644
+index 0000000..77b8a28
+--- /dev/null
++++ b/src/profiles.mjs
+@@ -0,0 +1,18 @@
++export const DEFAULT_PROFILE = Object.freeze({ displayName: '', bio: '', timezone: 'UTC' });
++const EDITABLE = ['displayName', 'bio', 'timezone'];
++
++const pickEditable = (changes) => Object.fromEntries(EDITABLE.filter((k) => k in changes).map((k) => [k, changes[k]]));
++
++// saveProfile(store, userId, changes): creates the profile on first save, else merges the changes.
++export async function saveProfile(store, userId, changes) {
++  const allowed = pickEditable(changes);
++  const existing = await store.get(userId);
++  if (!existing) {
++    const created = { ...DEFAULT_PROFILE, ...allowed, userId };
++    store.insert(userId, created);
++    return created;
++  }
++  const updated = { ...existing, ...allowed, userId };
++  await store.update(userId, updated);
++  return updated;
++}
+diff --git a/test/profiles.test.mjs b/test/profiles.test.mjs
+new file mode 100644
+index 0000000..8c7d8c3
+--- /dev/null
++++ b/test/profiles.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { DocStore } from '../src/profile-store.mjs';
++import { saveProfile } from '../src/profiles.mjs';
++
++test('the first save creates the profile with defaults', async () => {
++  const store = new DocStore();
++  const saved = await saveProfile(store, 'u1', { displayName: 'Ann', role: 'admin' });
++  assert.deepEqual(saved, { displayName: 'Ann', bio: '', timezone: 'UTC', userId: 'u1' });
++  assert.deepEqual(await store.get('u1'), saved);
++});
++
++test('later saves merge into the stored profile', async () => {
++  const store = new DocStore();
++  await store.insert('u1', { displayName: 'Ann', bio: 'hi', timezone: 'UTC', userId: 'u1' });
++  const saved = await saveProfile(store, 'u1', { timezone: 'Europe/Amsterdam' });
++  assert.equal(saved.bio, 'hi');
++  assert.equal((await store.get('u1')).timezone, 'Europe/Amsterdam');
++});

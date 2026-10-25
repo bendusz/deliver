@@ -1,0 +1,23 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index ac61270..3df236f 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Reservation window helpers.
++
++export function available(bookings, start, end) {
++  return !bookings.some(b => start <= b.end && end > b.start);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..c2f0a5e
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,7 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { available } from '../src/feature.mjs';
++test('check a room', () => {
++  assert.equal(available([{start: 10, end: 20}], 12, 15), false);
++  assert.equal(available([], 1, 2), true);
++});

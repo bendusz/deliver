@@ -1,0 +1,20 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 3006967..cfb8fb1 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,5 @@
+ // Shipping bracket helpers.
++
++export function findBracket(bands, value) {
++  return bands.find(band => value >= band.min && value < band.max)?.rate ?? null;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..00d885a
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { findBracket } from '../src/feature.mjs';
++test('interior and gap', () => { assert.equal(findBracket([{min:0,max:10,rate:4}],5),4); assert.equal(findBracket([],5),null); });

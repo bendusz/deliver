@@ -1,0 +1,47 @@
+diff --git a/src/validation.mjs b/src/validation.mjs
+index 587cb7e..fe84194 100644
+--- a/src/validation.mjs
++++ b/src/validation.mjs
+@@ -1,2 +1,17 @@
+ // Form validation helpers. Validators return a list of { field, message }.
+ export const isBlank = (s) => typeof s !== 'string' || s.trim() === '';
++
++const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
++
++// validateSignup(form): the problems with a signup form, or [] when it is valid.
++export function validateSignup({ email, password, displayName } = {}) {
++  const errors = [];
++  const validEmail = !isBlank(email) && EMAIL.test(email.trim());
++  if (!validEmail) errors.push({ field: 'email', message: 'Enter a valid email address.' });
++  if (typeof password !== 'string' || password.length < 12) {
++    errors.push({ field: 'password', message: 'Use at least 12 characters.' });
++  }
++  if (isBlank(displayName)) errors.push({ field: 'displayName', message: 'Enter a display name.' });
++  else if (displayName.trim().length > 40) errors.push({ field: 'displayName', message: 'Use at most 40 characters.' });
++  return errors;
++}
+diff --git a/test/validation.test.mjs b/test/validation.test.mjs
+new file mode 100644
+index 0000000..1a87e6e
+--- /dev/null
++++ b/test/validation.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { validateSignup } from '../src/validation.mjs';
++
++const ok = { email: ' ann@example.com ', password: 'correct horse battery', displayName: 'Ann' };
++
++test('a valid form has no errors', () => {
++  assert.deepEqual(validateSignup(ok), []);
++});
++
++test('each bad field is reported in order', () => {
++  const errors = validateSignup({ email: 'ann at example', password: 'short', displayName: ' ' });
++  assert.deepEqual(errors.map((e) => e.field), ['email', 'password', 'displayName']);
++  assert.deepEqual(validateSignup({}).map((e) => e.field), ['email', 'password', 'displayName']);
++});
++
++test('display names are limited to 40 characters', () => {
++  assert.deepEqual(validateSignup({ ...ok, displayName: 'x'.repeat(41) }).map((e) => e.field), ['displayName']);
++});

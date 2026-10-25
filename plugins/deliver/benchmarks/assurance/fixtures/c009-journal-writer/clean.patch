@@ -1,0 +1,46 @@
+diff --git a/src/serial.mjs b/src/serial.mjs
+new file mode 100644
+index 0000000..836bb10
+--- /dev/null
++++ b/src/serial.mjs
+@@ -0,0 +1,9 @@
++// serialize(fn): fn wrapped so that its calls run one at a time, in call order.
++export function serialize(fn) {
++  let tail = Promise.resolve();
++  return (...args) => {
++    const run = tail.then(() => fn(...args));
++    tail = run.catch(() => {});
++    return run;
++  };
++}
+diff --git a/test/serial.test.mjs b/test/serial.test.mjs
+new file mode 100644
+index 0000000..8394d19
+--- /dev/null
++++ b/test/serial.test.mjs
+@@ -0,0 +1,25 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { serialize } from '../src/serial.mjs';
++
++test('calls run one at a time in call order', async () => {
++  const log = [];
++  let active = 0;
++  const write = serialize(async (line, delay) => {
++    active++;
++    assert.equal(active, 1);
++    log.push(`start ${line}`);
++    for (let i = 0; i < delay; i++) await new Promise((r) => setImmediate(r));
++    log.push(`end ${line}`);
++    active--;
++    return line.length;
++  });
++  const results = await Promise.all([write('aa', 3), write('b', 1), write('ccc', 0)]);
++  assert.deepEqual(results, [2, 1, 3]);
++  assert.deepEqual(log, ['start aa', 'end aa', 'start b', 'end b', 'start ccc', 'end ccc']);
++});
++
++test('a failing call rejects its own promise', async () => {
++  const write = serialize(async (line) => { if (line === 'bad') throw new Error('disk full'); return line; });
++  await assert.rejects(write('bad'), /disk full/);
++});

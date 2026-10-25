@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index d410f0f..e7f24cb 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Activity cursor helpers.
++
++export function takePage(rows, cursor, limit) {
++  const start = cursor === null ? 0 : rows.findIndex(row => row.id === cursor);
++  return rows.slice(start, start + limit);
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..eeb6b68
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { takePage } from '../src/feature.mjs';
++test('first page', () => assert.deepEqual(takePage([{id:'a'}, {id:'b'}], null, 1), [{id:'a'}]));

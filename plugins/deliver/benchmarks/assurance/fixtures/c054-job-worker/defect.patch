@@ -1,0 +1,59 @@
+diff --git a/src/worker.mjs b/src/worker.mjs
+new file mode 100644
+index 0000000..908317c
+--- /dev/null
++++ b/src/worker.mjs
+@@ -0,0 +1,17 @@
++// runOnce(queue, handlers, options): runs the next job, re-queueing it on failure until it has
++// failed maxAttempts times.
++export async function runOnce(queue, handlers, { maxAttempts = 5 } = {}) {
++  const job = queue.shift();
++  if (!job) return 'idle';
++  try {
++    const handler = handlers[job.type];
++    if (!handler) throw new Error(`no handler for job type ${job.type}`);
++    await handler(job.payload);
++    return 'done';
++  } catch (err) {
++    const attempts = job.attempts + 1;
++    if (attempts >= maxAttempts) return 'dead';
++    queue.push({ ...job, attempts });
++    return 'retry';
++  }
++}
+diff --git a/test/worker.test.mjs b/test/worker.test.mjs
+new file mode 100644
+index 0000000..a34513a
+--- /dev/null
++++ b/test/worker.test.mjs
+@@ -0,0 +1,30 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { JobQueue } from '../src/queue.mjs';
++import { runOnce } from '../src/worker.mjs';
++
++test('a successful job is done and an empty queue is idle', async () => {
++  const q = new JobQueue();
++  const seen = [];
++  q.push({ id: 1, type: 'email', payload: 'hi' });
++  assert.equal(await runOnce(q, { email: async (p) => { seen.push(p); } }), 'done');
++  assert.deepEqual(seen, ['hi']);
++  assert.equal(await runOnce(q, {}), 'idle');
++});
++
++test('a failing job is retried with one more attempt', async () => {
++  const q = new JobQueue();
++  q.push({ id: 1, type: 'email', payload: null });
++  assert.equal(await runOnce(q, { email: async () => { throw new Error('smtp down'); } }), 'retry');
++  assert.equal(q.length, 1);
++  assert.equal(q.shift().attempts, 1);
++});
++
++test('a job stops being retried after maxAttempts', async () => {
++  const q = new JobQueue();
++  q.push({ id: 1, type: 'unknown', payload: null });
++  const results = [];
++  for (let i = 0; i < 3; i++) results.push(await runOnce(q, {}, { maxAttempts: 3 }));
++  assert.deepEqual(results, ['retry', 'retry', 'dead']);
++  assert.equal(q.length, 0);
++});

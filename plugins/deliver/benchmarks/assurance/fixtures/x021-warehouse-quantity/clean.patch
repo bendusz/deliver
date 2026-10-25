@@ -1,0 +1,23 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 2f3845c..55213ec 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1,3 +1,3 @@
+ export function clampQuantity(value, capacity) {
+-  return Math.min(value, capacity);
++  return Math.max(0, Math.min(value, capacity));
+ }
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..1280a61
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,8 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { clampQuantity } from '../src/feature.mjs';
++test('quantity stays within warehouse bounds', () => {
++  const result = clampQuantity(-3, 20);
++  assert.equal(result, 0);
++});
++test('capacity limit', () => assert.equal(clampQuantity(30,20),20));

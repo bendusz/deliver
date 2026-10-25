@@ -1,0 +1,30 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 9e4663b..b12acbc 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,8 @@
+ // Batch chunks helpers.
++
++export function chunkRows(items, size) {
++  if (!Number.isInteger(size) || size <= 0) throw new RangeError('invalid batch size');
++  const result = [];
++  for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
++  return result;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..9ac521b
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,11 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { chunkRows } from '../src/feature.mjs';
++test('full and partial batches', () => {
++  const items=[1,2,3,4,5]; assert.deepEqual(chunkRows(items,2),[[1,2],[3,4],[5]]);
++  assert.deepEqual(items,[1,2,3,4,5]); assert.deepEqual(chunkRows(items,8),[items]);
++  assert.deepEqual(chunkRows([],2),[]); assert.deepEqual(chunkRows([1],1),[[1]]);
++});
++test('size validation runs on empty lists too', () => {
++  for(const size of [0,-1,1.5,'2',NaN,Infinity]) assert.throws(()=>chunkRows([],size),RangeError);
++});

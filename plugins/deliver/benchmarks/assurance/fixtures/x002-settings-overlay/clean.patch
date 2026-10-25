@@ -1,0 +1,24 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index ff3ea47..80734dd 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,9 @@
+ // Settings overlay helpers.
++
++export function mergeSettings(defaults, overrides) {
++  const result = { ...defaults };
++  for (const [key, value] of Object.entries(overrides)) {
++    if (value !== undefined) result[key] = value;
++  }
++  return result;
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..7c16311
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { mergeSettings } from '../src/feature.mjs';
++test('overlay settings', () => assert.deepEqual(mergeSettings({port: 80}, {port: 90}), {port: 90}));

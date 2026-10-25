@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 688c435..ed0d85d 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,10 @@
+ // Reader lifetime helpers.
++
++export async function withReader(open, consume) {
++  const reader = await open();
++  try {
++    return consume(reader);
++  } finally {
++    await reader.close();
++  }
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..1fd360c
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { withReader } from '../src/feature.mjs';
++test('synchronous consumption', async () => { let closed=0; assert.equal(await withReader(async()=>({close:async()=>{closed++;}}),()=>7),7); assert.equal(closed,1); });

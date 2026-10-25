@@ -1,0 +1,56 @@
+diff --git a/src/capture.mjs b/src/capture.mjs
+new file mode 100644
+index 0000000..75bc7c4
+--- /dev/null
++++ b/src/capture.mjs
+@@ -0,0 +1,15 @@
++import { RETRYABLE_CODES } from './gateway.mjs';
++
++// capturePayment(gateway, order): charges a pending order and records the outcome on it.
++export async function capturePayment(gateway, order) {
++  if (order.status !== 'pending') throw new Error(`order ${order.id} is already ${order.status}`);
++  try {
++    await gateway.charge({ orderId: order.id, amountCents: order.totalCents });
++  } catch (err) {
++    if (RETRYABLE_CODES.has(err?.code)) throw err;
++    order.status = 'declined';
++    return 'declined';
++  }
++  order.status = 'paid';
++  return 'paid';
++}
+diff --git a/test/capture.test.mjs b/test/capture.test.mjs
+new file mode 100644
+index 0000000..db3d0fd
+--- /dev/null
++++ b/test/capture.test.mjs
+@@ -0,0 +1,29 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { capturePayment } from '../src/capture.mjs';
++
++const gatewayFailing = (code) => ({ charge: async () => { throw Object.assign(new Error(code), { code }); } });
++
++test('a successful charge marks the order paid', async () => {
++  const charges = [];
++  const order = { id: 'o1', totalCents: 2500, status: 'pending' };
++  assert.equal(await capturePayment({ charge: async (c) => { charges.push(c); } }, order), 'paid');
++  assert.equal(order.status, 'paid');
++  assert.deepEqual(charges, [{ orderId: 'o1', amountCents: 2500 }]);
++});
++
++test('a decline marks the order declined', async () => {
++  const order = { id: 'o1', totalCents: 2500, status: 'pending' };
++  assert.equal(await capturePayment(gatewayFailing('insufficient_funds'), order), 'declined');
++  assert.equal(order.status, 'declined');
++});
++
++test('a timeout leaves the order pending', async () => {
++  const order = { id: 'o1', totalCents: 2500, status: 'pending' };
++  await assert.rejects(capturePayment(gatewayFailing('ETIMEDOUT'), order), { code: 'ETIMEDOUT' });
++  assert.equal(order.status, 'pending');
++});
++
++test('an order that is not pending is not charged', async () => {
++  await assert.rejects(capturePayment(gatewayFailing('card_declined'), { id: 'o1', status: 'paid' }), /already paid/);
++});

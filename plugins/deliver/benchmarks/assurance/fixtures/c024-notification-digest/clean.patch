@@ -1,0 +1,41 @@
+diff --git a/src/notify.mjs b/src/notify.mjs
+index 873c80a..3a9c9d7 100644
+--- a/src/notify.mjs
++++ b/src/notify.mjs
+@@ -2,3 +2,13 @@
+ export function digestSubject(count) {
+   return count === 1 ? '1 new notification' : `${count} new notifications`;
+ }
++
++// sendDigests(users, send): sends one digest to every user with unread notifications and
++// resolves to the number sent.
++export async function sendDigests(users, send) {
++  const pending = users.filter((u) => u.unread > 0);
++  for (const user of pending) {
++    await send(user.email, digestSubject(user.unread));
++  }
++  return pending.length;
++}
+diff --git a/test/notify.test.mjs b/test/notify.test.mjs
+new file mode 100644
+index 0000000..5b35339
+--- /dev/null
++++ b/test/notify.test.mjs
+@@ -0,0 +1,17 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { sendDigests } from '../src/notify.mjs';
++
++test('sendDigests mails only users with unread notifications', async () => {
++  const sent = [];
++  const count = await sendDigests(
++    [{ email: 'a@x.test', unread: 2 }, { email: 'b@x.test', unread: 0 }, { email: 'c@x.test', unread: 1 }],
++    async (to, subject) => { sent.push([to, subject]); },
++  );
++  assert.equal(count, 2);
++  assert.deepEqual(sent, [['a@x.test', '2 new notifications'], ['c@x.test', '1 new notification']]);
++});
++
++test('sendDigests with nobody to mail sends nothing', async () => {
++  assert.equal(await sendDigests([], async () => assert.fail('no send expected')), 0);
++});

@@ -1,0 +1,50 @@
+diff --git a/src/activity.mjs b/src/activity.mjs
+index d2d215a..ea3d095 100644
+--- a/src/activity.mjs
++++ b/src/activity.mjs
+@@ -1,2 +1,18 @@
+ // Activity events: { userId, at } with `at` in epoch milliseconds.
+ export const DAY_MS = 86400000;
++
++// localDay(at, utcOffsetMinutes): the calendar date at instant `at` in a zone that far from UTC.
++export function localDay(at, utcOffsetMinutes) {
++  return new Date(at - utcOffsetMinutes * 60000).toISOString().slice(0, 10);
++}
++
++// dailyActiveCounts(events, utcOffsetMinutes): distinct users per local day, days ascending.
++export function dailyActiveCounts(events, utcOffsetMinutes) {
++  const users = new Map();
++  for (const e of events) {
++    const day = localDay(e.at, utcOffsetMinutes);
++    if (!users.has(day)) users.set(day, new Set());
++    users.get(day).add(e.userId);
++  }
++  return Object.fromEntries([...users.keys()].sort().map((day) => [day, users.get(day).size]));
++}
+diff --git a/test/activity.test.mjs b/test/activity.test.mjs
+new file mode 100644
+index 0000000..9a300e6
+--- /dev/null
++++ b/test/activity.test.mjs
+@@ -0,0 +1,21 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { localDay, dailyActiveCounts } from '../src/activity.mjs';
++
++const at = (iso) => Date.parse(iso);
++
++test('localDay in UTC', () => {
++  assert.equal(localDay(at('2024-03-10T23:30:00Z'), 0), '2024-03-10');
++});
++
++test('dailyActiveCounts counts distinct users per day, days in order', () => {
++  const events = [
++    { userId: 'b', at: at('2024-03-11T09:00:00Z') },
++    { userId: 'a', at: at('2024-03-10T08:00:00Z') },
++    { userId: 'a', at: at('2024-03-10T18:00:00Z') },
++    { userId: 'c', at: at('2024-03-10T12:00:00Z') },
++  ];
++  const counts = dailyActiveCounts(events, 0);
++  assert.deepEqual(counts, { '2024-03-10': 2, '2024-03-11': 1 });
++  assert.deepEqual(Object.keys(counts), ['2024-03-10', '2024-03-11']);
++});

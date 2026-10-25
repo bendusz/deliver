@@ -1,0 +1,21 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 637c583..af2a144 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,6 @@
+ // Ledger balances helpers.
++
++export function runningBalances(transactions) {
++  let balance = 0;
++  return transactions.map(row => { balance += row.amount; return balance; });
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..b336d9f
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { runningBalances } from '../src/feature.mjs';
++test('ledger credits and debits', () => assert.deepEqual(runningBalances([{amount:10},{amount:-3},{amount:2}]),[10,7,9]));

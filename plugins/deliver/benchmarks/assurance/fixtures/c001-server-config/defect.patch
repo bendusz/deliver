@@ -1,0 +1,56 @@
+diff --git a/src/config.mjs b/src/config.mjs
+new file mode 100644
+index 0000000..a62bc40
+--- /dev/null
++++ b/src/config.mjs
+@@ -0,0 +1,23 @@
++import { DEFAULTS } from './defaults.mjs';
++
++const ENV_KEYS = {
++  APP_PORT: 'port',
++  APP_HOST: 'host',
++  APP_LOG_LEVEL: 'logLevel',
++  APP_REQUEST_TIMEOUT_MS: 'requestTimeoutMs',
++};
++const NUMERIC = ['port', 'requestTimeoutMs'];
++
++// loadConfig(fileSettings, env): defaults, overridden by the settings file, overridden by APP_* variables.
++export function loadConfig(fileSettings = {}, env = {}) {
++  const config = { ...DEFAULTS, ...fileSettings };
++  for (const [name, key] of Object.entries(ENV_KEYS)) {
++    if (env[name] !== undefined && env[name] !== '') config[key] = env[name];
++  }
++  for (const key of NUMERIC) {
++    const n = Number(config[key]);
++    if (!Number.isInteger(n) || n < 0) throw new Error(`${key} must be a non-negative integer, got ${config[key]}`);
++    config[key] = n;
++  }
++  return Object.freeze(config);
++}
+diff --git a/test/config.test.mjs b/test/config.test.mjs
+new file mode 100644
+index 0000000..7a8ec71
+--- /dev/null
++++ b/test/config.test.mjs
+@@ -0,0 +1,21 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { loadConfig } from '../src/config.mjs';
++
++test('defaults apply when nothing overrides them', () => {
++  const c = loadConfig({}, {});
++  assert.equal(c.port, 8080);
++  assert.equal(c.logLevel, 'info');
++  assert.ok(Object.isFrozen(c));
++});
++
++test('the file overrides defaults and the environment overrides the file', () => {
++  const c = loadConfig({ port: 9000, logLevel: 'debug' }, { APP_PORT: '9100', APP_HOST: '' });
++  assert.equal(c.port, 9100);
++  assert.equal(c.host, '0.0.0.0');
++  assert.equal(c.logLevel, 'debug');
++});
++
++test('a non-numeric port is rejected', () => {
++  assert.throws(() => loadConfig({}, { APP_PORT: 'eighty' }), Error);
++});

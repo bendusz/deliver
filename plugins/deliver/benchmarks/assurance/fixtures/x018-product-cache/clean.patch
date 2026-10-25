@@ -1,0 +1,25 @@
+diff --git a/src/feature.mjs b/src/feature.mjs
+index 755dd8b..20a96e9 100644
+--- a/src/feature.mjs
++++ b/src/feature.mjs
+@@ -1 +1,10 @@
+ // Product cache helpers.
++
++export function createCache() {
++  const values = new Map();
++  return {
++    set(key, value) { values.set(key, value); },
++    get(key) { return values.get(key); },
++    invalidate(key) { return values.delete(key); }
++  };
++}
+diff --git a/test/feature.test.mjs b/test/feature.test.mjs
+new file mode 100644
+index 0000000..57077ba
+--- /dev/null
++++ b/test/feature.test.mjs
+@@ -0,0 +1,4 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { createCache } from '../src/feature.mjs';
++test('cache roundtrip', () => { const c=createCache(); c.set('a',1); assert.equal(c.get('a'),1); assert.equal(c.get('b'),undefined); });

@@ -1,0 +1,39 @@
+diff --git a/src/tickets.mjs b/src/tickets.mjs
+index d577bb1..5013879 100644
+--- a/src/tickets.mjs
++++ b/src/tickets.mjs
+@@ -1,2 +1,8 @@
+ // Support tickets: { id, priority, createdAt (ISO-8601 UTC) }.
+ export const PRIORITIES = ['urgent', 'high', 'normal', 'low'];
++
++// queueOrder(tickets): higher priority first; within a priority, the oldest ticket first.
++export function queueOrder(tickets) {
++  const rank = (t) => PRIORITIES.indexOf(t.priority);
++  return [...tickets].sort((a, b) => rank(a) - rank(b) || b.createdAt.localeCompare(a.createdAt));
++}
+diff --git a/test/tickets.test.mjs b/test/tickets.test.mjs
+new file mode 100644
+index 0000000..61cc60d
+--- /dev/null
++++ b/test/tickets.test.mjs
+@@ -0,0 +1,20 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { queueOrder } from '../src/tickets.mjs';
++
++const tickets = [
++  { id: 1, priority: 'normal', createdAt: '2024-05-01T08:00:00.000Z' },
++  { id: 2, priority: 'high', createdAt: '2024-05-01T10:00:00.000Z' },
++  { id: 3, priority: 'urgent', createdAt: '2024-05-01T11:00:00.000Z' },
++  { id: 4, priority: 'high', createdAt: '2024-05-01T09:00:00.000Z' },
++  { id: 5, priority: 'low', createdAt: '2024-04-30T09:00:00.000Z' },
++];
++
++test('queueOrder sorts by priority, then oldest first', () => {
++  assert.deepEqual(queueOrder(tickets).map((t) => t.priority), ['urgent', 'high', 'high', 'normal', 'low']);
++});
++
++test('queueOrder leaves the input alone', () => {
++  queueOrder(tickets);
++  assert.deepEqual(tickets.map((t) => t.id), [1, 2, 3, 4, 5]);
++});
