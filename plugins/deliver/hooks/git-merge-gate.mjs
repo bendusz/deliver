@@ -8,7 +8,7 @@
 //     ref is a deliver project's integration branch, so fetches and other ref updates never start
 //     node. Each update is judged by require-verified.mjs's judgeRefUpdate(): a merge commit, a
 //     fast-forward, a pull, a rebase, a reset, an update-ref, a cherry-pick, a squash merge, and a
-//     conflicted merge finished by hand alike. A deny exits 1, and git aborts the whole
+//     conflicted merge finished by hand alike. A deny exits REFUSED (86, lib.mjs), and git aborts the whole
 //     transaction. A push into this repository (`git push . pm/X:main`) runs it too: receive-pack
 //     runs hooks in the git directory, so the working tree is found from the git common directory.
 //   node git-merge-gate.mjs pre-merge-commit | pre-commit
@@ -83,7 +83,7 @@ try {
 if (verdict && !verdict.allow) {
   const what = verdict.ref ? `the update of ${verdict.ref}` : 'this merge commit';
   fs.writeSync(2, `deliver blocked ${what}: ${lib.oneLine(verdict.reason)}.\n${recovery({ inMerge, top, next: verdict.next })}\n`);
-  process.exit(1);
+  process.exit(lib.REFUSED);
 }
 process.exit(0);
 

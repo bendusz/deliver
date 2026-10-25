@@ -40,7 +40,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { git, chomp, isMain, oneLine } from './lib.mjs';
+import { git, chomp, isMain, oneLine, REFUSED } from './lib.mjs';
 import { discover, projectAt, project, planName, mergeTreeWorks } from './require-verified.mjs';
 
 export const MARKER = '# deliver-merge-gate v2';
@@ -58,8 +58,9 @@ const slash = (p) => path.resolve(p).replace(/\\/g, '/');
 const shQuote = (s) => `"${String(s).replace(/["\\$`]/g, '\\$&')}"`;
 
 // shim({ name, gate, node, branches }): the hook script `name`. Forward slashes, so git for
-// Windows' sh runs the same script. A missing gate script or node fails open with a warning:
-// deliver's hooks never wedge the repository.
+// Windows' sh runs the same script. A missing gate script or node fails open with a warning, and so
+// does a gate that fails to run (node exists but cannot start): only the gate's REFUSED status is
+// passed on, as itself. deliver's hooks never wedge the repository.
 export function shim({ name = RT_HOOK, gate = GATE, node = process.execPath, branches = ['main'] } = {}) {
   const head = [
     '#!/bin/sh',
@@ -76,6 +77,13 @@ export function shim({ name = RT_HOOK, gate = GATE, node = process.execPath, bra
     '[ -x "$node" ] || node=node',
     'command -v "$node" >/dev/null 2>&1 || { echo "deliver: node is not runnable, so the merge gate did not run; run /deliver:doctor" >&2; exit 0; }',
   ];
+  // The gate's status: 0 allows, REFUSED refuses, anything else is a failure to run, not enforced.
+  const verdictOf = [
+    'rc=$?',
+    `[ "$rc" = 0 ] || [ "$rc" = ${REFUSED} ] && exit "$rc"`,
+    'echo "deliver: merge gate failed to run ($rc); not enforced" >&2',
+    'exit 0',
+  ];
   if (name === RT_HOOK) {
     const refs = [...new Set(branches)].sort().map((b) => shQuote(`refs/heads/${b}`)).join('|');
     return [
@@ -90,6 +98,7 @@ export function shim({ name = RT_HOOK, gate = GATE, node = process.execPath, bra
       '[ -n "$lines" ] || exit 0',
       ...run,
       `printf '%s' "$lines" | "$node" "$gate" ${RT_HOOK}`,
+      ...verdictOf,
       '',
     ].join('\n');
   }
@@ -97,7 +106,8 @@ export function shim({ name = RT_HOOK, gate = GATE, node = process.execPath, bra
     ...head,
     ...(name === 'pre-commit' ? ['[ -f "$(git rev-parse --git-path MERGE_HEAD)" ] || exit 0'] : []),
     ...run,
-    `exec "$node" "$gate" ${name}`,
+    `"$node" "$gate" ${name}`,
+    ...verdictOf,
     '',
   ].join('\n');
 }
@@ -201,7 +211,8 @@ function layout(top) {
 }
 
 // gateLines(name, copy): the sh statements that run deliver's gate from another hook, one template
-// for addLine and wrapper. They stop with status 1 only when the gate refuses, and fail open: with
+// for addLine and wrapper. They stop with the gate's REFUSED status only when it refuses, and fail
+// open on anything else: with
 // the private copy gone (after --uninstall, or a git upgrade that drops a fallback hook), or
 // without mktemp, they do nothing. The reference-transaction form saves stdin once, feeds it to
 // the gate, and then gives the same records to whatever runs next.
@@ -211,11 +222,11 @@ function gateLines(name, copy) {
     ? [
       `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
       '  cat > "$deliver_in";',
-      `  sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; };`,
+      `  sh ${c} "$@" < "$deliver_in"; [ $? = ${REFUSED} ] && { rm -f "$deliver_in"; exit ${REFUSED}; };`,
       '  exec < "$deliver_in"; rm -f "$deliver_in";',
       'fi',
     ]
-    : [`if [ -f ${c} ]; then sh ${c} "$@"; [ $? = 1 ] && exit 1; fi`];
+    : [`if [ -f ${c} ]; then sh ${c} "$@"; [ $? = ${REFUSED} ] && exit ${REFUSED}; fi`];
 }
 
 // addLine(name, copy): gateLines as one line, to put right after the #! line of an existing
@@ -244,7 +255,7 @@ export function wrapper(name, copy) {
     `# deliver's merge gate, then the original hook, ${name}.local.`,
     ...gateLines(name, copy),
     `deliver_local="$(dirname "$0")/${name}.local"`,
-    '[ -x "$deliver_local" ] || { echo "deliver: $deliver_local missing; restore it or remove this wrapper" >&2; exit 0; }',
+    '[ -x "$deliver_local" ] || { echo "deliver: $deliver_local missing or not executable; restore it or remove this wrapper" >&2; exit 0; }',
     'exec "$deliver_local" "$@"',
     '',
   ].join('\n');
@@ -267,9 +278,16 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
   const note = (full, brief = full) => { res.notes.push(full); res.brief.push(brief); };
   // A foreign hook whose interpreter is not sh, or cannot be read (a dangling or unreadable
   // symlink target), gets the wrapper, which is always safe; a missing hook gets the lines.
-  const chain = (name, copy, cur) => (cur.state === 'foreign' && (cur.text === undefined || !shCompatible(cur.text))
-    ? `its interpreter is not sh, so deliver's lines cannot go inside it; rename it to ${name}.local in the same directory, and write this sh wrapper as ${name}, executable:\n${wrapper(name, copy)}`
-    : `add these as the lines right after its #! line: ${addLine(name, copy)}`);
+  // The wrapper, always safe, replaces inline lines for a symlinked hook (its target may be shared,
+  // and is never to be edited), a hook that cannot be read, and one whose interpreter is not sh.
+  const chain = (name, copy, cur) => {
+    if (cur.state !== 'foreign') return `add these as the lines right after its #! line: ${addLine(name, copy)}`;
+    const why = cur.why === 'is a symlink' ? 'it is a symlink, whose target may be shared and is never to be edited'
+      : cur.text === undefined ? `it ${cur.why}`
+        : !shCompatible(cur.text) ? 'its interpreter is not sh' : null;
+    if (!why) return `add these as the lines right after its #! line: ${addLine(name, copy)}`;
+    return `${why}, so deliver's lines cannot go inside it; rename it to ${name}.local in the same directory, and write this sh wrapper as ${name}, executable:\n${wrapper(name, copy)}`;
+  };
   const pointer = `for what to add to it, run ${doctor}`;
   for (const name of ALL_HOOKS) {
     const file = path.join(dir, name);
@@ -279,6 +297,8 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
     if (cur.v1) res.sawV1 = true;
     const whose = cur.v1 ? "an earlier deliver install's" : "deliver's";
     const chained = cur.state === 'foreign' && typeof cur.text === 'string' && cur.text.includes(slash(copy)) && shCompatible(cur.text);
+    // The lines it runs are this version's (the inline form, or the wrapper's block); else stale.
+    const current = chained && (cur.text.includes(addLine(name, copy)) || cur.text.includes(gateLines(name, copy).join('\n')));
     try {
       if (want === null) {
         // Not wanted in this mode (or uninstalling): remove only what is ours.
@@ -304,8 +324,9 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
       // needs the private copy it calls to be current.
       if (chained) {
         const executable = process.platform === 'win32' || Boolean(fs.statSync(file).mode & 0o111);
-        res.hooks[name] = !executable ? 'chained-inactive' : check ? copyState(copy, want) : 'chained';
+        res.hooks[name] = !executable ? 'chained-inactive' : !current ? 'chained-stale' : check ? copyState(copy, want) : 'chained';
         if (res.hooks[name] === 'chained-inactive') note(`merge gate: ${slash(file)} runs deliver's lines but is not executable, so git skips it; run chmod +x ${shQuote(slash(file))}`);
+        else if (res.hooks[name] === 'chained-stale') note(`merge gate: ${slash(file)} runs an earlier version of deliver's lines; replace them: ${chain(name, copy, { ...cur, why: "is not deliver's" })}`, `merge gate: ${slash(file)} runs an earlier version of deliver's lines; ${pointer}`);
         else if (res.hooks[name] !== 'chained') note(`merge gate: ${slash(file)} runs deliver's lines, but its copy ${slash(copy)} is ${res.hooks[name]}; run the installer without --check to refresh it`);
         continue;
       }

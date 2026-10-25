@@ -15,6 +15,11 @@ import { fileURLToPath } from 'node:url';
 // (which strips trailing \n but leaves other whitespace, unlike String#trim()).
 export const chomp = (s) => s.replace(/(\r?\n)+$/, '');
 
+// REFUSED: the exit status deliver's git-level gate uses for a deliberate refusal, and the only
+// one its shims and chaining lines pass on as a refusal; any other failure to run is a warning and
+// exit 0, so a broken node or gate never blocks updates. Unusual on purpose.
+export const REFUSED = 86;
+
 // oneLine(s): s with every run of control characters (newlines included) made one space, so
 // repository content another actor wrote cannot add lines to a hook's output.
 export const oneLine = (s) => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
