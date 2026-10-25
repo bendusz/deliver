@@ -276,9 +276,10 @@ test('assurance: a stale stamp is any changed or unstamped panel lens, a changed
   const codexArgsSha256 = sha(fs.readFileSync(path.join(PLUGIN_ROOT, 'scripts', 'codex', 'lib', 'args.mjs')));
   const tiers = { T1: { status: 'measured', panel: [{ lens: agent, trials: 1 }] } };
   const doc = (lenses, extra = {}, t = tiers) => ({ stamp: { deliver: 'x', calibratedAt: '2026-10-24T10:00:00.000Z', corpusSha256, codexArgsSha256, lenses, ...extra }, tiers: t });
-  assert.deepEqual(staleness(doc({ [agent]: { promptSha256: current(agent) } })), []);
+  const pins = { model: 'claude-opus-5-5', effort: 'medium' };
+  assert.deepEqual(staleness(doc({ [agent]: { ...pins, promptSha256: current(agent) } })), []);
   assert.match(staleness(doc({ [agent]: { promptSha256: 'old' } })).join(), /code-integrity-reviewer/);
-  assert.match(staleness(doc({ [agent]: { promptSha256: current(agent) } }, { corpusSha256: 'old' })).join(), /corpus/);
+  assert.match(staleness(doc({ [agent]: { ...pins, promptSha256: current(agent) } }, { corpusSha256: 'old' })).join(), /corpus/);
   assert.match(staleness(doc({})).join(), /code-integrity-reviewer/);
   assert.match(staleness({ stamp: { corpusSha256 }, tiers }).join(), /lens/);
   assert.match(staleness(doc({ 'code-integrity-reveiwer': { promptSha256: null } })).join(), /code-integrity-reviewer/);
@@ -452,7 +453,7 @@ test('assurance: trial-record stamps each line, refuses bad input, and calc --wr
   assert.equal(rec('a001-page-count', 'true', 'false').status, 0);
   assert.equal(rec('a003-slugify', 'false', 'false').status, 0);
   assert.equal(rec('a001-page-count', 'true', 'false').status, 1, 'a duplicate trial');
-  assert.equal(run('trial-record', '--corpus', copy, '--lens', 'security-auditor', '--model', 'm', '--effort', 'e', '--case', 'a001-page-count', '--trial', '2', '--caught', 'true', '--false-positive', 'false').status, 1, 'trial 2 without trial 1');
+  assert.equal(run('trial-record', '--corpus', copy, '--lens', 'security-auditor', '--model', 'claude-opus-5-5', '--effort', 'high', '--case', 'a001-page-count', '--trial', '2', '--caught', 'true', '--false-positive', 'false').status, 1, 'trial 2 without trial 1');
   assert.equal(rec('a002-upload-path', 'true', 'false').status, 64, 'a certify case recorded in the select phase');
   assert.equal(rec('a002-upload-path', 'true', 'false', ['--phase', 'certify']).status, 0);
   assert.equal(rec('a002-upload-path', 'true', 'false', ['--phase', 'certify'], '2').status, 0);
@@ -525,7 +526,7 @@ test('assurance: a tier bound shows only when every lens behind it, measured pan
     corpusSha256: sha(fs.readFileSync(path.join(CORPUS_ROOT, 'MANIFEST.sha256'))),
     codexArgsSha256: sha(fs.readFileSync(path.join(PLUGIN_ROOT, 'scripts', 'codex', 'lib', 'args.mjs'))),
     lenses: {
-      'code-integrity-reviewer': { model: 'm', effort: 'medium', promptSha256: current('code-integrity-reviewer') },
+      'code-integrity-reviewer': { model: 'claude-opus-5-5', effort: 'medium', promptSha256: current('code-integrity-reviewer') },
       'codex-reviewer': { model: 'gpt-old', effort: REVIEW_DEFAULTS.effort, promptSha256: current('codex-reviewer') },
     },
   };
@@ -558,4 +559,55 @@ test('assurance: stray dotfiles such as .DS_Store are outside the manifest and t
   assert.equal(run('manifest', '--check', '--corpus', copy).status, 0);
   const results = await witness(copy);
   assert.deepEqual(results.filter((r) => r.problems.length), [], 'no fixture directory named .DS_Store is reported');
+});
+
+// --- WP-H: Claude lens stamps against agent frontmatter ---
+
+test('assurance: trial-record refuses a Claude-lens trial whose model or effort differs from the agent frontmatter', () => {
+  const copy = exampleCorpus('assure-pins-');
+  const out = path.join(copy, 'results', 'trials.jsonl');
+  const rec = (lens, model, effort) => run('trial-record', '--corpus', copy, '--lens', lens, '--model', model, '--effort', effort,
+    '--case', 'a001-page-count', '--trial', '1', '--caught', 'true', '--false-positive', 'false');
+  const wrongModel = rec('code-integrity-reviewer', 'claude-sonnet-5', 'medium');
+  assert.equal(wrongModel.status, 64);
+  assert.match(wrongModel.stderr, /frontmatter/);
+  assert.equal(rec('code-integrity-reviewer', 'claude-opus-5-5', 'high').status, 64, 'code-integrity-reviewer pins effort medium');
+  assert.equal(rec('security-auditor', 'claude-opus-5-5', 'medium').status, 64, 'security-auditor pins effort high');
+  assert.ok(!fs.existsSync(out), 'nothing recorded');
+  assert.equal(rec('security-auditor', 'claude-opus-5-5', 'high').status, 0);
+  // codex-reviewer is judged by the runner's review defaults, never its Claude wrapper's frontmatter.
+  assert.equal(rec('codex-reviewer', REVIEW_DEFAULTS.model, REVIEW_DEFAULTS.effort).status, 0);
+});
+
+test('assurance: calc refuses, and staleness flags, a Claude stamp whose model or effort differs from the frontmatter', () => {
+  const copy = exampleCorpus('assure-pins-calc-');
+  const out = path.join(copy, 'results', 'trials.jsonl');
+  const lens = 'code-integrity-reviewer';
+  const ok = run('trial-record', '--corpus', copy, '--lens', lens, '--model', 'claude-opus-5-5', '--effort', 'medium', '--case', 'a001-page-count', '--trial', '1', '--caught', 'true', '--false-positive', 'false');
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(run('calc', '--corpus', copy).status, 0);
+  // The same line as if it had been recorded under another effort, the prompt file unchanged.
+  const [row] = readTrials(out);
+  fs.writeFileSync(out, JSON.stringify({ ...row, effort: 'low' }) + '\n');
+  const r = run('calc', '--corpus', copy);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /code-integrity-reviewer.*frontmatter/);
+
+  const current = sha(fs.readFileSync(path.join(PLUGIN_ROOT, 'agents', `${lens}.md`)));
+  const doc = (stamp) => ({
+    stamp: { deliver: 'x', calibratedAt: '2026-10-24T10:00:00.000Z', corpusSha256: sha(fs.readFileSync(path.join(CORPUS_ROOT, 'MANIFEST.sha256'))), codexArgsSha256: null, lenses: { [lens]: { promptSha256: current, ...stamp } } },
+    tiers: { T1: { status: 'measured', panel: [{ lens, trials: 1 }], certifyBound: 0.04 } },
+  });
+  assert.deepEqual(staleness(doc({ model: 'claude-opus-5-5', effort: 'medium' })), []);
+  assert.match(staleness(doc({ model: 'claude-sonnet-5', effort: 'medium' })).join(), /code-integrity-reviewer.*model claude-sonnet-5.*frontmatter/);
+  assert.match(staleness(doc({ model: 'claude-opus-5-5', effort: 'high' })).join(), /code-integrity-reviewer.*effort high.*frontmatter/);
+  assert.match(boundStaleness(doc({ model: 'claude-opus-5-5', effort: 'high' }), 'T1').join(), /effort/);
+});
+
+test('assurance: the committed trials and panels.json still validate against the frontmatter pins', () => {
+  const r = run('calc');
+  assert.equal(r.status, 0, r.stderr);
+  const doc = JSON.parse(fs.readFileSync(path.join(CORPUS_ROOT, 'panels.json'), 'utf8'));
+  assert.deepEqual(staleness(doc), []);
+  for (const t of ['T0', 'T1']) assert.deepEqual(boundStaleness(doc, t), [], t);
 });

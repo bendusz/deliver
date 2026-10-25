@@ -114,7 +114,9 @@ only now, after the trial returned.
 Record each trial as it is scored. `trial-record` stamps the line with the prompt and corpus hashes
 and the UTC time, plus the `scripts/codex/lib/args.mjs` hash on a codex-reviewer line. It refuses an
 unknown lens, a trial other than 1 or 2, trial 2 before trial 1, a case whose split differs from
-`--phase`, a trial already recorded, and a select trial once the file holds any certify trial:
+`--phase`, a trial already recorded, a select trial once the file holds any certify trial, and a
+Claude-lens trial whose `--model` or `--effort` is not what the lens's agent frontmatter pins
+(`calc` and the trust report treat such a recorded stamp as stale):
 
 ```
 node plugins/deliver/scripts/assurance.mjs trial-record --phase <select|certify> --lens <lens> \

@@ -395,3 +395,29 @@ test('integrity: a repeated coverage threshold that loses an occurrence is confi
   assert.deepEqual(kinds(r), ['config-weakened']);
   assert.match(r.out.findings[0].detail, /lines/);
 });
+
+test('integrity: renaming a config to a name with no config role is config-weakened', () => {
+  const cases = [
+    ['.nycrc', '.nycrc.disabled', '{ "check-coverage": true, "lines": 90, "branches": 80 }\n'],
+    ['tsconfig.json', 'tsconfig.json.bak', '{ "compilerOptions": { "strict": true } }\n'],
+    ['.eslintrc.json', '.eslintrc.json.off', '{ "rules": { "no-console": "error" } }\n'],
+    ['.nvmrc', 'nvmrc.old', '22\n'],
+  ];
+  for (const [from, to, text] of cases) {
+    const d = repo({ [from]: text }, (dir) => fs.renameSync(path.join(dir, from), path.join(dir, to)));
+    const r = run(d);
+    assert.deepEqual(kinds(r), ['config-weakened'], `${from} -> ${to}`);
+    assert.equal(r.out.findings[0].path, from);
+  }
+});
+
+test('integrity: a rename between two names of the same config role is judged by content', () => {
+  const text = '{ "check-coverage": true, "lines": 90, "branches": 80, "functions": 80, "statements": 90 }\n';
+  const same = repo({ '.nycrc': text }, (dir) => fs.renameSync(path.join(dir, '.nycrc'), path.join(dir, '.nycrc.json')));
+  assert.equal(run(same).status, 0, 'same content under another coverage name passes');
+  const lowered = repo({ '.nycrc': text }, (dir) => {
+    fs.renameSync(path.join(dir, '.nycrc'), path.join(dir, '.nycrc.json'));
+    write(dir, { '.nycrc.json': text.replace('"lines": 90', '"lines": 50') });
+  });
+  assert.deepEqual(kinds(run(lowered)), ['config-weakened'], 'a lowered threshold across the rename still counts');
+});

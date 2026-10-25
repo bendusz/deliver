@@ -45,8 +45,11 @@ protected paths and says that any change to them, or to any story file, stops th
 **Holdout checks, at `T2`.** In the same dispatch, give `test-engineer` a new empty directory
 under the OS temp directory, outside every checkout, for holdout checks and their `RUN` file. Store
 them with `node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" store <story-id> <dir>`, which
-commits them to the private ref `refs/deliver/holdout/<story-id>` without checking anything out,
-then delete the directory. Never push that ref. Never name it, the checks, or their directory in a
+commits them to the private ref `refs/deliver/holdout/<project-key>/<story-id>` without checking
+anything out, then delete the directory. `<project-key>` is `_` for a project at the git top level,
+else a slug and short hash of its path below it, so sibling projects never share checks; run
+`holdout.mjs` from the project directory or pass `--root` to it. A project at the top level still
+reads a legacy `refs/deliver/holdout/<story-id>` ref. Never push that ref. Never name it, the checks, or their directory in a
 builder brief, fix brief, or continuation.
 
 Dispatch the persisted `builder` with the inputs its agent file lists, plus the absolute repository
@@ -137,7 +140,7 @@ lenses that ran. At `T2`, set `status: blocked` and escalate.
 With the gates green and no `block` or `major` open, dispatch the read-only `pm-verifier` with the
 inputs its agent file lists and its `Specs`. At `T2`, run the holdout checks yourself on the same
 commit:
-`node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" run <story-id> --target <story checkout root>`
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" run <story-id> --target <project directory in the story checkout>`
 materialises them under the OS temp directory, runs them, and deletes the copy. A `fail` makes the
 verdict `FAIL` and increments `holdout_fails`, committed with the verdict. Exit 66 means the ref is
 missing, as in a fresh clone: dispatch `test-engineer` to regenerate the checks into a new temporary
