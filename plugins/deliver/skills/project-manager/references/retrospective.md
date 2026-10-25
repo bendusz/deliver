@@ -56,7 +56,7 @@ level); it then counts for that project alone. Merge and claim times come from t
 `chore(...)` commits in the same way. A commit that changes no path, as `--allow-empty` makes,
 belongs to the project at the top level, or to every project when none sits there. When git cannot
 read the paths a commit changes, its escapes count for every project, so none is dropped, while
-merge and claim times fall back to the Execution block's `updated`.
+merge times fall back to the Execution block's `updated`; claim times are not used.
 
 **Over target.** A tier flagged `OVER TARGET` runs the maximum panel from the next sprint on, as an
 unmeasured tier does, keeping every measured member at its trial count (`review-gates.md`), until `/deliver:calibrate` re-runs and the report no

@@ -214,7 +214,8 @@ test('holdout: refs are namespaced by project, so two projects keep their own S1
 
 test('holdout: --target must lie inside the owning project', () => {
   const { a, b } = twoProjects();
-  cli(['store', 'S1-1', checks('node -e "process.exit(0)"'), '--root', a]);
+  const stored = cli(['store', 'S1-1', checks('node -e "process.exit(0)"'), '--root', a]);
+  assert.equal(stored.status, 0, stored.stderr);
   assert.equal(cli(['run', 'S1-1', '--target', b, '--root', a]).status, 64, 'another project');
   assert.equal(cli(['run', 'S1-1', '--target', tmpDir('pmelse-'), '--root', a]).status, 64, 'outside the repository');
   assert.equal(cli(['run', 'S1-1', '--target', path.join(a, 'src'), '--root', a]).status, 0, 'inside the project');
@@ -260,7 +261,8 @@ test('holdout: a project directory whose name starts with .. is still inside the
 
 test('holdout: only a bad stored RUN names RUN in its exit-64 message, so the PM regenerates for that alone', () => {
   const { a, b } = twoProjects();
-  cli(['store', 'S1-1', checks('node -e "process.exit(0)"'), '--root', a]);
+  const stored = cli(['store', 'S1-1', checks('node -e "process.exit(0)"'), '--root', a]);
+  assert.equal(stored.status, 0, stored.stderr);
   const bad = cli(['run', 'S1-1', '--target', b, '--root', a]);
   assert.equal(bad.status, 64);
   assert.doesNotMatch(bad.stderr, /\bRUN\b/, 'a wrong --target is the command\'s mistake');

@@ -1375,3 +1375,175 @@ test('verified: a comment inside a command substitution cannot swallow the merge
   const quoted = merge(p, `echo "$(true # (\n)"; git merge --no-ff ${BRANCH}`);
   assert.equal(quoted.status, 2, quoted.stderr);
 });
+
+// --- WP-H fix round 3 ---
+
+test('verified: checkout <branch> -- with nothing after the -- is a branch switch', () => {
+  const { p } = project();
+  record(p, {});
+  // HEAD is the story branch; the checkout reaches main, so the merge ships the story.
+  const r = merge(p, `git checkout main -- && git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  // With a path after --, it stays a path checkout and the target stays the story branch.
+  assert.equal(merge(p, `git checkout main -- src/fix.js && git merge --no-ff main`).status, 0);
+});
+
+test('verified: redirections are not operands, so a bare merge into a log still judges the upstream', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  gitIn(p, ['branch', '--set-upstream-to', BRANCH, 'main']);
+  for (const command of ['git merge > /tmp/merge.log', 'git merge --no-ff 2>&1 >/tmp/merge.log', '2>/dev/null git merge']) {
+    const r = merge(p, command);
+    assert.equal(r.status, 2, `${command}: ${r.stderr}`);
+    assert.match(r.stderr, /pm\/S1-1-fix/);
+  }
+  gitIn(p, ['branch', '--unset-upstream', 'main']);
+  const piped = merge(p, `git merge --no-ff ${BRANCH} 2>&1 | tee log`);
+  assert.equal(piped.status, 2, piped.stderr);
+  assert.match(piped.stderr, /no verifier verdict/);
+});
+
+// fetchHead(p, lines): write FETCH_HEAD as git fetch would, one { sha, merge, desc } a line.
+const fetchHead = (p, lines) => {
+  const file = path.resolve(p, gitIn(p, ['rev-parse', '--git-path', 'FETCH_HEAD']).trim());
+  fs.writeFileSync(file, lines.map(({ sha, merge: m = true, desc }) => `${sha}\t${m ? '' : 'not-for-merge'}\t${desc}\n`).join(''));
+};
+
+test('verified: a merge of FETCH_HEAD judges every head marked for merge', () => {
+  const { p, code } = project();
+  record(p, {});
+  toMain(p);
+  const main = gitIn(p, ['rev-parse', 'main']).trim();
+  const tip = gitIn(p, ['rev-parse', BRANCH]).trim();
+  // As left by `git fetch origin main pm/S1-1-fix`: main first, so rev-parse FETCH_HEAD is main.
+  fetchHead(p, [{ sha: main, desc: "branch 'main' of ../origin" }, { sha: tip, desc: `branch '${BRANCH}' of ../origin` }]);
+  const r = merge(p, 'git merge --no-ff FETCH_HEAD');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /pm\/S1-1-fix/);
+  // A head marked not-for-merge is not merged, so it is not judged.
+  fetchHead(p, [{ sha: main, desc: "branch 'main' of ../origin" }, { sha: tip, merge: false, desc: `branch '${BRANCH}' of ../origin` }]);
+  assert.equal(merge(p, 'git merge --no-ff FETCH_HEAD').status, 0);
+  // Once verified, the story head passes.
+  toBranch(p);
+  record(p, { verifier: `PASS ${code}` });
+  toMain(p);
+  fetchHead(p, [{ sha: main, desc: "branch 'main' of ../origin" }, { sha: gitIn(p, ['rev-parse', BRANCH]).trim(), desc: `branch '${BRANCH}' of ../origin` }]);
+  assert.equal(merge(p, 'git merge --no-ff FETCH_HEAD').status, 0, merge(p, 'git merge --no-ff FETCH_HEAD').stderr);
+  // In one command with the fetch, the separate-command rule still applies.
+  assert.match(merge(p, `git fetch origin main ${BRANCH} && git merge --no-ff FETCH_HEAD`).stderr, /separate command|own command/);
+});
+
+test('verified: an unreadable FETCH_HEAD blocks while a story could be in it', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  const file = path.resolve(p, gitIn(p, ['rev-parse', '--git-path', 'FETCH_HEAD']).trim());
+  fs.mkdirSync(file, { recursive: true });
+  const r = merge(p, 'git merge --no-ff FETCH_HEAD');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /FETCH_HEAD/);
+});
+
+test('verified: a # right after ) or after an escaped space is part of the word, not a comment', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  assert.equal(merge(p, `echo "$(echo $(date)#)"; git merge --no-ff ${BRANCH}`).status, 2);
+  assert.equal(merge(p, `echo $(echo $(date)#\n); git merge --no-ff ${BRANCH}`).status, 2);
+  assert.equal(merge(p, `echo a\\ #b; git merge --no-ff ${BRANCH}`).status, 2);
+});
+
+test('verified: a bare pull whose upstream is a remote story branch gets the fetch-then-merge block', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  const tip = gitIn(p, ['rev-parse', BRANCH]).trim();
+  gitIn(p, ['update-ref', `refs/remotes/origin/${BRANCH}`, tip]);
+  gitIn(p, ['config', 'branch.main.remote', 'origin']);
+  gitIn(p, ['config', 'branch.main.merge', `refs/heads/${BRANCH}`]);
+  gitIn(p, ['config', 'remote.origin.url', p]);
+  gitIn(p, ['config', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*']);
+  const r = merge(p, 'git pull');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /fetch.*separate command/);
+});
+
+test('verified: a bare merge or pull on the integration branch tracking origin/main is allowed', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  gitIn(p, ['update-ref', 'refs/remotes/origin/main', 'main']);
+  gitIn(p, ['config', 'branch.main.remote', 'origin']);
+  gitIn(p, ['config', 'branch.main.merge', 'refs/heads/main']);
+  gitIn(p, ['config', 'remote.origin.url', p]);
+  gitIn(p, ['config', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*']);
+  for (const command of ['git merge --no-ff', 'git merge', 'git pull', 'git pull --no-rebase']) assert.equal(merge(p, command).status, 0, command);
+});
+
+// The audit: each shell construct an honest PM writes around a merge, judged for an unverified
+// story (blocked) and a verified one (allowed), unless `both` pins one decision for either.
+test('verified: audit of shell constructs around a merge, unverified blocked and verified allowed', () => {
+  const B = BRANCH;
+  const rows = [
+    ['&&', () => `echo go && git merge --no-ff ${B}`],
+    [';', () => `echo go; git merge --no-ff ${B}`],
+    ['||', () => `false || git merge --no-ff ${B}`],
+    ['|', () => `git merge --no-ff ${B} | cat`],
+    ['newline', () => `echo go\ngit merge --no-ff ${B}`],
+    ['backslash-newline', () => `git merge \\\n  --no-ff ${B}`],
+    ['git status && merge', () => `git status && git merge --no-ff ${B}`],
+    ['VAR=x prefix', () => `GIT_EDITOR=true git merge --no-ff ${B}`],
+    ['env prefix', () => `env GIT_EDITOR=true git merge --no-ff ${B}`],
+    ['nice prefix', () => `nice -n 5 git merge --no-ff ${B}`],
+    ['command prefix', () => `command git merge --no-ff ${B}`],
+    ['exec prefix', () => `exec git merge --no-ff ${B}`],
+    ['( ... )', () => `(git merge --no-ff ${B})`],
+    ['{ ...; }', () => `{ git merge --no-ff ${B}; }`],
+    ['double quotes', () => `git merge --no-ff "${B}"`],
+    ['single quotes', () => `git merge --no-ff '${B}'`],
+    ['backslash escape', () => `git merge --no-ff pm\\/S1-1-fix`],
+    ['trailing comment', () => `git merge --no-ff ${B} # ship it`],
+    ['comment line', () => `# ship it (git switch ${B})\ngit merge --no-ff ${B}`],
+    ['heredoc -F -', () => `git merge --no-ff ${B} -F - <<'EOF'\nfeat(S1-1): fix\nEOF`],
+    ['heredoc in -m', () => `git merge --no-ff ${B} -m "$(cat <<'EOF'\nfeat(S1-1): fix (#1)\nEOF\n)"`],
+    ['here-string', () => `git merge --no-ff ${B} -F - <<< "feat(S1-1): fix"`],
+    ['git -C', (p) => `git -C '${p}' merge --no-ff ${B}`],
+    ['git -c key=val', () => `git -c core.editor=true merge --no-ff ${B}`],
+    ['--git-dir/--work-tree', (p) => `git --git-dir='${p}/.git' --work-tree='${p}' merge --no-ff ${B}`],
+    ['--git-dir=', (p) => `git --git-dir=${p}/.git merge --no-ff ${B}`],
+    ['checkout main --', () => `git checkout main -- && git merge --no-ff ${B}`, { from: 'branch' }],
+    ['switch -- main', () => `git switch -- main && git merge --no-ff ${B}`, { from: 'branch' }],
+    ['merge --', () => `git merge --no-ff -- ${B}`],
+    ['> file', () => `git merge --no-ff ${B} > /tmp/merge.log`],
+    ['>> and 2>>', () => `git merge --no-ff ${B} >> /tmp/out.log 2>> /tmp/err.log`],
+    ['2>&1 | tee', () => `git merge --no-ff ${B} 2>&1 | tee merge.log`],
+    ['&> file', () => `git merge --no-ff ${B} &> /tmp/merge.log`],
+    ['>| file', () => `git merge --no-ff ${B} >| /tmp/merge.log`],
+    ['< /dev/null', () => `git merge --no-ff ${B} < /dev/null`],
+    ['redirect mid-args', () => `git merge > /tmp/merge.log --no-ff ${B}`],
+    ['redirect first', () => `2>/dev/null git merge --no-ff ${B}`],
+    ['N>file no space', () => `git merge --no-ff ${B} 2>/tmp/err.log`],
+    ['N<&M', () => `git merge --no-ff ${B} 0<&-`],
+    ['operand then options', () => `git merge ${B} --no-ff`],
+    ['-m', () => `git merge -m "feat(S1-1): fix" --no-ff ${B}`],
+    ['-F file', () => `git merge -F msg.txt --no-ff ${B}`],
+    ['--no-edit', () => `git merge --no-edit --no-ff ${B}`],
+    ['--ff-only', () => `git merge --ff-only ${B}`],
+    ['-s/-X', () => `git merge -s ort -X theirs --no-ff ${B}`],
+    ['pull with operand', () => `git pull --no-rebase origin ${B}`, { both: 2 }],
+  ];
+  const u = project();
+  record(u.p, {});
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  const wrong = [];
+  for (const [label, cmd, opts = {}] of rows) {
+    for (const [p, want] of [[u.p, opts.both ?? 2], [v.p, opts.both ?? 0]]) {
+      if (opts.from === 'branch') toBranch(p); else toMain(p);
+      const r = merge(p, cmd(p));
+      if (r.status !== want) wrong.push(`${label} (${p === u.p ? 'unverified' : 'verified'}): ${r.status} not ${want}${r.stderr ? `: ${r.stderr.trim()}` : ''}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
