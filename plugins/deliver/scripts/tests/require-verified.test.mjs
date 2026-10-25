@@ -623,3 +623,136 @@ test('verified: without git 2.38 merge-tree the deny says so', { skip: process.p
   assert.equal(r.status, 2);
   assert.match(r.stderr, /2\.38/);
 });
+
+// --- WP-D follow-ups ---
+
+test('verified: a backslash-newline continuation joins the lines, so the chained merge is gated', () => {
+  const command = `git checkout main && \\\n  git merge --no-ff ${BRANCH} -m "feat(S1-1): fix"`;
+  const bad = project();
+  record(bad.p, {});
+  const r = merge(bad.p, command);
+  assert.equal(r.status, 2, 'unverified');
+  assert.match(r.stderr, /no verifier verdict/);
+  const ok = project();
+  record(ok.p, { verifier: `PASS ${ok.code}` });
+  const g = merge(ok.p, command);
+  assert.equal(g.status, 0, g.stderr);
+});
+
+test('verified: a checkout to a computed branch leaves the target unknown, so a pm merge after it is a ship', () => {
+  const bad = project();
+  record(bad.p, {});
+  // HEAD is the story branch; the checkout's target cannot be read.
+  for (const co of ['git checkout "$INTEGRATION"', 'git switch $INTEGRATION', 'git checkout no-such-branch']) {
+    const r = merge(bad.p, `${co} && git merge --no-ff ${BRANCH}`);
+    assert.equal(r.status, 2, co);
+    assert.match(r.stderr, /no verifier verdict/, co);
+  }
+  const ok = project();
+  record(ok.p, { verifier: `PASS ${ok.code}` });
+  const g = merge(ok.p, `git checkout "$INTEGRATION" && git merge --no-ff ${BRANCH}`);
+  assert.equal(g.status, 0, g.stderr);
+});
+
+test('verified: handoff notes committed after the verdict, alone or with the story file, keep it', () => {
+  const { p, code } = project();
+  record(p, { verifier: `PASS ${code}` });
+  commitOn(p, 'docs/handoff/2026-10-25.md', '# Handoff\n', 'docs: handoff');
+  fs.writeFileSync(path.join(p, 'docs', 'handoff', '2026-10-25.md'), '# Handoff\n\nmore\n');
+  fs.writeFileSync(path.join(p, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${code}`, updated: '2026-10-25 09:00' }));
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'chore(S1-1): handoff and record']);
+  toMain(p);
+  const r = merge(p);
+  assert.equal(r.status, 0, r.stderr);
+  toBranch(p);
+  commitOn(p, 'docs/handoff/nested/x.md', 'x\n', 'not a handoff note');
+  toMain(p);
+  assert.equal(merge(p).status, 2, 'only docs/handoff/*.md counts');
+});
+
+test('verified: an absent protected equals [] and an absent protected_base equals an empty one', () => {
+  for (const [onMain, onBranch] of [[{ protected: [] }, {}], [{}, { protected: [], protected_base: '' }], [{ protected_base: '' }, {}]]) {
+    const { p, code } = project({ tier: 'T0', ...onMain });
+    record(p, { verifier: `PASS ${code}` }, { claim: { tier: 'T0', ...onBranch } });
+    toMain(p);
+    const r = merge(p);
+    assert.equal(r.status, 0, `${JSON.stringify(onMain)} vs ${JSON.stringify(onBranch)}: ${r.stderr}`);
+  }
+});
+
+test('verified: a named story branch the integration branch already holds is a no-op', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  gitIn(p, ['merge', '-q', '--no-ff', '--no-edit', BRANCH]);
+  const r = merge(p);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(merge(p, `git merge --ff-only ${BRANCH}`).status, 0);
+});
+
+test('verified: an operand the integration branch\'s upstream holds is skipped', () => {
+  const { p, code } = project();
+  record(p, { verifier: `PASS ${code}` });
+  gitIn(p, ['config', 'branch.main.remote', 'origin']);
+  gitIn(p, ['config', 'branch.main.merge', 'refs/heads/main']);
+  gitIn(p, ['checkout', '-qb', 'upstream', 'main']);
+  commitOn(p, 'src/other.js', 'pushed by someone\n', 'another story pushed');
+  gitIn(p, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  toBranch(p);
+  gitIn(p, ['branch', '-D', 'upstream']);
+  gitIn(p, ['merge', '-q', '--no-ff', '--no-edit', 'origin/main']);
+  toMain(p);
+  const r = merge(p, 'git merge --ff-only origin/main');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// --- WP-D fix round 1 ---
+
+test('verified: a no-op story merge after a ref-changing command in the same call is blocked', () => {
+  const { p } = project();
+  record(p, {});
+  const old = gitIn(p, ['rev-parse', 'HEAD']).trim();
+  toMain(p);
+  gitIn(p, ['merge', '-q', '--no-ff', '--no-edit', BRANCH]);
+  gitIn(p, ['update-ref', `refs/remotes/origin/${BRANCH}`, old]);
+  assert.equal(merge(p).status, 0, 'alone, the merge is a no-op');
+  for (const command of [`git fetch origin ${BRANCH}:${BRANCH} && git merge ${BRANCH}`, `git fetch origin && git merge origin/${BRANCH}`, `git branch -f ${BRANCH} ${old} && git merge ${BRANCH}`]) {
+    const r = merge(p, command);
+    assert.equal(r.status, 2, command);
+    assert.match(r.stderr, /run the merge as its own command/, command);
+  }
+});
+
+test('verified: a story the integration branch holds is still gated when the target is another branch', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  gitIn(p, ['branch', 'release']);
+  gitIn(p, ['merge', '-q', '--no-ff', '--no-edit', BRANCH]);
+  const r = merge(p, `git checkout release && git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+});
+
+test('verified: a same-named branch on an untrusted remote does not exempt an operand', () => {
+  const { p } = project();
+  record(p, {});
+  const tip = gitIn(p, ['rev-parse', 'HEAD']).trim();
+  toMain(p);
+  gitIn(p, ['update-ref', 'refs/remotes/fork/main', tip]);
+  const r = merge(p, `git merge --no-ff ${tip}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /no verifier verdict/);
+});
+
+test('verified: a computed start point does not hide a literal new branch name', () => {
+  const { p } = project();
+  record(p, {});
+  gitIn(p, ['branch', 'pm/S1-2-existing']);
+  toMain(p);
+  for (const command of ['git checkout -b pm/S1-3-new "$BASE" && git merge --no-ff pm/S1-2-existing', 'git switch -c pm/S1-3-new $BASE && git merge --no-ff pm/S1-2-existing']) {
+    const r = merge(p, command);
+    assert.equal(r.status, 0, `${command}: ${r.stderr}`);
+  }
+  assert.equal(merge(p, 'git checkout -b "$NEW" main && git merge --no-ff pm/S1-2-existing').status, 2, 'a computed new name is still unknown');
+});

@@ -11,10 +11,13 @@
 // control words (if, then, do, !, {), wrappers (env, nice, command, exec, sudo, time, nohup),
 // `-C` forms, and any path to the git binary. Option values, command substitutions, and heredoc
 // bodies are opaque, so the documented `-m "$(cat <<'EOF' ... EOF)"` message is never read as
-// operands. A merge into a `pm/*` branch is not a ship and is ignored; the target is the branch a
-// `checkout` or `switch` earlier in the command selects, else HEAD's. An operand is a story
-// branch when it names `pm/*` locally or on a remote, or resolves to the tip of, or a commit
-// inside, a `pm/*` branch that the integration branch does not already hold. In a deliver
+// operands; a backslash-newline joins lines. A merge into a `pm/*` branch is not a ship and is
+// ignored; the target is the branch a `checkout` or `switch` earlier in the command selects, else
+// HEAD's, and unknown (so gated) when that checkout names a computed or unresolvable branch. An
+// operand is a story branch when it names `pm/*` locally or on a remote, or resolves to the tip
+// of, or a commit inside, a `pm/*` branch that neither the integration branch nor its configured
+// upstream already holds. Merging a named story the integration branch holds into that branch is
+// a no-op and allowed, unless an earlier git command in the call can move refs. In a deliver
 // project the hook blocks a computed operand (`$VAR`, `$(...)`, backticks, `-`, `@{-N}`), a story
 // merge after another ref-changing git command in the same call (only a plain checkout or switch
 // may precede it), `git pull` of a story branch, a commit short of a story tip, and a tag that
@@ -29,11 +32,13 @@
 // Execution block's `branch`. A claim with neither `deliver` nor `tier` predates these fields and
 // passes; otherwise `deliver`, when present, must parse, `tier` must be T0, T1, or T2, and
 // `tier`, `deliver`, `branch`, `protected`, `protected_base`, and pm-meta `integrity_allow` must
-// be the same at the branch tip. A T1 or T2 claim needs non-empty `protected` and a
+// be the same at the branch tip (an absent `protected` equals [], an absent `protected_base` equals
+// ""). A T1 or T2 claim needs non-empty `protected` and a
 // `protected_base`. From the tip only `verifier` and `integrity` are read. The merge is allowed
 // only when:
 //   - `verifier` is "PASS <sha>", <sha> 7 or more hex digits naming the tip or an ancestor of it;
-//   - each commit after <sha> that the integration branch lacks changes only the story file, or
+//   - each commit after <sha> that the integration branch lacks changes only the story file and
+//     handoff notes (docs/handoff/*.md), or
 //     is a two-parent merge whose tree equals `git merge-tree --write-tree` of its parents (git
 //     2.38 or newer) with conflicts and differences confined to the story file;
 //   - at tier T1 or T2, `integrity` is "pass <sha>" under the same rule.
@@ -137,6 +142,9 @@ function tokenize(cmd) {
       const body = cmd.slice(i + 1, close);
       add(body.replace(/\\(["\\$`])/g, '$1'), /(^|[^\\])[$`]/.test(body));
       i = close;
+    } else if (c === '\\' && cmd[i + 1] === '\n') {
+      // A line continuation joins the lines; it is not a character of any word.
+      i++;
     } else if (c === '\\' && i + 1 < cmd.length) {
       add(cmd[++i]);
     } else if (c === '$' && cmd[i + 1] === '(') {
@@ -267,20 +275,26 @@ function operands(sub, args) {
   return sub === 'pull' ? positional.slice(1).map((w) => ({ ...w, text: w.text.replace(/^\+/, '').split(':')[0] })) : positional;
 }
 
-// checkoutOf(args): what a checkout or switch selects, as { create, name, detach, prev, paths, force }.
+// checkoutOf(args): what a checkout or switch selects, as { create, name, detach, prev, paths,
+// force, dynamic }; dynamic when the shell computes the branch it selects: the new branch's name
+// when it creates one, else the branch it names. A computed start point leaves the target known.
 function checkoutOf(sub, args) {
-  const out = { create: null, name: null, detach: false, prev: false, paths: false, force: false };
+  const out = { create: null, name: null, detach: false, prev: false, paths: false, force: false, dynamic: false };
+  let createDynamic = false;
+  let nameDynamic = false;
   for (let i = 0; i < args.length; i++) {
     const w = args[i].text;
     if (w === '--') { out.paths = true; break; }
     if (['-b', '-c', '-B', '-C', '--orphan'].includes(w)) {
       out.create = args[i + 1]?.text ?? null;
+      createDynamic = Boolean(args[i + 1]?.dynamic);
       if (w !== '-b' && w !== '-c') out.force = true;
       i++;
     } else if (w === '--detach' || (sub === 'switch' && w === '-d')) out.detach = true;
     else if (w === '-') out.prev = true;
-    else if (!w.startsWith('-') && out.name === null) out.name = w;
+    else if (!w.startsWith('-') && out.name === null) { out.name = w; nameDynamic = args[i].dynamic; }
   }
+  out.dynamic = out.create !== null ? createDynamic : nameDynamic;
   return out;
 }
 
@@ -344,9 +358,23 @@ function pmTips(root) {
   return out;
 }
 
-// storyBranches(root, op, integ): { branches: [{ name, tip }] } for the pm/* branches a merge
-// operand stands for, or { reason } when the operand must be refused outright.
-function storyBranches(root, op, integ) {
+// integrationRefs(root, integ): the trusted copies of the integration branch: its ref, the local
+// branch's configured upstream, and origin's copy when origin is that upstream's remote. A
+// same-named branch on any other remote, a fork's for example, proves nothing.
+function integrationRefs(root, integ) {
+  const refs = [integ.ref];
+  if (resolve(root, `refs/heads/${integ.name}`)) {
+    const upstream = chomp(git(root, ['for-each-ref', '--format=%(upstream)', `refs/heads/${integ.name}`]) || '');
+    if (upstream.startsWith('refs/remotes/')) refs.push(upstream);
+    if (chomp(git(root, ['config', '--get', `branch.${integ.name}.remote`]) || '') === 'origin') refs.push(`refs/remotes/origin/${integ.name}`);
+  }
+  return [...new Set(refs.filter((r) => r && resolve(root, r)))];
+}
+
+// storyBranches(root, op, integ, target): { branches: [{ name, tip }] } for the pm/* branches a
+// merge operand stands for, { noop } when merging it into the target changes nothing, or
+// { reason } when the operand must be refused outright.
+function storyBranches(root, op, integ, target) {
   const bare = op.replace(/[~^@].*$/, '').replace(/^refs\/tags\//, '');
   const tag = bare && git(root, ['show-ref', '--verify', '--quiet', `refs/tags/${bare}`]) !== null;
   if (tag && (looksPm(bare) || refFor(root, bare))) return { reason: `${bare} is ambiguous: a tag shadows a branch of that name; delete the tag or merge refs/heads/${bare}` };
@@ -355,10 +383,13 @@ function storyBranches(root, op, integ) {
   if (sym.startsWith('refs/heads/')) name = sym.slice('refs/heads/'.length);
   else if (sym.startsWith('refs/remotes/')) name = sym.split('/').slice(3).join('/');
   const commit = resolve(root, op);
+  // A story the integration branch already holds merges nothing into it.
+  if (name && name.startsWith('pm/') && commit && integ.ref && target === integ.name && contains(root, commit, integ.ref)) return { branches: [], noop: true };
   if (name && name.startsWith('pm/')) return { branches: commit ? [{ name, tip: commit }] : [] };
   if (!commit) return { branches: [] };
-  // What the integration branch already holds brings no story work, whatever names it.
-  if (integ.ref && contains(root, commit, integ.ref)) return { branches: [] };
+  // What the integration branch, or a trusted remote copy of it, already holds brings no story
+  // work, whatever names it.
+  if (integrationRefs(root, integ).some((r) => contains(root, commit, r))) return { branches: [] };
   const tips = pmTips(root);
   const exact = [...new Set(tips.filter((t) => t.tip === commit).map((t) => t.name))];
   if (exact.length) return { branches: exact.map((n) => ({ name: n, tip: commit })) };
@@ -410,7 +441,10 @@ function noteGitVersion(root) {
   if (v.length === 2 && (v[0] < 2 || (v[0] === 2 && v[1] < 38))) oldGit = v.join('.');
 }
 
-const onlyFile = (list, file) => list.split(/\r?\n/).filter(Boolean).every((p) => p === file);
+const HANDOFF = /^docs\/handoff\/[^/]+\.md$/;
+// onlyRecords(list, file, handoff): every path in the list is the story file, or with handoff also
+// a handoff note.
+const onlyRecords = (list, file, handoff = true) => list.split(/\r?\n/).filter(Boolean).every((p) => p === file || (handoff && HANDOFF.test(p)));
 
 // mergeMatches(root, commit, parents, file): true when a merge commit's tree is the automatic
 // merge of its two parents, apart from the story file.
@@ -421,11 +455,12 @@ function mergeMatches(root, commit, parents, file) {
   const [tree, ...conflicted] = r.stdout.split(/\r?\n/).filter(Boolean);
   if (!/^[0-9a-f]{40,64}$/.test(tree || '') || !conflicted.every((p) => p === file)) return false;
   const diff = git(root, ['diff', '--name-only', tree, commit, '--']);
-  return diff !== null && onlyFile(diff, file);
+  return diff !== null && onlyRecords(diff, file, false);
 }
 
 // afterVerdict(root, sha, tip, integrationRef, file): true when the commits between the verdict
-// and the tip that the integration branch lacks only record state or merge it automatically.
+// and the tip that the integration branch lacks only record state (the story file and handoff
+// notes) or merge it automatically.
 function afterVerdict(root, sha, tip, integrationRef, file) {
   if (tip.startsWith(sha)) return true;
   const full = resolve(root, sha);
@@ -439,7 +474,7 @@ function afterVerdict(root, sha, tip, integrationRef, file) {
       continue;
     }
     const changed = git(root, ['diff-tree', '--root', '--name-only', '--no-commit-id', '-r', commit]);
-    if (changed === null || !onlyFile(changed, file)) return false;
+    if (changed === null || !onlyRecords(changed, file)) return false;
   }
   return true;
 }
@@ -450,7 +485,10 @@ const staleReason = (what, sha, branch, tip, fix) => (oldGit
 
 const CLAIM_FIELDS = ['tier', 'deliver', 'branch', 'protected', 'protected_base'];
 const TIERS = new Set(['T0', 'T1', 'T2']);
-const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+// An absent `protected` reads as [] and an absent `protected_base` as "", so a T0 claim may
+// spell either.
+const EMPTY = { protected: [], protected_base: '' };
+const same = (a, b, k) => JSON.stringify(a ?? EMPTY[k] ?? null) === JSON.stringify(b ?? EMPTY[k] ?? null);
 const atCommit = (value, word) => (typeof value === 'string' ? value.trim().match(new RegExp(`^(${word})\\s+([0-9a-fA-F]{7,64})$`)) : null);
 
 // verdictFor(root, branch, tip, integ): null to allow, or the reason to block.
@@ -477,7 +515,7 @@ function verdictFor(root, branch, tip, integ) {
   const exec = text === null ? null : parseExec(text);
   if (!exec) return `${file} is missing or unparseable at the tip of ${branch}`;
   for (const k of CLAIM_FIELDS) {
-    if (!same(exec[k], claim.exec[k])) return `${file} on ${branch} changes the claimed ${k}; claim fields are set on ${integ.name} only`;
+    if (!same(exec[k], claim.exec[k], k)) return `${file} on ${branch} changes the claimed ${k}; claim fields are set on ${integ.name} only`;
   }
   if (!same(parseMeta(text)?.integrity_allow, parseMeta(claim.text)?.integrity_allow)) return `${file} on ${branch} changes pm-meta integrity_allow from the claim on ${integ.name}`;
   if (tier === 'T1' || tier === 'T2') {
@@ -536,11 +574,15 @@ try {
       if (co.force) earlierChange = true;
       const root = rootOf(dir);
       if (!root || co.paths) continue;
-      if (co.create) targets.set(root, co.create);
+      // A computed or unresolvable branch leaves the target unknown, and a story merge under an
+      // unknown target is gated as a ship.
+      if (co.dynamic) targets.set(root, UNKNOWN);
+      else if (co.create) targets.set(root, co.create);
       else if (co.detach) targets.set(root, null);
       else if (co.prev) targets.set(root, UNKNOWN);
       else if (co.name && (resolve(root, `refs/heads/${co.name}`) || resolve(root, `refs/remotes/origin/${co.name}`))) targets.set(root, co.name);
       else if (co.name && resolve(root, co.name)) targets.set(root, null);
+      else if (co.name) targets.set(root, UNKNOWN);
       continue;
     }
     if (!ops) { earlierChange = true; continue; }
@@ -569,7 +611,9 @@ try {
       continue;
     }
     for (const op of ops) {
-      const found = integ.error ? { branches: [] } : storyBranches(root, op.text, integ);
+      const found = integ.error ? { branches: [] } : storyBranches(root, op.text, integ, target);
+      // A no-op judged on refs an earlier command may move is no judgement; fall through to SEPARATE.
+      if (found.noop && !prior) continue;
       const story = Boolean(found.reason || found.branches.length || looksPm(op.text) || op.text === 'FETCH_HEAD');
       if (!story) continue;
       if (prior) block(op.text, SEPARATE);

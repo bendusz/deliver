@@ -2,8 +2,11 @@
 
 Seeded defects and clean changes that measure how often a review panel lets a real defect through.
 `/deliver:calibrate` runs the review lenses over these cases, and `scripts/assurance.mjs calc` turns
-the trials into `panels.json`. For each risk tier it holds the cheapest panel whose one-sided 95%
-Clopper-Pearson bound on the joint escape rate meets the tier's target, or `unmeasured`.
+the trials into `panels.json` in two stages. On the `select` split, each risk tier gets the
+cheapest panel whose observed joint escape rate is at or below the tier's target; no bound is
+computed there. On the `certify` split, fresh trials of only that panel give the one-sided 95%
+Clopper-Pearson bound. A tier is measured when that bound meets its target, and `unmeasured`
+otherwise.
 
 This is separate from `../agent-evals`, which scores single prompts for regressions.
 

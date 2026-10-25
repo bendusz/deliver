@@ -9,3 +9,6 @@
 # Runtime / working notes (disposable)
 tmp/
 /codex/
+
+# Agent worktrees created by Claude Code isolation
+/.claude/worktrees/

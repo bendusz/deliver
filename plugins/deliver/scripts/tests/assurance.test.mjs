@@ -9,7 +9,7 @@ import { tmpDir, PLUGIN_ROOT } from './helpers.mjs';
 import {
   CORPUS_ROOT, CLASSES, upperBound, incBeta, loadCases, listCases, manifest, enumeratePanels,
   calc, selectTier, parseTargets, panelsDoc, staleness, readTrials, checkCase, MAX_SLOTS, ceil4,
-  certifyCasesNeeded, certifyPlan, renderCalc, REVIEW_DEFAULTS,
+  certifyCasesNeeded, certifyPlan, renderCalc, REVIEW_DEFAULTS, boundStaleness, parseUtc,
 } from '../assurance.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'assurance.mjs');
@@ -112,14 +112,16 @@ test('assurance: panels are every lens subset at one or two trials within the sl
 // The batch 1 sizes: 35 select and 65 certify seeded cases, 10 select and 15 certify clean cases.
 const TWO_STAGE = corpus({ sel: 35, cert: 65, selClean: 10, certClean: 15 });
 const split = (name) => TWO_STAGE.filter((c) => c.split === name);
+// twoStage: every select line, then every certify line, the order trial-record writes them in.
 const twoStage = (certMissFor = {}) => {
-  const recs = [];
+  const sel = [];
+  const cert = [];
   for (const [lens, tokens, selMiss, fp] of [['cheap', 100, ids('s', 0, 2), []], ['dear', 1000, ids('s', 2, 4), ['k0']]]) {
-    recs.push(...records(lens, split('select'), { miss: selMiss, fp, tokens }));
-    recs.push(...records(lens, split('select'), { miss: selMiss, fp, tokens, trial: 2 }));
-    if (certMissFor[lens] !== null) recs.push(...records(lens, split('certify'), { miss: certMissFor[lens] || [], tokens }));
+    sel.push(...records(lens, split('select'), { miss: selMiss, fp, tokens }));
+    sel.push(...records(lens, split('select'), { miss: selMiss, fp, tokens, trial: 2 }));
+    if (certMissFor[lens] !== null) cert.push(...records(lens, split('certify'), { miss: certMissFor[lens] || [], tokens }));
   }
-  return recs;
+  return [...sel, ...cert];
 };
 
 test('assurance: at the batch 1 sizes a perfect panel certifies T1 at 4.5042%', () => {
@@ -235,7 +237,8 @@ test('assurance: a select trial recorded after certify began is refused (phase o
   const cert = TWO_STAGE.filter((c) => c.split === 'certify');
   const ordered = [...records('a', sel, { at: '2026-10-24T10:00:00.000Z' }), ...records('a', cert, { at: '2026-10-24T11:00:00.000Z' })];
   assert.doesNotThrow(() => calc(ordered, TWO_STAGE, { T1: 0.05 }));
-  const late = [...ordered, ...records('a', sel, { trial: 2, at: '2026-10-24T12:00:00.000Z' })];
+  // Before the certify lines in the file, but later in time.
+  const late = [...records('a', sel, { at: '2026-10-24T10:00:00.000Z' }), ...records('a', sel, { trial: 2, at: '2026-10-24T12:00:00.000Z' }), ...records('a', cert, { at: '2026-10-24T11:00:00.000Z' })];
   assert.throws(() => calc(late, TWO_STAGE, { T1: 0.05 }), /select trial .* after certify began/);
 });
 
@@ -328,9 +331,23 @@ test('assurance: witness passes on the three example cases', () => {
   assert.equal(run('witness', '--id', 'no-such-case').status, 66);
 });
 
+// exampleCorpus(prefix): a corpus of only the three batch-0 example cases, copied from the real one
+// with its own manifest, so tests that write into a corpus do not change with later batches.
+const EXAMPLES = ['a001-page-count', 'a002-upload-path', 'a003-slugify'];
+function exampleCorpus(prefix) {
+  const copy = path.join(tmpDir(prefix), 'assurance');
+  fs.mkdirSync(path.join(copy, 'fixtures'), { recursive: true });
+  for (const id of EXAMPLES) fs.cpSync(path.join(CORPUS_ROOT, 'fixtures', id), path.join(copy, 'fixtures', id), { recursive: true });
+  const cases = loadCases().filter((c) => EXAMPLES.includes(c.id));
+  assert.equal(cases.length, EXAMPLES.length, 'the batch-0 examples are in cases.json');
+  fs.writeFileSync(path.join(copy, 'cases.json'), JSON.stringify(cases, null, 2) + '\n');
+  fs.writeFileSync(path.join(copy, 'MANIFEST.sha256'), manifest(copy));
+  return copy;
+}
+
 test('assurance: witness rejects a defect the witness cannot see, and a missing witness', () => {
-  const copy = path.join(tmpDir('assure-'), 'assurance');
-  fs.cpSync(CORPUS_ROOT, copy, { recursive: true });
+  const copy = exampleCorpus('assure-');
+  const pristine = manifest(copy);
   const dir = path.join(copy, 'fixtures', 'a001-page-count');
   fs.copyFileSync(path.join(dir, 'clean.patch'), path.join(dir, 'defect.patch'));
   fs.rmSync(path.join(copy, 'fixtures', 'a002-upload-path', 'witness.test.mjs'));
@@ -338,7 +355,7 @@ test('assurance: witness rejects a defect the witness cannot see, and a missing 
   assert.equal(r.status, 1);
   assert.match(r.stderr, /a001-page-count: the witness passes with defect\.patch applied/);
   assert.match(r.stderr, /a002-upload-path: missing witness\.test\.mjs/);
-  assert.notEqual(manifest(copy), manifest());
+  assert.notEqual(manifest(copy), pristine);
 });
 
 // buildCase(root, id, files): a fixture whose patches come from real git diffs against base/.
@@ -416,8 +433,7 @@ test('assurance: prepare stages a variant in an opaque temporary repository', ()
 });
 
 test('assurance: prepare removes its repository when a git step fails', () => {
-  const copy = path.join(tmpDir('assure-prepfail-'), 'assurance');
-  fs.cpSync(CORPUS_ROOT, copy, { recursive: true });
+  const copy = exampleCorpus('assure-prepfail-');
   fs.writeFileSync(path.join(copy, 'fixtures', 'a002-upload-path', 'defect.patch'), 'diff --git a/nope b/nope\n--- a/nope\n+++ b/nope\n@@ -1 +1 @@\n-x\n+y\n');
   const scratch = tmpDir('assure-tmp-');
   const env = { ...process.env, TMPDIR: scratch, TMP: scratch, TEMP: scratch };
@@ -427,8 +443,8 @@ test('assurance: prepare removes its repository when a git step fails', () => {
 });
 
 test('assurance: trial-record stamps each line, refuses bad input, and calc --write builds panels.json', () => {
-  const copy = path.join(tmpDir('assure-calc-'), 'assurance');
-  fs.cpSync(CORPUS_ROOT, copy, { recursive: true });
+  const copy = exampleCorpus('assure-calc-');
+  const pristine = manifest(copy);
   const out = path.join(copy, 'results', 'trials.jsonl');
   const lens = 'code-integrity-reviewer';
   const rec = (c, caught, fp, extra = [], trial = '1') => run('trial-record', '--corpus', copy, '--lens', lens, '--model', 'claude-opus-5-5', '--effort', 'medium',
@@ -470,7 +486,7 @@ test('assurance: trial-record stamps each line, refuses bad input, and calc --wr
   assert.equal(doc.tiers.T1.reason, 'corpus too small: needs ≥ 59 certify cases');
   assert.equal(doc.stamp.lenses[lens].promptSha256, hash);
   assert.equal(doc.stamp.calibratedAt, rows.map((x) => x.recordedAt).sort().at(-1));
-  assert.equal(manifest(copy), manifest(), 'results/ and panels.json stay outside the manifest');
+  assert.equal(manifest(copy), pristine, 'results/ and panels.json stay outside the manifest');
   // Trials from another corpus are refused rather than restamped with the corpus today.
   fs.appendFileSync(path.join(copy, 'MANIFEST.sha256'), '0000  extra\n');
   assert.equal(run('calc', '--corpus', copy).status, 1);
@@ -480,4 +496,44 @@ test('assurance: trial-record stamps each line, refuses bad input, and calc --wr
   assert.equal(run('calc', '--corpus', copy).status, 1);
   assert.equal(run('calc', '--corpus', copy, '--targets', 'T1=lots').status, 64);
   assert.equal(run('calc', '--corpus', copy, '--in', path.join(copy, 'missing.jsonl')).status, 66);
+});
+
+// --- WP-D follow-ups ---
+
+test('assurance: a select line after the first certify line in the file is refused, whatever its time', () => {
+  const sel = split('select');
+  const cert = split('certify');
+  const recs = [...records('a', sel.slice(0, 20), { at: '2026-10-24T10:00:00.000Z' }), ...records('a', cert, { at: '2026-10-24T11:00:00.000Z' }), ...records('a', sel.slice(20), { at: '2026-10-24T09:00:00.000Z' })];
+  assert.throws(() => calc(recs, TWO_STAGE, { T1: 0.05 }), /after the first certify line/);
+});
+
+test('assurance: a select trial in the same millisecond as the first certify trial is accepted', () => {
+  const at = '2026-10-24T10:00:00.000Z';
+  const recs = [...records('a', split('select'), { at }), ...records('a', split('certify'), { at })];
+  assert.doesNotThrow(() => calc(recs, TWO_STAGE, { T1: 0.05 }));
+});
+
+test('assurance: parseUtc accepts only what toISOString writes', () => {
+  assert.equal(parseUtc('2026-10-24T10:00:00.000Z'), Date.UTC(2026, 9, 24, 10));
+  for (const bad of ['2026-10-24', '2026-10-24T10:00:00Z', '2026-10-24 10:00', '2026-10-24T10:00:00.000+01:00', null, 42]) assert.ok(Number.isNaN(parseUtc(bad)), String(bad));
+});
+
+test('assurance: a tier bound shows only when every lens behind it, measured panel or best panel, is current', () => {
+  const current = (lens) => sha(fs.readFileSync(path.join(PLUGIN_ROOT, 'agents', `${lens}.md`)));
+  const stamp = {
+    deliver: 'x', calibratedAt: '2026-10-24T10:00:00.000Z',
+    corpusSha256: sha(fs.readFileSync(path.join(CORPUS_ROOT, 'MANIFEST.sha256'))),
+    codexArgsSha256: sha(fs.readFileSync(path.join(PLUGIN_ROOT, 'scripts', 'codex', 'lib', 'args.mjs'))),
+    lenses: {
+      'code-integrity-reviewer': { model: 'm', effort: 'medium', promptSha256: current('code-integrity-reviewer') },
+      'codex-reviewer': { model: 'gpt-old', effort: REVIEW_DEFAULTS.effort, promptSha256: current('codex-reviewer') },
+    },
+  };
+  const best = (lens) => ({ status: 'unmeasured', panel: [], bestPanel: [{ lens, trials: 1 }], certifyBound: 0.06 });
+  const doc = { stamp, tiers: { T0: best('code-integrity-reviewer'), T1: best('codex-reviewer'), T2: { status: 'unmeasured', panel: [], certifyBound: 0.06 } } };
+  assert.deepEqual(staleness(doc), [], 'no measured tier, so the document as a whole is current');
+  assert.deepEqual(boundStaleness(doc, 'T0'), []);
+  assert.match(boundStaleness(doc, 'T1').join(), /codex-reviewer.*model/);
+  assert.match(boundStaleness(doc, 'T2').join(), /no lens/);
+  assert.match(boundStaleness({ ...doc, stamp: { ...stamp, corpusSha256: 'old' } }, 'T0').join(), /corpus/);
 });

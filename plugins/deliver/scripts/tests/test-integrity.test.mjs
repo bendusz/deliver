@@ -372,3 +372,26 @@ test('integrity: usage errors exit 64', () => {
   assert.equal(usage(['main', 'story', '--root', d, '--protected-base']), 64);
   assert.equal(usage(['main', 'story', '--root', d, '--protected-base', 'no-such-ref']), 64);
 });
+
+// --- WP-D follow-ups ---
+
+test('integrity: a pragma in code under docs/ counts; prose files of every listed extension do not', () => {
+  const pragma = '// eslint' + '-disable-next-line no-console\n';
+  const code = repo({ 'docs/site/build.js': 'console.log(1);\n' }, (dir) => write(dir, { 'docs/site/build.js': pragma + 'console.log(1);\n' }));
+  const r = run(code);
+  assert.equal(r.status, 1);
+  assert.deepEqual(kinds(r), ['pragma-added']);
+  for (const ext of ['md', 'mdx', 'rst', 'txt', 'adoc']) {
+    const prose = repo({}, (dir) => write(dir, { [`guide/notes.${ext}`]: `Use ${pragma}` }));
+    assert.equal(run(prose).status, 0, ext);
+  }
+});
+
+test('integrity: a repeated coverage threshold that loses an occurrence is config-weakened', () => {
+  const base = "export default { projects: [{ coverageThreshold: { global: { lines: 80 } } }, { coverageThreshold: { global: { lines: 100 } } }] };\n";
+  const d = repo({ 'jest.config.js': base }, (dir) => write(dir, { 'jest.config.js': "export default { projects: [{ coverageThreshold: { global: { lines: 80 } } }, {}] };\n" }));
+  const r = run(d);
+  assert.equal(r.status, 1);
+  assert.deepEqual(kinds(r), ['config-weakened']);
+  assert.match(r.out.findings[0].detail, /lines/);
+});

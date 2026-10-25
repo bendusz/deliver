@@ -29,7 +29,8 @@ none of this file applies.
   Git refuses to check one branch out twice, so you could not ship. Say so, and ask the user to
   start the PM in the root workspace. To detect it:
   - You are in a worktree thread when the two lines of
-    `git rev-parse --path-format=absolute --git-dir --git-common-dir` differ.
+    `git rev-parse --path-format=absolute --git-dir --git-common-dir` differ. `--path-format`
+    needs git 2.31 or newer; on older git, treat it as not detectable and say so.
   - The root checkout holds the integration branch when the first entry of
     `git worktree list --porcelain` has `branch refs/heads/<integration branch>`, the branch
     named by `Integration branch:` in `docs/plan.md` (`main` by default).

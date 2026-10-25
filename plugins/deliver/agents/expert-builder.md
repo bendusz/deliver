@@ -36,7 +36,8 @@ fail for the stated reason, then fix. Report both results.
 
 Never run a git command that changes repository state, delegate, or add speculative cleanup; the PM
 owns commits. You may edit a `.sdd` inside `pm-meta.touches` when the implementation forces it,
-never the root spec or `.specdd/`.
+never the root spec or `.specdd/`. Never edit `docs/stories/**` or any path listed as `protected`
+in the story's Execution block; the PM's scope check stops the story if you do.
 
 Return when done or blocked, never with a progress report.
 
