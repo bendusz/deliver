@@ -8,7 +8,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { newProj, runHook, gitIn, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
-const { installGitHook, shim, writeAtomic, MARKER, GATE, RT_HOOK, TREE_NOTE } = await import(path.join(HOOKS_DIR, 'git-hook-install.mjs'));
+const { installGitHook, shim, writeAtomic, shCompatible, wrapper, MARKER, GATE, RT_HOOK, TREE_NOTE } = await import(path.join(HOOKS_DIR, 'git-hook-install.mjs'));
 const { judgeMerge, judgeRefUpdate, ONE_AT_A_TIME } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
 
 const BRANCH = 'pm/S1-1-fix';
@@ -603,6 +603,152 @@ test('git gate: amending shipped story code by whitespace alone is refused', () 
   assert.match(r.stderr, /rewriting shipped story history changes code/);
 });
 
+// localStory(p, id, change): claim story `id` on main, build it on pm/<id> with `change(p)` as its
+// code commit, record its verifier, and return to main.
+function localStory(p, id, change) {
+  commitFile(p, `docs/stories/${id}.md`, storyText(claimFor(id)), `chore(${id}): claim`);
+  gitIn(p, ['checkout', '-qb', `pm/${id}`, 'main']);
+  change(p);
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', `build(${id}): code`]);
+  const code = head(p, 'HEAD');
+  fs.writeFileSync(path.join(p, 'docs', 'stories', `${id}.md`), storyText({ ...claimFor(id), status: 'in-review', verifier: `PASS ${code}` }));
+  gitIn(p, ['commit', '-qam', `chore(${id}): record`]);
+  gitIn(p, ['checkout', '-q', 'main']);
+}
+
+test('git gate: pull --rebase=merges over a local-only verified story merge is allowed; a linear pull --rebase keeps the replay advice', () => {
+  for (const [args, ok] of [[['pull', '--rebase=merges'], true], [['pull', '--rebase'], false]]) {
+    const o = verified();
+    const c = clonedProject(o);
+    localStory(c, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'z.js'), 'z\n'));
+    assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+    commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+    const before = head(c);
+    const r = gitRun(c, args);
+    if (ok) {
+      assert.equal(r.status, 0, `${args.join(' ')}: ${r.stderr}`);
+      assert.ok(fs.existsSync(path.join(c, 'src', 'z.js')) && fs.existsSync(path.join(c, 'src', 'other.js')));
+    } else {
+      assert.notEqual(r.status, 0, r.stderr);
+      assert.match(r.stderr, /a rebase is replaying a shipped story merge/);
+      gitRun(c, ['rebase', '--abort']);
+      assert.equal(head(c), before);
+    }
+  }
+});
+
+test('git gate: an amend that drops a story merge but keeps its code as a plain commit is refused', () => {
+  const p = verified();
+  assert.equal(gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']).status, 0);
+  const before = head(p);
+  // Replace the merge, in one update, with one plain commit carrying the story's code.
+  const flat = gitIn(p, ['commit-tree', 'HEAD^{tree}', '-p', 'HEAD^1', '-m', 'flattened']).trim();
+  const r = gitRun(p, ['reset', '--hard', flat]);
+  refused(p, before, r, 'flattening amend');
+});
+
+test('git gate: an amend that moves a verified change to another place in the file is refused', () => {
+  const p = project([], { install: false });
+  const two = 'function a() {\n  return false;\n}\nfunction b() {\n  return false;\n}\n';
+  commitFile(p, 'src/f.js', two, 'feat: f');
+  assert.equal(installGitHook(p).ok, true);
+  localStory(p, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'f.js'), two.replace('return false', 'return true')));
+  assert.equal(gitRun(p, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+  gitIn(p, ['branch', '-D', 'pm/S1-3-z']);
+  const before = head(p);
+  fs.writeFileSync(path.join(p, 'src', 'f.js'), 'function a() {\n  return false;\n}\nfunction b() {\n  return true;\n}\n');
+  const r = gitRun(p, ['commit', '-a', '--amend', '--no-edit']);
+  refused(p, before, r, 'moved change');
+  assert.match(r.stderr, /rewriting shipped story history changes code/);
+});
+
+test('git gate: pull --rebase=merges keeps a story forked from an older main commit as the merge\'s second parent', () => {
+  const o = verified();
+  commitFile(o, 'docs/stories/S1-3-z.md', storyText(claimFor('S1-3-z')), 'chore(S1-3-z): claim');
+  commitFile(o, 'src/older.js', 'older\n', 'feat: older');
+  const c = clonedProject(o);
+  // The story forks from main^1, older than origin/main.
+  gitIn(c, ['checkout', '-qb', 'pm/S1-3-z', 'main^1']);
+  fs.writeFileSync(path.join(c, 'src', 'z.js'), 'z\n');
+  gitIn(c, ['add', '-A']);
+  gitIn(c, ['commit', '-qm', 'build(S1-3-z): code']);
+  const code = head(c, 'HEAD');
+  fs.mkdirSync(path.join(c, 'docs', 'stories'), { recursive: true });
+  fs.writeFileSync(path.join(c, 'docs', 'stories', 'S1-3-z.md'), storyText({ ...claimFor('S1-3-z'), status: 'in-review', verifier: `PASS ${code}` }));
+  gitIn(c, ['add', '-A']);
+  gitIn(c, ['commit', '-qm', 'chore(S1-3-z): record']);
+  const tip = head(c, 'HEAD');
+  gitIn(c, ['checkout', '-q', 'main']);
+  const m = gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']);
+  assert.equal(m.status, 0, m.stderr);
+  commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+  const r = gitRun(c, ['pull', '--rebase=merges']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(head(c, 'main^2'), tip, 'the story tip is still the merge\'s second parent');
+});
+
+test('git gate: a merge-preserving rebase over an upstream rename, or an edit two lines from the story, is allowed', () => {
+  for (const [label, upstream] of [
+    ['rename', (o) => { commitFile(o, 'docs/notes.md', 'n\n', 'docs: notes'); gitIn(o, ['mv', 'docs/notes.md', 'docs/renamed.md']); gitIn(o, ['commit', '-qm', 'docs: rename']); }],
+    ['edit two lines away', (o) => commitFile(o, 'src/fix.js', lines('base').replace('line 3 base', 'line 3 upstream').replace('line 5 base', 'line 5 upstream'), 'fix: upstream around')],
+  ]) {
+    const o = verified();
+    const c = clonedProject(o);
+    assert.equal(gitRun(c, ['merge', '--no-ff', `origin/${BRANCH}`, '-m', 'feat: ship']).status, 0);
+    upstream(o);
+    const r = gitRun(c, ['pull', '--rebase=merges']);
+    assert.equal(r.status, 0, `${label}: ${r.stderr}`);
+  }
+});
+
+test('git gate: a story on a remote whose name holds a slash is still a story', () => {
+  const p = project();
+  gitIn(p, ['remote', 'add', 'team/origin', 'https://example.invalid/repo.git']);
+  gitIn(p, ['update-ref', `refs/remotes/team/origin/${BRANCH}`, BRANCH]);
+  gitIn(p, ['branch', '-D', BRANCH]);
+  const before = head(p);
+  refused(p, before, gitRun(p, ['merge', '--no-ff', `team/origin/${BRANCH}`, '-m', 'm']), 'slash remote story');
+});
+
+test('git gate: the tracking ref a fetch refspec maps the integration branch to is trusted', () => {
+  const p = project();
+  gitIn(p, ['checkout', '-qb', 'stage', 'main']);
+  gitIn(p, ['merge', '-q', '--no-ff', BRANCH, '-m', 'shipped elsewhere']);
+  gitIn(p, ['checkout', '-q', 'main']);
+  gitIn(p, ['config', 'remote.up.url', 'https://example.invalid/repo.git']);
+  gitIn(p, ['config', 'remote.up.fetch', '+refs/heads/*:refs/remotes/mirror/*']);
+  gitIn(p, ['update-ref', 'refs/remotes/mirror/main', 'stage']);
+  gitIn(p, ['config', 'branch.main.remote', 'up']);
+  gitIn(p, ['config', 'branch.main.merge', 'refs/heads/main']);
+  const r = gitRun(p, ['merge', '--ff-only', 'mirror/main']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: a linear pull --rebase of a local commit over an upstream squash of a story is allowed', () => {
+  const o = verified();
+  const c = clonedProject(o);
+  commitFile(c, 'src/local.js', 'local\n', 'feat: local');
+  // upstream squash-merges the story, past its own gate.
+  assert.equal(gitRun(o, ['merge', '--squash', BRANCH]).status, 0);
+  assert.equal(gitRun(o, ['commit', '-m', 'feat: squashed'], { DELIVER_NO_ENFORCE: '1' }).status, 0);
+  const r = gitRun(c, ['pull', '--rebase']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: a rebase carrying a story copy, with no story merge replayed, gets the copy reason, not the replay advice', () => {
+  const o = verified();
+  const c = clonedProject(o);
+  // A copy that reached main past the gate.
+  assert.equal(gitRun(c, ['cherry-pick', `origin/${BRANCH}~1`], { DELIVER_NO_ENFORCE: '1' }).status, 0);
+  commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+  const r = gitRun(c, ['pull', '--rebase']);
+  assert.notEqual(r.status, 0, r.stderr);
+  assert.match(r.stderr, /as a copy/);
+  assert.doesNotMatch(r.stderr, /replaying a shipped story merge/);
+  gitRun(c, ['rebase', '--abort']);
+});
+
 // --- what must keep working ---
 
 test('git gate: a pull that fast-forwards main to shipped history is allowed, with no extra merge commit', () => {
@@ -709,7 +855,7 @@ test('git gate: the chaining lines keep a foreign reference-transaction hook wor
   const r = installGitHook(p);
   assert.equal(r.hooks[RT_HOOK], 'foreign');
   const note = r.notes.find((n) => n.includes('right after its #! line'));
-  const add = note.split('right after its #! line: ')[1].replace(/ \(and run \/deliver:doctor after plugin updates\)$/, '');
+  const add = note.split('right after its #! line: ')[1];
   fs.writeFileSync(f, `#!/bin/sh\n${add}\n${body}`, { mode: 0o755 });
   const chained = installGitHook(p);
   assert.equal(chained.hooks[RT_HOOK], 'chained', 'a hook that calls the copy counts as in place');
@@ -729,7 +875,7 @@ test('git gate: after --uninstall, the chaining lines in a foreign hook fail ope
   fs.mkdirSync(path.dirname(f), { recursive: true });
   fs.writeFileSync(f, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   const note = installGitHook(p).notes.find((n) => n.includes('right after its #! line'));
-  const add = note.split('right after its #! line: ')[1].replace(/ \(and run \/deliver:doctor after plugin updates\)$/, '');
+  const add = note.split('right after its #! line: ')[1];
   fs.writeFileSync(f, `#!/bin/sh\n${add}\nexit 0\n`, { mode: 0o755 });
   const u = spawnSync(process.execPath, [INSTALL, '--uninstall', p], { encoding: 'utf8', env: env() });
   assert.equal(u.status, 0, u.stdout);
@@ -800,7 +946,7 @@ test('git gate: a Python reference-transaction hook gets an sh wrapper; followin
   const note = r.notes.find((n) => n.includes('its interpreter is not sh'));
   assert.ok(note, r.notes.join('\n'));
   assert.doesNotMatch(note, /right after its #! line/);
-  const script = note.split('executable:\n')[1].replace(/ \(and run \/deliver:doctor after plugin updates\)$/, '');
+  const script = note.split('executable:\n')[1];
   fs.renameSync(f, `${f}.local`);
   fs.writeFileSync(f, script, { mode: 0o755 });
   const after = installGitHook(p);
@@ -823,13 +969,48 @@ test('git gate: a chained hook that is not executable is chained-inactive, and c
   const f = path.join(p, '.git', 'hooks', RT_HOOK);
   fs.mkdirSync(path.dirname(f), { recursive: true });
   fs.writeFileSync(f, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-  const add = installGitHook(p).notes.find((n) => n.includes('right after its #! line')).split('right after its #! line: ')[1].replace(/ \(and run \/deliver:doctor after plugin updates\)$/, '');
+  const add = installGitHook(p).notes.find((n) => n.includes('right after its #! line')).split('right after its #! line: ')[1];
   fs.writeFileSync(f, `#!/bin/sh\n${add}\nexit 0\n`);
   fs.chmodSync(f, 0o644);
   const c = installGitHook(p, { check: true });
   assert.equal(c.hooks[RT_HOOK], 'chained-inactive');
   assert.equal(c.ok, false);
   assert.match(c.notes.join('\n'), /is not executable, so git skips it; run chmod \+x/);
+});
+
+test('git gate: a hook symlinked to a Python script gets the wrapper, and the script is never written', { skip: WIN && 'symlinks' }, () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  const target = path.join(tmpDir('pyhook-'), 'policy.py');
+  const py = '#!/usr/bin/env python3\nimport sys\nsys.exit(0)\n';
+  fs.writeFileSync(target, py, { mode: 0o755 });
+  const f = path.join(p, '.git', 'hooks', RT_HOOK);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.symlinkSync(target, f);
+  const r = installGitHook(p);
+  assert.equal(r.hooks[RT_HOOK], 'foreign');
+  const note = r.notes.find((n) => n.includes(RT_HOOK) && n.includes('is a symlink'));
+  assert.match(note, /its interpreter is not sh/);
+  assert.doesNotMatch(note, /right after its #! line/);
+  assert.equal(fs.readFileSync(target, 'utf8'), py);
+  assert.ok(fs.lstatSync(f).isSymbolicLink());
+  // A dangling symlink: the interpreter cannot be read, so the wrapper is the safe advice.
+  fs.rmSync(target);
+  assert.match(installGitHook(p).notes.find((n) => n.includes('is a symlink')), /its interpreter is not sh|cannot be read/);
+});
+
+test('git gate: the wrapper skips a missing or non-executable .local hook instead of wedging updates', { skip: NO_SH }, () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  const f = path.join(p, '.git', 'hooks', RT_HOOK);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, wrapper(RT_HOOK, path.join(p, '.git', 'deliver', RT_HOOK)), { mode: 0o755 });
+  const r = gitRun(p, ['branch', 'x']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /deliver: .*reference-transaction\.local missing; restore it or remove this wrapper/);
+});
+
+test('git gate: shCompatible knows the POSIX shells, through env or busybox', () => {
+  for (const line of ['#!/bin/sh', '#!/bin/mksh', '#!/usr/bin/env ash', '#!/bin/busybox sh', '#!/usr/bin/yash', '#!/bin/posh', 'echo no shebang']) assert.equal(shCompatible(`${line}\nexit 0\n`), true, line);
+  for (const line of ['#!/usr/bin/env python3', '#!/usr/bin/env -S node --x', '#!/usr/bin/perl', '#!/bin/busybox awk']) assert.equal(shCompatible(`${line}\n`), false, line);
 });
 
 test('git gate: a symlinked hooks directory outside the git directory is not written', { skip: WIN && 'symlinks' }, () => {

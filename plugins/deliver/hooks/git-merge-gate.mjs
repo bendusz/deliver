@@ -72,7 +72,7 @@ try {
     if (!head.startsWith('refs/heads/') || !merged.size) process.exit(0);
     verdict = judgeMerge(top, { target: head.slice('refs/heads/'.length), commits: [...merged], strictFetch: fetchedMerge(top, merged) });
     if (verdict.allow && verdict.story && merged.size > 1) verdict = { allow: false, reason: ONE_AT_A_TIME };
-    else if (verdict.allow && verdict.story && verdict.judged[0]?.file && stagedDiffers(top, [...merged][0], verdict.judged[0].files ?? [verdict.judged[0].file])) {
+    else if (verdict.allow && verdict.story && verdict.judged[0]?.file && stagedDiffers(top, [...merged][0], verdict.judged[0].files)) {
       verdict = { allow: false, reason: 'the staged merge result differs from the automatic merge of the story; re-verify' };
     }
   }
