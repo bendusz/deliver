@@ -249,12 +249,14 @@ Two of the four bundled hooks are fail-open accident tripwires on the Write, Edi
 tools. The third, `require-verified.mjs`, gates story merges made through Bash, and the fourth runs
 at session start. **In a deliver project, session start installs a git hook**: a
 `reference-transaction` shim, marked `# deliver-merge-gate v2`, that runs `git-merge-gate.mjs`
-whenever the integration branch moves (a merge, fast-forward, pull, rebase, or reset), whatever
-command made it. Git 2.28 or newer is needed for that; older git gets `pre-merge-commit` and
+whenever the integration branch moves (a merge, fast-forward, pull, rebase, reset, cherry-pick,
+or squash merge), whatever command made it. Git 2.28 or newer is needed for that, and 2.38 for
+comparing a merge with the verified automatic merge; older git gets `pre-merge-commit` and
 `pre-commit` hooks, which miss fast-forwards. It never overwrites a hook you wrote, and never
-writes a hooks directory you manage through `core.hooksPath`; it reports either, with the line to
+writes a hooks directory you manage through `core.hooksPath`; it reports either, with the lines to
 add. `/deliver:doctor` checks the install, and
-`node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes it. None is a security
+`node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes it and keeps it off
+(`git config deliver.mergeGate off`) until you run the installer again. None is a security
 boundary; deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, and pushing
 straight to the remote all bypass it. Bash
 coverage is the optional hardening allowlist described in

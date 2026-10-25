@@ -189,9 +189,12 @@ The hook refuses a shell variable or substitution, `-` or `@{-1}`, a `git pull` 
 commit short of the branch tip, a tag that shadows the branch, and `--no-verify`; the quoted heredoc
 message is fine. Behind it, a git `reference-transaction` hook that session start installs judges
 every update of the integration branch by the same rules, whatever the shell form: a merge
-commit, a fast-forward, a reset, or a rebase, and the merged result must be git's automatic merge
-apart from the story file. When git refuses a merge, it stays in progress: run `git merge --abort`,
-fix the cause, and merge again. The hook catches honest mistakes such as a
+commit, a fast-forward, a reset, a rebase, a cherry-pick, or a squash merge, and the merged result
+must be git's automatic merge apart from the story file (git 2.38 or newer). A cherry-pick or squash
+of a story is refused even when verified, and so is an octopus merge: merge each story branch itself
+with `--no-ff`, one at a time. When git refuses a merge, it stays in progress: run
+`git merge --abort`, fix the cause, and merge again; after a refused fast-forward or reset, run
+`git reset --merge` if the refused changes were left staged. The hook catches honest mistakes such as a
 missed or stale verdict, a careless chain, or a wrong tier; it is not a boundary against an agent
 set on evading it, which is the 0.30 sandbox's job. A block means a state was skipped: go back to
 it, and never set `DELIVER_NO_ENFORCE` to get past it.

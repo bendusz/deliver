@@ -66,10 +66,15 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   `git-merge-gate.mjs` on every update of an integration branch, which judges the stories the
   update brings in with the Bash hook's own verdict (`judgeMerge`) and requires any merge on top of
   a story to be git's automatic merge apart from the story file, so merge commits, fast-forwards,
-  pulls, rebases, resets, `update-ref`, and hand-finished conflicted merges are all judged,
-  whatever the shell form. Out of scope remain deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, and pushing straight to the remote.
+  pulls, rebases, resets, `update-ref`, amended merges, `git push .`, and hand-finished conflicted
+  merges are all judged, whatever the shell form. Cherry-picks and squash merges of a story are
+  found by `git patch-id --stable` and refused, verified or not: merge the story branch itself with
+  `--no-ff`. An octopus merge of a story is refused: merge one story at a time. The merged-tree
+  comparison needs git 2.38 (`git merge-tree --write-tree`); on 2.28 to 2.37 it alone is skipped
+  and reported, and the verdicts still apply. Out of scope remain deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, the merged-result comparison on git older than 2.38 (the verdicts still apply), and pushing straight to the remote.
   `/deliver:doctor` checks and repairs the install, and
-  `node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes it. It catches a PM's honest mistakes, such as
+  `node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes it and sets
+  `git config deliver.mergeGate off`, which session start honours until an explicit install. It catches a PM's honest mistakes, such as
   a forgotten verification or a stale verdict. It is not a boundary against an agent that evades
   it on purpose. The merge's own directory, after `cd` or `git -C`, identifies the project; from a
   directory that is in no deliver project (for example a monorepo root), a story-like merge blocks
