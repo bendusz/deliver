@@ -22,10 +22,18 @@ open the PR with the message format in `implementation-loop.md`, and merge it. B
 `gh pr merge` or a merge in the UI, confirm the recorded `verifier: PASS <sha>` and, at `T1` and
 `T2`, `integrity: pass <sha>` name the PR head, or an ancestor of it followed only by story-file
 and handoff commits or by merges of the integration branch that git would make automatically.
-This is the rule the hook applies to a local merge. Check it with
-`git merge-base --is-ancestor <sha> <head>` and `git log --stat <sha>..<head>`. The
-`require-verified.mjs` hook does not see this path, so the check is yours alone; treat it as a
-residual risk. Never push to a remote without an explicit request.
+This is the rule the hook applies to a local merge. Check it for each recorded `<sha>`:
+
+1. `git merge-base --is-ancestor <sha> <head>` succeeds.
+2. `git log --stat <sha>..<head> --not origin/<integration>` shows only the story file and
+   `docs/handoff/*.md` in its non-merge commits.
+3. For each merge commit that `git rev-list --merges <sha>..<head>` lists,
+   `git merge-tree --write-tree <merge>^1 <merge>^2` succeeds without conflicts and prints the same
+   tree as `git rev-parse <merge>^{tree}`. `git show --remerge-diff <merge>` shows the same thing
+   as a diff, and is empty for an automatic merge.
+
+If any step fails, re-verify before merging. The `require-verified.mjs` hook does not see this
+path, so the check is yours alone; treat it as a residual risk. Never push to a remote without an explicit request.
 
 ## Agents you orchestrate
 Run reviewers as the tier panel `review-gates.md` sets, plus the lenses the story's risk adds.
