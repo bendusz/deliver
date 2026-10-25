@@ -11,9 +11,12 @@
 // control words (if, then, do, !, {), wrappers (env, nice, command, exec, sudo, time, nohup),
 // `-C` forms, and any path to the git binary. Option values, command substitutions, and heredoc
 // bodies are opaque, so the documented `-m "$(cat <<'EOF' ... EOF)"` message is never read as
-// operands; a backslash-newline joins lines; an unquoted `#` comment is skipped. A merge or pull
+// operands; a backslash-newline joins lines; an unquoted `#` comment is skipped, and so are
+// redirections (`>`, `2>&1`, `&>`, `<<<`, ...) with their targets. `--work-tree`, or a
+// `--git-dir` naming a checkout's own `.git`, locates the repository like `-C`. A merge or pull
 // with no operand stands for the target's configured upstream, and on an integration branch with
-// none it blocks. A merge into a `pm/*` branch is not a ship and is
+// none it blocks. FETCH_HEAD stands for every head it lists for merging. status, log, diff, show,
+// and rev-parse before a merge move no ref and do not count as earlier ref changes. A merge into a `pm/*` branch is not a ship and is
 // ignored; the target is the branch a `checkout` or `switch` earlier in the command selects, else
 // HEAD's, and unknown (so gated) when that checkout names a computed or unresolvable branch. An
 // operand is a story branch when it names `pm/*` locally or on a remote, or resolves to the tip
@@ -21,7 +24,7 @@
 // upstream already holds. Merging a named story the integration branch holds into that branch is
 // a no-op and allowed, unless an earlier git command in the call can move refs. In a deliver
 // project the hook blocks a computed operand (`$VAR`, `$(...)`, backticks, `-`, `@{-N}`), a story
-// merge after another ref-changing git command in the same call (only a plain checkout or switch
+// merge after another ref-changing git command in the same call (only a plain checkout or switch, or status, log, diff, show, or rev-parse,
 // may precede it), `git pull` of a story branch, a commit short of a story tip, and a tag that
 // shadows a `pm/*` name.
 //
@@ -133,13 +136,14 @@ function skipDouble(cmd, i) {
 
 // skipSubst(cmd, i): i is the `(` of `$(`; the index of its matching `)`. Quotes, nested
 // substitutions, heredoc bodies, and comments (a # starting a word, to the end of its line)
-// inside are skipped whole.
+// inside are skipped whole. A # right after `)`, as in `$(x)#y`, or after an escaped space is
+// part of a word.
 function skipSubst(cmd, i) {
   let depth = 1;
   let pending = [];
   for (let j = i + 1; j < cmd.length; j++) {
     const c = cmd[j];
-    if (c === '#' && /[\s;&|()]/.test(cmd[j - 1])) { const nl = cmd.indexOf('\n', j); j = (nl < 0 ? cmd.length : nl) - 1; } else if (c === '\\') j++;
+    if (c === '#' && /[\s;&|(]/.test(cmd[j - 1]) && cmd[j - 2] !== '\\') { const nl = cmd.indexOf('\n', j); j = (nl < 0 ? cmd.length : nl) - 1; } else if (c === '\\') j++;
     else if (c === "'") { const e = cmd.indexOf("'", j + 1); j = e < 0 ? cmd.length : e; } else if (c === '"') j = skipDouble(cmd, j);
     else if (c === '`') j = skipBacktick(cmd, j);
     else if (c === '<' && cmd[j + 1] === '<' && cmd[j + 2] !== '<') {
@@ -155,15 +159,18 @@ function skipSubst(cmd, i) {
 // unquoted ; & | ( ) and newlines; `(` and `)` also come back as { op }. A word carries `dynamic`
 // when the shell computes part of it: `$`, `$(...)`, or backticks outside single quotes. A
 // substitution and any heredoc body are swallowed whole into their word or skipped. An unquoted
-// comment, a # starting a word up to the end of its line, is skipped as the shell skips it.
+// comment, a # starting a word up to the end of its line, is skipped as the shell skips it, and so
+// are redirections with their targets, wherever they sit in the command.
 function tokenize(cmd) {
   const items = [];
   let seg = [];
   let word = null;
   let pending = [];
+  // dropNext: the next whole word is a redirection's target, never an argument.
+  let dropNext = false;
   const add = (s, dyn = false) => { word = word ?? { text: '', dynamic: false }; word.text += s; word.dynamic ||= dyn; };
-  const push = () => { if (word !== null) { seg.push(word); word = null; } };
-  const end = () => { push(); if (seg.length) items.push(seg); seg = []; };
+  const push = () => { if (word !== null) { if (dropNext) dropNext = false; else seg.push(word); word = null; } };
+  const end = () => { push(); dropNext = false; if (seg.length) items.push(seg); seg = []; };
   for (let i = 0; i < cmd.length; i++) {
     const c = cmd[i];
     if (c === '#' && word === null) {
@@ -198,6 +205,15 @@ function tokenize(cmd) {
       push();
       pending.push(h);
       i = h.end - 1;
+    } else if (c === '<' || c === '>' || (c === '&' && cmd[i + 1] === '>')) {
+      // A redirection, with any file descriptor glued before it (`2>`), and its target are not
+      // words of the command: `>`, `>>`, `>|`, `<`, `<>`, `&>`, `&>>`, `N>&M`, `N<&-`, `<<<`.
+      if (c !== '&' && word !== null && !word.dynamic && /^\d+$/.test(word.text)) word = null;
+      else push();
+      const j = c === '&' ? i + 1 : i;
+      const m = cmd.slice(j).match(/^(<<<|<>|<&|>>|>\||>&|<|>)/);
+      i = j + m[0].length - 1;
+      dropNext = true;
     } else if (/[;&|()\n]/.test(c)) {
       end();
       if (c === '(' || c === ')') items.push({ op: c });
@@ -255,9 +271,10 @@ function commandStart(seg) {
   }
 }
 
-// gitCalls(cmd, cwd): every git invocation in order, as { dir, sub, args, ops }. dir is where
-// git runs after any preceding cd and its -C options, or UNKNOWN; ops are the operands that
-// merge, for `merge` and `pull` only.
+// gitCalls(cmd, cwd): every git invocation in order, as { dir, gitDir, sub, args, ops, bare }.
+// dir is where git runs after any preceding cd and its -C, --work-tree, and --git-dir options, or
+// UNKNOWN; gitDir the --git-dir given, or null; ops the operands that merge, for `merge` and
+// `pull` only; bare when such a call names none and is no control form.
 function gitCalls(cmd, cwd) {
   const out = [];
   const stack = [];
@@ -282,20 +299,32 @@ function gitCalls(cmd, cwd) {
     if (head === 'popd') { cur = UNKNOWN; continue; }
     if (!head || !isGit(head)) continue;
     let dir = cur;
+    const repo = {};
     for (i++; i < seg.length && seg[i].text.startsWith('-'); i++) {
       const w = seg[i].text;
+      const eq = w.indexOf('=');
+      const opt = eq < 0 ? w : w.slice(0, eq);
       if (w === '-C') { const v = seg[++i]; dir = v ? into(dir, v) : UNKNOWN; } else if (w.startsWith('-C')) dir = into(dir, { text: w.slice(2), dynamic: seg[i].dynamic });
-      else if (GIT_REPO_OPTS.has(w)) { dir = UNKNOWN; i++; } else if ([...GIT_REPO_OPTS].some((o) => w.startsWith(`${o}=`))) dir = UNKNOWN;
-      else if (GIT_OPTS_WITH_VALUE.has(w)) i++;
+      else if (GIT_REPO_OPTS.has(opt)) {
+        const v = eq < 0 ? seg[++i] : { text: w.slice(eq + 1), dynamic: seg[i].dynamic };
+        repo[opt] = v ? into(dir, v) : UNKNOWN;
+      } else if (GIT_OPTS_WITH_VALUE.has(w)) i++;
     }
+    // --work-tree names the checkout; --git-dir alone names one only as its .git directory. The
+    // main loop checks that the checkout's own git directory is the one named.
+    const gitDir = repo['--git-dir'] ?? null;
+    if (repo['--work-tree'] !== undefined) dir = repo['--work-tree'];
+    else if (gitDir !== null) dir = gitDir !== UNKNOWN && path.basename(gitDir) === '.git' ? path.dirname(gitDir) : UNKNOWN;
     const sub = seg[i]?.text ?? '';
     const args = seg.slice(i + 1);
-    out.push({ dir, sub, args, ops: sub === 'merge' || sub === 'pull' ? operands(sub, args) : null });
+    const merging = sub === 'merge' || sub === 'pull' ? operands(sub, args) : null;
+    out.push({ dir, gitDir, sub, args, ops: merging && merging.ops, bare: Boolean(merging && merging.bare) });
   }
   return out;
 }
 
-// operands(sub, args): the words that merge, or null for a merge --abort and its kin.
+// operands(sub, args): { ops, bare }: the words that merge, none for a merge --abort and its kin,
+// and bare when there are none and no control form, so git merges the configured upstream.
 function operands(sub, args) {
   const withValue = sub === 'merge' ? MERGE_OPTS_WITH_VALUE : PULL_OPTS_WITH_VALUE;
   const positional = [];
@@ -303,7 +332,7 @@ function operands(sub, args) {
   for (let i = 0; i < args.length; i++) {
     const w = args[i];
     if (options && w.text === '--') options = false;
-    else if (options && MERGE_CONTROL.has(w.text)) return [];
+    else if (options && MERGE_CONTROL.has(w.text)) return { ops: [], bare: false };
     else if (options && withValue.has(w.text)) i++;
     // `-` and `@{-N}` name the previously checked-out branch, which the shell state decides.
     else if (w.text === '-' || /@\{-\d+\}/.test(w.text)) positional.push({ ...w, dynamic: true });
@@ -311,9 +340,7 @@ function operands(sub, args) {
   }
   // A pull's first operand is the remote; each further one is a refspec whose source merges.
   const ops = sub === 'pull' ? positional.slice(1).map((w) => ({ ...w, text: w.text.replace(/^\+/, '').split(':')[0] })) : positional;
-  // No operand, and no control form: git merges the target branch's configured upstream.
-  if (!ops.length) ops.bare = true;
-  return ops;
+  return { ops, bare: !ops.length };
 }
 
 // upstreamOf(root, branch): the configured upstream a bare merge or pull on branch merges, as
@@ -340,7 +367,8 @@ function checkoutOf(sub, args) {
     // options: the next word is still the branch.
     if (!options) { if (out.name === null && out.create === null) { out.name = w; nameDynamic = args[i].dynamic; } continue; }
     if (w === '--' && sub === 'switch') { options = false; continue; }
-    if (w === '--') { out.paths = true; break; }
+    // `git checkout main --` with nothing after the -- still switches branches.
+    if (w === '--') { out.paths = i + 1 < args.length; break; }
     if (['-b', '-c', '-B', '-C', '--orphan'].includes(w)) {
       out.create = args[i + 1]?.text ?? null;
       createDynamic = Boolean(args[i + 1]?.dynamic);
@@ -459,7 +487,34 @@ function operandOf(root, op) {
   return { bare, name, commit: resolve(root, op) };
 }
 
+// fetchHeads(root): the commits FETCH_HEAD lists for merging, every line not marked
+// not-for-merge, as `git merge FETCH_HEAD` merges them all; null when it cannot be read.
+function fetchHeads(root) {
+  const where = chomp(git(root, ['rev-parse', '--git-path', 'FETCH_HEAD']) || '');
+  if (!where) return null;
+  let text;
+  try { text = fs.readFileSync(path.resolve(root, where), 'utf8'); } catch { return null; }
+  const out = [];
+  for (const line of text.split(/\r?\n/)) {
+    const [sha, mark = ''] = line.split('\t');
+    if (/^[0-9a-f]{40,64}$/.test(sha || '') && mark !== 'not-for-merge') out.push(sha);
+  }
+  return out;
+}
+
 function storyBranches(root, op, integ, target) {
+  // FETCH_HEAD resolves to its first line alone, but git merges every head marked for merge.
+  if (op === 'FETCH_HEAD') {
+    const heads = fetchHeads(root);
+    if (heads === null) return pmTips(root).length ? { reason: 'FETCH_HEAD cannot be read, so the heads it merges cannot be checked; merge the fetched branch by name' } : { branches: [] };
+    const branches = [];
+    for (const sha of heads) {
+      const found = storyBranches(root, sha, integ, target);
+      if (found.reason) return found;
+      for (const b of found.branches || []) if (!branches.some((x) => x.name === b.name)) branches.push(b);
+    }
+    return { branches };
+  }
   const { bare, name, commit } = operandOf(root, op);
   const tag = bare && git(root, ['show-ref', '--verify', '--quiet', `refs/tags/${bare}`]) !== null;
   if (tag && (looksPm(bare) || refFor(root, bare))) return { reason: `${bare} is ambiguous: a tag shadows a branch of that name; delete the tag or merge refs/heads/${bare}` };
@@ -758,6 +813,13 @@ function readsOnly(sub, args) {
   return positional.slice(1).every((w) => !w.dynamic && !w.text.includes(':'));
 }
 
+// ownGitDir(dir, gitDir): whether gitDir is the git directory of the checkout at dir.
+function ownGitDir(dir, gitDir) {
+  if (gitDir === UNKNOWN) return false;
+  const actual = chomp(git(dir, ['rev-parse', '--absolute-git-dir']) || '');
+  try { return Boolean(actual) && fs.realpathSync(actual) === fs.realpathSync(gitDir); } catch { return false; }
+}
+
 // candidates(lists): the prefixes in priority order, each once, ending with the top level.
 const candidates = (...lists) => [...new Set([...lists.flat(), ''])];
 
@@ -784,13 +846,16 @@ try {
   };
   // discover(root) per repository, read on first need.
   const discovered = new Map();
-  // earlierChange: an earlier git call may move refs (anything but a plain checkout or switch).
+  // earlierChange: an earlier git call may move refs (anything but a plain checkout or switch, or a read-only status, log, diff, show, or rev-parse).
   // earlierWrite: an earlier git call may write refs outright (anything but readsOnly).
   let earlierChange = false;
   let earlierWrite = false;
   // earlierFetch: an earlier git call is a fetch, which can bring in pm/* and remote-tracking refs.
   let earlierFetch = false;
-  for (const { dir, sub, args, ops } of calls) {
+  for (const call of calls) {
+    const { sub, args, ops, bare } = call;
+    // A --git-dir that is not the checkout's own git directory leaves the repository unknown.
+    const dir = call.gitDir !== null && call.dir !== UNKNOWN && !ownGitDir(call.dir, call.gitDir) ? UNKNOWN : call.dir;
     if (sub === 'checkout' || sub === 'switch') {
       const co = checkoutOf(sub, args);
       if (co.force) { earlierChange = true; earlierWrite = true; }
@@ -808,6 +873,9 @@ try {
       continue;
     }
     if (!ops) {
+      // status, log, diff, show, and rev-parse move no ref, so a merge after them is judged as
+      // if alone.
+      if (READ_ONLY.has(sub)) continue;
       earlierChange = true;
       if (!readsOnly(sub, args)) earlierWrite = true;
       if (sub === 'fetch') earlierFetch = true;
@@ -837,18 +905,15 @@ try {
     // A bare merge or pull merges the target's configured upstream: judge that. With none to
     // read, a bare merge onto a deliver project's integration branch, or onto a target the gate
     // cannot name, blocks rather than guess.
-    if (ops.bare) {
-      const up = typeof target === 'string' ? upstreamOf(root, target) : null;
-      if (up) ops.push(up);
-      else if (target !== null) {
-        const owner = project(root, candidates(prefixesOf(root, dir)));
-        if (owner && (target === UNKNOWN || owner.error || target === owner.name)) block('(no operand)', `it merges ${target === UNKNOWN ? 'the target branch' : target}'s upstream, which the gate cannot resolve; name the branch to merge explicitly`);
-      }
-    }
     // The project that owns the merge is the one the merge's own directory sits in, else a deliver
     // project at the top level. Outside every project, in a repository holding any, a story-like
     // operand blocks: the gate does not guess which project ships it.
     const integ = project(root, candidates(prefixesOf(root, dir)));
+    if (bare) {
+      const up = typeof target === 'string' ? upstreamOf(root, target) : null;
+      if (up) ops.push(up);
+      else if (target !== null && integ && (target === UNKNOWN || integ.error || target === integ.name)) block('(no operand)', `it merges ${target === UNKNOWN ? 'the target branch' : target}'s upstream, which the gate cannot resolve; name the branch to merge explicitly`);
+    }
     if (!integ) {
       // Nothing to merge, or no pm/* tip and no named story with no earlier ref-writing call or
       // fetch (either could bring in a pm/* tip): nothing here can block, so the repository is not
