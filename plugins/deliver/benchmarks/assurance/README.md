@@ -159,8 +159,9 @@ tried and the lucky ones pass.
    the choice never saw. A chosen panel with missing certify trials, or whose certify bound misses
    the target, leaves the tier `unmeasured`.
 
-With zero escapes in `n` certify cases, the 95% bound is `1 - 0.05^(1/n)`, about `3/n`. Batch 1's
-65 certify cases prove 4.5042% at best: enough for T0 (10%, needs 29) and T1 (5%, needs 59). T2 (2%)
+With zero escapes in `n` certify cases, the 95% bound is `1 - 0.05^(1/n)`, about `3/n`. The 66
+certify cases (batch 1 plus batch 0's) prove 4.4375% at best: enough for T0 (10%, needs 29) and
+T1 (5%, needs 59). T2 (2%)
 needs 149 certify cases with no escape, so `calc` reports it as
 `unmeasured (corpus too small: needs ≥ 149 certify cases)` and the certify phase skips it. A lens
 never run on a case counts as missing it, and a panel whose members have not all run on every
