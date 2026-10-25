@@ -172,8 +172,8 @@ conflict resolution in code included, needs a fresh verdict. Run the merge as it
 from the project directory or with `git -C <project>`, after at most a plain `git checkout` or
 `git switch` of the integration branch in the same `&&` chain, or a `git status`, `log`, `diff`,
 `show`, or `rev-parse`, and name the story branch literally. A checkout that might not run (inside
-`if` or a loop, after `||`, or behind another command in the chain) leaves the target unknown, and
-the hook blocks the story merge after it. The merge's own
+`if` or a loop, after `||`, or behind another command in its chain) leaves the target unknown for
+any merge outside that `&&` chain, and the hook blocks the story merge there. The merge's own
 directory identifies the project; from a directory that is in no deliver project (for example a
 monorepo root), a story-like merge blocks, unless the checked-out target is a non-base branch that no project integrates on.
 
@@ -187,11 +187,11 @@ EOF
 
 The hook refuses a shell variable or substitution, `-` or `@{-1}`, a `git pull` of a story branch, a
 commit short of the branch tip, a tag that shadows the branch, and `--no-verify`; the quoted heredoc
-message is fine. Behind it, a git `pre-merge-commit` hook that session start installs judges the
-merge git is actually committing by the same rules, whatever the shell form, and
-`branch.<integration>.mergeoptions --no-ff` makes every merge into the integration branch a merge
-commit it sees. When git refuses the merge commit, the merge stays in progress: `git merge --abort`,
-then go back to the skipped state. The hook catches honest mistakes such as a
+message is fine. Behind it, a git `reference-transaction` hook that session start installs judges
+every update of the integration branch by the same rules, whatever the shell form: a merge
+commit, a fast-forward, a reset, or a rebase, and the merged result must be git's automatic merge
+apart from the story file. When git refuses a merge, it stays in progress: run `git merge --abort`,
+fix the cause, and merge again. The hook catches honest mistakes such as a
 missed or stale verdict, a careless chain, or a wrong tier; it is not a boundary against an agent
 set on evading it, which is the 0.30 sandbox's job. A block means a state was skipped: go back to
 it, and never set `DELIVER_NO_ENFORCE` to get past it.

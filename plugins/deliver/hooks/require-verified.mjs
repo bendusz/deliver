@@ -6,11 +6,12 @@
 // evasive agent with Bash; that protection is the 0.30 sandbox. So it reads every form a PM could
 // plausibly write, stays fail-closed once a story merge is certain, and never blocks the
 // documented merge, but a text parser cannot be complete. The authoritative check is the git-level
-// gate: git-merge-gate.mjs, run by git's pre-merge-commit hook, judges the merge git is actually
-// committing with judgeMerge() below, the same verdict logic, whatever the shell form. This hook
-// gives the friendly early message, and blocks `--no-verify` (and merge's `-n`, or a
-// `core.hooksPath` override) on a story merge or pull, or on a commit of an in-progress story
-// merge, since that skips the git-level gate.
+// gate: git-merge-gate.mjs, run by git's reference-transaction hook, judges every update of an
+// integration branch with judgeRefUpdate() below, whatever the shell form, and a ship this hook
+// judges goes through judgeMerge(), the same verdict. This hook gives the friendly early message,
+// and blocks `--no-verify` (and commit's `-n`; merge's `-n` is --no-stat) or a `core.hooksPath`
+// override on a story merge or pull, or on a commit of an in-progress story merge, since the
+// fallback hooks on git older than 2.28 honour it.
 //
 // It reads the command's `git merge` and `git pull` calls, through `cd` chains, subshells,
 // control words (if, then, do, !, {), wrappers (env, nice, command, exec, sudo, time, nohup),
@@ -106,7 +107,7 @@ if (MAIN && process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
 
 let lib;
 try { lib = await import('./lib.mjs'); } catch (e) { if (MAIN) process.exit(0); throw e; }
-const { readHookInput, parseExec, git, chomp, deliverVersion, versionAtLeast } = lib;
+const { readHookInput, parseExec, git, chomp, deliverVersion, versionAtLeast, oneLine } = lib;
 
 const UNKNOWN = Symbol('unknown');
 
@@ -269,6 +270,7 @@ const GIT_REPO_OPTS = new Set(['--git-dir', '--work-tree']);
 const MERGE_OPTS_WITH_VALUE = new Set(['-m', '--message', '-F', '--file', '-s', '-X', '--strategy', '--strategy-option', '--into-name']);
 const PULL_OPTS_WITH_VALUE = new Set(['-s', '-X', '--strategy', '--strategy-option', '--depth', '--deepen', '--shallow-since', '--shallow-exclude', '-j', '--jobs', '--upload-pack', '-o', '--server-option', '--negotiation-tip']);
 const MERGE_CONTROL = new Set(['--abort', '--continue', '--quit', '--skip']);
+const COMMIT_OPTS_WITH_VALUE = new Set(['-m', '-F', '-C', '-c', '-t', '--message', '--file', '--author', '--date', '--template', '--reuse-message', '--reedit-message', '--fixup', '--squash', '--cleanup']);
 
 const isGit = (w) => /^git(\.exe)?$/i.test(w.split(/[\\/]/).at(-1));
 const expandHome = (t) => (t === '~' || t.startsWith('~/') ? path.join(os.homedir(), t.slice(1)) : t);
@@ -393,9 +395,10 @@ function gitSubIndex(seg, i) {
 }
 
 // skipsHooks(sub, args): the call skips the pre-merge-commit or pre-commit hook: --no-verify, or
-// -n for merge and commit (alone or in a cluster of short flags), unless a later --verify undoes it.
+// commit's -n (alone or in a cluster of short flags), unless a later --verify undoes it. For merge
+// and pull, -n is --no-stat.
 function skipsHooks(sub, args) {
-  const withValue = sub === 'merge' ? MERGE_OPTS_WITH_VALUE : sub === 'pull' ? PULL_OPTS_WITH_VALUE : new Set(['-m', '-F', '-C', '-c', '-t', '--message', '--file', '--author', '--date', '--template', '--reuse-message', '--reedit-message', '--fixup', '--squash', '--cleanup']);
+  const withValue = sub === 'merge' ? MERGE_OPTS_WITH_VALUE : sub === 'pull' ? PULL_OPTS_WITH_VALUE : COMMIT_OPTS_WITH_VALUE;
   let skip = false;
   for (let k = 0; k < args.length; k++) {
     const w = args[k].text;
@@ -403,7 +406,7 @@ function skipsHooks(sub, args) {
     if (w === '--no-verify') skip = true;
     else if (w === '--verify') skip = false;
     else if (withValue.has(w)) k++;
-    else if (sub !== 'pull' && /^-[A-Za-z]+$/.test(w)) {
+    else if (sub === 'commit' && /^-[A-Za-z]+$/.test(w)) {
       // In a cluster, a letter that takes a value swallows the rest: -nm msg skips, -mn is a message.
       for (const ch of w.slice(1)) {
         if (ch === 'n') { skip = true; break; }
@@ -476,7 +479,6 @@ function checkoutOf(sub, args) {
 // ---- the repository ----
 
 const looksPm = (op) => /(^|\/)pm\//.test(op);
-const oneLine = (s) => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
 const sanitize = (s) => oneLine(s).slice(0, 80);
 const resolve = (root, rev) => chomp(git(root, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`]) || '');
 const contains = (root, ancestor, of) => git(root, ['merge-base', '--is-ancestor', ancestor, of]) !== null;
@@ -758,7 +760,7 @@ function verdictFor(root, branch, tip, integ) {
   if (integ.name.startsWith('pm/')) return `the integration branch ${integ.name} is itself a story branch; fix ${prefix}docs/plan.md`;
   if (contains(root, tip, integ.ref)) return `the integration branch ${integ.name} already contains ${branch}, so it cannot judge the merge`;
   const claim = claimOf(root, integ.ref, branch, prefix);
-  if (!claim) return `no story on ${integ.name} claims ${branch}; claim it per state.md before merging`;
+  if (!claim) return `no story on ${integ.name} claims ${branch} in ${prefix}docs/stories; claim it per state.md before merging`;
   if (!claim.exec) return `${claim.file} on ${integ.name} has an Execution block that does not parse`;
   const has = (k) => Object.hasOwn(claim.exec, k);
   // A claim with neither field was made before they existed, unless the project already records
@@ -1094,6 +1096,13 @@ function judgeCommand(calls, sessionDir) {
       if (target === UNKNOWN) block(op.text, UNKNOWN_TARGET);
       if (integ.error) block(op.text, integ.error);
       if (found.reason) block(op.text, found.reason);
+      // A ship into the project's integration branch is judged by judgeMerge, the git-level gate's
+      // own verdict; a story merged into any other branch keeps the directory project's verdict.
+      if (found.branches.length && target === integ.name) {
+        const v = judgeMerge(root, { target, commits: found.branches.map((b) => b.tip), prefixes: candidates(prefixesOf(root, dir)) });
+        if (!v.allow) block(v.what ?? op.text, v.why ?? v.reason);
+        continue;
+      }
       for (const { name, tip } of found.branches) {
         const reason = verdictFor(root, name, tip, integ);
         if (reason) block(name, reason);
@@ -1104,36 +1113,83 @@ function judgeCommand(calls, sessionDir) {
 
 // ---- the merge git is making ----
 
-const ALLOW = (reason, story = false) => ({ allow: true, reason, story });
-const DENY = (reason) => ({ allow: false, reason, story: true });
+const ALLOW = (reason, story = false, judged = []) => ({ allow: true, reason, story, judged });
+const DENY = (reason, what = null) => ({ allow: false, reason: what ? `${what}: ${reason}` : reason, what, why: reason, story: true, judged: [] });
+const ZERO = /^0+$/;
+const MERGE_DIFFERS = 'the merge result differs from the verified automatic merge; re-verify';
 
 // storiesOf(root, commit, integ): the pm/* branches a merged commit stands for, as
 // { branches: [{ name, tip }] }, or { reason } when it must be refused: the tip of a pm/* branch
 // here or on a remote, or a head FETCH_HEAD names as a pm/* branch; refused when it sits inside a
-// pm/* tip short of it. A commit the integration branch or a trusted copy of it holds is no story.
+// pm/* tip short of it, or when FETCH_HEAD has a line that does not parse, since that head could be
+// a story. A commit the integration branch or a trusted copy of it holds is no story.
 function storiesOf(root, commit, integ) {
   const full = resolve(root, commit);
   if (!full) return { reason: `${sanitize(commit)} does not resolve to a commit, so the merge cannot be judged` };
   if (integ.ref && integrationRefs(root, integ).some((r) => contains(root, full, r))) return { branches: [] };
   const tips = pmTips(root);
   const names = new Set(tips.filter((t) => t.tip === full).map((t) => t.name));
-  for (const h of fetchHeads(root)?.heads ?? []) if (h.sha === full && h.name?.startsWith('pm/')) names.add(h.name);
+  const fetched = fetchHeads(root);
+  for (const h of fetched?.heads ?? []) if (h.sha === full && h.name?.startsWith('pm/')) names.add(h.name);
   if (names.size) return { branches: [...names].map((name) => ({ name, tip: full })) };
+  if (fetched?.bad) return { reason: 'FETCH_HEAD has a line the gate cannot read, so the heads it merges cannot be checked; fetch again, or delete FETCH_HEAD' };
   const holder = tips.find((t) => contains(root, full, t.tip));
   if (holder) return { reason: `${full.slice(0, 12)} is part of ${holder.name} short of its tip, which carries the verdict; merge the branch itself` };
   return { branches: [] };
 }
 
-// judgeMerge(root, { target, commits }): the verdict on a merge git is about to commit, as
-// { allow, reason, story }: target is the branch merged into, commits the merged SHAs (MERGE_HEAD).
-// root is the repository's top level. The projects judged are the deliver projects anywhere in the
-// repository (discover) whose trusted integration branch is target; a merge into any other branch
-// is not a ship. Each merged commit that is a story (storiesOf) is judged by verdictFor against the
-// project whose integration branch claims it, so the claim, tier, verifier and integrity SHAs, the
-// after-verdict rules, the legacy rule, and the merge-tree check are the PreToolUse hook's own.
-// story is true once a story merge into an integration branch is certain. Fails open on an internal
-// error before that, and closed after it, like the PreToolUse hook. DELIVER_NO_ENFORCE=1 allows.
-export function judgeMerge(root, { target, commits }) {
+// integrationProjects(root, branch, prefixes): the deliver projects whose trusted integration
+// branch is `branch`, as { projects: [{ name, ref, prefix, error? }], failed }: every project
+// discover() finds, and the projects at `prefixes` (the merge's own directory, deepest first).
+function integrationProjects(root, branch, prefixes = []) {
+  const disc = discover(root);
+  const dirs = [...new Set([...prefixes, ...disc.found.map((d) => (d === '.' ? '' : `${d}/`))])];
+  const projects = [];
+  for (const prefix of dirs) {
+    const p = projectAt(root, prefix);
+    if (p && (p.name === branch || p.names?.includes(branch))) projects.push({ ...p, prefix });
+  }
+  return { projects, failed: disc.failed };
+}
+
+// judgeStories(root, branch, commits, { prefixes, info }): the verdict on story commits merged into
+// `branch`; judged lists each story allowed as { name, tip, file, prefix }. One project judges each
+// story: the first that claims it, in the order of the merge's own directory (`prefixes`, deepest
+// first), the top level, then the rest; with no claim anywhere, the first of that order, whose
+// verdict is "no story claims". The git-level gate has no directory, so the top level comes first.
+function judgeStories(root, branch, commits, { prefixes = [], info } = {}) {
+  const { projects, failed } = info ?? integrationProjects(root, branch, prefixes);
+  if (!projects.length && !(failed && baseBranches(root).includes(branch))) return ALLOW(`${branch} is no deliver project's integration branch`);
+  const integ = { name: branch, ref: refFor(root, branch), prefix: '' };
+  const judged = [];
+  let story = false;
+  for (const commit of commits) {
+    const found = storiesOf(root, commit, integ);
+    if (found.reason) return DENY(found.reason);
+    for (const { name, tip } of found.branches) {
+      story = true;
+      if (!projects.length) return DENY(`cannot establish which deliver project ships ${name}: the repository listing failed`, name);
+      const order = [...new Set([...prefixes, '', ...projects.map((p) => p.prefix)])].map((x) => projects.find((p) => p.prefix === x)).filter(Boolean);
+      const p = order.find((x) => !x.error && x.ref && claimOf(root, x.ref, name, x.prefix)) ?? order[0];
+      if (p.error) return DENY(p.error, name);
+      const reason = verdictFor(root, name, tip, p);
+      if (reason) return DENY(reason, name);
+      judged.push({ name, tip, file: claimOf(root, p.ref, name, p.prefix)?.file ?? null, prefix: p.prefix });
+    }
+  }
+  return ALLOW(story ? 'every story merged records the verdicts it needs' : 'no story is merged', story, judged);
+}
+
+// judgeMerge(root, { target, commits, prefixes }): the verdict on a merge into `target` of
+// `commits`, as { allow, reason, story }. root is the repository's top level; prefixes, optional,
+// the merge's own directory as project prefixes, deepest first. The projects judged are the deliver
+// projects anywhere in the repository whose trusted integration branch is target; a merge into any
+// other branch is not a ship. Each merged commit that is a story (storiesOf) is judged by verdictFor
+// against the project whose integration branch claims it, so the claim, tier, verifier and
+// integrity SHAs, the after-verdict rules, the legacy rule, and the merge-tree check are the
+// PreToolUse hook's own. story is true once a story merge into an integration branch is certain.
+// Fails open on an internal error before that, and closed after it. DELIVER_NO_ENFORCE=1 allows.
+export function judgeMerge(root, { target, commits, prefixes = [] }) {
   if (process.env.DELIVER_NO_ENFORCE === '1') return ALLOW('DELIVER_NO_ENFORCE=1 is set');
   let certain = false;
   try {
@@ -1141,32 +1197,98 @@ export function judgeMerge(root, { target, commits }) {
     if (!branch || branch.startsWith('pm/')) return ALLOW('not a merge into an integration branch');
     const list = (commits || []).filter(Boolean);
     if (!list.length) return ALLOW('nothing is being merged');
-    const disc = discover(root);
-    const projects = [];
-    for (const dir of disc.found) {
-      const prefix = dir === '.' ? '' : `${dir}/`;
-      const p = projectAt(root, prefix);
-      if (p && (p.name === branch || p.names?.includes(branch))) projects.push({ ...p, prefix });
-    }
-    if (!projects.length && !(disc.failed && baseBranches(root).includes(branch))) return ALLOW(`${branch} is no deliver project's integration branch`);
-    const integ = { name: branch, ref: refFor(root, branch), prefix: '' };
-    for (const commit of list) {
-      const found = storiesOf(root, commit, integ);
-      if (found.reason) { certain = true; return DENY(found.reason); }
-      for (const { name, tip } of found.branches) {
-        certain = true;
-        if (!projects.length) return DENY(`cannot establish which deliver project ships ${name}: the repository listing failed`);
-        const owners = projects.filter((p) => !p.error && p.ref && claimOf(root, p.ref, name, p.prefix));
-        for (const p of owners.length ? owners : [projects[0]]) {
-          if (p.error) return DENY(`${name}: ${p.error}`);
-          const reason = verdictFor(root, name, tip, p);
-          if (reason) return DENY(`${name}: ${reason}`);
-        }
-      }
-    }
-    return ALLOW(certain ? 'every story merged records the verdicts it needs' : 'no story is merged', certain);
+    certain = true;
+    const v = judgeStories(root, branch, list, { prefixes });
+    certain = v.story;
+    return v;
   } catch (e) {
     return certain ? DENY(`cannot establish the verdict for this story merge (${oneLine(e?.message ?? e)})`) : ALLOW('the gate could not read the merge');
+  }
+}
+
+// resultCheck(root, next, exclude, introduced, judged): null when what the update builds on top of
+// the stories it brings in is their automatic merge; else the reason to refuse. Commits inside an
+// introduced story tip were judged with it. Every other commit in the update that descends from a
+// judged story tip must be a two-parent merge whose tree is `git merge-tree --write-tree` of its
+// parents with conflicts and differences confined to the story file (mergeMatches), or a commit
+// that changes only story files and handoff notes.
+function resultCheck(root, next, exclude, introduced, judged) {
+  const held = git(root, ['rev-list', ...introduced, '--not', ...exclude]);
+  if (held === null) return 'the commits this update brings in cannot be listed';
+  const inside = new Set(held.split(/\s+/).filter(Boolean));
+  const range = git(root, ['rev-list', '--parents', next, '--not', ...exclude]);
+  if (range === null) return 'the commits this update brings in cannot be listed';
+  for (const line of range.split(/\r?\n/).filter(Boolean)) {
+    const [c, ...parents] = line.split(' ');
+    if (inside.has(c)) continue;
+    const below = judged.filter((st) => contains(root, st.tip, c));
+    if (!below.length) continue;
+    if (parents.length > 1) {
+      const st = judged.find((x) => parents.includes(x.tip)) ?? below[0];
+      if (!st.file || !mergeMatches(root, c, parents, st.file)) {
+        return oldGit ? `checking the merge result needs git 2.38 or newer (git merge-tree --write-tree), and this is git ${oldGit}; upgrade git` : `${c.slice(0, 12)}: ${MERGE_DIFFERS}`;
+      }
+      continue;
+    }
+    const changed = listing(root, ['diff-tree', '-z', '--root', '--name-only', '--no-commit-id', '-r', c]);
+    if (changed === null || !changed.every((p) => below.some((st) => p === st.file || isHandoff(p, st.prefix)))) {
+      return `${c.slice(0, 12)} changes more than the story file and handoff notes on top of a story merge; ${MERGE_DIFFERS}`;
+    }
+  }
+  return null;
+}
+
+// judgeRefUpdate(root, { target, old, new }): the verdict on moving refs/heads/<target> from old
+// to new, as git's reference-transaction hook sees it, so a merge commit, a fast-forward, a pull,
+// a rebase, a reset, an update-ref, and a conflicted merge finished by hand are judged alike.
+// Allowed: a deletion, a branch that is no deliver project's integration branch, and a new tip a
+// trusted remote copy of the integration branch already holds (it has shipped there). Otherwise the
+// stories the update brings in are found, a pm/* tip (local, remote, or named in FETCH_HEAD) that
+// new reaches and old does not, or a commit inside such a tip short of it, and judged by
+// judgeStories; then resultCheck judges what the update builds on top of them. A creation counts
+// only exact tips the trusted base refs lack. Same failure model as judgeMerge.
+export function judgeRefUpdate(root, { target, old, new: next }) {
+  if (process.env.DELIVER_NO_ENFORCE === '1') return ALLOW('DELIVER_NO_ENFORCE=1 is set');
+  let certain = false;
+  try {
+    const branch = typeof target === 'string' ? target.replace(/^refs\/heads\//, '') : '';
+    if (!branch || branch.startsWith('pm/')) return ALLOW('not an integration branch');
+    if (!next || ZERO.test(next)) return ALLOW('a deletion brings nothing in');
+    const info = integrationProjects(root, branch);
+    if (!info.projects.length && !(info.failed && baseBranches(root).includes(branch))) return ALLOW(`${branch} is no deliver project's integration branch`);
+    const local = `refs/heads/${branch}`;
+    const integ = { name: branch, ref: refFor(root, branch) };
+    const shipped = integrationRefs(root, integ).filter((r) => r !== local).find((r) => contains(root, next, r));
+    if (shipped) return ALLOW(`${shipped} already holds it`);
+    const oldSha = old && !ZERO.test(old) ? old : null;
+    const exclude = oldSha ? [oldSha] : baseRefs(root).filter((r) => r !== local);
+    const reached = (c) => exclude.some((x) => contains(root, c, x));
+    const fetched = fetchHeads(root);
+    const tips = [...pmTips(root)];
+    for (const h of fetched?.heads ?? []) {
+      const c = h.name?.startsWith('pm/') ? resolve(root, h.sha) : '';
+      if (c) tips.push({ name: h.name, tip: c });
+    }
+    const commits = new Set();
+    const introduced = new Set();
+    for (const t of tips) {
+      if (reached(t.tip)) continue;
+      if (contains(root, t.tip, next)) { commits.add(t.tip); introduced.add(t.tip); continue; }
+      if (!oldSha) continue;
+      const bases = chomp(git(root, ['merge-base', '--all', t.tip, next]) || '').split(/\s+/).filter(Boolean);
+      const partial = bases.find((mb) => !contains(root, mb, oldSha));
+      if (partial) commits.add(partial);
+    }
+    // An unreadable FETCH_HEAD line could be a story: judge anything beyond one plain commit.
+    if (fetched?.bad && !(oldSha && chomp(git(root, ['rev-list', '--parents', '-n', '1', next]) || '') === `${resolve(root, next)} ${oldSha}`)) commits.add(next);
+    if (!commits.size) return ALLOW('the update brings in no story');
+    certain = true;
+    const v = judgeStories(root, branch, [...commits], { info });
+    if (!v.allow || !introduced.size) return v;
+    const bad = resultCheck(root, next, exclude, [...introduced], v.judged);
+    return bad ? DENY(bad) : v;
+  } catch (e) {
+    return certain ? DENY(`cannot establish the verdict for this story merge (${oneLine(e?.message ?? e)})`) : ALLOW('the gate could not read the update');
   }
 }
 

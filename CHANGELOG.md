@@ -58,15 +58,18 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   automatically. It reads `tier`, `deliver`, and `protected` from the
   integration branch's copy, never the story branch's. It fails open on unreadable hook input,
   with the kill switch set, or outside a deliver project; the hook header lists the remaining
-  known limits. Behind it, an authoritative git-level gate: at session start in a deliver project,
-  `git-hook-install.mjs` installs `pre-merge-commit` and `pre-commit` shims marked
-  `# deliver-merge-gate v1` (never over a hook it did not write, which it reports) and sets
-  `branch.<integration>.mergeoptions --no-ff`, and git runs `git-merge-gate.mjs`, which judges the
-  merge actually being committed with the same rules (`judgeMerge`) and refuses the merge commit
-  on a deny. The git-level gate judges every `git merge` that creates a commit, whatever the shell
-  form; `--no-verify` on a story merge is blocked by the Bash hook, and `update-ref`, `push`, a
-  merge with no merge commit (`--ff-only`, `--squash`), and deleting the hook stay out of scope.
-  `/deliver:doctor` checks and repairs the install. It catches a PM's honest mistakes, such as
+  known limits. Behind it, an authoritative git-level gate. **Session start installs a git hook
+  in deliver projects**: `git-hook-install.mjs` writes a `reference-transaction` shim marked
+  `# deliver-merge-gate v2` (git 2.28 or newer; below that, `pre-merge-commit` and `pre-commit`,
+  which miss fast-forwards), never over a hook it did not write, a symlink, or a hooks directory in
+  the working tree or from global `core.hooksPath`, each of which it reports. Git runs
+  `git-merge-gate.mjs` on every update of an integration branch, which judges the stories the
+  update brings in with the Bash hook's own verdict (`judgeMerge`) and requires any merge on top of
+  a story to be git's automatic merge apart from the story file, so merge commits, fast-forwards,
+  pulls, rebases, resets, `update-ref`, and hand-finished conflicted merges are all judged,
+  whatever the shell form. Out of scope remain deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, and pushing straight to the remote.
+  `/deliver:doctor` checks and repairs the install, and
+  `node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes it. It catches a PM's honest mistakes, such as
   a forgotten verification or a stale verdict. It is not a boundary against an agent that evades
   it on purpose. The merge's own directory, after `cd` or `git -C`, identifies the project; from a
   directory that is in no deliver project (for example a monorepo root), a story-like merge blocks
@@ -122,8 +125,8 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   a plain checkout or switch once a `pm/*` branch exists, it blocks unless the merge names a base
   branch. Only a `status`, `log`, `diff`, `show`, or `rev-parse`, or a plain checkout or switch,
   may precede a story merge in the same command, and a checkout that might not run (in an `if` or
-  loop, after `||`, or behind another command in a `&&` chain) makes the target unknown, so a
-  story merge after it blocks even when verified. Run such a merge as its own command.
+  loop, after `||`, or behind another command in its `&&` chain) makes the target unknown for any
+  merge outside that `&&` chain, so a story merge there blocks even when verified. Run such a merge as its own command.
   The corpus README says batch 1's 65 certify cases prove 4.5042%. That
   is true of batch 1 alone; the calibrated set is 66 certify cases including batch 0, at 4.4%. The README
   is in the corpus manifest, so editing it would invalidate the calibration; the next corpus batch

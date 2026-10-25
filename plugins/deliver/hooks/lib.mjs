@@ -15,6 +15,10 @@ import { fileURLToPath } from 'node:url';
 // (which strips trailing \n but leaves other whitespace, unlike String#trim()).
 export const chomp = (s) => s.replace(/(\r?\n)+$/, '');
 
+// oneLine(s): s with every run of control characters (newlines included) made one space, so
+// repository content another actor wrote cannot add lines to a hook's output.
+export const oneLine = (s) => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
+
 // git(cwd, args): stdout of `git -C cwd args...`, or null on any failure.
 export function git(cwd, args) {
   try {

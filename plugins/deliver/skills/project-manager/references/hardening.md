@@ -29,23 +29,30 @@ after `cd` or `git -C`, identifies the project. Run from a directory that is in 
 directory, or with git -C <project>", unless the checked-out target is a non-base branch that no project integrates on. `implementation-loop.md` state 6
 describes it.
 
-Behind it sits a git-level gate. In a deliver project, `session-context.mjs` installs
-`hooks/git-hook-install.mjs`'s shims, marked `# deliver-merge-gate v1`, as `pre-merge-commit` and
-`pre-commit` in `git rev-parse --git-path hooks` (honouring `core.hooksPath`), and sets
-`branch.<integration>.mergeoptions --no-ff`, so every merge into the integration branch creates a
-commit. Git then runs `hooks/git-merge-gate.mjs`, which judges the merge actually happening, the
-current branch and the heads being merged, with the Bash hook's own rules, and refuses the merge
-commit on a deny. It never overwrites a hook without the marker; it reports it. `/deliver:doctor`
-checks and repairs the install.
+Behind it sits the authoritative git-level gate. At session start in a deliver project,
+`session-context.mjs` runs `hooks/git-hook-install.mjs`, which writes a POSIX sh
+`reference-transaction` hook, marked `# deliver-merge-gate v2` on line 2, into
+`git rev-parse --git-path hooks`. Git (2.28 or newer) runs it for every ref update. It exits at
+once unless the update moves an integration branch; then `hooks/git-merge-gate.mjs` judges what
+the update brings in: every `pm/*` story tip it introduces, with the Bash hook's own verdict, and
+every merge built on top of a story, which must be git's automatic merge apart from the story
+file. A deny aborts the update. So a merge commit, a fast-forward, a pull, a rebase, a reset, an
+`update-ref`, and a conflicted merge finished with `git commit` are all judged, whatever the shell
+form, and `--no-verify` does not skip it. On older git it falls back to `pre-merge-commit` and
+`pre-commit` hooks, which miss fast-forwards, and says so. The installer never overwrites a hook
+without the marker, a symlink, or an unreadable file, and never writes a hooks directory in the
+working tree or one set by global or system `core.hooksPath`; it reports each, with the line to add
+to your hook manager. `/deliver:doctor` checks and repairs the install, and
+`node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --uninstall <project>` removes it.
 
 Both catch a PM's honest mistakes, such as a forgotten or stale verdict, a careless command chain,
-or a mis-stated tier. The git-level gate judges every `git merge` that creates a commit, whatever
-the shell form. Out of its reach are `--no-verify` (the Bash hook blocks it on a story merge), a
-merge that creates no merge commit (`--ff-only` or `--squash`, which the Bash hook still judges),
-`update-ref` and `push`, and deleting the hook. Neither is a boundary against a deliberately evasive agent with Bash; that protection is the 0.30 sandbox.
+or a mis-stated tier. Out of the git-level gate's reach are deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, and pushing straight to the remote. Neither is a
+boundary against a deliberately evasive agent with Bash; that protection is the 0.30 sandbox.
 
 **Session context.** `session-context.mjs` reads the marker, the story files, and git, and adds
-the current position to new and compacted sessions. It is a `SessionStart` hook and only reads.
+the current position to new and compacted sessions. It is a `SessionStart` hook. It writes one
+thing: in a deliver project it installs or refreshes the git-level merge gate above, and reports
+what it could not install.
 
 **Read-only review and verify agents.** `code-integrity-reviewer`, `architecture-reviewer`,
 `security-auditor`, `performance-reviewer`, `debugger`, and `codebase-analyst` carry only `Read`, `Grep`, and `Glob`, so the
