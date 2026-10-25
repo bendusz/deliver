@@ -228,7 +228,7 @@ const updatedAt = (v) => {
 // blocks are the committed `integrity_fails` counter, else 1 for an `integrity` verdict of fail,
 // else unknown (null) for a 0.29 T1 or T2 story, whose gate ran but whose count is lost, and 0
 // otherwise. Holdout failures are `holdout_fails`, or null when it is missing. `panel` is the lens
-// names the first review ran, one entry per trial, or null.
+// names that ran on every review round, one entry per trial, or null.
 function readStories(root, ref) {
   const merges = ref ? recordTimes(root, ref, 'merged') : null;
   return storyTexts(root, ref).map(({ name, text }) => {
@@ -285,8 +285,9 @@ const planBranch = (root) => {
 };
 
 // planTargets(text): { targets, problem } from docs/plan.md's Delivery mode line, found by its
-// label `- Assurance targets:` whatever follows, such as `T0=0.10, T1=0.05, T2=0.02`. Backticks
-// are dropped before parsing. No line gives { {}, null }. A line that does not parse whole, with
+// label `- Assurance targets:` whatever follows, such as `T0=0.10, T1=0.05, T2=0.02`. HTML
+// comments (`<!-- ... -->`, as the plan template puts on the line), trailing whitespace, and
+// backticks are dropped before parsing. No line gives { {}, null }. A line that does not parse whole, with
 // a malformed part or a tier given twice, fails closed per tier: each tier takes the smallest of
 // its default and every value for it that did parse, and `problem` names what was wrong.
 export function planTargets(text) {
@@ -294,7 +295,8 @@ export function planTargets(text) {
   if (!m) return { targets: {}, problem: null };
   const values = {};
   const bad = [];
-  for (const raw of m[1].replace(/`/g, '').split(',')) {
+  const body = m[1].replace(/<!--[\s\S]*?-->/g, '').replace(/<!--.*$/, '').replace(/\s+$/, '');
+  for (const raw of body.replace(/`/g, '').split(',')) {
     const part = raw.trim();
     let t = null;
     try { t = parseTargets(part); } catch { t = null; }
@@ -308,16 +310,46 @@ export function planTargets(text) {
   return { targets, problem: bad.join(', ') };
 }
 
-// observed(shipped, escapes, tierOf, tier, target): escaped stories over stories shipped, with
-// the one-sided 95% bound. Zero escapes over a few stories still leaves a wide bound; that is a
-// small sample, not evidence against the calibration, so only an observed escape can put a tier
-// over target.
-function observed(shipped, escapes, target) {
-  const ids = new Set(shipped.map((s) => s.id));
+// observed(shipped, escapes, target, extra): the stories in `shipped`, or among the ids in
+// `extra` (numerator only), that `escapes` name, over the stories shipped, with the one-sided 95%
+// bound, and whether it is over `target`. Zero escapes over a few stories still leaves a wide
+// bound; that is a small sample, not evidence against the calibration, so only an observed escape
+// can put a tier over target.
+function observed(shipped, escapes, target, extra = []) {
+  const ids = new Set([...shipped.map((s) => s.id), ...extra]);
   const mine = escapes.filter((e) => ids.has(e.story));
   const escaped = new Set(mine.map((e) => e.story));
   const bound = upperBound(escaped.size, shipped.length);
   return { shipped: shipped.length, escapedStories: escaped.size, escapeCommits: new Set(mine.map((e) => e.commit)).size, bound, overTarget: escaped.size > 0 && target !== null && bound > target };
+}
+
+// firingSprint(window, escapes, target, sprintOfEscape): the sprint OVER TARGET first fired in, or
+// null. Walking the window's escapes in time order, it fires at the first escape by which the
+// dated stories merged so far, with the escapes so far, exceed the target. A story with no known
+// merge time never enters a step's denominator, which would dilute the bound, but its escapes
+// count from the window start. The firing step is dated by its escape's sprint, else by the
+// earliest known sprint of an escape after it, else by the latest known sprint of one before it,
+// so it is null while over target only when no escape's sprint is known; when no step fires but
+// the whole window is over target, the last escape is the firing step.
+export function firingSprint(window, escapes, target, sprintOfEscape) {
+  const dated = window.filter((s) => s.mergedAt !== null);
+  const undated = window.filter((s) => s.mergedAt === null).map((s) => s.id);
+  const ids = new Set(window.map((s) => s.id));
+  const mine = escapes.filter((e) => ids.has(e.story)).sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity));
+  let step = mine.findIndex((e) => {
+    const upTo = e.at ?? Infinity;
+    return observed(dated.filter((s) => s.mergedAt <= upTo), mine.filter((x) => (x.at ?? Infinity) <= upTo), target, undated).overTarget;
+  });
+  if (step < 0) {
+    if (!mine.length || !observed(window, escapes, target).overTarget) return null;
+    step = mine.length - 1;
+  }
+  const own = sprintOfEscape(mine[step]);
+  if (own !== null) return own;
+  const after = mine.slice(step + 1).map(sprintOfEscape).filter((n) => n !== null);
+  if (after.length) return Math.min(...after);
+  const before = mine.slice(0, step).map(sprintOfEscape).filter((n) => n !== null);
+  return before.length ? Math.max(...before) : null;
 }
 
 // trust(root, opts): the trust report. Shipped, first pass, fix rounds, integrity blocks, and
@@ -327,8 +359,8 @@ function observed(shipped, escapes, target) {
 // bound, an unmeasured tier's best one included, shows only when every lens behind it is current.
 // OVER TARGET counts only stories merged at or after the calibration in force
 // (`stamp.calibratedAt`, compared as full UTC times), so a recalibration starts a fresh window; a
-// story with no known merge time is counted, the conservative choice. The to-date figure is
-// informational.
+// story with no known merge time is in the window and the final figure, and in the walk for when
+// it fired only through its escapes (firingSprint). The to-date figure is informational.
 export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT_PANELS, targets = null } = {}) {
   if (branch !== null && String(branch).startsWith('-')) throw new Error(`refusing ref ${branch}`);
   const ref = branch || planBranch(root) || 'HEAD';
@@ -374,21 +406,14 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
     const certify = valid && entry && typeof entry.certifyBound === 'number' && boundStaleness(panels, t, { docReasons: docStale }).length === 0 ? entry.certifyBound : null;
     const calibrated = Boolean(valid && entry && entry.status === 'measured' && Array.isArray(entry.panel) && certify !== null && tgt[t] !== undefined && certify <= tgt[t]);
     let observedNow = null;
-    // The sprint OVER TARGET first fired in: walking the window's escapes in time order, the first
-    // at which the stories merged by then, with the escapes by then, exceed the target. Maximum
-    // panels start the sprint after it (retrospective.md) and hold until recalibration; that sprint
-    // and earlier ones kept the measured panel.
+    // The sprint OVER TARGET first fired in (firingSprint). Maximum panels start the sprint after
+    // it (retrospective.md) and hold until recalibration; that sprint and earlier ones kept the
+    // measured panel.
     let firedSprint = null;
     if (escapes !== null && t !== 'untiered') {
       const window = since === null ? shippedAll : shippedAll.filter((s) => s.mergedAt === null || s.mergedAt >= sinceMs);
       observedNow = { since, ...observed(window, escapes, tgt[t] ?? null) };
-      const ids = new Set(window.map((s) => s.id));
-      const mine = escapes.filter((e) => ids.has(e.story)).sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity));
-      for (const e of mine) {
-        const upTo = e.at ?? Infinity;
-        const shippedBy = window.filter((s) => s.mergedAt !== null && s.mergedAt <= upTo);
-        if (observed(shippedBy, mine.filter((x) => (x.at ?? Infinity) <= upTo), tgt[t] ?? null).overTarget) { firedSprint = escapeSprint(e); break; }
-      }
+      firedSprint = firingSprint(window, escapes, tgt[t] ?? null, escapeSprint);
     }
     // A story whose sprint cannot be read counts as after it.
     const forced = (s) => firedSprint !== null && !(Number.isFinite(s.sprint) && s.sprint <= firedSprint);
@@ -465,7 +490,7 @@ export function renderTrust(r) {
     out.push(`| ${t} | ${row.shipped} | ${panel} | ${bound} | ${pctOf(row.target)} | ${row.firstPass}/${row.shipped} | ${row.fixRounds} | ${integrity} | ${holdout} |`);
   }
   out.push('');
-  // A story whose first review ran fewer lenses than its tier's panel in force is not covered by
+  // A story whose recorded panel ran fewer lenses than its tier's panel in force is not covered by
   // that tier's calibration.
   for (const [t, row] of Object.entries(r.tiers)) if (row.belowPanel !== undefined) out.push(`${t} below panel: ${row.belowPanel}`);
   out.push('');
