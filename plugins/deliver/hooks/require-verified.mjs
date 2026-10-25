@@ -11,7 +11,9 @@
 // control words (if, then, do, !, {), wrappers (env, nice, command, exec, sudo, time, nohup),
 // `-C` forms, and any path to the git binary. Option values, command substitutions, and heredoc
 // bodies are opaque, so the documented `-m "$(cat <<'EOF' ... EOF)"` message is never read as
-// operands; a backslash-newline joins lines. A merge into a `pm/*` branch is not a ship and is
+// operands; a backslash-newline joins lines; an unquoted `#` comment is skipped. A merge or pull
+// with no operand stands for the target's configured upstream, and on an integration branch with
+// none it blocks. A merge into a `pm/*` branch is not a ship and is
 // ignored; the target is the branch a `checkout` or `switch` earlier in the command selects, else
 // HEAD's, and unknown (so gated) when that checkout names a computed or unresolvable branch. An
 // operand is a story branch when it names `pm/*` locally or on a remote, or resolves to the tip
@@ -130,13 +132,14 @@ function skipDouble(cmd, i) {
 }
 
 // skipSubst(cmd, i): i is the `(` of `$(`; the index of its matching `)`. Quotes, nested
-// substitutions, and heredoc bodies inside are skipped whole.
+// substitutions, heredoc bodies, and comments (a # starting a word, to the end of its line)
+// inside are skipped whole.
 function skipSubst(cmd, i) {
   let depth = 1;
   let pending = [];
   for (let j = i + 1; j < cmd.length; j++) {
     const c = cmd[j];
-    if (c === '\\') j++;
+    if (c === '#' && /[\s;&|()]/.test(cmd[j - 1])) { const nl = cmd.indexOf('\n', j); j = (nl < 0 ? cmd.length : nl) - 1; } else if (c === '\\') j++;
     else if (c === "'") { const e = cmd.indexOf("'", j + 1); j = e < 0 ? cmd.length : e; } else if (c === '"') j = skipDouble(cmd, j);
     else if (c === '`') j = skipBacktick(cmd, j);
     else if (c === '<' && cmd[j + 1] === '<' && cmd[j + 2] !== '<') {
@@ -307,7 +310,20 @@ function operands(sub, args) {
     else if (!options || !w.text.startsWith('-')) positional.push(w);
   }
   // A pull's first operand is the remote; each further one is a refspec whose source merges.
-  return sub === 'pull' ? positional.slice(1).map((w) => ({ ...w, text: w.text.replace(/^\+/, '').split(':')[0] })) : positional;
+  const ops = sub === 'pull' ? positional.slice(1).map((w) => ({ ...w, text: w.text.replace(/^\+/, '').split(':')[0] })) : positional;
+  // No operand, and no control form: git merges the target branch's configured upstream.
+  if (!ops.length) ops.bare = true;
+  return ops;
+}
+
+// upstreamOf(root, branch): the configured upstream a bare merge or pull on branch merges, as
+// { text, local }: a local branch name when the upstream's remote is `.`, else the
+// remote-tracking name; null when none is configured.
+function upstreamOf(root, branch) {
+  const name = chomp(git(root, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${branch}@{upstream}`]) || '');
+  if (!name || name === '@{upstream}') return null;
+  const remote = chomp(git(root, ['config', '--get', `branch.${branch}.remote`]) || '');
+  return { text: name, dynamic: false, upstream: true, local: remote === '.' };
 }
 
 // checkoutOf(args): what a checkout or switch selects, as { create, name, detach, prev, paths,
@@ -317,8 +333,13 @@ function checkoutOf(sub, args) {
   const out = { create: null, name: null, detach: false, prev: false, paths: false, force: false, dynamic: false };
   let createDynamic = false;
   let nameDynamic = false;
+  let options = true;
   for (let i = 0; i < args.length; i++) {
     const w = args[i].text;
+    // For checkout, -- introduces paths. For switch, which takes no paths, it only ends the
+    // options: the next word is still the branch.
+    if (!options) { if (out.name === null && out.create === null) { out.name = w; nameDynamic = args[i].dynamic; } continue; }
+    if (w === '--' && sub === 'switch') { options = false; continue; }
     if (w === '--') { out.paths = true; break; }
     if (['-b', '-c', '-B', '-C', '--orphan'].includes(w)) {
       out.create = args[i + 1]?.text ?? null;
@@ -813,6 +834,17 @@ try {
     const target = targets.has(root) ? targets.get(root) : currentBranch(root);
     // Merging into a story branch, such as the integration tip into it, is not a ship.
     if (typeof target === 'string' && target.startsWith('pm/')) continue;
+    // A bare merge or pull merges the target's configured upstream: judge that. With none to
+    // read, a bare merge onto a deliver project's integration branch, or onto a target the gate
+    // cannot name, blocks rather than guess.
+    if (ops.bare) {
+      const up = typeof target === 'string' ? upstreamOf(root, target) : null;
+      if (up) ops.push(up);
+      else if (target !== null) {
+        const owner = project(root, candidates(prefixesOf(root, dir)));
+        if (owner && (target === UNKNOWN || owner.error || target === owner.name)) block('(no operand)', `it merges ${target === UNKNOWN ? 'the target branch' : target}'s upstream, which the gate cannot resolve; name the branch to merge explicitly`);
+      }
+    }
     // The project that owns the merge is the one the merge's own directory sits in, else a deliver
     // project at the top level. Outside every project, in a repository holding any, a story-like
     // operand blocks: the gate does not guess which project ships it.
@@ -848,9 +880,11 @@ try {
     }
     if (dyn) block(dyn.text || '(computed)', DYNAMIC);
     if (sub === 'pull') {
-      const pm = ops.find((o) => looksPm(o.text));
+      // A local upstream (remote `.`) is read now and judged like a merge; a remote one can move
+      // in the pull's own fetch.
+      const pm = ops.find((o) => looksPm(o.text) && !o.local);
       if (pm) block(pm.text, 'git pull merges a story branch commit the gate cannot see before the fetch; git fetch, then git merge the fetched ref in a separate command');
-      continue;
+      if (!ops.some((o) => o.local)) continue;
     }
     for (const op of ops) {
       const found = integ.error ? { branches: [] } : storyBranches(root, op.text, integ, target);

@@ -775,3 +775,43 @@ test('retro-stats: when the paths a commit touches cannot be read, it counts for
   }
   assert.deepEqual([...ownCommits(p, projectScope(p, 'main'), commits)], [], 'read normally, a commit changing only b/ is not the root\'s');
 });
+
+// --- WP-H fix round 2 ---
+
+test('retro-stats --trust: with no project at the top level, a commit with no paths counts for every project', () => {
+  const top = tmpDir('retro-notop-');
+  const a = path.join(top, 'a');
+  const b = path.join(top, 'b');
+  for (const p of [a, b]) {
+    fs.mkdirSync(path.join(p, 'docs', 'stories'), { recursive: true });
+    fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n');
+    trustStory(p, 'S1-1', ex('T1'));
+  }
+  gitProj(top);
+  gitIn(top, ['commit', '-q', '--allow-empty', '-m', 'fix: x\n\nEscaped-From: S1-1']);
+  const none = path.join(top, 'none.json');
+  assert.equal(trust(a, { panelsFile: none }).tiers.T1.observedToDate.escapedStories, 1);
+  assert.equal(trust(b, { panelsFile: none }).tiers.T1.observedToDate.escapedStories, 1);
+});
+
+test('retro-stats --trust: when diff-tree fails, merge times fall back to updated while escapes still count', { skip: process.platform === 'win32' && 'POSIX stub' }, () => {
+  const pr = multiProject();
+  const top = pr[''];
+  // A's own story says it merged inside the window; B's merged commit predates the calibration.
+  trustStory(pr.a, 'S1-1', ex('T1', 0, 0, { updated: '2026-10-15 10:00' }));
+  gitIn(top, ['add', '-A']);
+  gitIn(top, ['commit', '-qm', 'a updated']);
+  touchAt(top, 'b/docs/stories/S1-1-thing.md', 'chore(S1-1): merged', '2026-10-01T00:00:00Z');
+  touchAt(top, 'a/docs/stories/S1-1-thing.md', 'chore(S1-1): merged', '2026-10-12T00:00:00Z');
+  touchAt(top, 'b/src/x.txt', 'fix: in b\n\nEscaped-From: S1-1', '2026-10-13T00:00:00Z');
+  const bin = tmpDir('retro-stub-');
+  const real = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
+  fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\ncase "$*" in *diff-tree*) exit 1;; esac\nexec "${real}" "$@"\n`, { mode: 0o755 });
+  const report = (env = {}) => JSON.parse(spawnSync(process.execPath, [SCRIPT, pr.a, '--trust', '--json', '--panels', path.join(top, 'p.json')], { encoding: 'utf8', env: { ...process.env, ...env } }).stdout);
+  const normal = report();
+  assert.equal(normal.tiers.T1.observed.shipped, 1, 'read normally, A merged on 2026-10-12');
+  assert.equal(normal.tiers.T1.observed.escapedStories, 0, "B's fix is not A's");
+  const failing = report({ PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+  assert.equal(failing.tiers.T1.observed.shipped, 1, "the merge time falls back to updated, not to B's earlier merged commit");
+  assert.equal(failing.tiers.T1.observed.escapedStories, 1, 'an escape is never dropped: it counts for every project');
+});
