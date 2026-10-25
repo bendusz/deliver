@@ -421,3 +421,29 @@ test('integrity: a rename between two names of the same config role is judged by
   });
   assert.deepEqual(kinds(run(lowered)), ['config-weakened'], 'a lowered threshold across the rename still counts');
 });
+
+test('integrity: paths stay repository-relative from a nested project with diff.relative=true', () => {
+  const rel = 'proj/tests/acceptance/a.test.js';
+  const d = repo({ [rel]: TEST_JS }, (dir) => {
+    gitIn(dir, ['config', 'diff.relative', 'true']);
+    write(dir, { [rel]: TEST_JS.replace("test('subtracts', () => { assert.equal(2 - 1, 1); });", "test('subtracts', () => {});") });
+  });
+  const r = spawnSync(process.execPath, [SCRIPT, 'main', 'story', '--root', path.join(d, 'proj'), '--protected', 'proj/tests/acceptance'], { encoding: 'utf8', windowsHide: true });
+  const out = JSON.parse(r.stdout);
+  assert.deepEqual(out.findings.map((f) => f.kind).sort(), ['assertions-dropped', 'protected-changed']);
+});
+
+test('integrity: a config renamed outside its tool\'s own aliases, or to another directory, is a deletion', () => {
+  const cases = [
+    ['jest.config.js', '.nycrc', 'export default { coverageThreshold: { global: { lines: 90 } } };\n'],
+    ['tsconfig.json', 'tsconfig.disabled.json', '{ "compilerOptions": { "strict": true } }\n'],
+    ['.eslintrc.json', 'archive/.eslintrc.json', '{ "rules": { "no-console": "error" } }\n'],
+  ];
+  for (const [from, to, text] of cases) {
+    const d = repo({ [from]: text }, (dir) => { fs.mkdirSync(path.dirname(path.join(dir, to)), { recursive: true }); fs.renameSync(path.join(dir, from), path.join(dir, to)); });
+    const r = run(d);
+    assert.ok(r.out.findings.some((f) => f.kind === 'config-weakened' && f.path === from), `${from} -> ${to}: ${JSON.stringify(r.out.findings)}`);
+  }
+  const alias = repo({ 'jest.config.js': 'export default { coverageThreshold: { global: { lines: 90, branches: 80 } } };\n' }, (dir) => fs.renameSync(path.join(dir, 'jest.config.js'), path.join(dir, 'jest.config.cjs')));
+  assert.equal(run(alias).status, 0, 'jest resolves jest.config.cjs itself; same content passes');
+});

@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { tmpDir, gitIn, PLUGIN_ROOT } from './helpers.mjs';
-import { collect, render, auditLessons, renderAudit, trust, renderTrust, firingSprint } from '../retro-stats.mjs';
+import { collect, render, auditLessons, renderAudit, trust, renderTrust, firingSprint, projectScope, ownCommits } from '../retro-stats.mjs';
 import { upperBound, CORPUS_ROOT, REVIEW_DEFAULTS } from '../assurance.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'retro-stats.mjs');
@@ -723,7 +723,55 @@ test('retro-stats --trust: a story filename git would quote is still read, with 
   trustStory(p, 'S1-1', ex('T1'));
   fs.renameSync(path.join(p, 'docs', 'stories', 'S1-1-thing.md'), path.join(p, 'docs', 'stories', 'S1-1-café.md'));
   gitProj(p);
+  // Git's default, set here so a user's global core.quotePath=false cannot void the precondition.
+  gitIn(p, ['config', 'core.quotePath', 'true']);
   assert.match(gitIn(p, ['ls-tree', '--name-only', 'main', 'docs/stories/']), /"/, 'git quotes the name by default');
   const r = trust(p, { panelsFile: path.join(p, 'none.json') });
   assert.equal(r.tiers.T1.shipped, 1);
+});
+
+// --- WP-H fix round 1 ---
+
+test('retro-stats --trust: a forced maximum panel keeps every calibrated member at its trial count', () => {
+  const twice = { ...PANELS, tiers: { ...PANELS.tiers, T0: { ...PANELS.tiers.T0, panel: [{ lens: 'code-integrity-reviewer', trials: 2 }] } } };
+  const plusOne = [...MAX, 'code-integrity-reviewer'];
+  const p = soloProject([['S1-1', ex('T0', 0, 0, { panel: ['code-integrity-reviewer', 'code-integrity-reviewer', 'codex-reviewer'] })], ['S2-1', ex('T0', 0, 0, { panel: MAX })], ['S2-2', ex('T0', 0, 0, { panel: plusOne })]]);
+  commitAt(p, 'chore(S1-1): merged', '2026-10-05T10:00:00Z');
+  commitAt(p, 'fix: x\n\nEscaped-From: S1-1', '2026-10-06T10:00:00Z');
+  commitAt(p, 'chore(S2-1): merged', '2026-10-09T10:00:00Z');
+  commitAt(p, 'chore(S2-2): merged', '2026-10-09T11:00:00Z');
+  fs.writeFileSync(path.join(p, 'twice.json'), JSON.stringify(twice));
+  const r = trust(p, { panelsFile: path.join(p, 'twice.json'), sprint: 2 });
+  assert.equal(r.tiers.T0.maximumForced, true);
+  assert.equal(r.tiers.T0.belowPanel, 1, 'S2-1 ran the maximum panel but code-integrity-reviewer once, not the calibrated twice');
+});
+
+test('retro-stats --trust: an empty escape commit counts for the root project beside a nested one', () => {
+  const p = soloProject([['S1-1', ex('T1')]]);
+  fs.mkdirSync(path.join(p, 'examples', 'x', 'docs', 'stories'), { recursive: true });
+  trustStory(path.join(p, 'examples', 'x'), 'S1-1', ex('T1'));
+  fs.renameSync(path.join(p, 'examples', 'x', 'docs', 'stories', 'S1-1-thing.md'), path.join(p, 'examples', 'x', 'docs', 'stories', 'S1-1-a.md'));
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'example project']);
+  gitIn(p, ['commit', '-q', '--allow-empty', '-m', 'fix: x\n\nEscaped-From: S1-1']);
+  const none = path.join(p, 'none.json');
+  assert.equal(trust(p, { panelsFile: none }).tiers.T1.observedToDate.escapedStories, 1, 'a commit with no paths is the root project\'s');
+  assert.equal(trust(path.join(p, 'examples', 'x'), { panelsFile: none }).tiers.T1.observedToDate.escapedStories, 0);
+});
+
+test('retro-stats: when the paths a commit touches cannot be read, it counts for every project', () => {
+  const p = soloProject([['S1-1', ex('T1')]]);
+  fs.mkdirSync(path.join(p, 'b', 'docs', 'stories'), { recursive: true });
+  trustStory(path.join(p, 'b'), 'S1-1', ex('T1'));
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'b']);
+  const sha = gitIn(p, ['rev-parse', 'HEAD']).trim();
+  const commits = [{ sha, parent: gitIn(p, ['rev-parse', 'HEAD^']).trim() }];
+  const failing = () => null;
+  for (const root of [p, path.join(p, 'b')]) {
+    const scope = projectScope(root, 'main');
+    assert.equal(scope.solo, false);
+    assert.deepEqual([...ownCommits(root, scope, commits, { touchedBy: failing })], [sha], root);
+  }
+  assert.deepEqual([...ownCommits(p, projectScope(p, 'main'), commits)], [], 'read normally, a commit changing only b/ is not the root\'s');
 });

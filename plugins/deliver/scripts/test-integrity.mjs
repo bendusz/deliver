@@ -358,6 +358,31 @@ function deletedConfig(file, oldText) {
   return details;
 }
 
+// Names one tool resolves itself, so a rename between two of them in one directory keeps the file
+// in force. Every other name with a config role is its own family; tsconfig.json is exactly that.
+const ALIASES = [
+  /^\.nycrc(?:\.json|\.ya?ml)?$/,
+  /^\.c8rc(?:\.json)?$/,
+  /^\.eslintrc(?:\.(?:c?js|json|ya?ml))?$/,
+  /^eslint\.config\.[cm]?[jt]s$/,
+  /^(?:\.stylelintrc(?:\.(?:c?js|json|ya?ml))?|stylelint\.config\.[cm]?js)$/,
+  /^biome\.jsonc?$/,
+  /^jest\.config\.(?:[cm]?[jt]s|json)$/,
+  /^vitest\.config\.[cm]?[jt]s$/,
+  /^vite\.config\.[cm]?[jt]s$/,
+  /^rust-toolchain(?:\.toml)?$/,
+];
+
+// keepsConfig(oldPath, newPath): whether a rename leaves the same config in force: the same
+// directory and the same name, or two aliases one tool resolves itself.
+function keepsConfig(oldPath, newPath) {
+  const dir = (p) => p.split('/').slice(0, -1).join('/');
+  const base = (p) => p.split('/').at(-1);
+  if (dir(oldPath) !== dir(newPath)) return false;
+  if (base(oldPath) === base(newPath)) return true;
+  return ALIASES.some((re) => re.test(base(oldPath)) && re.test(base(newPath)));
+}
+
 // configRoles(file): the checks a file's name gives it a role in: coverage, lint, tsconfig, toolchain.
 function configRoles(file) {
   const base = file.split('/').at(-1);
@@ -390,8 +415,10 @@ function configFindings(file, rawOld, rawNew, oldFile = file) {
 
 // ---- the diff ----
 
+// changes(root, from, to): the diff's entries, with paths from the git top level whatever
+// diff.relative says, as --protected paths and show() expect.
 function changes(root, from, to) {
-  const raw = git(root, ['diff', '--name-status', '-M', '-z', from, to, '--']);
+  const raw = git(root, ['diff', '--no-relative', '--name-status', '-M', '-z', from, to, '--']);
   const parts = raw.split('\0');
   const out = [];
   for (let i = 0; i < parts.length;) {
@@ -453,11 +480,14 @@ export function check(root, base, head, protectedPaths = [], protectedBase = nul
       if (after < before) findings.push({ kind: 'assertions-dropped', path: newPath, detail: `assertion-like calls fell from ${before} to ${after}` });
     }
 
-    // A rename that takes a config's role away, `.nycrc` to `.nycrc.disabled`, removes it; one
-    // between two names of the same role is judged by content.
-    const lostRole = status === 'R' && [...configRoles(oldPath)].some((r) => !configRoles(newPath).has(r));
-    if (lostRole) {
+    // A rename keeps a config in force only between aliases its own tool resolves, in the same
+    // directory (`.nycrc` to `.nycrc.json`), and is then judged by content. Any other rename of a
+    // config, `.nycrc` to `.nycrc.disabled`, `jest.config.js` to `.nycrc`, `tsconfig.json` to
+    // `tsconfig.disabled.json`, or into another directory, deletes the old one and adds the new.
+    const moved = status === 'R' && (configRoles(oldPath).size > 0 || configRoles(newPath).size > 0) && !keepsConfig(oldPath, newPath);
+    if (moved) {
       for (const detail of deletedConfig(oldPath, oldText)) findings.push({ kind: 'config-weakened', path: oldPath, detail: `${detail} (renamed to ${newPath})` });
+      for (const detail of addedConfig(newPath, newText)) findings.push({ kind: 'config-weakened', path: newPath, detail });
     } else if (status === 'M' || status === 'R') {
       for (const detail of configFindings(newPath, oldText, newText, oldPath)) findings.push({ kind: 'config-weakened', path: newPath, detail });
     }

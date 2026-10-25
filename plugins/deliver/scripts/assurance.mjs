@@ -150,7 +150,6 @@ const sha256File = (file) => {
 };
 // corpusSha256: the identity of the frozen corpus, the hash of its recorded manifest.
 export const corpusSha256 = (root = CORPUS_ROOT) => sha256File(path.join(root, MANIFEST));
-// promptSha256: the hash of a lens's agent file, or null when there is no such lens.
 // The lens run through the Codex runner: its model and effort are the runner's review defaults, and
 // its agent file's frontmatter pins only the Claude wrapper that drives it.
 const CODEX_LENS = 'codex-reviewer';
@@ -181,6 +180,7 @@ export function pinMismatch(lens, model, effort, agentsDir = AGENTS_DIR) {
   return out;
 }
 
+// promptSha256: the hash of a lens's agent file, or null when there is no such lens.
 export const promptSha256 = (lens, agentsDir = AGENTS_DIR) => (/^[a-z0-9-]+$/.test(String(lens)) ? sha256File(path.join(agentsDir, `${lens}.md`)) : null);
 
 // Children run without the caller's repository (GIT_DIR and friends) and without a parent test

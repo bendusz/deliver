@@ -8,7 +8,7 @@
 // AGENTS.md against the retro records. --trust prints the trust report: per risk tier, what
 // shipped, the panel it ran, the calibrated bound, and the escapes observed since, counted from
 // `Escaped-From: <story-id>` trailers on the integration branch, or `Escaped-From:
-// <project>/<story-id>` to name a project in a repository holding several. Targets are docs/plan.md's
+// <project-path>/<story-id>` to name a project in a repository holding several. Targets are docs/plan.md's
 // `- Assurance targets:` line, else 10/5/2%; --targets overrides. A shipped story whose recorded
 // `panel` lacks a member of its tier's panel in force is counted below panel, and withholds the
 // calibrated bound. Exit 64 usage, 66 no docs/stories directory.
@@ -172,7 +172,7 @@ function storyTexts(root, ref) {
   const named = (names) => names.filter((n) => /^S\d+-\d+-.*\.md$/.test(n));
   if (ref) {
     // -z: names in their real bytes, never quoted as core.quotePath would quote S1-1-café.md.
-    const ls = gitRead(root, ['ls-tree', '-z', '--name-only', ref, 'docs/stories/']);
+    const ls = gitRead(root, ['ls-tree', '-z', '--name-only', '--end-of-options', ref, 'docs/stories/']);
     if (ls !== null) {
       const names = named(ls.split('\0').filter(Boolean).map((p) => p.split('/').pop()));
       if (!names.length) return [];
@@ -207,7 +207,7 @@ function storyTexts(root, ref) {
 export function projectScope(root, ref) {
   const prefix = (gitRead(root, ['rev-parse', '--show-prefix']) ?? '').trim();
   const projects = new Set([prefix]);
-  const ls = ref ? gitRead(root, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', ref]) : null;
+  const ls = ref ? gitRead(root, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', '--end-of-options', ref]) : null;
   for (const p of (ls ?? '').split('\0')) {
     const m = p.match(/^((?:.*\/)?)docs\/stories\/S\d+-\d+-[^/]*\.md$/);
     if (m) projects.add(m[1]);
@@ -217,12 +217,13 @@ export function projectScope(root, ref) {
 }
 
 // touched(root, commits): sha to the paths, from the top level, that each { sha, parent } changes
-// against its first parent (every path for a root commit), read NUL-delimited in one git call.
+// against its first parent (every path for a root commit), read NUL-delimited in one git call, or
+// null when git cannot read them.
 function touched(root, commits) {
   const out = new Map(commits.map((c) => [c.sha, []]));
   if (!commits.length) return out;
-  const raw = gitRead(root, ['diff-tree', '-r', '-z', '--name-only', '--root', '--no-renames', '--stdin'], Buffer.from(commits.map((c) => (c.parent ? `${c.sha} ${c.parent}` : c.sha)).join('\n') + '\n'));
-  if (raw === null) return out;
+  const raw = gitRead(root, ['diff-tree', '--no-relative', '-r', '-z', '--name-only', '--root', '--no-renames', '--stdin'], Buffer.from(commits.map((c) => (c.parent ? `${c.sha} ${c.parent}` : c.sha)).join('\n') + '\n'));
+  if (raw === null) return null;
   const order = new Map(commits.map((c, i) => [c.sha, i]));
   let at = -1;
   for (const tok of raw.toString('utf8').split('\0')) {
@@ -233,12 +234,19 @@ function touched(root, commits) {
   return out;
 }
 
-// ownCommits(root, scope, commits): the shas among commits that count for scope's project: every
-// one when it is the only project, else those changing a file the project owns.
-function ownCommits(root, scope, commits) {
-  if (scope.solo) return new Set(commits.map((c) => c.sha));
-  const files = touched(root, commits);
-  return new Set(commits.filter((c) => files.get(c.sha).some((f) => scope.owner(f) === scope.prefix)).map((c) => c.sha));
+// ownCommits(root, scope, commits, { touchedBy }): the shas among commits that count for scope's
+// project: every one when it is the only project, else those changing a file the project owns. A
+// commit changing no path at all, as `--allow-empty` makes, is the top-level project's. When the
+// paths cannot be read, every commit counts for every project: an escape is never dropped silently.
+export function ownCommits(root, scope, commits, { touchedBy = touched } = {}) {
+  const all = () => new Set(commits.map((c) => c.sha));
+  if (scope.solo) return all();
+  const files = touchedBy(root, commits);
+  if (!files) return all();
+  return new Set(commits.filter((c) => {
+    const paths = files.get(c.sha) || [];
+    return paths.length ? paths.some((f) => scope.owner(f) === scope.prefix) : scope.prefix === '';
+  }).map((c) => c.sha));
 }
 
 // recordTimes(root, ref, word, scope): story id to the committer time (ms, UTC) of the first
@@ -481,16 +489,20 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
     const forced = (s) => firedSprint !== null && !(Number.isFinite(s.sprint) && s.sprint <= firedSprint);
     // The panel in force, as lens to trials required. Calibrated and not forced: the measured panel
     // plus the builder's opposite-family lens. Otherwise the maximum panel: every lens plus the
-    // opposite family, and at T2 code-integrity-reviewer twice. A 0.29 story whose recorded panel,
+    // opposite family, and at T2 code-integrity-reviewer twice; when OVER TARGET forced it on a
+    // calibrated tier, also every measured member at its trial count. A 0.29 story whose recorded panel,
     // one entry per trial, falls short of it, or that records none, ran below panel, and the
     // calibrated bound does not cover it.
     const inForce = (s) => {
       const need = new Map();
       const add = (lens, n) => need.set(lens, Math.max(need.get(lens) || 0, n));
-      if (calibrated && !forced(s)) {
+      if (calibrated) {
         for (const m of entry.panel) add(m.lens, Number.isInteger(m.trials) && m.trials > 0 ? m.trials : 1);
         add(oppositeLens(s.builder), 1);
-      } else {
+      }
+      // Forced or uncalibrated: the maximum panel, joined with any calibrated members at their trial
+      // counts, so the calibrated bound never covers a panel that dropped one of its trials.
+      if (!calibrated || forced(s)) {
         for (const l of maximumPanel(s.builder)) add(l, 1);
         if (t === 'T2') add('code-integrity-reviewer', 2);
       }

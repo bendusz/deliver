@@ -1306,3 +1306,24 @@ test('directory rule: with no pm/* tips known, a merge after a fetch still reach
     assert.equal(/ls-tree -r|ls-files/.test(g.calls()), false, `${cmd}: no discovery`);
   }
 });
+
+// --- shell comments (WP-H fix round 1) ---
+
+test('verified: an unquoted shell comment is skipped, so a commented-out switch cannot hide the merge', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  const r = merge(p, `# Resume later (git switch ${BRANCH})\ngit merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  const trailing = merge(p, `git status # then (git switch ${BRANCH})\ngit merge --no-ff ${BRANCH}`);
+  assert.equal(trailing.status, 2, trailing.stderr);
+});
+
+test('verified: a # inside quotes or inside a word is not a comment', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  assert.equal(merge(p, `git merge -m "fix #1" --no-ff ${BRANCH}`).status, 2);
+  assert.equal(merge(p, `git merge -m 'fix #1' --no-ff ${BRANCH}`).status, 2);
+  assert.equal(merge(p, `echo a#b; git merge --no-ff ${BRANCH}`).status, 2, 'a#b is one word, so the merge still runs');
+});

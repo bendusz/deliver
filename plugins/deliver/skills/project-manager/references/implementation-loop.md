@@ -143,7 +143,8 @@ commit:
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" run <story-id> --target <project directory in the story checkout>`
 materialises them under the OS temp directory, runs them, and deletes the copy. A `fail` makes the
 verdict `FAIL` and increments `holdout_fails`, committed with the verdict. Exit 66 means the ref is
-missing, as in a fresh clone: dispatch `test-engineer` to regenerate the checks into a new temporary
+missing, as in a fresh clone; exit 64 with the ref present means its stored `RUN` is blank or more
+than one line, so treat it as 66. In either case dispatch `test-engineer` to regenerate the checks into a new temporary
 directory, with a brief that says holdout directory only, never touch the repository; store them,
 then verify. Record the verdict and the commit it judged as
 `verifier: "<verdict> <sha>"`, the full `git rev-parse HEAD`, and commit it on the story branch.

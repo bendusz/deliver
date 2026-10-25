@@ -75,15 +75,18 @@ function parse(argv) {
 
 const PREFIX = 'refs/deliver/holdout';
 
-// project(root): { top, rel, key } for the deliver project at root: the git top level of its
-// checkout, root's path below it with `/` separators ('' at the top), and the ref-safe key. The key
-// is the same in every checkout of the repository, linked worktrees included.
+// projectKey(rel): the ref-safe key for the project at rel below the git top level: `_` at the top,
+// else a slug of rel and a short hash of it. The key is the same in every checkout of the
+// repository, linked worktrees included.
 export function projectKey(rel) {
   if (!rel) return '_';
   const slug = rel.replace(/[^A-Za-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40).replace(/-$/, '') || 'p';
   return `${slug}_${crypto.createHash('sha256').update(rel).digest('hex').slice(0, 8)}`;
 }
 
+// located(dir): { at, top, common, rel } for a directory in a checkout: its real path, the
+// checkout's top level, the repository's common git directory, and its path below the top level
+// with `/` separators ('' at the top). Exit 64 when it is missing or outside its top level.
 function located(dir) {
   const real = (p) => fs.realpathSync.native(p);
   let at = null;
@@ -91,10 +94,11 @@ function located(dir) {
   const top = real(git(at, ['rev-parse', '--show-toplevel']));
   const common = real(path.resolve(at, git(at, ['rev-parse', '--git-common-dir'])));
   const rel = path.relative(top, at).split(path.sep).join('/');
-  if (rel.startsWith('..') || path.isAbsolute(rel)) throw usage(`${dir} is outside its git top level ${top}`);
+  if (rel === '..' || rel.startsWith('../') || path.isAbsolute(rel)) throw usage(`${dir} is outside its git top level ${top}`);
   return { at, top, common, rel };
 }
 
+// project(root): located(root) plus the project's ref key.
 function project(root) {
   const loc = located(root);
   return { ...loc, key: projectKey(loc.rel) };
