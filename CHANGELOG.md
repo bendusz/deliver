@@ -32,9 +32,9 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   with `retro-stats.mjs --trust`; under the fully autonomous policy it runs at each sprint boundary
   into `tmp/log.md` and goes into the completion report. It prints stories shipped per tier, the
   panel each tier ran, the stories reviewed below panel, the calibrated bound or "unmeasured,
-  maximum panel", first-pass gate rate, fix rounds, integrity blocks, holdout failures, and
-  observed escapes. A tier with any story below panel has its bound withheld. A fix for a defect an earlier story shipped
-  carries an `Escaped-From: <story-id>` trailer. A tier is OVER TARGET when at least one escape
+  maximum panel", first-pass stories (no fix rounds, no retries), fix rounds, integrity blocks,
+  holdout failures, and observed escapes. A tier with any story below panel has its bound
+  withheld. A fix for a defect an earlier story shipped carries an `Escaped-From: <story-id>` trailer. A tier is OVER TARGET when at least one escape
   was observed since the calibration in force and the escape bound over those stories exceeds the
   target; the PM reads the report at sprint start and runs that tier at the maximum panel until
   `/deliver:calibrate` re-runs.
@@ -47,17 +47,23 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
 - **New `scripts/test-integrity.mjs`.** At `T1` and `T2`, the PM runs it after every writer run.
   It fails on a deleted or renamed test file, added skip or focus markers, a net drop in
   assertions in a modified test, weakened coverage thresholds, lint rules, `tsconfig` strict
-  flags, or toolchain versions, and any change to a protected path. A story that needs one of these declares it in
+  flags, or toolchain versions, added disable or ignore pragmas (`pragma-added`), and any change
+  to a protected path. A story that needs one of these declares it in
   `pm-meta` as `integrity_allow`.
 - **A mechanical ship gate.** The new `require-verified.mjs` hook blocks a `git merge` of a `pm/*`
   branch into the integration branch unless the Execution block records `verifier: PASS <sha>`
   and, at `T1` and `T2`, `integrity: pass <sha>`, for the branch tip or an ancestor followed only
-  by story-file and handoff commits. It reads `tier`, `deliver`, and `protected` from the
+  by story-file and handoff commits, or by merges of the integration branch that git would make
+  automatically. It reads `tier`, `deliver`, and `protected` from the
   integration branch's copy, never the story branch's. It catches a PM's honest mistakes, such as
   a forgotten verification or a stale verdict. It is not a boundary against an agent that evades
-  it on purpose. It sees only a local `git merge`: in remote PR mode the PM checks that
-  `verifier: PASS <sha>` and, at `T1` and `T2`, `integrity: pass <sha>` name the PR head before
-  merging, and that path stays a residual risk.
+  it on purpose. The merge's own directory, after `cd` or `git -C`, identifies the project; at a
+  monorepo root a story-like merge blocks with "run the merge from the project directory, or with
+  git -C <project>". The hook does not see a remote PR merge. Before `gh pr merge` or a UI merge,
+  the PM applies the same rule by hand: the recorded verdicts must name the PR head, or an
+  ancestor of it followed only by story-file and handoff commits or automatic merges of the
+  integration branch, checked with `git merge-base --is-ancestor` and `git log`. That path stays a
+  residual risk.
   `DELIVER_NO_ENFORCE=1` turns it off.
 - **Review is opposite-family.** The panel includes a lens from a family other than the
   builder's: an `expert-builder` story gets `codex-reviewer`, and a `codex-builder` story gets the
@@ -96,6 +102,11 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   unmeasured and runs the maximum panel until the corpus reaches 149 certify cases. The bound holds
   for defects a careful reviewer can catch from the story and the diff; observed escapes correct it
   on real projects.
+- **Known issues.** The corpus README says batch 1's 65 certify cases prove 4.5042%. That is true
+  of batch 1 alone; the calibrated set is 66 certify cases including batch 0, at 4.4%. The README
+  is in the corpus manifest, so editing it would invalidate the calibration; the next corpus batch
+  fixes it. The corpus identity also hashes the whole manifest, README included; a later release
+  should hash only the fixtures and `cases.json`.
 
 ## 0.28.1 - 2026-10-11
 

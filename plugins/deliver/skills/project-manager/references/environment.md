@@ -20,9 +20,12 @@ The loop merges locally by default. Open a real PR only when the user has explic
 pushes or PRs, `gh auth status` succeeds, and a GitHub remote exists. Then push the story branch,
 open the PR with the message format in `implementation-loop.md`, and merge it. Before
 `gh pr merge` or a merge in the UI, confirm the recorded `verifier: PASS <sha>` and, at `T1` and
-`T2`, `integrity: pass <sha>` name the PR's head commit. The `require-verified.mjs` ship gate sees
-only local `git merge`, so it does not cover this path; treat that as a residual risk. Never push
-to a remote without an explicit request.
+`T2`, `integrity: pass <sha>` name the PR head, or an ancestor of it followed only by story-file
+and handoff commits or by merges of the integration branch that git would make automatically.
+This is the rule the hook applies to a local merge. Check it with
+`git merge-base --is-ancestor <sha> <head>` and `git log --stat <sha>..<head>`. The
+`require-verified.mjs` hook does not see this path, so the check is yours alone; treat it as a
+residual risk. Never push to a remote without an explicit request.
 
 ## Agents you orchestrate
 Run reviewers as the tier panel `review-gates.md` sets, plus the lenses the story's risk adds.

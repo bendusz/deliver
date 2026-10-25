@@ -21,8 +21,12 @@ tree, or the kill switch `DELIVER_NO_ENFORCE=1`), and never sees a write made th
 **Ship gate.** A third `PreToolUse` hook, `require-verified.mjs`, matches `Bash`. It blocks a
 `git merge` of a `pm/*` branch unless that branch's story records `verifier: PASS <sha>` for the
 code at the branch head and, at `T1` and `T2`, `integrity: pass <sha>`. It reads the claim from the
-integration branch, never from the working tree. It fails open the same way and obeys the same
-kill switch. `implementation-loop.md` state 6 describes it. It catches a PM's honest mistakes,
+integration branch, never from the working tree. It fails open only on unreadable hook input, with
+the kill switch set, or outside a deliver project. Once a story merge is certain, whatever it
+cannot establish blocks. The merge's own directory, after `cd` or `git -C`, identifies the
+project; at the root of a repository holding deliver projects, a story-like merge blocks with "run
+the merge from the project directory, or with git -C <project>". `implementation-loop.md` state 6
+describes it. It catches a PM's honest mistakes,
 such as a forgotten or stale verdict, a careless command chain, or a mis-stated tier. It is not a
 boundary against a deliberately evasive agent with Bash; that protection is the 0.30 sandbox.
 

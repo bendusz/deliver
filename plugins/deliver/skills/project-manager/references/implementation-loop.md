@@ -111,8 +111,8 @@ A failing gate, the integrity gate included, loads `fix-loop.md`.
 Re-derive and scope-check the paths, then produce the diff yourself, since reviewers have no Bash:
 `git diff <integration>...HEAD -- <paths>`, plus `git add -N -- <paths> && git diff -- <paths>` for
 anything still uncommitted, **never** `git add -A`. Set `status: in-review` and commit. Dispatch the
-panel per `review-gates.md`: the story's tier panel, which always includes
-`code-integrity-reviewer`, plus the lenses its risk triggers add. Once the first review returns,
+panel per `review-gates.md`: the story's tier panel plus the lenses its risk triggers add, which
+always include `code-integrity-reviewer`. Once the first review returns,
 record the lenses that actually ran as `panel` and commit it. When a fix round's re-review runs
 without one of those lenses, drop it from `panel` in that round's commit. List a lens once per trial
 that ran, so two trials of one lens appear twice. `architecture-reviewer` also gets the plan's
@@ -161,8 +161,9 @@ claim fields `state.md` lists unchanged from the integration branch. Every commi
 after either `<sha>` may only record state in the story file and `docs/handoff/*.md`, or merge the
 integration tip exactly as git would automatically, which the re-gate covers. Any other change, a
 conflict resolution in code included, needs a fresh verdict. Run the merge as its own Bash command,
-after at most a plain `git checkout` or `git switch` of the integration branch, and name the story
-branch literally:
+from the project directory or with `git -C <project>`, after at most a plain `git checkout` or
+`git switch` of the integration branch, and name the story branch literally. The merge's own
+directory identifies the project; at a monorepo root a story-like merge blocks.
 
 ```
 git checkout <integration> && git merge --no-ff pm/S1-2-x -m "$(cat <<'EOF'
