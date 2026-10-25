@@ -30,11 +30,12 @@ This is the rule the hook applies to a local merge. Check it for each recorded `
 3. For each merge commit that `git rev-list --merges <sha>..<head> --not origin/<integration>`
    lists, run `git merge-tree --write-tree --name-only <merge>^1 <merge>^2`. Its first line is the
    result tree; on a conflict it exits 1 and lists the conflicted paths after that line. The merge
-   passes when either holds:
-   - it exits 0 and the tree equals `git rev-parse <merge>^{tree}`;
-   - the only conflicted path is the story file, `docs/stories/<story-id>.md`, and
-     `git diff --name-only <result-tree> <merge>^{tree}` lists only that path. The hook allows a
-     conflict confined to the story file the same way.
+   passes when every conflicted path it lists, and every path that
+   `git diff --name-only <result-tree> <merge>^{tree}` lists, is the story file. The story file is
+   the project-prefixed `docs/stories/…` path (`<project>/docs/stories/<story-id>.md` for a
+   project below the git top level), or the file whose Execution block names the branch. A
+   conflict-free merge whose only difference is the story file passes too. This is exactly the
+   rule the hook applies to a merge commit.
 
    `git show --remerge-diff <merge>` shows the same difference as a diff.
 

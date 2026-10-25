@@ -30,7 +30,7 @@
 // below then carries that directory's prefix. The project that owns a merge is the one the merge's
 // own directory (after cd, -C, and git -C) sits in, the deepest first, else a deliver project at
 // the top level. When neither resolves and nothing can be a story (no operand, or no `pm/*` tip,
-// no named story operand, and no earlier ref-writing call), the merge is allowed unread. Otherwise the hook looks for deliver
+// no named story operand, and no earlier ref-writing call or fetch), the merge is allowed unread. Otherwise the hook looks for deliver
 // projects anywhere in the repository, from NUL-delimited listings: a docs/approval.json at any
 // depth on a trusted base ref, on a local non-`pm/*` branch whose committed plan there names it,
 // or in the working tree. When a listing fails and an operand could be a story, the merge blocks.
@@ -761,6 +761,8 @@ try {
   // earlierWrite: an earlier git call may write refs outright (anything but readsOnly).
   let earlierChange = false;
   let earlierWrite = false;
+  // earlierFetch: an earlier git call is a fetch, which can bring in pm/* and remote-tracking refs.
+  let earlierFetch = false;
   for (const { dir, sub, args, ops } of calls) {
     if (sub === 'checkout' || sub === 'switch') {
       const co = checkoutOf(sub, args);
@@ -781,10 +783,12 @@ try {
     if (!ops) {
       earlierChange = true;
       if (!readsOnly(sub, args)) earlierWrite = true;
+      if (sub === 'fetch') earlierFetch = true;
       continue;
     }
     const prior = earlierChange;
     const priorWrite = earlierWrite;
+    const priorFetch = earlierFetch;
     earlierChange = true;
     earlierWrite = true;
     const dyn = ops.find((o) => o.dynamic);
@@ -808,11 +812,12 @@ try {
     // operand blocks: the gate does not guess which project ships it.
     const integ = project(root, candidates(prefixesOf(root, dir)));
     if (!integ) {
-      // Nothing to merge, or no pm/* tip and no named story with no earlier ref-writing call
-      // (which could create a pm/* branch): nothing here can block, so the repository is not listed.
+      // Nothing to merge, or no pm/* tip and no named story with no earlier ref-writing call or
+      // fetch (either could bring in a pm/* tip): nothing here can block, so the repository is not
+      // listed.
       if (!ops.length) continue;
       const tips = pmTips(root);
-      if (!tips.length && !ops.some(namedStory) && !priorWrite) continue;
+      if (!tips.length && !ops.some(namedStory) && !priorWrite && !priorFetch) continue;
       // Discovery next: it is read once per repository, and with no deliver project anywhere
       // nothing below needs a merge-base.
       if (!discovered.has(root)) discovered.set(root, discover(root));
