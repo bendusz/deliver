@@ -163,7 +163,8 @@ integration tip exactly as git would automatically, which the re-gate covers. An
 conflict resolution in code included, needs a fresh verdict. Run the merge as its own Bash command,
 from the project directory or with `git -C <project>`, after at most a plain `git checkout` or
 `git switch` of the integration branch, and name the story branch literally. The merge's own
-directory identifies the project; at a monorepo root a story-like merge blocks.
+directory identifies the project; from a directory that is in no deliver project (for example a
+monorepo root), a story-like merge blocks.
 
 ```
 git checkout <integration> && git merge --no-ff pm/S1-2-x -m "$(cat <<'EOF'

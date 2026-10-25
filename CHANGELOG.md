@@ -55,14 +55,18 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   and, at `T1` and `T2`, `integrity: pass <sha>`, for the branch tip or an ancestor followed only
   by story-file and handoff commits, or by merges of the integration branch that git would make
   automatically. It reads `tier`, `deliver`, and `protected` from the
-  integration branch's copy, never the story branch's. It catches a PM's honest mistakes, such as
+  integration branch's copy, never the story branch's. It fails open on unreadable hook input,
+  with the kill switch set, or outside a deliver project; the hook header lists the remaining
+  known limits. It catches a PM's honest mistakes, such as
   a forgotten verification or a stale verdict. It is not a boundary against an agent that evades
-  it on purpose. The merge's own directory, after `cd` or `git -C`, identifies the project; at a
-  monorepo root a story-like merge blocks with "run the merge from the project directory, or with
-  git -C <project>". The hook does not see a remote PR merge. Before `gh pr merge` or a UI merge,
-  the PM applies the same rule by hand: the recorded verdicts must name the PR head, or an
-  ancestor of it followed only by story-file and handoff commits or automatic merges of the
-  integration branch, checked with `git merge-base --is-ancestor` and `git log`. That path stays a
+  it on purpose. The merge's own directory, after `cd` or `git -C`, identifies the project; from a
+  directory that is in no deliver project (for example a monorepo root), a story-like merge blocks
+  with "run the merge from the project directory, or with git -C <project>". The hook does not see
+  a remote PR merge. Before `gh pr merge` or a UI merge, the PM applies the same rule by hand: the
+  recorded verdicts must name the PR head, or an ancestor of it followed only by story-file and
+  handoff commits or automatic merges of the integration branch. `environment.md` gives the
+  checks: `git merge-base --is-ancestor`, `git log --stat` for the non-merge commits, and
+  `git merge-tree --write-tree` matched against each merge commit's tree. That path stays a
   residual risk.
   `DELIVER_NO_ENFORCE=1` turns it off.
 - **Review is opposite-family.** The panel includes a lens from a family other than the
