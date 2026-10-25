@@ -152,8 +152,8 @@ function skipCount(code, testFile) {
 // Disable and ignore pragmas. Each pattern is spelt so that this source does not match it.
 const PRAGMA = /eslint[-]disable|istanbul\s+ignore|c8\s+ignore|pragma:\s*no\s+cover|@ts[-](?:ignore|nocheck)|type:\s*ignore\b|#\[\s*allow\s*\(|\/\/\s*nolint\b/g;
 
-// Prose files mention pragmas without applying them.
-const PROSE = /(^|\/)docs\/|\.(md|mdx|markdown|rst|txt|adoc)$/i;
+// Prose files mention pragmas without applying them. Code under docs/ is still code.
+const PROSE = /\.(md|mdx|markdown|rst|txt|adoc)$/i;
 
 const ASSERTION = /\bassert(?:\.\w+|_\w+|[A-Z]\w*)?!?\s*\(|^\s*assert\s|\bexpect\s*\(|\.should\b|\bshould\.|\bt\.(?:Error|Errorf|Fatal|Fatalf|Fail|FailNow)\s*\(|\brequire\.[A-Z]\w*\s*\(/gm;
 
@@ -184,6 +184,7 @@ function coverageWeakened(oldText, newText) {
   for (const [k, olds] of oldMap) {
     const news = newMap.get(k);
     if (!news) { out.push(`coverage threshold ${k} removed (was ${olds.join(', ')})`); continue; }
+    if (news.length < olds.length) { out.push(`coverage threshold ${k} lost an occurrence (was ${olds.join(', ')}, now ${news.join(', ')})`); continue; }
     for (let i = 0; i < Math.min(olds.length, news.length); i++) {
       if (news[i] < olds[i]) { out.push(`coverage threshold ${k} lowered from ${olds[i]} to ${news[i]}`); break; }
     }

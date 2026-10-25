@@ -80,8 +80,8 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
   commit SHA it judged, recorded at state 5 and absent before the first verification. The
   `require-verified.mjs` hook blocks a merge of the story branch unless this reads `PASS` and,
   at `T1` and `T2`, `integrity` reads `pass`. Each SHA must be the branch head, or a commit after
-  which the branch gained only story-file commits and merges whose tree equals the automatic
-  merge of their parents outside the story file.
+  which the branch gained only commits to the story file or `docs/handoff/*.md` and merges whose
+  tree equals the automatic merge of their parents outside the story file.
 - **Claim fields.** `tier`, `deliver`, `branch`, `protected`, `protected_base`, and pm-meta
   `integrity_allow` are set on the integration branch: the first three in the claim commit, the
   protected pair in a `chore(<story-id>): protect` commit that you then merge into the story

@@ -18,9 +18,11 @@
 // the system shell with the target as cwd and HOLDOUT_DIR and HOLDOUT_TARGET in the environment,
 // deletes the copy, and prints { verdict, exit, timedOut, dir }. The checks' own output goes to
 // stderr. A run longer than --timeout (default 600 seconds) fails, and its whole process tree is
-// killed before the copy is deleted: the process group on POSIX, `taskkill /T /F` on Windows. Any
-// process RUN left in the background is killed the same way when it ends. RUN goes through cmd.exe
-// on Windows, so quote paths there with double quotes. A blank RUN is refused.
+// killed before the copy is deleted: the process group on POSIX, `taskkill /T /F` on Windows. On
+// POSIX any process RUN left in the background is killed with its group when RUN exits. On
+// Windows nothing is killed after a normal exit, because the exited pid may already name another
+// process; a RUN there must not leave background processes, which may survive. RUN goes through
+// cmd.exe on Windows, so quote paths there with double quotes. A blank RUN is refused.
 //
 // Exit codes: 0 stored, present, or pass; 1 the checks failed; 64 usage; 66 no holdout ref.
 import fs from 'node:fs';
@@ -112,6 +114,11 @@ function killTree(pid) {
   else { try { process.kill(-pid, 'SIGKILL'); } catch { /* the group is gone */ } }
 }
 
+// killsAfterExit(platform): whether to kill RUN's process tree once RUN has exited. Only a POSIX
+// process group can be killed safely then; on Windows taskkill would take the pid, which the OS
+// may have reused.
+export const killsAfterExit = (platform) => platform !== 'win32';
+
 async function run({ id, root, target, timeout }) {
   check({ id, root });
   const ref = refOf(id);
@@ -132,7 +139,7 @@ async function run({ id, root, target, timeout }) {
       child.on('exit', (code) => done(code ?? 1));
     });
     clearTimeout(timer);
-    killTree(child.pid);
+    if (killsAfterExit(process.platform)) killTree(child.pid);
     const pass = exit === 0 && !timedOut;
     return { code: pass ? 0 : 1, out: { verdict: pass ? 'pass' : 'fail', exit, timedOut, dir } };
   } finally {

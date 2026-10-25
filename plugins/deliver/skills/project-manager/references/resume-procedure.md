@@ -51,7 +51,10 @@ move on.
 
 ## Parallel batches
 On resume from the main checkout, reconcile `git worktree list` against the Execution blocks whose
-`branch` is unmerged:
+`branch` is unmerged. Batch stories become `building` on their own branches, so read each one's
+status at its branch tip with `git -C <worktree> show HEAD:<story file>`, not on the integration
+branch. Treat a story that reads `claimed` at its branch tip and has a worktree with
+uncommitted changes as `building`.
 - A worktree with uncommitted changes and status `building` is the expected state before the
   tail commits. Re-run the scope check, then re-enter `parallel-execution.md`'s integration tail
   at its step 1.

@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseExec, listDir, readText } from '../hooks/lib.mjs';
-import { upperBound, staleness, parseTargets, DEFAULT_TARGETS, CORPUS_ROOT } from './assurance.mjs';
+import { upperBound, staleness, boundStaleness, parseUtc, parseTargets, DEFAULT_TARGETS, CORPUS_ROOT } from './assurance.mjs';
 
 const count = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
 
@@ -285,10 +285,12 @@ function observed(shipped, escapes, target) {
 // trust(root, opts): the trust report. Shipped, first pass, fix rounds, integrity blocks, and
 // holdout failures cover the chosen sprint, or every sprint without one. Stories and trailers
 // both come from the integration branch. A tier counts as calibrated only when panels.json is
-// current, the tier is measured, and its certify bound meets the effective target. OVER TARGET
-// counts only stories merged at or after the calibration in force (`stamp.calibratedAt`, compared
-// as full UTC times), so a recalibration starts a fresh window; a story with no known merge time
-// is counted, the conservative choice. The to-date figure is informational.
+// current, the tier is measured, and its certify bound meets the effective target. Any certify
+// bound, an unmeasured tier's best one included, shows only when every lens behind it is current.
+// OVER TARGET counts only stories merged at or after the calibration in force
+// (`stamp.calibratedAt`, compared as full UTC times), so a recalibration starts a fresh window; a
+// story with no known merge time is counted, the conservative choice. The to-date figure is
+// informational.
 export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT_PANELS, targets = null } = {}) {
   if (branch !== null && String(branch).startsWith('-')) throw new Error(`refusing ref ${branch}`);
   const ref = branch || planBranch(root) || 'HEAD';
@@ -296,12 +298,16 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
   const stories = readStories(root, resolved ? ref : null);
   let panels = null;
   try { panels = JSON.parse(fs.readFileSync(panelsFile, 'utf8')); } catch { panels = null; }
-  const stale = panels ? staleness(panels) : [];
+  const docStale = panels ? staleness(panels) : [];
+  const stale = [...docStale];
+  // The calibration window starts at calibratedAt, so a stamp that is not a strict UTC time is no
+  // calibration at all.
+  if (panels && panels.stamp && !Number.isFinite(parseUtc(panels.stamp.calibratedAt))) stale.push(`calibratedAt ${JSON.stringify(panels.stamp.calibratedAt ?? null)} is not an ISO UTC time (YYYY-MM-DDTHH:MM:SS.sssZ)`);
   const valid = Boolean(panels && panels.tiers && stale.length === 0);
   const tgt = { ...DEFAULT_TARGETS };
   if (panels && panels.tiers) for (const t of TIERS) if (panels.tiers[t] && typeof panels.tiers[t].target === 'number') tgt[t] = panels.tiers[t].target;
   Object.assign(tgt, targets || {});
-  const sinceMs = valid ? Date.parse(panels.stamp.calibratedAt) : NaN;
+  const sinceMs = valid ? parseUtc(panels.stamp.calibratedAt) : NaN;
   const since = Number.isFinite(sinceMs) ? panels.stamp.calibratedAt : null;
   const escapes = resolved ? escapesOn(root, ref) : null;
   const tierOf = new Map(stories.map((s) => [s.id, s.tier]));
@@ -311,7 +317,8 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
     const shippedAll = stories.filter((s) => s.tier === t && s.merged);
     if (t === 'untiered' && !inSprint.length && !shippedAll.length) continue;
     const entry = panels && panels.tiers ? panels.tiers[t] : null;
-    const certify = entry && typeof entry.certifyBound === 'number' ? entry.certifyBound : null;
+    // A bound shows only while every lens behind it, panel or best panel, is still the one measured.
+    const certify = valid && entry && typeof entry.certifyBound === 'number' && boundStaleness(panels, t, { docReasons: docStale }).length === 0 ? entry.certifyBound : null;
     const calibrated = Boolean(valid && entry && entry.status === 'measured' && certify !== null && tgt[t] !== undefined && certify <= tgt[t]);
     const row = {
       shipped: inSprint.length,

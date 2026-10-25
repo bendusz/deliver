@@ -22,12 +22,12 @@ Resolve a `pm-meta` builder of `auto` now, by `decomposition.md`'s rules for the
 Codex it falls back to `expert-builder`. An explicit `codex-builder` is a readiness blocker and
 never switches workers silently.
 
-**Claim.** Pull or rebase the integration branch. Confirm no `pm/<story-id>-*` branch exists
-locally or on the remote and that the story has no Execution block owned by someone else. Append
-the `## Execution` section per `state.md`, with your `owner`, the resolved `builder`, the branch
-name, `status: claimed`, the story's `tier`, both counters at `0`, and the `deliver` version, and commit it on the integration branch as
-`chore(<story-id>): claim`. Push it only under a standing push permission, then create and check
-out `pm/S<sprint>-<n>-<slug>`.
+**Claim.** Pull or rebase the integration branch. Confirm no `pm/<story-id>-*` branch exists locally
+or on the remote and that the story has no Execution block owned by someone else. Append the
+`## Execution` section per `state.md`, with your `owner`, the resolved `builder`, the branch name,
+`status: claimed`, the story's `tier`, both counters at `0`, and the `deliver` version, and commit
+it on the integration branch as `chore(<story-id>): claim`. Push it only under a standing push
+permission, then create and check out `pm/S<sprint>-<n>-<slug>`.
 
 ### 1. Build, then commit
 **Acceptance tests first.** At `T1` and `T2`, dispatch `test-engineer` before any builder for
@@ -128,17 +128,18 @@ this round and Codex is absent or refuses, note the gap in the story's Execution
 `fix(<story-id>): round <n>` before the gates re-run.
 
 ### 5. Verify, then ship or fix
-With the gates green and no `block` or `major` open, dispatch the read-only `pm-verifier`
-with the inputs its agent file lists and its `Specs`. At `T2`, run the holdout checks yourself on
-the same commit: `node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" run <story-id> --target <story
-checkout root>` materialises them under the OS temp directory, runs them, and deletes the copy. A
-`fail` makes the verdict `FAIL`. Exit 66 means the ref is missing, as in a fresh clone: dispatch
-`test-engineer` to regenerate the checks, store them, then verify. Record the verdict and the commit it judged as `verifier: "<verdict> <sha>"`, the
-full `git rev-parse HEAD`, and commit it on the story branch. `PASS` alone permits shipping. `FAIL`
-loads `fix-loop.md`, then re-verify; a fix brief for a holdout failure names the broken behaviour
-and the criterion, never the holdout check. `UNKNOWN` means you obtain the evidence it named and
-re-verify, or escalate. Load `verification.md` only when a criterion needs the running app or the
-story needs a durable report.
+With the gates green and no `block` or `major` open, dispatch the read-only `pm-verifier` with the
+inputs its agent file lists and its `Specs`. At `T2`, run the holdout checks yourself on the same
+commit:
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" run <story-id> --target <story checkout root>`
+materialises them under the OS temp directory, runs them, and deletes the copy. A `fail` makes the
+verdict `FAIL`. Exit 66 means the ref is missing, as in a fresh clone: dispatch `test-engineer` to
+regenerate the checks, store them, then verify. Record the verdict and the commit it judged as
+`verifier: "<verdict> <sha>"`, the full `git rev-parse HEAD`, and commit it on the story branch.
+`PASS` alone permits shipping. `FAIL` loads `fix-loop.md`, then re-verify; a fix brief for a holdout
+failure names the broken behaviour and the criterion, never the holdout check. `UNKNOWN` means you
+obtain the evidence it named and re-verify, or escalate. Load `verification.md` only when a
+criterion needs the running app or the story needs a durable report.
 
 ### 6. Ship
 Everything the story changed is already on its branch; `git status --porcelain` must be empty.
@@ -149,16 +150,16 @@ explicit request. `environment.md` owns the opt-in remote PR path.
 The `require-verified.mjs` hook blocks that merge unless the story branch's Execution block records
 `verifier: PASS <sha>` and, at the claimed tier `T1` or `T2`, `integrity: pass <sha>`, with the
 claim fields `state.md` lists unchanged from the integration branch. Every commit on the branch
-after either `<sha>` may only record state in the story file or merge the integration tip exactly
-as git would automatically, which the re-gate covers. Any other change, a conflict resolution in
-code included, needs a fresh verdict. Run the merge as its own Bash command, after at most a plain
-`git checkout` or `git switch` of the integration branch, and name the story branch literally: the
-hook refuses a shell variable or substitution, `-` or `@{-1}`, a `git pull` of a story branch, a
-commit short of the branch tip, and a tag that shadows the branch. The `-m "$(cat <<'EOF' ...)"`
-message form above is fine. The hook catches honest mistakes such as a missed or stale verdict, a
-careless chain, or a wrong tier; it is not a boundary against an agent set on evading it, which is
-the 0.30 sandbox's job. A block means a state was skipped: go back to it, and never set
-`DELIVER_NO_ENFORCE` to get past it.
+after either `<sha>` may only record state in the story file and `docs/handoff/*.md`, or merge the
+integration tip exactly as git would automatically, which the re-gate covers. Any other change, a
+conflict resolution in code included, needs a fresh verdict. Run the merge as its own Bash command,
+after at most a plain `git checkout` or `git switch` of the integration branch, and name the story
+branch literally: the hook refuses a shell variable or substitution, `-` or `@{-1}`, a `git pull` of
+a story branch, a commit short of the branch tip, and a tag that shadows the branch. The
+`-m "$(cat <<'EOF' ...)"` message form above is fine. The hook catches honest mistakes such as a
+missed or stale verdict, a careless chain, or a wrong tier; it is not a boundary against an agent
+set on evading it, which is the 0.30 sandbox's job. A block means a state was skipped: go back to
+it, and never set `DELIVER_NO_ENFORCE` to get past it.
 
 **Merge and PR message format.** Title `type(scope): subject`, imperative, no trailing period. Body
 sections in this order, dropping any that are empty: `## Why` (intent and why this approach),
@@ -176,8 +177,8 @@ boundary and never per story.
 
 Every state change above gets its `tmp/log.md` entry, per `state.md`.
 
-A story is done only with every criterion met, no open `block` or `major`, green gates, at `T1`
-and `T2` `integrity: pass <sha>`, a `pm-verifier` `PASS`, and `status: merged` committed. `/deliver:correct-course` owns scope changes
-and the scope freeze, `planning-and-signoff.md` checkpoints, escalation triggers, and handoff
-timing, `fix-loop.md` the fix rounds and their escalation, and `review-gates.md` severities,
-tier panels, and lens selection.
+A story is done only with every criterion met, no open `block` or `major`, green gates, at `T1` and
+`T2` `integrity: pass <sha>`, a `pm-verifier` `PASS`, and `status: merged` committed.
+`/deliver:correct-course` owns scope changes and the scope freeze, `planning-and-signoff.md`
+checkpoints, escalation triggers, and handoff timing, `fix-loop.md` the fix rounds and their
+escalation, and `review-gates.md` severities, tier panels, and lens selection.

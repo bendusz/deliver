@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { tmpDir, gitIn, PLUGIN_ROOT } from './helpers.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'holdout.mjs');
@@ -141,4 +142,13 @@ test('holdout: usage errors exit 64', () => {
   assert.equal(cli(['store', 'S1-2', path.join(d, 'nope'), '--root', d]).status, 64, 'missing directory');
   assert.equal(cli(['run', 'S1-2', '--root', d]).status, 64, 'run needs --target');
   assert.equal(cli(['bogus', 'S1-2', '--root', d]).status, 64);
+});
+
+test('holdout: after RUN exits only POSIX kills the process group; Windows kills the tree only on timeout', async () => {
+  const { killsAfterExit } = await import(pathToFileURL(SCRIPT).href);
+  assert.equal(killsAfterExit('darwin'), true);
+  assert.equal(killsAfterExit('linux'), true);
+  // The pid of a process that has exited may already belong to another one, and taskkill /T
+  // would kill that process and its children.
+  assert.equal(killsAfterExit('win32'), false);
 });

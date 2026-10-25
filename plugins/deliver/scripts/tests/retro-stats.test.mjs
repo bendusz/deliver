@@ -130,7 +130,7 @@ const PANELS = {
   },
   tiers: {
     T0: { status: 'measured', panel: [{ lens: 'code-integrity-reviewer', trials: 1 }], bound: 0.0488, certifyBound: 0.0488, target: 0.1, fpRate: 0.05, tokens: 9000 },
-    T1: { status: 'unmeasured', panel: [], bound: 0.0617, certifyBound: 0.0617, target: 0.05, fpRate: 0.1, tokens: 30000 },
+    T1: { status: 'unmeasured', panel: [], bestPanel: [{ lens: 'code-integrity-reviewer', trials: 1 }], bound: 0.0617, certifyBound: 0.0617, target: 0.05, fpRate: 0.1, tokens: 30000 },
     T2: { status: 'unmeasured', panel: [], bound: 0.08, certifyBound: null, target: 0.02, fpRate: null, tokens: 30000 },
   },
 };
@@ -298,4 +298,32 @@ test('retro-stats --trust: CLI, JSON, a branch override, targets, refused refs, 
   assert.equal(nogit.status, 0, nogit.stderr);
   assert.match(nogit.stdout, /Observed escapes: unknown, could not read history/);
   assert.match(nogit.stdout, /\| T1 \| 1 \|/, 'without git the working tree still gives the stories');
+});
+
+// --- WP-D follow-ups ---
+
+test('retro-stats --trust: an unmeasured tier shows its best bound only when every lens behind it is current', () => {
+  const p = trustProject();
+  const stale = {
+    ...PANELS,
+    stamp: { ...PANELS.stamp, lenses: { ...PANELS.stamp.lenses, 'codex-reviewer': { model: 'gpt-old', effort: 'high', promptSha256: 'old' } } },
+    tiers: { ...PANELS.tiers, T1: { ...PANELS.tiers.T1, bestPanel: [{ lens: 'code-integrity-reviewer', trials: 1 }, { lens: 'codex-reviewer', trials: 1 }] } },
+  };
+  fs.writeFileSync(path.join(p, 'best.json'), JSON.stringify(stale));
+  const r = trust(p, { panelsFile: path.join(p, 'best.json') });
+  assert.deepEqual(r.panels.stale, [], 'the measured T0 panel is current');
+  assert.equal(r.tiers.T0.calibratedBound, 0.0488);
+  assert.equal(r.tiers.T1.bestBound, null, 'a stale lens behind the bound hides it');
+  assert.match(renderTrust(r), /\| T1 \| \d+ \| unmeasured, maximum panel \| - \|/);
+});
+
+test('retro-stats --trust: a calibratedAt that is not a strict ISO UTC time makes panels.json invalid', () => {
+  const p = trustProject();
+  for (const at of ['2026-10-10', '2026-10-10 14:30', '2026-10-10T14:30:00+02:00']) {
+    fs.writeFileSync(path.join(p, 'odd.json'), JSON.stringify({ ...PANELS, stamp: { ...PANELS.stamp, calibratedAt: at } }));
+    const r = trust(p, { panelsFile: path.join(p, 'odd.json') });
+    assert.equal(r.panels.valid, false, at);
+    assert.match(r.panels.stale.join(), /calibratedAt/, at);
+    assert.equal(r.tiers.T0.calibratedBound, null, at);
+  }
 });

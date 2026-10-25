@@ -366,12 +366,14 @@ export function trialLine({ lens, model, effort, promptSha256: hash, corpusSha25
 const trialKey = (r) => `${r.lens}\u0000${r.case}\u0000${r.trial}\u0000${r.phase}`;
 // recordedAt is exactly what Date.prototype.toISOString writes: milliseconds and a Z.
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-const timeOf = (r) => (typeof r.recordedAt === 'string' && ISO_UTC.test(r.recordedAt) ? Date.parse(r.recordedAt) : NaN);
+// parseUtc(s): milliseconds since the epoch for a timestamp in exactly that form, else NaN.
+export const parseUtc = (s) => (typeof s === 'string' && ISO_UTC.test(s) ? Date.parse(s) : NaN);
+const timeOf = (r) => parseUtc(r.recordedAt);
 
 // validateTrials(records, cases, { corpusSha256 }): throws on any record calc cannot trust. When
 // corpusSha256 is given, every record must have been made against that corpus. Select trials must
-// all precede the first certify trial: a select phase reopened after certify results were seen
-// would let those results steer the choice.
+// all precede the first certify trial, in time and in file order: a select phase reopened after
+// certify results were seen would let those results steer the choice.
 export function validateTrials(records, cases, { corpusSha256: corpus = null } = {}) {
   const byId = new Map(cases.map((c) => [c.id, c]));
   const seen = new Set();
@@ -398,6 +400,9 @@ export function validateTrials(records, cases, { corpusSha256: corpus = null } =
   for (const r of records) {
     if (r.trial === 2 && !seen.has(trialKey({ ...r, trial: 1 }))) throw new Error(`${r.lens} ${r.case} (${r.phase}): trial 2 without trial 1`);
   }
+  const firstCertify = records.findIndex((r) => r.phase === 'certify');
+  const after = firstCertify < 0 ? undefined : records.slice(firstCertify + 1).find((r) => r.phase === 'select');
+  if (after) throw new Error(`select trial ${after.lens} ${after.case} trial ${after.trial} comes after the first certify line in the trials file. Start a fresh trials file and re-run both phases.`);
   const certify = records.filter((r) => r.phase === 'certify').map(timeOf);
   if (certify.length) {
     const began = Math.min(...certify);
@@ -686,19 +691,41 @@ export function staleness(doc, { agentsDir = AGENTS_DIR, corpusRoot = CORPUS_ROO
   const stamped = doc.stamp.lenses && typeof doc.stamp.lenses === 'object' ? doc.stamp.lenses : {};
   const measured = Object.values(doc.tiers).filter((t) => t && t.status === 'measured');
   if (measured.length && !Object.keys(stamped).length) reasons.push('measured tiers but no lens stamps');
-  const lenses = new Set(measured.flatMap((t) => (Array.isArray(t.panel) ? t.panel.map((m) => m && m.lens) : [])));
-  for (const lens of [...lenses].sort()) {
-    const s = stamped[lens];
-    const now = promptSha256(lens, agentsDir);
-    if (!s || typeof s.promptSha256 !== 'string') reasons.push(`${lens} has no prompt stamp`);
-    else if (now === null) reasons.push(`${lens} has no agent file`);
-    else if (s.promptSha256 !== now) reasons.push(`${lens} prompt changed since calibration`);
-    if (lens === 'codex-reviewer' && s) {
-      if (s.model !== REVIEW_DEFAULTS.model) reasons.push(`codex-reviewer was calibrated on model ${s.model}, but the runner's review default is ${REVIEW_DEFAULTS.model}`);
-      if (s.effort !== REVIEW_DEFAULTS.effort) reasons.push(`codex-reviewer was calibrated at effort ${s.effort}, but the runner's review default is ${REVIEW_DEFAULTS.effort}`);
-      if (doc.stamp.codexArgsSha256 !== sha256File(CODEX_ARGS)) reasons.push('scripts/codex/lib/args.mjs changed since calibration');
-    }
+  const lenses = new Set(measured.flatMap((t) => panelLenses(t.panel)));
+  for (const lens of [...lenses].sort()) reasons.push(...lensStaleness(doc, lens, agentsDir));
+  return reasons;
+}
+
+const panelLenses = (panel) => (Array.isArray(panel) ? panel.map((m) => m && m.lens) : []);
+
+// lensStaleness(doc, lens, agentsDir): why one lens's stamp no longer matches the shipped lens.
+function lensStaleness(doc, lens, agentsDir) {
+  const reasons = [];
+  const s = doc.stamp.lenses && typeof doc.stamp.lenses === 'object' ? doc.stamp.lenses[lens] : undefined;
+  const now = promptSha256(lens, agentsDir);
+  if (!s || typeof s.promptSha256 !== 'string') reasons.push(`${lens} has no prompt stamp`);
+  else if (now === null) reasons.push(`${lens} has no agent file`);
+  else if (s.promptSha256 !== now) reasons.push(`${lens} prompt changed since calibration`);
+  if (lens === 'codex-reviewer' && s) {
+    if (s.model !== REVIEW_DEFAULTS.model) reasons.push(`codex-reviewer was calibrated on model ${s.model}, but the runner's review default is ${REVIEW_DEFAULTS.model}`);
+    if (s.effort !== REVIEW_DEFAULTS.effort) reasons.push(`codex-reviewer was calibrated at effort ${s.effort}, but the runner's review default is ${REVIEW_DEFAULTS.effort}`);
+    if (doc.stamp.codexArgsSha256 !== sha256File(CODEX_ARGS)) reasons.push('scripts/codex/lib/args.mjs changed since calibration');
   }
+  return reasons;
+}
+
+// boundStaleness(doc, tier): why the tier's certify bound may not be shown, or [] when it may. The
+// whole document must be current, and so must every lens behind the bound: the measured panel's,
+// or an unmeasured tier's best panel. A bound with no lens recorded behind it is never shown.
+// docReasons, when given, is staleness(doc) already computed, so a caller checking every tier
+// computes it once.
+export function boundStaleness(doc, tier, { agentsDir = AGENTS_DIR, corpusRoot = CORPUS_ROOT, docReasons = null } = {}) {
+  const reasons = [...(docReasons ?? staleness(doc, { agentsDir, corpusRoot }))];
+  if (!doc || !doc.stamp || !doc.tiers) return reasons;
+  const t = doc.tiers[tier] || {};
+  const behind = [...new Set(panelLenses(t.panel).length ? panelLenses(t.panel) : panelLenses(t.bestPanel))];
+  if (!behind.length || behind.some((l) => typeof l !== 'string')) return [...reasons, `${tier} records no lens behind its bound`];
+  for (const lens of behind.sort()) for (const r of lensStaleness(doc, lens, agentsDir)) if (!reasons.includes(r)) reasons.push(r);
   return reasons;
 }
 

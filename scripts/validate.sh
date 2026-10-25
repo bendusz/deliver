@@ -251,6 +251,16 @@ suite "agent eval fixtures differ from MANIFEST.sha256 (the eval set is frozen)"
   node plugins/deliver/scripts/agent-evals.mjs manifest --check
 suite "builder benchmark tests failed (scripts/test-builder-benchmark.sh)" \
   bash "$(dirname "$0")/test-builder-benchmark.sh"
+suite "test-integrity tests failed (node --test plugins/deliver/scripts/tests/test-integrity.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/test-integrity.test.mjs
+suite "ship gate tests failed (node --test plugins/deliver/scripts/tests/require-verified.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/require-verified.test.mjs
+suite "holdout tests failed (node --test plugins/deliver/scripts/tests/holdout.test.mjs)" \
+  node --test plugins/deliver/scripts/tests/holdout.test.mjs
+# Every node test file must be run by a suite in this script.
+for t in plugins/deliver/scripts/tests/*.test.mjs; do
+  grep -q "^  node --test .*$t" "$0" || err "$t is not run by any suite in scripts/validate.sh"
+done
 
 # 15b) assurance corpus: frozen by its own manifest (results/ and panels.json excluded), and
 # every seeded witness fails with its defect and passes clean.
