@@ -310,16 +310,43 @@ export function planTargets(text) {
   return { targets, problem: bad.join(', ') };
 }
 
-// observed(shipped, escapes, target): the stories in `shipped` that `escapes` name, over the
-// stories shipped, with the one-sided 95% bound, and whether it is over `target`. Zero escapes
-// over a few stories still leaves a wide bound; that is a small sample, not evidence against the
-// calibration, so only an observed escape can put a tier over target.
-function observed(shipped, escapes, target) {
-  const ids = new Set(shipped.map((s) => s.id));
+// observed(shipped, escapes, target, extra): the stories in `shipped`, or among the ids in
+// `extra` (numerator only), that `escapes` name, over the stories shipped, with the one-sided 95%
+// bound, and whether it is over `target`. Zero escapes over a few stories still leaves a wide
+// bound; that is a small sample, not evidence against the calibration, so only an observed escape
+// can put a tier over target.
+function observed(shipped, escapes, target, extra = []) {
+  const ids = new Set([...shipped.map((s) => s.id), ...extra]);
   const mine = escapes.filter((e) => ids.has(e.story));
   const escaped = new Set(mine.map((e) => e.story));
   const bound = upperBound(escaped.size, shipped.length);
   return { shipped: shipped.length, escapedStories: escaped.size, escapeCommits: new Set(mine.map((e) => e.commit)).size, bound, overTarget: escaped.size > 0 && target !== null && bound > target };
+}
+
+// firingSprint(window, escapes, target, sprintOfEscape): the sprint OVER TARGET first fired in, or
+// null. Walking the window's escapes in time order, it fires at the first escape by which the
+// dated stories merged so far, with the escapes so far, exceed the target. A story with no known
+// merge time never enters a step's denominator, which would dilute the bound, but its escapes
+// count from the window start. The firing step is dated by its escape's sprint, else by the
+// earliest known sprint of an escape after it; when no step fires but the whole window is over
+// target, the last escape is the firing step.
+export function firingSprint(window, escapes, target, sprintOfEscape) {
+  const dated = window.filter((s) => s.mergedAt !== null);
+  const undated = window.filter((s) => s.mergedAt === null).map((s) => s.id);
+  const ids = new Set(window.map((s) => s.id));
+  const mine = escapes.filter((e) => ids.has(e.story)).sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity));
+  let step = mine.findIndex((e) => {
+    const upTo = e.at ?? Infinity;
+    return observed(dated.filter((s) => s.mergedAt <= upTo), mine.filter((x) => (x.at ?? Infinity) <= upTo), target, undated).overTarget;
+  });
+  if (step < 0) {
+    if (!mine.length || !observed(window, escapes, target).overTarget) return null;
+    step = mine.length - 1;
+  }
+  const own = sprintOfEscape(mine[step]);
+  if (own !== null) return own;
+  const known = mine.slice(step + 1).map(sprintOfEscape).filter((n) => n !== null);
+  return known.length ? Math.min(...known) : null;
 }
 
 // trust(root, opts): the trust report. Shipped, first pass, fix rounds, integrity blocks, and
@@ -329,8 +356,8 @@ function observed(shipped, escapes, target) {
 // bound, an unmeasured tier's best one included, shows only when every lens behind it is current.
 // OVER TARGET counts only stories merged at or after the calibration in force
 // (`stamp.calibratedAt`, compared as full UTC times), so a recalibration starts a fresh window; a
-// story with no known merge time is counted, the conservative choice. The to-date figure is
-// informational.
+// story with no known merge time is in the window and the final figure, and in the walk for when
+// it fired only through its escapes (firingSprint). The to-date figure is informational.
 export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT_PANELS, targets = null } = {}) {
   if (branch !== null && String(branch).startsWith('-')) throw new Error(`refusing ref ${branch}`);
   const ref = branch || planBranch(root) || 'HEAD';
@@ -376,27 +403,14 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
     const certify = valid && entry && typeof entry.certifyBound === 'number' && boundStaleness(panels, t, { docReasons: docStale }).length === 0 ? entry.certifyBound : null;
     const calibrated = Boolean(valid && entry && entry.status === 'measured' && Array.isArray(entry.panel) && certify !== null && tgt[t] !== undefined && certify <= tgt[t]);
     let observedNow = null;
-    // The sprint OVER TARGET first fired in: walking the window's escapes in time order, the first
-    // at which the stories merged by then, with the escapes by then, exceed the target. Maximum
-    // panels start the sprint after it (retrospective.md) and hold until recalibration; that sprint
-    // and earlier ones kept the measured panel.
+    // The sprint OVER TARGET first fired in (firingSprint). Maximum panels start the sprint after
+    // it (retrospective.md) and hold until recalibration; that sprint and earlier ones kept the
+    // measured panel.
     let firedSprint = null;
     if (escapes !== null && t !== 'untiered') {
       const window = since === null ? shippedAll : shippedAll.filter((s) => s.mergedAt === null || s.mergedAt >= sinceMs);
       observedNow = { since, ...observed(window, escapes, tgt[t] ?? null) };
-      const ids = new Set(window.map((s) => s.id));
-      const mine = escapes.filter((e) => ids.has(e.story)).sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity));
-      // A story with no known merge time counts in every step from the window start, so its own
-      // escapes are never dropped: conservative for firing.
-      for (const e of mine) {
-        const upTo = e.at ?? Infinity;
-        const shippedBy = window.filter((s) => s.mergedAt === null || s.mergedAt <= upTo);
-        if (observed(shippedBy, mine.filter((x) => (x.at ?? Infinity) <= upTo), tgt[t] ?? null).overTarget) { firedSprint = escapeSprint(e); break; }
-      }
-      // Over target with no datable firing step: date it by the latest escape whose sprint is known.
-      if (observedNow.overTarget && firedSprint === null) {
-        for (const e of [...mine].reverse()) if ((firedSprint = escapeSprint(e)) !== null) break;
-      }
+      firedSprint = firingSprint(window, escapes, tgt[t] ?? null, escapeSprint);
     }
     // A story whose sprint cannot be read counts as after it.
     const forced = (s) => firedSprint !== null && !(Number.isFinite(s.sprint) && s.sprint <= firedSprint);

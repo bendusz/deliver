@@ -29,14 +29,20 @@
 // directory is a deliver project when one of them holds docs/approval.json there; every docs/ path
 // below then carries that directory's prefix. The project that owns a merge is the one the merge's
 // own directory (after cd, -C, and git -C) sits in, the deepest first, else a deliver project at
-// the top level. When neither resolves, the repository holds a deliver project anywhere (a
-// docs/approval.json at any depth on a trusted base ref, read from NUL-delimited listings, or in
-// the working tree), and an operand could be a story, the merge blocks and names the projects
-// found: run it from the project directory or with git -C <project>. An operand could be a story
-// when it is computed, `-`, or `@{-N}`, spells a `pm/*` name, or resolves to the tip of, or a
-// commit inside, a `pm/*` branch here or on any remote that no trusted base ref (main, master,
-// the origin/HEAD target, init.defaultBranch, and their trusted upstreams) already holds. So
-// `git merge main` at a monorepo root right after `git branch pm/<id> main` passes. Inside the
+// the top level. When neither resolves, the hook looks for deliver projects anywhere in the
+// repository, from NUL-delimited listings: a docs/approval.json at any depth on a trusted base
+// ref, on a local non-`pm/*` branch whose committed plan there names it, or in the working tree.
+// With none, the merge is allowed. Otherwise, unless the target is a known branch that is neither
+// a base branch nor any found project's integration branch, the merge blocks when a listing
+// failed and an operand could be a story; when an earlier git command in the call can move refs
+// and an operand is not a trusted base branch by name (SEPARATE); and when an operand could be a
+// story, naming the projects found: run it from the project directory or with git -C <project>.
+// An operand could be a story when it is computed, `-`, `@{-N}`, or FETCH_HEAD, spells a `pm/*`
+// name, or resolves to the tip of, or a commit inside, a `pm/*` branch here or on any remote that
+// no trusted base ref (main, master, the origin/HEAD target, init.defaultBranch, and their trusted
+// upstreams) already holds. That exemption is a deliberate trade-off under the honest-mistake
+// threat model: a story tip a trusted base branch holds has already shipped there, and refusing
+// it would block `git merge main` at a monorepo root right after `git branch pm/<id> main`. Inside the
 // owning project, its plans' `Integration branch:` lines must agree, and the branch named may
 // not be `pm/*` or already contain the story tip. The claim is the
 // story on that branch, at docs/stories/<branch minus pm/>.md or found by its Execution block's
@@ -61,8 +67,8 @@
 // Known limits: that session check looks at the session directory and the directories above it,
 // never below, so a session opened at a monorepo root whose deliver projects all sit in
 // subdirectories fails open on a computed cd; run the merge without one. And a project whose
-// approval sits only on a non-base integration branch, absent from the working tree, is not found
-// from outside it. Blocks exit 2 with the reason on stderr.
+// integration branch exists only on a remote, with no local copy and absent from the working
+// tree, is not found from outside it. Blocks exit 2 with the reason on stderr.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -636,29 +642,67 @@ const baseRefs = (root) => [...new Set(baseBranches(root).flatMap((name) => {
   return ref ? integrationRefs(root, { name, ref }) : [];
 }))];
 
-// deliverProjects(root, refs): every directory, at any depth, holding docs/approval.json on one of
-// the trusted base refs or in the working tree, as "." or "a/b", sorted.
-function deliverProjects(root, refs) {
+// discover(root): the deliver projects in the repository, as { found, integrations, failed }:
+// found, every directory at any depth holding docs/approval.json, as "." or "a/b", sorted;
+// integrations, every branch name a found project's plan names as its integration branch; failed,
+// true when a listing could not be read. Projects are read from the trusted base refs, from each
+// local non-`pm/*` branch whose committed plan there names that branch, and from the working tree.
+// Listings are NUL-delimited, so no path is quoted.
+function discover(root) {
   const tail = 'docs/approval.json';
-  const paths = refs.flatMap((ref) => listing(root, ['ls-tree', '-r', '-z', '--name-only', ref]) ?? []);
-  paths.push(...(listing(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', `:(glob)**/${tail}`]) ?? []));
-  const out = new Set();
-  for (const p of paths) {
-    if (p === tail) out.add('.');
-    else if (p.endsWith(`/${tail}`)) out.add(p.slice(0, -tail.length - 1));
+  const found = new Set();
+  const integrations = new Set();
+  let failed = false;
+  const dirs = (paths) => {
+    if (paths === null) { failed = true; return []; }
+    return paths.filter((p) => p === tail || p.endsWith(`/${tail}`)).map((p) => p.slice(0, -tail.length));
+  };
+  const note = (prefix, plan) => {
+    found.add(prefix.replace(/\/$/, '') || '.');
+    if (plan) integrations.add(plan);
+  };
+  const bases = baseBranches(root);
+  for (const ref of baseRefs(root)) {
+    for (const prefix of dirs(listing(root, ['ls-tree', '-r', '-z', '--name-only', ref]))) note(prefix, planName(git(root, ['show', `${ref}:${prefix}docs/plan.md`])));
   }
-  return [...out].sort();
+  for (const name of localBranches(root)) {
+    if (name.startsWith('pm/') || bases.includes(name)) continue;
+    for (const prefix of dirs(listing(root, ['ls-tree', '-r', '-z', '--name-only', `refs/heads/${name}`]))) {
+      if (planName(git(root, ['show', `refs/heads/${name}:${prefix}docs/plan.md`])) === name) note(prefix, name);
+    }
+  }
+  // The working tree is untrusted, so it only adds projects, and so blocks; it never removes one.
+  for (const prefix of dirs(listing(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', `:(glob)**/${tail}`]))) {
+    let plan = null;
+    try { plan = planName(fs.readFileSync(path.join(root, `${prefix}docs/plan.md`), 'utf8')); } catch { plan = null; }
+    note(prefix, plan);
+  }
+  return { found: [...found].sort(), integrations, failed };
 }
 
-// storyLike(root, op, tips, base): the operand could be a story: computed by the shell (with `-`
-// and `@{-N}`), a pm/* name in any spelling, or a commit that is, or is inside, a pm/* tip here
-// or on any remote and that no trusted base ref already holds.
+// namedStory(op): the operand's spelling alone makes it a story candidate: computed by the shell
+// (with `-` and `@{-N}`), a pm/* name in any spelling, or FETCH_HEAD. Shared by every path, so
+// they cannot drift.
+const namedStory = (op) => op.dynamic || looksPm(op.text) || op.text === 'FETCH_HEAD';
+
+// storyLike(root, op, tips, base): the operand could be a story outside every project: a named
+// story, a ref resolving to a pm/* branch, or a commit that is, or is inside, a pm/* tip here or
+// on any remote and that no trusted base ref already holds. The exemption is deliberate: a tip a
+// base branch holds has shipped there, and refusing it would block `git merge main` right after
+// `git branch pm/<id> main`.
 function storyLike(root, op, tips, base) {
-  if (op.dynamic || looksPm(op.text)) return true;
+  if (namedStory(op)) return true;
   const o = operandOf(root, op.text);
   if (o.name?.startsWith('pm/')) return true;
   if (!o.commit || !tips.some((t) => t.tip === o.commit || contains(root, o.commit, t.tip))) return false;
   return !base().some((r) => contains(root, o.commit, r));
+}
+
+// baseByName(root, text, refs): the operand names a trusted base branch: main or its kin, locally,
+// as origin/<name>, or as one of the trusted base refs.
+function baseByName(root, text, refs) {
+  const names = baseBranches(root).flatMap((n) => [n, `origin/${n}`, `refs/heads/${n}`, `refs/remotes/origin/${n}`]);
+  return names.includes(text) || refs().some((r) => text === r || text === r.replace(/^refs\/(heads|remotes)\//, ''));
 }
 
 // candidates(lists): the prefixes in priority order, each once, ending with the top level.
@@ -685,6 +729,8 @@ try {
     }
     return sessionDeliver;
   };
+  // discover(root) per repository, read on first need.
+  const discovered = new Map();
   let earlierChange = false;
   for (const { dir, sub, args, ops } of calls) {
     if (sub === 'checkout' || sub === 'switch') {
@@ -707,7 +753,7 @@ try {
     const prior = earlierChange;
     earlierChange = true;
     const dyn = ops.find((o) => o.dynamic);
-    const suspect = dyn || ops.find((o) => looksPm(o.text) || o.text === 'FETCH_HEAD');
+    const suspect = ops.find(namedStory);
     // Where the repository cannot be read, a pm-looking merge is suspect only from a deliver
     // session; anywhere else the gate has nothing to protect and fails open.
     if (dir === UNKNOWN) {
@@ -727,13 +773,26 @@ try {
     // operand blocks: the gate does not guess which project ships it.
     const integ = project(root, candidates(prefixesOf(root, dir)));
     if (!integ) {
-      const tips = pmTips(root);
+      // Discovery first: it is read once per repository, and with no deliver project anywhere
+      // nothing below needs a merge-base.
+      if (!discovered.has(root)) discovered.set(root, discover(root));
+      const disc = discovered.get(root);
+      if (!disc.failed && !disc.found.length) continue;
+      // A known target that is no base branch and that no project integrates on is not a ship.
+      if (!disc.failed && typeof target === 'string' && !baseBranches(root).includes(target) && !disc.integrations.has(target)) continue;
       let base;
       const baseOnce = () => (base ??= baseRefs(root));
+      const tips = pmTips(root);
       const op = ops.find((o) => storyLike(root, o, tips, baseOnce));
-      if (!op) continue;
-      const found = deliverProjects(root, baseOnce());
-      if (found.length) block(op.text || '(computed)', `${dir} is in no deliver project; run the merge from the project directory, or with git -C <project> (found deliver projects: ${found.join(', ')})`);
+      if (disc.failed) {
+        if (op) block(op.text || '(computed)', 'the gate cannot list the repository to look for deliver projects; run the merge from the project directory, or with git -C <project>');
+        continue;
+      }
+      if (prior) {
+        const other = ops.find((o) => !baseByName(root, o.text, baseOnce));
+        if (other) block(other.text || '(computed)', SEPARATE);
+      }
+      if (op) block(op.text || '(computed)', `${dir} is in no deliver project; run the merge from the project directory, or with git -C <project> (found deliver projects: ${disc.found.join(', ')})`);
       continue;
     }
     if (dyn) block(dyn.text || '(computed)', DYNAMIC);
@@ -746,7 +805,7 @@ try {
       const found = integ.error ? { branches: [] } : storyBranches(root, op.text, integ, target);
       // A no-op judged on refs an earlier command may move is no judgement; fall through to SEPARATE.
       if (found.noop && !prior) continue;
-      const story = Boolean(found.reason || found.branches.length || looksPm(op.text) || op.text === 'FETCH_HEAD');
+      const story = Boolean(found.reason || found.branches.length || namedStory(op));
       if (!story) continue;
       if (prior) block(op.text, SEPARATE);
       if (integ.error) block(op.text, integ.error);
