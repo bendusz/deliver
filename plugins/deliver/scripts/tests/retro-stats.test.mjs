@@ -646,3 +646,13 @@ test('retro-stats: firingSprint counts an undated story\'s escapes from the wind
   assert.equal(firingSprint(window, later, 0.1, (e) => e.sprint), 2);
   assert.equal(firingSprint(window, [], 0.1, (e) => e.sprint), null);
 });
+
+// --- WP-F fix round 2 ---
+
+test('retro-stats: firingSprint falls back to the latest known sprint at or before the firing step', () => {
+  // 70 stories: the third escape crosses 10%; it and every later escape have no known sprint.
+  const window = Array.from({ length: 70 }, (_, i) => ({ id: `S1-${i + 1}`, mergedAt: 0 }));
+  const esc = (story, at, sprint) => ({ commit: `c${at}`, story, at, sprint });
+  const escapes = [esc('S1-1', 1, 1), esc('S1-2', 2, 3), esc('S1-3', 3, null), esc('S1-4', 4, null)];
+  assert.equal(firingSprint(window, escapes, 0.1, (e) => e.sprint), 3);
+});

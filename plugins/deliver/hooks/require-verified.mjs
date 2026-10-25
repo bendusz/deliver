@@ -29,14 +29,18 @@
 // directory is a deliver project when one of them holds docs/approval.json there; every docs/ path
 // below then carries that directory's prefix. The project that owns a merge is the one the merge's
 // own directory (after cd, -C, and git -C) sits in, the deepest first, else a deliver project at
-// the top level. When neither resolves, the hook looks for deliver projects anywhere in the
-// repository, from NUL-delimited listings: a docs/approval.json at any depth on a trusted base
-// ref, on a local non-`pm/*` branch whose committed plan there names it, or in the working tree.
-// With none, the merge is allowed. Otherwise, unless the target is a known branch that is neither
-// a base branch nor any found project's integration branch, the merge blocks when a listing
-// failed and an operand could be a story; when an earlier git command in the call can move refs
-// and an operand is not a trusted base branch by name (SEPARATE); and when an operand could be a
-// story, naming the projects found: run it from the project directory or with git -C <project>.
+// the top level. When neither resolves and nothing can be a story (no operand, or no `pm/*` tip,
+// no named story operand, and no earlier ref-writing call), the merge is allowed unread. Otherwise the hook looks for deliver
+// projects anywhere in the repository, from NUL-delimited listings: a docs/approval.json at any
+// depth on a trusted base ref, on a local non-`pm/*` branch whose committed plan there names it,
+// or in the working tree. When a listing fails and an operand could be a story, the merge blocks.
+// When every listing was read: with no project found, the merge is allowed; a known target that
+// is neither a base branch nor any found project's integration branch is not a ship, and is
+// allowed; else the merge blocks when an earlier git call in the command can move refs and an
+// operand is not a trusted base branch by name, or is one but an earlier call may write refs
+// (anything but a plain checkout or switch, status, log, diff, show, rev-parse, or a fetch with
+// no `<src>:<dst>` refspec) (SEPARATE); and when an operand could be a story, naming the projects
+// found: run it from the project directory or with git -C <project>.
 // An operand could be a story when it is computed, `-`, `@{-N}`, or FETCH_HEAD, spells a `pm/*`
 // name, or resolves to the tip of, or a commit inside, a `pm/*` branch here or on any remote that
 // no trusted base ref (main, master, the origin/HEAD target, init.defaultBranch, and their trusted
@@ -68,7 +72,9 @@
 // never below, so a session opened at a monorepo root whose deliver projects all sit in
 // subdirectories fails open on a computed cd; run the merge without one. And a project whose
 // integration branch exists only on a remote, with no local copy and absent from the working
-// tree, is not found from outside it. Blocks exit 2 with the reason on stderr.
+// tree, is not found from outside it. And a listing that times out in a very large repository
+// blocks a story-like merge outside every project even when the repository holds no deliver
+// project: fail closed by design. Blocks exit 2 with the reason on stderr.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -705,6 +711,26 @@ function baseByName(root, text, refs) {
   return names.includes(text) || refs().some((r) => text === r || text === r.replace(/^refs\/(heads|remotes)\//, ''));
 }
 
+// readsOnly(sub, args): a git call known not to write refs: status, log, diff, show, rev-parse,
+// or a fetch with no destination refspec (`<src>:<dst>`), which updates only remote-tracking refs.
+// A plain checkout or switch is judged by checkoutOf.
+const READ_ONLY = new Set(['status', 'log', 'diff', 'show', 'rev-parse']);
+const FETCH_OPTS_WITH_VALUE = new Set([...PULL_OPTS_WITH_VALUE, '--refmap', '--recurse-submodules-default']);
+function readsOnly(sub, args) {
+  if (READ_ONLY.has(sub)) return true;
+  if (sub !== 'fetch') return false;
+  const positional = [];
+  for (let i = 0; i < args.length; i++) {
+    const w = args[i];
+    if (w.dynamic) return false;
+    if (w.text === '--') { positional.push(...args.slice(i + 1)); break; }
+    if (FETCH_OPTS_WITH_VALUE.has(w.text)) i++;
+    else if (!w.text.startsWith('-')) positional.push(w);
+  }
+  // The first operand is the remote, which may be a URL; each further one is a refspec.
+  return positional.slice(1).every((w) => !w.dynamic && !w.text.includes(':'));
+}
+
 // candidates(lists): the prefixes in priority order, each once, ending with the top level.
 const candidates = (...lists) => [...new Set([...lists.flat(), ''])];
 
@@ -731,11 +757,14 @@ try {
   };
   // discover(root) per repository, read on first need.
   const discovered = new Map();
+  // earlierChange: an earlier git call may move refs (anything but a plain checkout or switch).
+  // earlierWrite: an earlier git call may write refs outright (anything but readsOnly).
   let earlierChange = false;
+  let earlierWrite = false;
   for (const { dir, sub, args, ops } of calls) {
     if (sub === 'checkout' || sub === 'switch') {
       const co = checkoutOf(sub, args);
-      if (co.force) earlierChange = true;
+      if (co.force) { earlierChange = true; earlierWrite = true; }
       const root = rootOf(dir);
       if (!root || co.paths) continue;
       // A computed or unresolvable branch leaves the target unknown, and a story merge under an
@@ -749,9 +778,15 @@ try {
       else if (co.name) targets.set(root, UNKNOWN);
       continue;
     }
-    if (!ops) { earlierChange = true; continue; }
+    if (!ops) {
+      earlierChange = true;
+      if (!readsOnly(sub, args)) earlierWrite = true;
+      continue;
+    }
     const prior = earlierChange;
+    const priorWrite = earlierWrite;
     earlierChange = true;
+    earlierWrite = true;
     const dyn = ops.find((o) => o.dynamic);
     const suspect = ops.find(namedStory);
     // Where the repository cannot be read, a pm-looking merge is suspect only from a deliver
@@ -773,7 +808,12 @@ try {
     // operand blocks: the gate does not guess which project ships it.
     const integ = project(root, candidates(prefixesOf(root, dir)));
     if (!integ) {
-      // Discovery first: it is read once per repository, and with no deliver project anywhere
+      // Nothing to merge, or no pm/* tip and no named story with no earlier ref-writing call
+      // (which could create a pm/* branch): nothing here can block, so the repository is not listed.
+      if (!ops.length) continue;
+      const tips = pmTips(root);
+      if (!tips.length && !ops.some(namedStory) && !priorWrite) continue;
+      // Discovery next: it is read once per repository, and with no deliver project anywhere
       // nothing below needs a merge-base.
       if (!discovered.has(root)) discovered.set(root, discover(root));
       const disc = discovered.get(root);
@@ -782,14 +822,14 @@ try {
       if (!disc.failed && typeof target === 'string' && !baseBranches(root).includes(target) && !disc.integrations.has(target)) continue;
       let base;
       const baseOnce = () => (base ??= baseRefs(root));
-      const tips = pmTips(root);
       const op = ops.find((o) => storyLike(root, o, tips, baseOnce));
       if (disc.failed) {
         if (op) block(op.text || '(computed)', 'the gate cannot list the repository to look for deliver projects; run the merge from the project directory, or with git -C <project>');
         continue;
       }
+      // A base branch by name is exempt only when no earlier call can have written refs.
       if (prior) {
-        const other = ops.find((o) => !baseByName(root, o.text, baseOnce));
+        const other = ops.find((o) => priorWrite || !baseByName(root, o.text, baseOnce));
         if (other) block(other.text || '(computed)', SEPARATE);
       }
       if (op) block(op.text || '(computed)', `${dir} is in no deliver project; run the merge from the project directory, or with git -C <project> (found deliver projects: ${disc.found.join(', ')})`);

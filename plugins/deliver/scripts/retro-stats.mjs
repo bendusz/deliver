@@ -328,8 +328,9 @@ function observed(shipped, escapes, target, extra = []) {
 // dated stories merged so far, with the escapes so far, exceed the target. A story with no known
 // merge time never enters a step's denominator, which would dilute the bound, but its escapes
 // count from the window start. The firing step is dated by its escape's sprint, else by the
-// earliest known sprint of an escape after it; when no step fires but the whole window is over
-// target, the last escape is the firing step.
+// earliest known sprint of an escape after it, else by the latest known sprint of one before it,
+// so it is null while over target only when no escape's sprint is known; when no step fires but
+// the whole window is over target, the last escape is the firing step.
 export function firingSprint(window, escapes, target, sprintOfEscape) {
   const dated = window.filter((s) => s.mergedAt !== null);
   const undated = window.filter((s) => s.mergedAt === null).map((s) => s.id);
@@ -345,8 +346,10 @@ export function firingSprint(window, escapes, target, sprintOfEscape) {
   }
   const own = sprintOfEscape(mine[step]);
   if (own !== null) return own;
-  const known = mine.slice(step + 1).map(sprintOfEscape).filter((n) => n !== null);
-  return known.length ? Math.min(...known) : null;
+  const after = mine.slice(step + 1).map(sprintOfEscape).filter((n) => n !== null);
+  if (after.length) return Math.min(...after);
+  const before = mine.slice(0, step).map(sprintOfEscape).filter((n) => n !== null);
+  return before.length ? Math.max(...before) : null;
 }
 
 // trust(root, opts): the trust report. Shipped, first pass, fix rounds, integrity blocks, and
