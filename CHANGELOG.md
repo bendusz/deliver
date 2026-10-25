@@ -66,8 +66,8 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   recorded verdicts must name the PR head, or an ancestor of it followed only by story-file and
   handoff commits or automatic merges of the integration branch. `environment.md` gives the
   checks: `git merge-base --is-ancestor`, `git log --stat` for the non-merge commits, and
-  `git merge-tree --write-tree` matched against each merge commit's tree. That path stays a
-  residual risk.
+  `git merge-tree --write-tree` matched against each merge commit's tree, differing at most in the
+  story file, as the hook allows. That path stays a residual risk.
   `DELIVER_NO_ENFORCE=1` turns it off.
 - **Review is opposite-family.** The panel includes a lens from a family other than the
   builder's: an `expert-builder` story gets `codex-reviewer`, and a `codex-builder` story gets the
