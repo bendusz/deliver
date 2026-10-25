@@ -586,3 +586,34 @@ test('retro-stats --trust: the sprint OVER TARGET fired in is the latest of the 
     return p;
   });
 });
+
+// --- WP-F ---
+
+test('retro-stats --trust: a merged story with no known merge time counts in the OVER TARGET walk and can fire it', () => {
+  const { updated, ...noTime } = t0('');
+  const p = soloProject([['S1-1', noTime], ['S2-1', t0('2026-10-12 10:00')], ['S3-1', t0('2026-10-20 10:00')]]);
+  // The only escape is from the story whose merge time is unknown; it counts from the window start.
+  commitAt(p, 'fix(S2-1): x\n\nEscaped-From: S1-1', '2026-10-13T10:00:00Z');
+  fs.writeFileSync(path.join(p, 'p.json'), JSON.stringify(PANELS));
+  const r = trust(p, { panelsFile: path.join(p, 'p.json') });
+  assert.equal(r.tiers.T0.observed.overTarget, true);
+  assert.equal(r.tiers.T0.maximumForced, true, 'OVER TARGET fired, so the tier runs the maximum panel');
+  assert.equal(r.tiers.T0.belowPanel, 1, 'only the sprint 3 story, after the firing sprint, fell short');
+  assert.equal(trust(p, { panelsFile: path.join(p, 'p.json'), sprint: 2 }).tiers.T0.maximumForced, false, 'sprint 2 kept the measured panel');
+});
+
+test('retro-stats --trust: the shipped plan template\'s Assurance targets line parses, with or without its trailing comment', () => {
+  const template = fs.readFileSync(path.join(PLUGIN_ROOT, 'templates', 'plan.md.template'), 'utf8');
+  const line = template.split(/\r?\n/).find((l) => /^\s*-\s*Assurance targets:/.test(l));
+  assert.ok(line, 'the template carries an Assurance targets line');
+  const edited = line.replace(/T2=[0-9.]+%?/, 'T2=0.01');
+  assert.notEqual(edited, line);
+  for (const form of [edited, `${edited.replace(/\s*<!--.*?-->\s*$/, '')}   `, `${edited}  `]) {
+    const p = trustProject();
+    fs.writeFileSync(path.join(p, 'docs', 'plan.md'), `# Plan\n\n## Delivery mode\n- Integration branch: main\n${form}\n`);
+    gitIn(p, ['commit', '-qam', 'targets']);
+    const r = trust(p, { panelsFile: path.join(p, 'panels.json') });
+    assert.equal(r.targetsProblem, null, form);
+    assert.equal(r.tiers.T2.target, 0.01, form);
+  }
+});

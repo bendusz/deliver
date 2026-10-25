@@ -228,7 +228,7 @@ const updatedAt = (v) => {
 // blocks are the committed `integrity_fails` counter, else 1 for an `integrity` verdict of fail,
 // else unknown (null) for a 0.29 T1 or T2 story, whose gate ran but whose count is lost, and 0
 // otherwise. Holdout failures are `holdout_fails`, or null when it is missing. `panel` is the lens
-// names the first review ran, one entry per trial, or null.
+// names that ran on every review round, one entry per trial, or null.
 function readStories(root, ref) {
   const merges = ref ? recordTimes(root, ref, 'merged') : null;
   return storyTexts(root, ref).map(({ name, text }) => {
@@ -285,8 +285,9 @@ const planBranch = (root) => {
 };
 
 // planTargets(text): { targets, problem } from docs/plan.md's Delivery mode line, found by its
-// label `- Assurance targets:` whatever follows, such as `T0=0.10, T1=0.05, T2=0.02`. Backticks
-// are dropped before parsing. No line gives { {}, null }. A line that does not parse whole, with
+// label `- Assurance targets:` whatever follows, such as `T0=0.10, T1=0.05, T2=0.02`. HTML
+// comments (`<!-- ... -->`, as the plan template puts on the line), trailing whitespace, and
+// backticks are dropped before parsing. No line gives { {}, null }. A line that does not parse whole, with
 // a malformed part or a tier given twice, fails closed per tier: each tier takes the smallest of
 // its default and every value for it that did parse, and `problem` names what was wrong.
 export function planTargets(text) {
@@ -294,7 +295,8 @@ export function planTargets(text) {
   if (!m) return { targets: {}, problem: null };
   const values = {};
   const bad = [];
-  for (const raw of m[1].replace(/`/g, '').split(',')) {
+  const body = m[1].replace(/<!--[\s\S]*?-->/g, '').replace(/<!--.*$/, '').replace(/\s+$/, '');
+  for (const raw of body.replace(/`/g, '').split(',')) {
     const part = raw.trim();
     let t = null;
     try { t = parseTargets(part); } catch { t = null; }
@@ -308,10 +310,10 @@ export function planTargets(text) {
   return { targets, problem: bad.join(', ') };
 }
 
-// observed(shipped, escapes, tierOf, tier, target): escaped stories over stories shipped, with
-// the one-sided 95% bound. Zero escapes over a few stories still leaves a wide bound; that is a
-// small sample, not evidence against the calibration, so only an observed escape can put a tier
-// over target.
+// observed(shipped, escapes, target): the stories in `shipped` that `escapes` name, over the
+// stories shipped, with the one-sided 95% bound, and whether it is over `target`. Zero escapes
+// over a few stories still leaves a wide bound; that is a small sample, not evidence against the
+// calibration, so only an observed escape can put a tier over target.
 function observed(shipped, escapes, target) {
   const ids = new Set(shipped.map((s) => s.id));
   const mine = escapes.filter((e) => ids.has(e.story));
@@ -384,10 +386,16 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
       observedNow = { since, ...observed(window, escapes, tgt[t] ?? null) };
       const ids = new Set(window.map((s) => s.id));
       const mine = escapes.filter((e) => ids.has(e.story)).sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity));
+      // A story with no known merge time counts in every step from the window start, so its own
+      // escapes are never dropped: conservative for firing.
       for (const e of mine) {
         const upTo = e.at ?? Infinity;
-        const shippedBy = window.filter((s) => s.mergedAt !== null && s.mergedAt <= upTo);
+        const shippedBy = window.filter((s) => s.mergedAt === null || s.mergedAt <= upTo);
         if (observed(shippedBy, mine.filter((x) => (x.at ?? Infinity) <= upTo), tgt[t] ?? null).overTarget) { firedSprint = escapeSprint(e); break; }
+      }
+      // Over target with no datable firing step: date it by the latest escape whose sprint is known.
+      if (observedNow.overTarget && firedSprint === null) {
+        for (const e of [...mine].reverse()) if ((firedSprint = escapeSprint(e)) !== null) break;
       }
     }
     // A story whose sprint cannot be read counts as after it.
@@ -465,7 +473,7 @@ export function renderTrust(r) {
     out.push(`| ${t} | ${row.shipped} | ${panel} | ${bound} | ${pctOf(row.target)} | ${row.firstPass}/${row.shipped} | ${row.fixRounds} | ${integrity} | ${holdout} |`);
   }
   out.push('');
-  // A story whose first review ran fewer lenses than its tier's panel in force is not covered by
+  // A story whose recorded panel ran fewer lenses than its tier's panel in force is not covered by
   // that tier's calibration.
   for (const [t, row] of Object.entries(r.tiers)) if (row.belowPanel !== undefined) out.push(`${t} below panel: ${row.belowPanel}`);
   out.push('');

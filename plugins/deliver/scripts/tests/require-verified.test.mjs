@@ -66,7 +66,8 @@ test('verified: blocks a pm/* merge whose story records no verifier PASS', () =>
   const r = merge(p);
   assert.equal(r.status, 2);
   assert.match(r.stderr, /^deliver blocked git merge pm\/S1-1-fix: .*no verifier verdict/);
-  assert.match(r.stderr, /DELIVER_NO_ENFORCE=1/);
+  // The block never advertises the kill switch; the PM must not use it to get past a block.
+  assert.doesNotMatch(r.stderr, /DELIVER_NO_ENFORCE/);
 });
 
 test('verified: blocks a FAIL or UNKNOWN verdict even at the head SHA', () => {
@@ -836,7 +837,7 @@ test('verified: a pm-looking operand under an unknown directory blocks only when
 
 // --- fix round 1 ---
 
-test('verified: the project that owns the merge wins over the session project in a sibling layout', () => {
+test('verified: the merge directory\'s project wins over the session project in a sibling layout; the root blocks', () => {
   // packages/bar holds the claim and the verified story; packages/foo is the session's project.
   const { top, proj: bar, code } = subProject({}, 'bar');
   const foo = path.join(top, 'packages', 'foo');
@@ -855,8 +856,10 @@ test('verified: the project that owns the merge wins over the session project in
   assert.equal(viaC.status, 0, viaC.stderr);
   const viaCd = hook(top, `cd packages/bar && git merge --no-ff ${BRANCH}`, env);
   assert.equal(viaCd.status, 0, viaCd.stderr);
-  const viaStory = hook(top, `git merge --no-ff ${BRANCH}`, env);
-  assert.equal(viaStory.status, 0, `the story branch's story path names bar: ${viaStory.stderr}`);
+  // From the root, in no project, the gate does not guess the owner (WP-F directory rule).
+  const viaRoot = hook(top, `git merge --no-ff ${BRANCH}`, env);
+  assert.equal(viaRoot.status, 2, viaRoot.stderr);
+  assert.match(viaRoot.stderr, /git -C <project> \(found deliver projects: packages\/bar, packages\/foo\)/);
 });
 
 test('verified: block messages name the project plan path below the top level', () => {
@@ -873,13 +876,13 @@ test('verified: block messages name the project plan path below the top level', 
 // --- fix round 2 ---
 
 // siblings({ barStory, fooClaims }): deliver projects at packages/foo and packages/bar on main.
-// bar's claim of BRANCH sits at barStory (renamed when it differs from the branch); fooClaims adds
+// bar (at packages/<barName>) holds its claim of BRANCH at barStory (renamed when it differs from the branch); fooClaims adds
 // a claim of the same branch to foo. The story branch changes bar's code. Returns { top, foo, bar,
 // code }, checked out on the story branch.
-function siblings({ barStory = path.join('docs', 'stories', 'S1-1-renamed.md'), fooClaims = false } = {}) {
+function siblings({ barStory = path.join('docs', 'stories', 'S1-1-renamed.md'), fooClaims = false, barName = 'bar' } = {}) {
   const top = tmpDir('pmsib-');
   const foo = path.join(top, 'packages', 'foo');
-  const bar = path.join(top, 'packages', 'bar');
+  const bar = path.join(top, 'packages', barName);
   gitIn(top, ['init', '-q']);
   gitIn(top, ['config', 'user.email', 'casey@example.com']);
   gitIn(top, ['config', 'user.name', 'Casey Example']);
@@ -906,41 +909,43 @@ const recordAt = (dir, rel, fields) => {
   gitIn(dir, ['commit', '-qm', 'chore(S1-1): record']);
 };
 
-test('verified: the owner of a renamed story in a sibling project is found by its committed claim', () => {
+test('verified: a renamed story in a sibling project is judged with -C; from the root it blocks', () => {
   const un = siblings();
   recordAt(un.bar, un.barStory, {});
   gitIn(un.top, ['checkout', '-q', 'main']);
-  const r = hook(un.top, `git merge --no-ff ${BRANCH}`, { CLAUDE_PROJECT_DIR: un.foo });
+  assert.match(hook(un.top, `git merge --no-ff ${BRANCH}`, { CLAUDE_PROJECT_DIR: un.foo }).stderr, /found deliver projects/);
+  const r = hook(un.top, `git -C packages/bar merge --no-ff ${BRANCH}`, { CLAUDE_PROJECT_DIR: un.foo });
   assert.equal(r.status, 2, r.stderr);
   assert.match(r.stderr, /packages\/bar\/docs\/stories\/S1-1-renamed\.md.*no verifier verdict/);
   const ok = siblings();
   recordAt(ok.bar, ok.barStory, { verifier: `PASS ${ok.code}` });
   gitIn(ok.top, ['checkout', '-q', 'main']);
-  const v = hook(ok.top, `git merge --no-ff ${BRANCH}`, { CLAUDE_PROJECT_DIR: ok.foo });
+  const v = hook(ok.top, `git -C packages/bar merge --no-ff ${BRANCH}`, { CLAUDE_PROJECT_DIR: ok.foo });
   assert.equal(v.status, 0, v.stderr);
 });
 
-test('verified: a SHA operand finds the project whose claimed branch tip it is', () => {
+test('verified: a story tip SHA is judged in the merge directory\'s project; from the root it blocks', () => {
   const ok = siblings();
   recordAt(ok.bar, ok.barStory, { verifier: `PASS ${ok.code}` });
   const tip = gitIn(ok.top, ['rev-parse', 'HEAD']).trim();
   gitIn(ok.top, ['checkout', '-q', 'main']);
-  const v = hook(ok.top, `git merge --no-ff ${tip}`, { CLAUDE_PROJECT_DIR: ok.foo });
+  assert.match(hook(ok.top, `git merge --no-ff ${tip}`, { CLAUDE_PROJECT_DIR: ok.foo }).stderr, /found deliver projects/);
+  const v = hook(ok.top, `git -C packages/bar merge --no-ff ${tip}`);
   assert.equal(v.status, 0, v.stderr);
   const un = siblings();
   recordAt(un.bar, un.barStory, {});
   const unTip = gitIn(un.top, ['rev-parse', 'HEAD']).trim();
   gitIn(un.top, ['checkout', '-q', 'main']);
-  assert.equal(hook(un.top, `git merge --no-ff ${unTip}`, { CLAUDE_PROJECT_DIR: un.foo }).status, 2);
+  assert.match(hook(un.top, `git -C packages/bar merge --no-ff ${unTip}`).stderr, /no verifier verdict/);
 });
 
-test('verified: a story branch two projects claim is ambiguous from the root, and resolved by -C', () => {
+test('verified: a story branch two projects claim blocks from the root, and is judged by -C', () => {
   const s = siblings({ barStory: STORY, fooClaims: true });
   recordAt(s.bar, STORY, { verifier: `PASS ${s.code}` });
   gitIn(s.top, ['checkout', '-q', 'main']);
   const r = hook(s.top, `git merge --no-ff ${BRANCH}`);
   assert.equal(r.status, 2, r.stderr);
-  assert.match(r.stderr, /ambiguous/);
+  assert.match(r.stderr, /run the merge from the project directory, or with git -C <project>/);
   const c = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
   assert.equal(c.status, 0, c.stderr);
 });
@@ -964,17 +969,17 @@ test('verified: a deliver project at the top level owns a root merge, even when 
   assert.equal(r.status, 0, r.stderr);
 });
 
-test('verified: a story merge no deliver project claims blocks from the repository root', () => {
+test('verified: a story merge from the repository root of nested projects blocks and names them', () => {
   const s = siblings();
   gitIn(s.top, ['checkout', '-q', 'main']);
   gitIn(s.top, ['rm', '-q', path.join('packages', 'bar', s.barStory)]);
   gitIn(s.top, ['commit', '-qm', 'no claim in bar']);
   const r = hook(s.top, `git merge --no-ff ${BRANCH}`);
   assert.equal(r.status, 2, r.stderr);
-  assert.match(r.stderr, /no deliver project in this repository claims pm\/S1-1-fix.*git -C <project>/);
+  assert.match(r.stderr, /run the merge from the project directory, or with git -C <project> \(found deliver projects: packages\/bar, packages\/foo\)/);
 });
 
-test('verified: a nested owner whose plans disagree across trusted branches blocks, never falls through', () => {
+test('verified: a project whose plans disagree across trusted branches blocks with -C, and from the root', () => {
   const s = siblings();
   recordAt(s.bar, s.barStory, { verifier: `PASS ${s.code}` });
   gitIn(s.top, ['checkout', '-q', 'main']);
@@ -982,12 +987,13 @@ test('verified: a nested owner whose plans disagree across trusted branches bloc
   fs.writeFileSync(path.join(s.bar, 'docs', 'plan.md'), '# Plan\n- Integration branch: master\n');
   gitIn(s.top, ['commit', '-qam', 'bar on master names master']);
   gitIn(s.top, ['checkout', '-q', 'main']);
-  const r = hook(s.top, `git merge --no-ff ${BRANCH}`);
+  assert.match(hook(s.top, `git merge --no-ff ${BRANCH}`).stderr, /found deliver projects/);
+  const r = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
   assert.equal(r.status, 2, r.stderr);
-  assert.match(r.stderr, /packages\/bar has: .*disagree/);
+  assert.match(r.stderr, /disagree/);
 });
 
-test('verified: a claimed tip known only on a non-origin remote still finds its owner', () => {
+test('verified: a story tip known only on a non-origin remote is still gated', () => {
   const tipOnUpstream = (fields) => {
     const s = siblings();
     recordAt(s.bar, s.barStory, fields(s));
@@ -998,10 +1004,141 @@ test('verified: a claimed tip known only on a non-origin remote still finds its 
     return { ...s, tip };
   };
   const un = tipOnUpstream(() => ({}));
-  const r = hook(un.top, `git merge --no-ff ${un.tip}`);
+  assert.match(hook(un.top, `git merge --no-ff ${un.tip}`).stderr, /found deliver projects/);
+  const r = hook(un.top, `git -C packages/bar merge --no-ff ${un.tip}`);
   assert.equal(r.status, 2, r.stderr);
   assert.match(r.stderr, /no verifier verdict/);
   const ok = tipOnUpstream((s) => ({ verifier: `PASS ${s.code}` }));
-  const v = hook(ok.top, `git merge --no-ff ${ok.tip}`);
+  const v = hook(ok.top, `git -C packages/bar merge --no-ff ${ok.tip}`);
   assert.equal(v.status, 0, v.stderr);
+});
+
+// --- WP-F: the directory rule ---
+// The project that owns a merge is the one its directory sits in. From a directory in no deliver
+// project, in a repository holding any, a story-like operand blocks and names the projects.
+
+const atRoot = (where = 'packages/bar') => new RegExp(`run the merge from the project directory, or with git -C <project> \\(found deliver projects: [^)]*${where}`);
+const verifiedSiblings = (opts) => {
+  const s = siblings(opts);
+  recordAt(s.bar, s.barStory, { verifier: `PASS ${s.code}` });
+  gitIn(s.top, ['checkout', '-q', 'main']);
+  return s;
+};
+
+test('directory rule: a computed pm/ operand blocks from a monorepo root; the branch ships with -C', () => {
+  const s = verifiedSiblings();
+  const r = hook(s.top, 'git merge --no-ff pm/"$STORY_ID"');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, atRoot());
+  const c = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
+  assert.equal(c.status, 0, c.stderr);
+  // Inside the project a computed operand still blocks, as before.
+  assert.equal(hook(s.top, 'git -C packages/bar merge --no-ff pm/"$STORY_ID"').status, 2);
+});
+
+test('directory rule: a story-ancestor SHA blocks from a monorepo root; the branch ships with -C', () => {
+  const s = verifiedSiblings();
+  const r = hook(s.top, `git merge --no-ff ${s.code}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, atRoot());
+  const c = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
+  assert.equal(c.status, 0, c.stderr);
+  // Inside the project the ancestor is short of the tip, as before.
+  assert.match(hook(s.top, `git -C packages/bar merge --no-ff ${s.code}`).stderr, /short of its tip/);
+});
+
+test('directory rule: a second claimant with disagreeing plans blocks from the root; -C picks the healthy project', () => {
+  const s = siblings({ fooClaims: true });
+  recordAt(s.bar, s.barStory, { verifier: `PASS ${s.code}` });
+  gitIn(s.top, ['checkout', '-q', 'main']);
+  gitIn(s.top, ['checkout', '-qb', 'master']);
+  fs.writeFileSync(path.join(s.foo, 'docs', 'plan.md'), '# Plan\n- Integration branch: master\n');
+  gitIn(s.top, ['commit', '-qam', 'foo on master names master']);
+  gitIn(s.top, ['checkout', '-q', 'main']);
+  const r = hook(s.top, `git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, atRoot('packages/bar, packages/foo'));
+  const c = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
+  assert.equal(c.status, 0, c.stderr);
+  assert.match(hook(s.top, `git -C packages/foo merge --no-ff ${BRANCH}`).stderr, /disagree/);
+});
+
+test('directory rule: a project at a non-ASCII path (core.quotePath) is found from the root, and ships with -C', () => {
+  const s = verifiedSiblings({ barName: 'café' });
+  const r = hook(s.top, `git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, atRoot('packages/café'));
+  const c = hook(s.top, `git -C packages/café merge --no-ff ${BRANCH}`);
+  assert.equal(c.status, 0, c.stderr);
+  const un = siblings({ barName: 'café' });
+  recordAt(un.bar, un.barStory, {});
+  gitIn(un.top, ['checkout', '-q', 'main']);
+  assert.match(hook(un.top, `git -C packages/café merge --no-ff ${BRANCH}`).stderr, /no verifier verdict/);
+});
+
+test('directory rule: an unclaimed story blocks from the root; once claimed and verified it ships with -C', () => {
+  const s = verifiedSiblings();
+  gitIn(s.top, ['rm', '-q', path.join('packages', 'bar', s.barStory)]);
+  gitIn(s.top, ['commit', '-qm', 'no claim in bar']);
+  const r = hook(s.top, `git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, atRoot());
+  assert.match(hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`).stderr, /no story on main claims/);
+  gitIn(s.top, ['revert', '--no-edit', 'HEAD']);
+  const c = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
+  assert.equal(c.status, 0, c.stderr);
+});
+
+test('directory rule: a renamed story blocks from the root, even with a deliver session elsewhere; ships with -C', () => {
+  const s = verifiedSiblings();
+  for (const env of [{}, { CLAUDE_PROJECT_DIR: s.foo }]) {
+    const r = hook(s.top, `git merge --no-ff ${BRANCH}`, env);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, atRoot());
+  }
+  const c = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
+  assert.equal(c.status, 0, c.stderr);
+  const viaCd = hook(s.top, `cd packages/bar && git merge --no-ff ${BRANCH}`);
+  assert.equal(viaCd.status, 0, viaCd.stderr);
+});
+
+test('directory rule: merging main or origin/main at a monorepo root right after a story branch is cut is allowed', () => {
+  const s = verifiedSiblings();
+  const origin = tmpDir('pmorigin-');
+  gitIn(origin, ['init', '-q', '--bare']);
+  gitIn(s.top, ['remote', 'add', 'origin', origin]);
+  gitIn(s.top, ['push', '-q', '-u', 'origin', 'main']);
+  gitIn(s.top, ['checkout', '-qb', 'feat/x']);
+  commitOn(s.top, 'notes.txt', 'x\n', 'feat: x');
+  gitIn(s.top, ['branch', 'pm/S1-1', 'main']);
+  for (const cmd of ['git merge main', 'git fetch && git merge origin/main', 'git merge --no-ff main -m "sync"']) {
+    const r = hook(s.top, cmd);
+    assert.equal(r.status, 0, `${cmd}: ${r.stderr}`);
+  }
+  // A fetched origin/main ahead of local main is still a trusted upstream.
+  gitIn(s.top, ['checkout', '-q', 'main']);
+  commitOn(s.top, 'more.txt', 'y\n', 'feat: y');
+  gitIn(s.top, ['push', '-q', 'origin', 'main']);
+  gitIn(s.top, ['reset', '-q', '--hard', 'HEAD~1']);
+  gitIn(s.top, ['checkout', '-q', 'feat/x']);
+  const r = hook(s.top, 'git merge origin/main');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('directory rule: a repository with no deliver project is never blocked', () => {
+  const plain = tmpDir('pmplainrepo-');
+  gitIn(plain, ['init', '-q']);
+  gitIn(plain, ['config', 'user.email', 'casey@example.com']);
+  gitIn(plain, ['config', 'user.name', 'Casey Example']);
+  commitOn(plain, 'a.txt', 'a\n', 'init');
+  gitIn(plain, ['branch', '-M', 'main']);
+  gitIn(plain, ['checkout', '-qb', BRANCH]);
+  commitOn(plain, 'b.txt', 'b\n', 'one');
+  const mid = gitIn(plain, ['rev-parse', 'HEAD']).trim();
+  commitOn(plain, 'c.txt', 'c\n', 'two');
+  gitIn(plain, ['checkout', '-q', 'main']);
+  for (const cmd of [`git merge ${BRANCH}`, 'git merge pm/"$ID"', `git merge ${mid}`, 'git merge -', `git pull origin ${BRANCH}`, `cd sub && git merge ${BRANCH}`]) {
+    const r = hook(plain, cmd);
+    assert.equal(r.status, 0, `${cmd}: ${r.stderr}`);
+  }
 });
