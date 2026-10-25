@@ -60,7 +60,9 @@ only on a refusal, do nothing once deliver's copy is gone, and, for `reference-t
 the same stdin records to the rest of the hook; `--uninstall` says to remove them. A hook whose
 interpreter is not sh (Python, Node, ..., or unknown, such as a symlink whose target cannot be
 read) gets an sh wrapper to install instead: rename the hook to `<hook>.local` and write the
-printed wrapper as `<hook>`; it skips a missing `<hook>.local` rather than block updates. A hook that runs deliver's lines, in
+printed wrapper as `<hook>`; it skips a missing `<hook>.local` rather than block updates. A
+symlinked hook always gets the wrapper, so its shared target is never edited. Only the gate's own
+refusal status (86) blocks an update; a gate or node that fails to run warns and lets it through. A hook that runs deliver's lines, in
 any hooks directory, is `chained` once it is executable (else `chained-inactive`) and its private
 copy is current. `/deliver:doctor` checks and repairs the install.
 `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --uninstall <project>` removes it and sets

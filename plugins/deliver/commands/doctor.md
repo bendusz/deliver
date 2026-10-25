@@ -55,8 +55,8 @@ Inspect (whichever apply):
   fast-forwards, squash merges, and cherry-picks, and compares a merge's staged result only where
   git needs no content merge). A foreign hook that already runs deliver's lines shows as
   `chained`, which is in place, in any hooks directory; `chained-inactive` (not executable; run the
-  printed `chmod +x`) and `copy-missing` or `copy-stale` (run the installer without `--check`) are
-  not. For a hook whose interpreter is not sh, it prints an sh wrapper to install instead. It
+  printed `chmod +x`), `chained-stale` (lines from an earlier version; replace them as printed),
+  and `copy-missing` or `copy-stale` (run the installer without `--check`) are not. For a hook whose interpreter is not sh, it prints an sh wrapper to install instead. It
   reports `merge gate: disabled` and exits 1 when `git config deliver.mergeGate` is `off`, which
   `--uninstall` sets; ask before re-enabling, since the user turned it off. It also reports a
   deliver shim it cannot remove, such as a v1 shim in an in-tree `core.hooksPath`. On any other

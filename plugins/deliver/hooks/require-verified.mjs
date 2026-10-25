@@ -541,8 +541,13 @@ function currentBranch(root) {
   return chomp(git(root, ['symbolic-ref', '--quiet', '--short', 'HEAD']) || '') || null;
 }
 
-// remotes(root): the configured remote names, longest first (a name may hold a slash).
-const remotes = (root) => (git(root, ['remote']) || '').split(/\r?\n/).filter(Boolean).sort((a, b) => b.length - a.length);
+// remotes(root): the configured remote names, longest first (a name may hold a slash); read once per
+// repository per process (a hook is one short process).
+const remoteNames = new Map();
+function remotes(root) {
+  if (!remoteNames.has(root)) remoteNames.set(root, (git(root, ['remote']) || '').split(/\r?\n/).filter(Boolean).sort((a, b) => b.length - a.length));
+  return remoteNames.get(root);
+}
 
 // branchOf(ref, names): the branch a ref names: refs/heads/<b>, or refs/remotes/<remote>/<b>, the
 // remote being the longest configured name in `names` that fits (a name may hold a slash), else
@@ -606,7 +611,7 @@ function operandOf(root, op) {
 
 // fetchHeads(root): the heads FETCH_HEAD lists for merging, every line not marked not-for-merge,
 // as `git merge FETCH_HEAD` merges them all: { heads: [{ sha, name }], bad }, name the branch the
-// line's `branch '<name>' of <url>` part names, or null; bad when a line marked for merge does not
+// line's `branch '<name>' of <url>` part names, or null, and url that line's url; bad when a line marked for merge does not
 // parse. null when FETCH_HEAD cannot be read.
 export function fetchHeads(root) {
   const where = chomp(git(root, ['rev-parse', '--git-path', 'FETCH_HEAD']) || '');
@@ -620,7 +625,8 @@ export function fetchHeads(root) {
     const [sha, mark = '', desc = ''] = line.split('\t');
     if (mark === 'not-for-merge') continue;
     if (!/^[0-9a-f]{40,64}$/.test(sha || '') || mark !== '') { bad = true; continue; }
-    heads.push({ sha, name: (desc.match(/^branch '(.+)' of /) || [])[1] ?? null });
+    const m = desc.match(/^branch '(.+)' of (.+)$/);
+    heads.push({ sha, name: m?.[1] ?? null, url: m?.[2] ?? null });
   }
   return { heads, bad };
 }
@@ -1407,54 +1413,102 @@ function recordSpecs(info) {
 
 const commitTime = (root, c) => Number(chomp(git(root, ['show', '-s', '--format=%ct', c]) || '0'));
 
-// copiedStories(root, { rest, next, exclude, introduced, info, local }): the tips in `rest` whose
-// changes the update copies in (a cherry-pick, or a squash merge). Patches are compared on code
-// alone, the PM state paths (recordSpecs) left out on both sides, so a squash whose story record
-// conflicted still matches. A copy is a non-merge commit the update brings in, outside every
-// introduced tip and outside the tip itself (a commit of the story is no copy of it; that is a
-// partial), whose `git patch-id --stable` equals the tip's whole code diff from the update's base
-// (a squash), or one of the tip's own non-merge commits past that base (a cherry-pick) unless the
-// story did not author it: the update's commit is held by a non-story ref and is no newer than the
-// story's (a hotfix cherry-picked onto the story, then merged itself), or, in a rewrite of a story
-// merge old held, the story's own commits recreated off next's first-parent line. Cost is bounded: nothing
-// when the update brings no code commit, a tip whose changed paths miss the update's is skipped
-// after two calls, and patches are read once per tip commit. Fails open (no copy) when the
-// patches cannot be read.
+// copiedStories(root, { rest, next, exclude, base, introduced, info, local, old }): the tips in
+// `rest` whose changes the update copies in, each as { ...tip, replay } (replay: a linear rebase
+// flattened a story merge old held). Patches are compared on code alone, the PM state paths
+// (recordSpecs) left out on both sides, so a squash whose story record conflicted still matches.
+// The update's side (updatePatches) is every non-merge commit it brings in outside the introduced
+// tips. A story's side is its own work: what it holds past the update's base and, in a rewrite,
+// past old, since story commits old already holds are judged by rewriteCheck, not as copies. A
+// copy is a squash (squashCopy: the update carries the story's whole code diff) or a cherry-pick
+// (pickCopy: one of the story's commits), not counting the story's own commits, nor a hotfix the
+// story copied (hotfixExempt). A tip old holds is, in a rewrite, a copy only as a replay
+// (replayCopy). Cost is bounded: nothing when the update brings no code commit, a tip whose
+// changed paths miss the update's is skipped after two calls, and patches are read once per tip.
+// Fails open (no copy) when the patches cannot be read.
 function copiedStories(root, { rest, next, exclude, base = exclude[0], introduced, info, local, old = null }) {
   if (!rest.length) return [];
-  // A rewrite that keeps a story merge old held (`git pull --rebase=merges`) recreates the story's
-  // commits on a merged side branch, off next's first-parent line: they are the rewritten story,
-  // which rewriteCheck judges, not a copy. Story commits on the first-parent line flatten the merge
-  // (a linear rebase), and stay copies.
-  const rewrite = Boolean(old) && !contains(root, old, next);
-  let line = null;
-  const onLine = (c) => (line ??= new Set((git(root, ['rev-list', '--first-parent', next, '--not', ...exclude]) || '').split(/\s+/).filter(Boolean))).has(c);
   const { code } = recordSpecs(info);
-  const range = [next, '--not', ...exclude, ...introduced];
-  const mine = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', ...range, ...code]);
-  if (!mine?.size) return [];
-  const touched = new Set(listing(root, ['log', '--no-merges', '--name-only', '-z', '--format=', ...range, ...code]) ?? []);
+  const update = updatePatches(root, { next, exclude, introduced, code });
+  if (!update) return [];
+  const rewrite = Boolean(old) && !contains(root, old, next);
   const seen = new Map();
   const out = [];
   for (const t of rest) {
     if (!seen.has(t.tip)) {
-      const paths = listing(root, ['log', '--no-merges', '--name-only', '-z', '--format=', t.tip, '--not', ...exclude, ...code]) ?? [];
-      if (!paths.some((p) => touched.has(p))) { seen.set(t.tip, false); continue; }
-      const own = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', t.tip, '--not', ...exclude, ...code]) ?? new Map();
-      const mb = base ? chomp(git(root, ['merge-base', base, t.tip]) || '') : '';
-      const whole = new Set(mb ? patchIds(root, ['diff', ...PATCH, mb, t.tip, ...code])?.keys() ?? [] : []);
-      const kept = rewrite && contains(root, t.tip, old);
-      const copies = (c) => !contains(root, c, t.tip) && !(kept && !onLine(c));
-      let hit = [...whole].some((id) => (mine.get(id) ?? []).some(copies));
-      for (const [id, theirs] of own) {
-        if (hit) break;
-        hit = (mine.get(id) ?? []).filter(copies).some((c) => !(heldOutsideStories(root, c, local) && theirs.some((sc) => commitTime(root, c) <= commitTime(root, sc))));
+      // In a rewrite, a linear rebase flattening this story's merge (even after the branch moved on
+      // past the merged commit) is a replay; a tip old holds is a copy only that way.
+      const replay = rewrite && replayCopy(root, t.tip, { old, next, exclude, code, update });
+      let hit = replay;
+      if (!hit && !(rewrite && contains(root, t.tip, old))) {
+        // The story's own work: past the update's base, and, in a rewrite, neither held by old nor
+        // patch-equivalent to a commit old holds (an earlier merge-preserving rebase recreated it).
+        const span = rewrite ? ['--cherry-pick', '--right-only', `${old}...${t.tip}`, '--not', ...exclude] : [t.tip, '--not', ...exclude];
+        const paths = listing(root, ['log', '--no-merges', '--name-only', '-z', '--format=', ...span, ...code]) ?? [];
+        if (paths.some((x) => update.touched.has(x))) {
+          const own = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', ...span, ...code]) ?? new Map();
+          const outside = (c) => !contains(root, c, t.tip);
+          hit = (own.size > 0 && squashCopy(root, t.tip, { from: rewrite ? old : base, code, update, outside, own, local }))
+            || pickCopy(root, { own, update, outside, local });
+        }
       }
-      seen.set(t.tip, hit);
+      seen.set(t.tip, hit ? { replay } : null);
     }
-    if (seen.get(t.tip)) out.push(t);
+    if (seen.get(t.tip)) out.push({ ...t, replay: seen.get(t.tip).replay });
   }
   return out;
+}
+
+// updatePatches(root, { next, exclude, introduced, code }): the update's non-merge commits outside
+// the introduced tips, as { ids: patch-id -> commits, touched: paths }; null when there are none.
+function updatePatches(root, { next, exclude, introduced, code }) {
+  const range = [next, '--not', ...exclude, ...introduced];
+  const ids = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', ...range, ...code]);
+  if (!ids?.size) return null;
+  return { ids, touched: new Set(listing(root, ['log', '--no-merges', '--name-only', '-z', '--format=', ...range, ...code]) ?? []) };
+}
+
+// squashCopy(root, tip, { from, code, update, outside, own, local }): the update carries, in one
+// commit outside the story, the story's whole code diff from merge-base(from, tip), unless that
+// commit is hotfixExempt against every code commit making up the story's own work (an unfinished
+// story whose only code is a hotfix it cherry-picked).
+function squashCopy(root, tip, { from, code, update, outside, own, local }) {
+  const mb = from ? chomp(git(root, ['merge-base', from, tip]) || '') : '';
+  if (!mb) return false;
+  const whole = patchIds(root, ['diff', ...PATCH, mb, tip, ...code]);
+  const theirs = [...own.values()].flat();
+  return [...(whole?.keys() ?? [])].some((id) => (update.ids.get(id) ?? []).filter(outside).some((c) => !hotfixExempt(root, c, theirs, local, true)));
+}
+
+// pickCopy(root, { own, update, outside, local }): the update carries, outside the story, a commit
+// with the patch-id of one of the story's own commits, unless hotfixExempt.
+function pickCopy(root, { own, update, outside, local }) {
+  for (const [id, theirs] of own) {
+    if ((update.ids.get(id) ?? []).filter(outside).some((c) => !hotfixExempt(root, c, theirs, local))) return true;
+  }
+  return false;
+}
+
+// hotfixExempt(root, c, theirs, local, all): the story did not author the change: the update's
+// commit c is held by a non-story ref and is no newer than the story's commit (any of `theirs`,
+// or, with `all`, every one of them: a hotfix cherry-picked onto the story, then merged itself).
+// Relies on commit order (spec: out of scope).
+function hotfixExempt(root, c, theirs, local, all = false) {
+  if (!theirs.length || !heldOutsideStories(root, c, local)) return false;
+  const t = commitTime(root, c);
+  return all ? theirs.every((sc) => t <= commitTime(root, sc)) : theirs.some((sc) => t <= commitTime(root, sc));
+}
+
+// replayCopy(root, tip, { old, next, exclude, code, update }): a linear rebase flattened a story
+// merge old held: old's replaced range holds a merge m, gone from next, of this story (replayedMerge),
+// and a commit m brought in reappears, by patch-id, on next's first-parent line. A rewrite that
+// keeps the merge (`git pull --rebase=merges`) recreates those commits off that line, and is no copy.
+function replayCopy(root, tip, { old, next, exclude, code, update }) {
+  const line = new Set((git(root, ['rev-list', '--first-parent', next, '--not', ...exclude]) || '').split(/\s+/).filter(Boolean));
+  return replayedMerge(root, tip, { old, next, exclude }).some((m) => {
+    const brought = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', `${m}^2`, '--not', `${m}^1`, ...code]) ?? new Map();
+    return [...brought.keys()].some((id) => (update.ids.get(id) ?? []).some((c) => line.has(c)));
+  });
 }
 
 // rewriteCheck(root, { old, next, base, info, trusted }): for an update that rewrites history (old
@@ -1462,13 +1516,30 @@ function copiedStories(root, { rest, next, exclude, base = exclude[0], introduce
 // base..old held shipped story work, a commit that records a story's verifier in its story file,
 // as { found }, and, when it did, { bad }, the refusal when the rewrite changes code (records,
 // recordSpecs, left out). `from` is the commit next builds on: the newest of its first-parent
-// history that old or a trusted remote copy holds. With the same base (an amend), next's code
+// history that old, a trusted remote copy, or FETCH_HEAD's head of the integration branch from a
+// configured remote (fetchedIntegration) holds. With the same base (an amend), next's code
 // tree must equal old's exactly. On a new base (a rebase), next's code tree must equal the rebased
 // result, `git merge-tree --write-tree --merge-base <base> <from> <old>` (git 2.40 or newer); where
-// that cannot run or conflicts, the code diff base..old must equal from..next byte for byte apart
+// conflicts are confined to records, the code is compared all the same; a code conflict resolved
+// to anything else is refused (CONFLICTED); where merge-tree cannot run, the code diff base..old
+// must equal from..next byte for byte apart
 // from line numbers (codeDiff). A reword, a record edit, or a clean rebase passes; a change of a
 // single space, or a change moved to another place, does not.
 const REWRITE = 'rewriting shipped story history changes code; ship the change as a story';
+const CONFLICTED = 'the rebase changed code while resolving a conflict; ship that change as a story';
+// recordFile(f, info): f is a PM state path, a story file or handoff note of a judged project.
+const recordFile = (f, info) => (info?.projects?.length ? info.projects : [{ prefix: '' }]).some(({ prefix = '' }) => {
+  const dir = `${prefix}docs/stories/`;
+  return isHandoff(f, prefix) || (f.startsWith(dir) && /^[^/]+\.md$/.test(f.slice(dir.length)));
+});
+
+// fetchedIntegration(root, branch): the heads FETCH_HEAD names as `branch '<branch>' of <url>` for
+// a configured remote's url: what `git pull <remote> <branch>` just fetched, a trusted copy of the
+// integration branch even without tracking config.
+function fetchedIntegration(root, branch) {
+  const urls = new Set((git(root, ['config', '--get-regexp', '^remote\\..*\\.url$']) || '').split(/\r?\n/).map((l) => l.slice(l.indexOf(' ') + 1)).filter(Boolean));
+  return (fetchHeads(root)?.heads ?? []).filter((h) => h.name === branch && h.url && urls.has(h.url)).map((h) => h.sha);
+}
 // Diffs this gate compares are made the same way whatever the user's config says.
 const DIFF_CONFIG = ['-c', 'diff.noprefix=false', '-c', 'diff.mnemonicPrefix=false', '-c', 'diff.relative=false', '-c', 'diff.suppressBlankEmpty=false', '-c', 'diff.renames=false', '-c', 'diff.algorithm=myers', '-c', 'diff.indentHeuristic=false'];
 const DIFF_OPTS = ['--no-renames', '--diff-algorithm=myers', '--no-indent-heuristic', ...PATCH];
@@ -1484,10 +1555,10 @@ function codeDiff(root, a, b, spec) {
 }
 // sameCode(root, a, b, spec): the two trees are identical over spec; null when git fails.
 function sameCode(root, a, b, spec) {
-  const r = spawnGit(root, [...DIFF_CONFIG, 'diff', '--quiet', '--no-renames', '--no-ext-diff', '--no-textconv', a, b, ...spec]);
+  const r = spawnGit(root, [...DIFF_CONFIG, 'diff', '--quiet', ...DIFF_OPTS, a, b, ...spec]);
   return r.error ? null : r.status === 0 ? true : r.status === 1 ? false : null;
 }
-function rewriteCheck(root, { old, next, base, info, trusted }) {
+function rewriteCheck(root, { old, next, base, info, trusted, branch }) {
   if (contains(root, next, old)) return { found: false };
   const { code, stories } = recordSpecs(info);
   const touched = (git(root, ['log', '--no-merges', '--format=%H', old, '--not', base, ...stories]) || '').split(/\s+/).filter(Boolean);
@@ -1496,40 +1567,47 @@ function rewriteCheck(root, { old, next, base, info, trusted }) {
     return Boolean(exec?.verifier);
   }));
   if (!found) return { found: false };
-  const gone = (git(root, ['rev-list', '--first-parent', next, '--not', old, ...trusted]) || '').split(/\s+/).filter(Boolean);
+  const gone = (git(root, ['rev-list', '--first-parent', next, '--not', old, ...trusted, ...fetchedIntegration(root, branch)]) || '').split(/\s+/).filter(Boolean);
   const from = gone.length ? resolve(root, `${gone.at(-1)}^1`) : resolve(root, next);
   if (!from) return { found: true, bad: `${REWRITE} (the commit it builds on cannot be read)` };
   const verdict = (same) => (same === null ? { found: true, bad: `${REWRITE} (the trees cannot be compared)` } : same ? { found: true } : { found: true, bad: REWRITE });
   if (from === resolve(root, base)) return verdict(sameCode(root, old, next, code));
-  const mt = spawnGit(root, ['merge-tree', '--write-tree', '--merge-base', base, from, old]);
-  const tree = mt.status === 0 ? chomp(mt.stdout).split(/\r?\n/)[0] : '';
-  if (/^[0-9a-f]{40,64}$/.test(tree)) return verdict(sameCode(root, tree, next, code));
+  // The rebased result; a conflict confined to records still gives a tree whose code is exact.
+  const mt = spawnGit(root, ['merge-tree', '--write-tree', '--name-only', '--no-messages', '-z', '--merge-base', base, from, old]);
+  const [tree, ...conflicted] = mt.status === 0 || mt.status === 1 ? mt.stdout.split('\0').filter(Boolean) : [];
+  if (/^[0-9a-f]{40,64}$/.test(tree ?? '')) {
+    const recordsOnly = conflicted.every((f) => recordFile(f, info));
+    if (!conflicted.length || recordsOnly) return verdict(sameCode(root, tree, next, code));
+    const same = sameCode(root, tree, next, code);
+    return same === true ? { found: true } : { found: true, bad: CONFLICTED };
+  }
   const before = codeDiff(root, base, old, code);
   const after = codeDiff(root, from, next, code);
   if (before === null || after === null) return { found: true, bad: `${REWRITE} (the diffs cannot be read)` };
   return verdict(before === after);
 }
 
-// replayedMerge(root, tip, { old, next, exclude }): old's replaced range holds a merge whose second
-// parent is the story tip, and next no longer holds that merge: a linear rebase replaying it.
+// replayedMerge(root, tip, { old, next, exclude }): the merges in old's replaced range that merged
+// this story and that next no longer holds: the second parent is the tip, or an ancestor of it (the
+// story moved on past its merged commit, the merge itself not in its history), or a descendant of
+// it.
 export const REPLAY = 'a rebase is replaying a shipped story merge; use git pull --rebase=merges (or git pull --no-rebase)';
 function replayedMerge(root, tip, { old, next, exclude }) {
-  if (!old) return false;
+  if (!old) return [];
   const merges = (git(root, ['rev-list', '--merges', '--parents', old, '--not', ...exclude]) || '').split(/\r?\n/).filter(Boolean);
-  return merges.some((line) => {
-    const [m, , second] = line.split(' ');
-    return second === tip && !contains(root, m, next);
-  });
+  return merges.map((line) => line.split(' ')).filter(([m, , second]) => {
+    const ofStory = second === tip || (contains(root, second, tip) && !contains(root, m, tip)) || contains(root, tip, second);
+    return ofStory && !contains(root, m, next);
+  }).map(([m]) => m);
 }
 
-// copyVerdict(root, branch, copies, info, range): the refusal of a story copied into `branch`. A
-// copy from a rebase replaying a story merge old held (replayedMerge) is told to keep the merge.
-// Otherwise an unverified story is refused with its verdict; a verified one too, since a copy is no
-// merge of the verified tip and so bypasses the merged-tree check. Allowed only when no copy is a
-// story.
-function copyVerdict(root, branch, copies, info, range) {
+// copyVerdict(root, branch, copies, info): the refusal of a story copied into `branch`. A replay (a
+// linear rebase flattening a story merge old held) is told to keep the merge. Otherwise an
+// unverified story is refused with its verdict; a verified one too, since a copy is no merge of the
+// verified tip and so bypasses the merged-tree check. Allowed only when no copy is a story.
+function copyVerdict(root, branch, copies, info) {
   for (const t of copies) {
-    if (replayedMerge(root, t.tip, range)) return DENY(REPLAY, t.name);
+    if (t.replay) return DENY(REPLAY, t.name);
     const v = judgeStories(root, branch, [t.tip], { info, strictFetch: false });
     const how = `its changes reach ${branch} as a copy (a cherry-pick or a squash merge)`;
     if (!v.allow) return DENY(`${how}, and ${v.why}; after verification, merge the story branch itself with git merge --no-ff ${t.name}`, t.name);
@@ -1567,7 +1645,7 @@ function judgeIncoming(root, { branch, local, oldSha, next, info, exclude, base 
   if (!introduced.length && !partials.length && !copies.length) return ALLOW('the update brings in no story');
   mark();
   if (copies.length) {
-    const c = copyVerdict(root, branch, copies, info, { old: oldSha, next, exclude });
+    const c = copyVerdict(root, branch, copies, info);
     if (!c.allow) return c;
   }
   // A story old already held (an amend or a rebase of its merge) was judged when it shipped;
@@ -1583,9 +1661,9 @@ function judgeIncoming(root, { branch, local, oldSha, next, info, exclude, base 
 
 // judgeRewrite(root, ctx, v, mark): v, unless the update rewrites history (old is not an ancestor
 // of next) over shipped story work and changes its code (rewriteCheck).
-function judgeRewrite(root, { oldSha, next, info, trusted, base }, v, mark) {
+function judgeRewrite(root, { branch, oldSha, next, info, trusted, base }, v, mark) {
   if (!oldSha || contains(root, oldSha, next)) return v;
-  const r = rewriteCheck(root, { old: oldSha, next, base, info, trusted });
+  const r = rewriteCheck(root, { old: oldSha, next, base, info, trusted, branch });
   if (r.found) mark();
   return r.bad ? DENY(r.bad) : v;
 }

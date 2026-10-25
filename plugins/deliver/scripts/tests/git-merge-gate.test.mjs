@@ -355,7 +355,7 @@ test('git gate: git push . of a story into the integration branch is refused', (
   // receive-pack runs the hook inside the git directory: the gate finds the working tree from there.
   gitIn(p, ['checkout', '-q', 'main']);
   const g = spawnSync(process.execPath, [GATE, RT_HOOK], { cwd: path.join(p, '.git'), env: env(), encoding: 'utf8', input: `${head(p)} ${head(p, BRANCH)} refs/heads/main\n` });
-  assert.equal(g.status, 1, g.stderr);
+  assert.equal(g.status, 86, g.stderr);
   assert.match(g.stderr, /deliver blocked the update of refs\/heads\/main/);
 });
 
@@ -736,16 +736,190 @@ test('git gate: a linear pull --rebase of a local commit over an upstream squash
   assert.equal(r.status, 0, r.stderr);
 });
 
-test('git gate: a rebase carrying a story copy, with no story merge replayed, gets the copy reason, not the replay advice', () => {
+test('git gate: a rewrite that brings in a copy of an unshipped story gets the copy reason; a copy old already held is not re-judged', () => {
+  // An amend that turns a local commit into a copy of the story's code commit.
+  {
+    const p = project();
+    commitFile(p, 'src/h.js', 'h\n', 'feat: h');
+    const before = head(p);
+    gitIn(p, ['rm', '-q', 'src/h.js']);
+    fs.writeFileSync(path.join(p, 'src', 'fix.js'), lines('base').replace('line 1 base', 'line 1 fixed'));
+    gitIn(p, ['add', '-A']);
+    const r = gitRun(p, ['commit', '--amend', '-m', 'feat: h, now the story']);
+    refused(p, before, r, 'amend into a copy');
+    assert.match(r.stderr, /as a copy/);
+    assert.doesNotMatch(r.stderr, /replaying a shipped story merge/);
+  }
+  // A copy that reached main past the gate earlier is old's own history: a rebase carrying it on
+  // does not bring it in, so it is not judged again.
   const o = verified();
   const c = clonedProject(o);
-  // A copy that reached main past the gate.
   assert.equal(gitRun(c, ['cherry-pick', `origin/${BRANCH}~1`], { DELIVER_NO_ENFORCE: '1' }).status, 0);
   commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
   const r = gitRun(c, ['pull', '--rebase']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+// storyB(c): an unverified story B branched from main, with a code commit of its own.
+function storyB(c) {
+  gitIn(c, ['checkout', '-qb', 'pm/S1-4-b', 'main']);
+  commitFile(c, 'src/b.js', 'b\n', 'build(S1-4-b): code');
+  gitIn(c, ['checkout', '-q', 'main']);
+}
+
+test('git gate: syncing main past story work old already holds is allowed', () => {
+  // (a) story A merged locally, story B branched from main after it, then pull --rebase=merges.
+  {
+    const o = verified();
+    const c = clonedProject(o);
+    localStory(c, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'z.js'), 'z\n'));
+    assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+    storyB(c);
+    commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+    const r = gitRun(c, ['pull', '--rebase=merges']);
+    assert.equal(r.status, 0, `(a): ${r.stderr}`);
+  }
+  // (b) a code commit on local main, story B branched from main, then pull --rebase; (c) a reword.
+  for (const label of ['(b)', '(c)']) {
+    const o = verified();
+    const c = clonedProject(o);
+    commitFile(c, 'src/h.js', 'h\n', 'feat: h');
+    storyB(c);
+    let r;
+    if (label === '(b)') {
+      commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+      r = gitRun(c, ['pull', '--rebase']);
+    } else {
+      r = gitRun(c, ['commit', '--amend', '-m', 'feat: h, reworded']);
+    }
+    assert.equal(r.status, 0, `${label}: ${r.stderr}`);
+  }
+});
+
+test('git gate: pull --rebase=merges with no tracking config, naming origin main, is allowed', () => {
+  const o = verified();
+  const c = clonedProject(o);
+  gitIn(c, ['config', '--unset', 'branch.main.remote']);
+  gitIn(c, ['config', '--unset', 'branch.main.merge']);
+  localStory(c, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'z.js'), 'z\n'));
+  assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+  gitIn(c, ['branch', '-D', 'pm/S1-3-z']);
+  commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+  const r = gitRun(c, ['pull', '--rebase=merges', 'origin', 'main']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: a rebase that resolves a record-only conflict is allowed; one that changes code while resolving a conflict is refused', () => {
+  // Record-only: the story is claimed upstream, recorded locally, and upstream then changes the
+  // claim, so recreating the merge conflicts in the story file alone; it is resolved to the record.
+  {
+    const o = verified();
+    const z = 'docs/stories/S1-3-z.md';
+    commitFile(o, z, storyText(claimFor('S1-3-z')), 'chore(S1-3-z): claim');
+    const c = clonedProject(o);
+    gitIn(c, ['checkout', '-qb', 'pm/S1-3-z', 'main']);
+    commitFile(c, 'src/z.js', 'z\n', 'build(S1-3-z): code');
+    const record = storyText({ ...claimFor('S1-3-z'), status: 'in-review', verifier: `PASS ${head(c, 'HEAD')}` });
+    commitFile(c, z, record, 'chore(S1-3-z): record');
+    gitIn(c, ['checkout', '-q', 'main']);
+    assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+    gitIn(c, ['branch', '-D', 'pm/S1-3-z']);
+    commitFile(o, z, storyText({ ...claimFor('S1-3-z'), updated: '2026-10-26 09:00' }), 'chore(S1-3-z): note');
+    let r = gitRun(c, ['pull', '--rebase=merges']);
+    for (let i = 0; i < 5 && r.status !== 0 && fs.existsSync(path.join(c, '.git', 'rebase-merge')); i++) {
+      fs.writeFileSync(path.join(c, z), record);
+      gitIn(c, ['add', z]);
+      r = gitRun(c, ['rebase', '--continue']);
+    }
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+  }
+  // Code: upstream edits the line the local story changed; the conflict is resolved by hand.
+  const o = verified();
+  const c = clonedProject(o);
+  localStory(c, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'fix.js'), lines('base').replace('line 7 base', 'line 7 story')));
+  assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+  gitIn(c, ['branch', '-D', 'pm/S1-3-z']);
+  commitFile(o, 'src/fix.js', lines('base').replace('line 7 base', 'line 7 upstream'), 'fix: upstream line 7');
+  const before = head(c);
+  let r = gitRun(c, ['pull', '--rebase=merges']);
+  for (let i = 0; i < 5 && r.status !== 0 && /CONFLICT|could not apply|Resolve all conflicts/i.test(r.stdout + r.stderr); i++) {
+    fs.writeFileSync(path.join(c, 'src', 'fix.js'), lines('base').replace('line 7 base', 'line 7 story and upstream'));
+    gitIn(c, ['add', 'src/fix.js']);
+    r = gitRun(c, ['rebase', '--continue']);
+  }
+  assert.notEqual(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stderr, /the rebase changed code while resolving a conflict; ship that change as a story/);
+  gitRun(c, ['rebase', '--abort']);
+  assert.equal(head(c), before);
+});
+
+test('git gate: a local story kept on its branch survives two successive pull --rebase=merges', () => {
+  const o = verified();
+  const c = clonedProject(o);
+  localStory(c, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'z.js'), 'z\n'));
+  assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+  for (const n of [1, 2]) {
+    commitFile(o, `src/up${n}.js`, `up ${n}\n`, `feat: upstream ${n}`);
+    const r = gitRun(c, ['pull', '--rebase=merges']);
+    assert.equal(r.status, 0, `pull ${n}: ${r.stderr}`);
+  }
+});
+
+test('git gate: a verified change moved to another function while resolving a record conflict in a rebase is refused', () => {
+  const o = verified();
+  const two = 'function a() {\n  return false;\n}\nfunction b() {\n  return false;\n}\n';
+  commitFile(o, 'src/f.js', two, 'feat: f');
+  const z = 'docs/stories/S1-3-z.md';
+  commitFile(o, z, storyText(claimFor('S1-3-z')), 'chore(S1-3-z): claim');
+  const c = clonedProject(o);
+  gitIn(c, ['checkout', '-qb', 'pm/S1-3-z', 'main']);
+  commitFile(c, 'src/f.js', two.replace('return false', 'return true'), 'build(S1-3-z): code');
+  const record = storyText({ ...claimFor('S1-3-z'), status: 'in-review', verifier: `PASS ${head(c, 'HEAD')}` });
+  commitFile(c, z, record, 'chore(S1-3-z): record');
+  gitIn(c, ['checkout', '-q', 'main']);
+  assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+  gitIn(c, ['branch', '-D', 'pm/S1-3-z']);
+  commitFile(o, z, storyText({ ...claimFor('S1-3-z'), updated: '2026-10-26 09:00' }), 'chore(S1-3-z): note');
+  const before = head(c);
+  let r = gitRun(c, ['pull', '--rebase=merges']);
+  for (let i = 0; i < 5 && r.status !== 0 && fs.existsSync(path.join(c, '.git', 'rebase-merge')) && !/deliver blocked/.test(r.stderr); i++) {
+    fs.writeFileSync(path.join(c, z), record);
+    fs.writeFileSync(path.join(c, 'src', 'f.js'), 'function a() {\n  return false;\n}\nfunction b() {\n  return true;\n}\n');
+    gitIn(c, ['add', '-A']);
+    r = gitRun(c, ['rebase', '--continue']);
+  }
+  assert.notEqual(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stderr, /rewriting shipped story history changes code/);
+  gitRun(c, ['rebase', '--abort']);
+  assert.equal(head(c), before);
+});
+
+test('git gate: merging a hotfix that an unfinished story only cherry-picked is allowed', () => {
+  const p = project();
+  gitIn(p, ['checkout', '-qb', 'hotfix', 'main']);
+  commitFile(p, 'src/hot.js', 'hot\n', 'fix: hot');
+  gitIn(p, ['checkout', '-q', 'main']);
+  commitFile(p, 'docs/stories/S1-4-b.md', storyText(claimFor('S1-4-b')), 'chore(S1-4-b): claim');
+  gitIn(p, ['checkout', '-qb', 'pm/S1-4-b', 'main']);
+  gitIn(p, ['cherry-pick', 'hotfix']);
+  commitFile(p, 'docs/stories/S1-4-b.md', storyText({ ...claimFor('S1-4-b'), status: 'in-progress' }), 'chore(S1-4-b): status');
+  gitIn(p, ['checkout', '-q', 'main']);
+  const r = gitRun(p, ['merge', '--no-ff', 'hotfix', '-m', 'm']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: a linear rebase replaying a story merge whose branch moved past the merged commit keeps the replay advice', () => {
+  const o = verified();
+  const c = clonedProject(o);
+  localStory(c, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'z.js'), 'z\n'));
+  assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+  gitIn(c, ['checkout', '-q', 'pm/S1-3-z']);
+  commitFile(c, 'docs/handoff/casey.md', 'later\n', 'docs: handoff');
+  gitIn(c, ['checkout', '-q', 'main']);
+  commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+  const r = gitRun(c, ['pull', '--rebase']);
   assert.notEqual(r.status, 0, r.stderr);
-  assert.match(r.stderr, /as a copy/);
-  assert.doesNotMatch(r.stderr, /replaying a shipped story merge/);
+  assert.match(r.stderr, /a rebase is replaying a shipped story merge/);
   gitRun(c, ['rebase', '--abort']);
 });
 
@@ -978,7 +1152,7 @@ test('git gate: a chained hook that is not executable is chained-inactive, and c
   assert.match(c.notes.join('\n'), /is not executable, so git skips it; run chmod \+x/);
 });
 
-test('git gate: a hook symlinked to a Python script gets the wrapper, and the script is never written', { skip: WIN && 'symlinks' }, () => {
+test('git gate: a symlinked hook, Python, sh, or dangling, gets the wrapper, and its target is never written', { skip: WIN && 'symlinks' }, () => {
   const p = project([{ id: 'S1-1-fix' }], { install: false });
   const target = path.join(tmpDir('pyhook-'), 'policy.py');
   const py = '#!/usr/bin/env python3\nimport sys\nsys.exit(0)\n';
@@ -989,13 +1163,17 @@ test('git gate: a hook symlinked to a Python script gets the wrapper, and the sc
   const r = installGitHook(p);
   assert.equal(r.hooks[RT_HOOK], 'foreign');
   const note = r.notes.find((n) => n.includes(RT_HOOK) && n.includes('is a symlink'));
-  assert.match(note, /its interpreter is not sh/);
+  const symlinked = /it is a symlink, whose target may be shared and is never to be edited, so deliver's lines cannot go inside it; rename it to reference-transaction\.local/;
+  assert.match(note, symlinked);
   assert.doesNotMatch(note, /right after its #! line/);
   assert.equal(fs.readFileSync(target, 'utf8'), py);
   assert.ok(fs.lstatSync(f).isSymbolicLink());
-  // A dangling symlink: the interpreter cannot be read, so the wrapper is the safe advice.
+  // An sh target is shared all the same: the wrapper again, never inline lines.
+  fs.writeFileSync(target, '#!/bin/sh\nexit 0\n');
+  assert.match(installGitHook(p).notes.find((n) => n.includes('is a symlink')), symlinked);
+  // A dangling symlink: the same advice.
   fs.rmSync(target);
-  assert.match(installGitHook(p).notes.find((n) => n.includes('is a symlink')), /its interpreter is not sh|cannot be read/);
+  assert.match(installGitHook(p).notes.find((n) => n.includes('is a symlink')), symlinked);
 });
 
 test('git gate: the wrapper skips a missing or non-executable .local hook instead of wedging updates', { skip: NO_SH }, () => {
@@ -1005,12 +1183,49 @@ test('git gate: the wrapper skips a missing or non-executable .local hook instea
   fs.writeFileSync(f, wrapper(RT_HOOK, path.join(p, '.git', 'deliver', RT_HOOK)), { mode: 0o755 });
   const r = gitRun(p, ['branch', 'x']);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stderr, /deliver: .*reference-transaction\.local missing; restore it or remove this wrapper/);
+  assert.match(r.stderr, /deliver: .*reference-transaction\.local missing or not executable; restore it or remove this wrapper/);
 });
 
 test('git gate: shCompatible knows the POSIX shells, through env or busybox', () => {
   for (const line of ['#!/bin/sh', '#!/bin/mksh', '#!/usr/bin/env ash', '#!/bin/busybox sh', '#!/usr/bin/yash', '#!/bin/posh', 'echo no shebang']) assert.equal(shCompatible(`${line}\nexit 0\n`), true, line);
   for (const line of ['#!/usr/bin/env python3', '#!/usr/bin/env -S node --x', '#!/usr/bin/perl', '#!/bin/busybox awk']) assert.equal(shCompatible(`${line}\n`), false, line);
+});
+
+test('git gate: a hook that is a directory gets the wrapper, worded from why it cannot be read', () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  fs.mkdirSync(path.join(p, '.git', 'hooks', RT_HOOK), { recursive: true });
+  const note = installGitHook(p).notes.find((n) => n.includes('is not a regular file'));
+  assert.match(note, /it is not a regular file, so deliver's lines cannot go inside it/);
+  assert.doesNotMatch(note, /interpreter/);
+});
+
+test('git gate: chaining lines from an earlier version are chained-stale until replaced', { skip: NO_SH }, () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  const f = path.join(p, '.git', 'hooks', RT_HOOK);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  const copy = path.join(p, '.git', 'deliver', RT_HOOK).replace(/\\/g, '/');
+  fs.writeFileSync(f, `#!/bin/sh\nif [ -f "${copy}" ]; then sh "${copy}" "$@"; [ $? = 1 ] && exit 1; fi\nexit 0\n`, { mode: 0o755 });
+  const r = installGitHook(p);
+  assert.equal(r.hooks[RT_HOOK], 'chained-stale');
+  assert.equal(r.ok, false);
+  assert.match(r.notes.join('\n'), /runs an earlier version of deliver's lines; replace them/);
+});
+
+test('git gate: a pinned node that cannot start lets an unrelated commit through with a warning; a refusal still blocks', { skip: NO_SH }, () => {
+  for (const code of [1, 127]) {
+    const p = project([{ id: 'S1-1-fix' }], { install: false });
+    const fake = path.join(tmpDir('fakenode-'), 'node');
+    fs.writeFileSync(fake, `#!/bin/sh\nexit ${code}\n`, { mode: 0o755 });
+    installGitHook(p, { node: fake });
+    const r = gitRun(p, ['commit', '--allow-empty', '-m', 'chore: empty']);
+    assert.equal(r.status, 0, `${code}: ${r.stderr}`);
+    assert.match(r.stderr, new RegExp(`deliver: merge gate failed to run \\(${code}\\); not enforced`));
+  }
+  const p = project();
+  const before = head(p);
+  const m = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']);
+  refused(p, before, m, 'real refusal');
+  assert.doesNotMatch(m.stderr, /failed to run/);
 });
 
 test('git gate: a symlinked hooks directory outside the git directory is not written', { skip: WIN && 'symlinks' }, () => {
