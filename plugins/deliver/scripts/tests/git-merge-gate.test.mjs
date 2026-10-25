@@ -389,7 +389,7 @@ test('git gate: a refused fast-forward says how to restore the working tree, and
 test('git gate: the fallback refuses extra code staged into a merge, and allows a clean verified merge', () => {
   const p = verified({ install: false });
   const r0 = installGitHook(p, { version: [2, 27, 0] });
-  assert.match(r0.notes.join('\n'), /fast-forward updates are not gated, and a merge commit's result is compared with the automatic merge only where git needs no content merge/);
+  assert.match(r0.notes.join('\n'), /fast-forward updates, squash merges, and cherry-picks are not gated \(they make no merge commit\), and a merge commit's result is compared with the automatic merge only where git needs no content merge/);
   const before = head(p);
   assert.equal(gitRun(p, ['merge', '--no-commit', '--no-ff', BRANCH]).status, 0);
   fs.writeFileSync(path.join(p, 'src', 'extra.js'), 'extra\n');
@@ -400,6 +400,139 @@ test('git gate: the fallback refuses extra code staged into a merge, and allows 
   clean(p);
   const ok = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']);
   assert.equal(ok.status, 0, ok.stderr);
+});
+
+test('git gate: an upstream that is not the integration branch on a remote proves nothing shipped', () => {
+  const p = project();
+  gitIn(p, ['remote', 'add', 'origin', 'https://example.invalid/repo.git']);
+  gitIn(p, ['config', 'branch.main.remote', 'origin']);
+  gitIn(p, ['config', 'branch.main.merge', `refs/heads/${BRANCH}`]);
+  gitIn(p, ['update-ref', `refs/remotes/origin/${BRANCH}`, BRANCH]);
+  for (const args of [['merge', '--no-ff', BRANCH, '-m', 'm'], ['merge', '--ff-only', BRANCH]]) {
+    const before = head(p);
+    refused(p, before, gitRun(p, args), args.join(' '));
+    clean(p);
+  }
+  assert.equal(judgeMerge(p, { target: 'main', commits: [head(p, BRANCH)] }).allow, false);
+});
+
+test('git gate: an update with no old value is judged against the ref as it stands', () => {
+  const p = project();
+  const part = head(p, `${BRANCH}~1`);
+  const v = judgeRefUpdate(p, { target: 'main', old: '0'.repeat(40), new: part });
+  assert.equal(v.allow, false, v.reason);
+  assert.match(v.reason, /part of pm\/S1-1-fix short of its tip/);
+  const before = head(p);
+  refused(p, before, gitRun(p, ['update-ref', 'refs/heads/main', part]), 'update-ref with no old value');
+});
+
+test('git gate: creating the integration branch at part of a story is refused; at shipped history it is allowed', () => {
+  const p = project();
+  gitIn(p, ['update-ref', 'refs/remotes/origin/main', 'main']);
+  gitIn(p, ['checkout', '-q', BRANCH]);
+  gitIn(p, ['branch', '-D', 'main']);
+  const part = head(p, `${BRANCH}~1`);
+  const v = judgeRefUpdate(p, { target: 'main', old: '0'.repeat(40), new: part });
+  assert.equal(v.allow, false, v.reason);
+  assert.match(v.reason, /part of pm\/S1-1-fix short of its tip/, 'a commit of the story itself is no copy');
+  const r = gitRun(p, ['branch', 'main', part]);
+  assert.notEqual(r.status, 0, r.stderr);
+  assert.match(r.stderr, /deliver blocked/);
+  assert.equal(gitRun(p, ['rev-parse', '-q', '--verify', 'refs/heads/main']).status, 1);
+  const ok = gitRun(p, ['branch', 'main', 'origin/main']);
+  assert.equal(ok.status, 0, ok.stderr);
+});
+
+test('git gate: a refused update-ref keeps the user\'s staged work; the advice is not reset --merge', () => {
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'notes.md'), 'mine\n');
+  gitIn(p, ['add', 'docs/notes.md']);
+  const before = head(p);
+  const r = gitRun(p, ['update-ref', 'refs/heads/main', BRANCH]);
+  refused(p, before, r, 'update-ref with staged work');
+  assert.doesNotMatch(r.stderr, /reset --merge/);
+  assert.match(r.stderr, /Fix the cause and retry/);
+});
+
+test('git gate: a refused cherry-pick says git cherry-pick --abort, which restores the tree', () => {
+  const p = project();
+  commitFile(p, 'docs/notes.md', 'n\n', 'docs: notes');
+  const before = head(p);
+  const r = gitRun(p, ['cherry-pick', `${BRANCH}~1`]);
+  refused(p, before, r, 'cherry-pick');
+  assert.match(r.stderr, /git cherry-pick --abort/);
+  assert.equal(gitRun(p, ['cherry-pick', '--abort']).status, 0);
+  assert.equal(gitIn(p, ['status', '--porcelain']), '');
+});
+
+test('git gate: a hotfix cherry-picked onto a story branch does not make the hotfix merge a copy', () => {
+  const p = project();
+  gitIn(p, ['checkout', '-qb', 'hotfix', 'main']);
+  commitFile(p, 'src/hot.js', 'hot\n', 'fix: hot');
+  gitIn(p, ['checkout', '-q', BRANCH]);
+  gitIn(p, ['cherry-pick', 'hotfix']);
+  gitIn(p, ['checkout', '-q', 'main']);
+  const r = gitRun(p, ['merge', '--no-ff', 'hotfix', '-m', 'm']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: a squash whose story record conflicted is still a copy', () => {
+  const p = project();
+  commitFile(p, STORY, storyText({ ...claimFor('S1-1-fix'), rounds: 1 }), 'chore(S1-1-fix): round');
+  const before = head(p);
+  assert.notEqual(gitRun(p, ['merge', '--squash', BRANCH]).status, 0, 'the record conflicts');
+  gitIn(p, ['checkout', '--theirs', STORY]);
+  gitIn(p, ['add', STORY]);
+  const r = gitRun(p, ['commit', '-m', 'squash']);
+  refused(p, before, r, 'squash with a record conflict');
+  assert.match(r.stderr, /as a copy/);
+});
+
+test('git gate: rewriting shipped story history with new code is refused; a reword or a record edit is not', () => {
+  // A verified --no-ff merge, the story branch deleted, then an amend that adds code.
+  const a = verified();
+  assert.equal(gitRun(a, ['merge', '--no-ff', BRANCH, '-m', 'm']).status, 0);
+  gitIn(a, ['branch', '-D', BRANCH]);
+  let before = head(a);
+  fs.writeFileSync(path.join(a, 'src', 'fix.js'), 'unverified\n');
+  let r = gitRun(a, ['commit', '-a', '--amend', '--no-edit']);
+  refused(a, before, r, 'amended merge after branch -D');
+  assert.match(r.stderr, /rewriting shipped story history changes code; ship the change as a story/);
+  clean(a);
+  // A verified fast-forward, then a code-changing amend while the branch still exists.
+  const b = verified();
+  assert.equal(gitRun(b, ['merge', '--ff-only', BRANCH]).status, 0);
+  before = head(b);
+  fs.writeFileSync(path.join(b, 'src', 'fix.js'), 'unverified\n');
+  r = gitRun(b, ['commit', '-a', '--amend', '--no-edit']);
+  refused(b, before, r, 'amended fast-forward');
+  assert.match(r.stderr, /rewriting shipped story history changes code/);
+  clean(b);
+  // Rewording, or editing only the record, keeps the code.
+  const c = verified();
+  assert.equal(gitRun(c, ['merge', '--no-ff', BRANCH, '-m', 'm']).status, 0);
+  gitIn(c, ['branch', '-D', BRANCH]);
+  const w = gitRun(c, ['commit', '--amend', '-m', 'feat(S1-1-fix): reworded']);
+  assert.equal(w.status, 0, w.stderr);
+  fs.appendFileSync(path.join(c, STORY), '\nnote\n');
+  const e = gitRun(c, ['commit', '-a', '--amend', '--no-edit']);
+  assert.equal(e.status, 0, e.stderr);
+});
+
+test('git gate: the fallback is strict on an unreadable FETCH_HEAD only for a fetched merge, and refuses an octopus with a story', () => {
+  const p = verified({ install: false });
+  installGitHook(p, { version: [2, 27, 0] });
+  gitIn(p, ['checkout', '-qb', 'feature', 'main']);
+  commitFile(p, 'src/feature.js', 'f\n', 'feature');
+  gitIn(p, ['checkout', '-q', 'main']);
+  fs.writeFileSync(path.resolve(p, gitIn(p, ['rev-parse', '--git-path', 'FETCH_HEAD']).trim()), 'not a line\n');
+  const before = head(p);
+  const o = gitRun(p, ['merge', '--no-ff', BRANCH, 'feature', '-m', 'm']);
+  refused(p, before, o, 'fallback octopus');
+  assert.ok(o.stderr.includes(ONE_AT_A_TIME), o.stderr);
+  clean(p);
+  const r = gitRun(p, ['merge', '--no-ff', 'feature', '-m', 'm']);
+  assert.equal(r.status, 0, r.stderr);
 });
 
 // --- what must keep working ---
@@ -490,7 +623,7 @@ test('git gate: below git 2.28 the pre-merge-commit and pre-commit fallback is i
   const r = installGitHook(p, { version: [2, 27, 0] });
   assert.equal(r.mode, 'fallback');
   assert.deepEqual(Object.keys(r.hooks).sort(), ['pre-commit', 'pre-merge-commit']);
-  assert.match(r.notes.join('\n'), /git < 2\.28 .*fast-forward updates are not gated/);
+  assert.match(r.notes.join('\n'), /git < 2\.28 .*fast-forward updates, squash merges, and cherry-picks are not gated/);
   const before = head(p);
   const m = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']);
   refused(p, before, m, 'fallback merge commit');
@@ -510,6 +643,9 @@ test('git gate: the chaining lines keep a foreign reference-transaction hook wor
   const note = r.notes.find((n) => n.includes('right after its #! line'));
   const add = note.split('right after its #! line: ')[1].replace(/ \(and run \/deliver:doctor after plugin updates\)$/, '');
   fs.writeFileSync(f, `#!/bin/sh\n${add}\n${body}`, { mode: 0o755 });
+  const chained = installGitHook(p);
+  assert.equal(chained.hooks[RT_HOOK], 'chained', 'a hook that calls the copy counts as in place');
+  assert.equal(chained.ok, true);
   const before = head(p);
   refused(p, before, gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']), 'chained gate');
   clean(p);
@@ -517,6 +653,42 @@ test('git gate: the chaining lines keep a foreign reference-transaction hook wor
   assert.notEqual(rel.status, 0);
   assert.match(rel.stderr, /no release updates/);
   assert.equal(gitRun(p, ['branch', 'other']).status, 0, 'an unrelated update passes both');
+});
+
+test('git gate: after --uninstall, the chaining lines in a foreign hook fail open', { skip: NO_SH }, () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  const f = path.join(p, '.git', 'hooks', RT_HOOK);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const note = installGitHook(p).notes.find((n) => n.includes('right after its #! line'));
+  const add = note.split('right after its #! line: ')[1].replace(/ \(and run \/deliver:doctor after plugin updates\)$/, '');
+  fs.writeFileSync(f, `#!/bin/sh\n${add}\nexit 0\n`, { mode: 0o755 });
+  const u = spawnSync(process.execPath, [INSTALL, '--uninstall', p], { encoding: 'utf8', env: env() });
+  assert.equal(u.status, 0, u.stdout);
+  assert.match(u.stdout, /remove the deliver lines you added/);
+  const r = gitRun(p, ['branch', 'x']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: session start points to the installer for chaining lines, whole, even on a long path', () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  const long = path.join(tmpDir('pmlong-'), 'a'.repeat(120), 'b'.repeat(120));
+  fs.mkdirSync(path.dirname(long), { recursive: true });
+  fs.renameSync(p, long);
+  fs.writeFileSync(path.join(long, '.git', 'hooks', RT_HOOK), '#!/bin/sh\necho mine\n', { mode: 0o755 });
+  const s = runHook('session-context.mjs', { cwd: long });
+  const line = s.stdout.split('\n').find((l) => l.includes("reference-transaction is not deliver's"));
+  assert.ok(line, s.stdout);
+  assert.doesNotMatch(line, /deliver_in/);
+  assert.ok(line.includes(`node "${INSTALL.replace(/\\/g, '/')}" --check "${long.replace(/\\/g, '/')}"`), line);
+});
+
+test('git gate: installGitHook with check and uninstall together writes nothing', () => {
+  const p = project();
+  const r = installGitHook(p, { check: true, uninstall: true });
+  assert.equal(r.ok, false);
+  assert.equal(gitRun(p, ['config', '--local', '--get', 'deliver.mergeGate']).status, 1);
+  assert.ok(fs.existsSync(path.join(p, '.git', 'hooks', RT_HOOK)));
 });
 
 test('git gate: a symlinked hooks directory outside the git directory is not written', { skip: WIN && 'symlinks' }, () => {

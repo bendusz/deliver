@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { newProj, runHook, gitIn, tmpDir } from './helpers.mjs';
+import { newProj, runHook, gitIn, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
 const BRANCH = 'pm/S1-1-fix';
 const STORY = path.join('docs', 'stories', 'S1-1-fix.md');
@@ -941,7 +941,7 @@ test('verified: a story tip SHA is judged in the merge directory\'s project; fro
   assert.match(hook(un.top, `git -C packages/bar merge --no-ff ${unTip}`).stderr, /no verifier verdict/);
 });
 
-test('verified: a story branch two projects claim blocks from the root, and is judged by -C', () => {
+test('verified: a story branch two projects claim blocks from the root, and from -C unless every claimant verified it', () => {
   const s = siblings({ barStory: STORY, fooClaims: true });
   recordAt(s.bar, STORY, { verifier: `PASS ${s.code}` });
   gitIn(s.top, ['checkout', '-q', 'main']);
@@ -949,12 +949,59 @@ test('verified: a story branch two projects claim blocks from the root, and is j
   assert.equal(r.status, 2, r.stderr);
   assert.match(r.stderr, /run the merge from the project directory, or with git -C <project>/);
   const c = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
-  assert.equal(c.status, 0, c.stderr);
+  assert.equal(c.status, 2, c.stderr);
+  assert.match(c.stderr, /packages\/foo.*no verifier verdict.*two projects claim this story; verify it in each or rename the branch/);
+  // Verified in both, in one record commit.
+  const both = siblings({ barStory: STORY, fooClaims: true });
+  for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${both.code}` }));
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'chore(S1-1): record']);
+  gitIn(both.top, ['checkout', '-q', 'main']);
+  for (const dir of ['packages/bar', 'packages/foo']) {
+    const ok = hook(both.top, `git -C ${dir} merge --no-ff ${BRANCH}`);
+    assert.equal(ok.status, 0, `${dir}: ${ok.stderr}`);
+  }
+});
+
+test('directory rule: a story two projects claim is judged in each, by both gates; one owner only when one claims it', async () => {
+  const { judgeMerge, judgeRefUpdate } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+  const s = siblings({ barStory: STORY, fooClaims: true });
+  recordAt(s.bar, STORY, { verifier: `PASS ${s.code}` });
+  const tip = gitIn(s.top, ['rev-parse', 'HEAD']).trim();
+  gitIn(s.top, ['checkout', '-q', 'main']);
+  const main = gitIn(s.top, ['rev-parse', 'main']).trim();
+  const shared = /packages\/foo\/docs\/stories\/S1-1-fix\.md records no verifier verdict.*two projects claim this story; verify it in each or rename the branch/;
+  for (const dir of ['packages/foo', 'packages/bar']) {
+    const r = hook(s.top, `git -C ${dir} merge --no-ff ${BRANCH}`);
+    assert.equal(r.status, 2, `${dir}: ${r.stderr}`);
+    assert.match(r.stderr, shared, dir);
+    const j = judgeMerge(s.top, { target: 'main', commits: [tip], prefixes: [`${dir}/`, 'packages/', ''] });
+    assert.equal(j.allow, false, dir);
+    assert.match(j.reason, shared);
+  }
+  const v = judgeRefUpdate(s.top, { target: 'main', old: main, new: tip });
+  assert.equal(v.allow, false, v.reason);
+  assert.match(v.reason, shared);
+  // Verified in each: both gates allow, and judge both claims.
+  const both = siblings({ barStory: STORY, fooClaims: true });
+  for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${both.code}` }));
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'chore(S1-1): record']);
+  const bothTip = gitIn(both.top, ['rev-parse', 'HEAD']).trim();
+  gitIn(both.top, ['checkout', '-q', 'main']);
+  const ok = judgeRefUpdate(both.top, { target: 'main', old: gitIn(both.top, ['rev-parse', 'main']).trim(), new: bothTip });
+  assert.equal(ok.allow, true, ok.reason);
+  assert.deepEqual(ok.judged.map((j) => j.prefix).sort(), ['packages/bar/', 'packages/foo/']);
+  // One claimant: its project judges it alone.
+  const one = siblings({ barStory: STORY });
+  recordAt(one.bar, STORY, { verifier: `PASS ${one.code}` });
+  gitIn(one.top, ['checkout', '-q', 'main']);
+  assert.equal(hook(one.top, `git -C packages/bar merge --no-ff ${BRANCH}`).status, 0);
 });
 
 // --- fix round 3 ---
 
-test('verified: a deliver project at the top level owns a root merge, even when a nested project claims the same branch', () => {
+test('verified: a root merge of a branch the top level and a nested project both claim needs the verdict in each', () => {
   const { p, code } = project();
   const foo = path.join(p, 'packages', 'foo');
   onMain(p, () => {
@@ -968,7 +1015,16 @@ test('verified: a deliver project at the top level owns a root merge, even when 
   record(p, { verifier: `PASS ${code}` });
   toMain(p);
   const r = merge(p);
-  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /packages\/foo\/docs\/stories\/S1-1-fix\.md records no verifier verdict.*two projects claim this story; verify it in each or rename the branch/);
+  // Recording the same verdict in the nested claim too, in a later record commit, ships it.
+  gitIn(p, ['checkout', '-q', BRANCH]);
+  fs.writeFileSync(path.join(foo, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${code}` }));
+  gitIn(p, ['add', path.join('packages', 'foo', STORY)]);
+  gitIn(p, ['commit', '-qm', 'chore(S1-1): record in packages/foo']);
+  toMain(p);
+  const ok = merge(p);
+  assert.equal(ok.status, 0, ok.stderr);
 });
 
 test('verified: a story merge from the repository root of nested projects blocks and names them', () => {

@@ -553,16 +553,21 @@ function pmTips(root) {
 }
 
 // integrationRefs(root, integ): the trusted copies of the integration branch: its ref, the local
-// branch's configured upstream, and origin's copy when origin is that upstream's remote. A
-// same-named branch on any other remote, a fork's for example, proves nothing.
+// branch's configured upstream, and origin's copy when origin is that upstream's remote. A copy on
+// a remote counts only as `refs/remotes/<remote>/<name>` with the branch's own name, and the
+// upstream only when its merge ref is `refs/heads/<name>`: an upstream set to a `pm/*` branch or
+// any other branch proves nothing. A same-named branch on any other remote, a fork's for example,
+// proves nothing either.
+const sameBranch = (ref, name) => typeof ref === 'string' && ref.startsWith('refs/remotes/') && ref.split('/').length > 3 && ref.split('/').slice(3).join('/') === name && !name.startsWith('pm/');
 function integrationRefs(root, integ) {
   const refs = [integ.ref];
   if (resolve(root, `refs/heads/${integ.name}`)) {
     const upstream = chomp(git(root, ['for-each-ref', '--format=%(upstream)', `refs/heads/${integ.name}`]) || '');
-    if (upstream.startsWith('refs/remotes/')) refs.push(upstream);
-    if (chomp(git(root, ['config', '--get', `branch.${integ.name}.remote`]) || '') === 'origin') refs.push(`refs/remotes/origin/${integ.name}`);
+    const merge = chomp(git(root, ['config', '--get', `branch.${integ.name}.merge`]) || '');
+    if (merge === `refs/heads/${integ.name}` && sameBranch(upstream, integ.name)) refs.push(upstream);
+    if (merge === `refs/heads/${integ.name}` && chomp(git(root, ['config', '--get', `branch.${integ.name}.remote`]) || '') === 'origin') refs.push(`refs/remotes/origin/${integ.name}`);
   }
-  return [...new Set(refs.filter((r) => r && resolve(root, r)))];
+  return [...new Set(refs.filter((r) => r && (r === integ.ref || sameBranch(r, integ.name)) && resolve(root, r)))];
 }
 
 // storyBranches(root, op, integ, target): { branches: [{ name, tip }] } for the pm/* branches a
@@ -660,10 +665,25 @@ function parseMeta(text) {
   try { return JSON.parse(m[1]); } catch { return null; }
 }
 
+// spawnGit(root, args, { input, env }): git's raw spawnSync result, with the one set of options
+// every caller here shares: a large buffer (a monorepo's whole tree fits), a 10 s timeout, stdin
+// only when `input` is given, and stderr ignored.
+export function spawnGit(root, args, { input, env } = {}) {
+  return spawnSync('git', ['-C', root, ...args], {
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: 10000,
+    maxBuffer: 256 * 1024 * 1024,
+    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'ignore'],
+    ...(input === undefined ? {} : { input }),
+    ...(env ? { env } : {}),
+  });
+}
+
 // listing(root, args): git's NUL-delimited path output (-z) as an array, unquoted whatever
-// core.quotePath says; null on failure. A large buffer, so a monorepo's whole tree fits.
+// core.quotePath says; null on failure.
 function listing(root, args) {
-  const r = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true, timeout: 5000, maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+  const r = spawnGit(root, args);
   return r.error || r.status !== 0 ? null : r.stdout.split('\0').filter(Boolean);
 }
 
@@ -691,24 +711,25 @@ function claimOf(root, ref, branch, prefix) {
   return null;
 }
 
-function run(root, args) {
-  return spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true, timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] });
-}
+const run = spawnGit;
 
 // Set when merge-tree failed on a git older than 2.38, so the deny can say why.
 let oldGit = null;
 
-function noteGitVersion(root) {
+// olderThan238(root): this git's version as "X.Y" when older than 2.38, else null.
+function olderThan238(root) {
   const v = (chomp(git(root, ['version']) || '').match(/(\d+)\.(\d+)/) || []).slice(1).map(Number);
-  if (v.length === 2 && (v[0] < 2 || (v[0] === 2 && v[1] < 38))) oldGit = v.join('.');
+  return v.length === 2 && (v[0] < 2 || (v[0] === 2 && v[1] < 38)) ? v.join('.') : null;
+}
+
+function noteGitVersion(root) {
+  oldGit = olderThan238(root);
 }
 
 // mergeTreeWorks(root): this git can run `git merge-tree --write-tree` (git 2.38 or newer), which
-// the merged-tree check needs; probed on HEAD when it resolves.
+// the merged-tree check needs; probed on HEAD when it resolves. Reads no module state.
 export function mergeTreeWorks(root) {
-  oldGit = null;
-  noteGitVersion(root);
-  if (oldGit) return false;
+  if (olderThan238(root)) return false;
   if (!resolve(root, 'HEAD')) return true;
   const r = run(root, ['merge-tree', '--write-tree', 'HEAD', 'HEAD']);
   return !r.error && (r.status === 0 || r.status === 1);
@@ -718,7 +739,8 @@ export function mergeTreeWorks(root) {
 const isHandoff = (p, prefix) => p.startsWith(`${prefix}docs/handoff/`) && /^[^/]+\.md$/.test(p.slice(`${prefix}docs/handoff/`.length));
 // onlyRecords(list, file, prefix): every path in the list is the story file, or, when prefix is a
 // string, a handoff note of the project there.
-const onlyRecords = (list, file, prefix = null) => list.every((p) => p === file || (prefix !== null && isHandoff(p, prefix)));
+// `file` may be a list: a story several projects claim has a story file in each.
+const onlyRecords = (list, file, prefix = null) => list.every((p) => [file].flat().includes(p) || (prefix !== null && isHandoff(p, prefix)));
 
 // mergeMatches(root, commit, parents, file): true when a merge commit's tree is the automatic
 // merge of its two parents, apart from the story file; null when this git has no
@@ -728,7 +750,7 @@ function mergeMatches(root, commit, parents, file) {
   const r = run(root, ['merge-tree', '--write-tree', '--name-only', '--no-messages', '-z', parents[0], parents[1]]);
   if (r.error || (r.status !== 0 && r.status !== 1)) { noteGitVersion(root); return oldGit || r.status === 129 ? null : false; }
   const [tree, ...conflicted] = r.stdout.split('\0').filter(Boolean);
-  if (!/^[0-9a-f]{40,64}$/.test(tree || '') || !conflicted.every((p) => p === file)) return false;
+  if (!/^[0-9a-f]{40,64}$/.test(tree || '') || !conflicted.every((p) => [file].flat().includes(p))) return false;
   const diff = listing(root, ['diff', '-z', '--name-only', tree, commit, '--']);
   return diff !== null && onlyRecords(diff, file);
 }
@@ -809,11 +831,13 @@ function verdictFor(root, branch, tip, integ) {
   if (!m) return `${file} records no verifier verdict at a commit ("verifier": "PASS <sha>")`;
   if (m[1] !== 'PASS') return `${file} records verifier ${m[1]}, and only PASS ships`;
   const sha = m[2].toLowerCase();
-  if (!afterVerdict(root, sha, tip, integ.ref, file, prefix)) return staleReason('verifier PASS', sha, branch, tip, 're-verify');
+  // A story several projects claim may record its verdicts in each claimant's story file.
+  const records = integ.records ?? file;
+  if (!afterVerdict(root, sha, tip, integ.ref, records, prefix)) return staleReason('verifier PASS', sha, branch, tip, 're-verify');
   if (tier === 'T1' || tier === 'T2') {
     const ig = atCommit(exec.integrity, 'pass');
     if (!ig) return `${file} is tier ${tier} and records integrity ${sanitize(exec.integrity ?? 'unset')}, not "pass <sha>"`;
-    if (!afterVerdict(root, ig[2].toLowerCase(), tip, integ.ref, file, prefix)) return staleReason('integrity pass', ig[2], branch, tip, 're-run test-integrity.mjs');
+    if (!afterVerdict(root, ig[2].toLowerCase(), tip, integ.ref, records, prefix)) return staleReason('integrity pass', ig[2], branch, tip, 're-run test-integrity.mjs');
   }
   return null;
 }
@@ -1173,10 +1197,12 @@ function integrationProjects(root, branch, prefixes = []) {
 }
 
 // judgeStories(root, branch, commits, { prefixes, info, strictFetch }): the verdict on story
-// commits merged into `branch`; judged lists each story allowed as { name, tip, file, prefix }. One
-// project judges each story: the first that claims it, in the order of the merge's own directory
-// (`prefixes`, deepest first), the top level, then the rest; with no claim anywhere, the first of
-// that order, whose verdict is "no story claims". The git-level gate has no directory, so the top
+// commits merged into `branch`; judged lists each story allowed as { name, tip, file, prefix }, once
+// per claim. A story several projects claim is judged in each, and any refusal refuses it ("verify
+// it in each or rename the branch"); its verdicts may be recorded in every claimant's story file.
+// A story one project claims is judged there; with no claim anywhere, the first project in the
+// order of the merge's own directory (`prefixes`, deepest first), the top level, then the rest
+// (sorted), whose verdict is "no story claims". The git-level gate has no directory, so the top
 // level comes first. strictFetch is storiesOf's.
 function judgeStories(root, branch, commits, { prefixes = [], info, strictFetch = true } = {}) {
   const { projects, failed } = info ?? integrationProjects(root, branch, prefixes);
@@ -1191,11 +1217,23 @@ function judgeStories(root, branch, commits, { prefixes = [], info, strictFetch 
       story = true;
       if (!projects.length) return DENY(`cannot establish which deliver project ships ${name}: the repository listing failed`, name);
       const order = [...new Set([...prefixes, '', ...projects.map((p) => p.prefix)])].map((x) => projects.find((p) => p.prefix === x)).filter(Boolean);
-      const p = order.find((x) => !x.error && x.ref && claimOf(root, x.ref, name, x.prefix)) ?? order[0];
+      const claims = order.map((x) => ({ p: x, claim: !x.error && x.ref ? claimOf(root, x.ref, name, x.prefix) : null })).filter((c) => c.claim);
+      // A story several projects claim is judged in each; else the one claimant, or the first
+      // project in order, whose verdict is "no story claims".
+      if (claims.length > 1) {
+        const records = claims.map((c) => c.claim.file);
+        for (const { p } of claims) {
+          const reason = verdictFor(root, name, tip, { ...p, records });
+          if (reason) return DENY(`${reason}; ${claims.length === 2 ? 'two' : String(claims.length)} projects claim this story; verify it in each or rename the branch`, name);
+        }
+        for (const { p, claim } of claims) judged.push({ name, tip, file: claim.file, prefix: p.prefix });
+        continue;
+      }
+      const p = claims[0]?.p ?? order[0];
       if (p.error) return DENY(p.error, name);
       const reason = verdictFor(root, name, tip, p);
       if (reason) return DENY(reason, name);
-      judged.push({ name, tip, file: claimOf(root, p.ref, name, p.prefix)?.file ?? null, prefix: p.prefix });
+      judged.push({ name, tip, file: claims[0]?.claim.file ?? null, prefix: p.prefix });
     }
   }
   return ALLOW(story ? 'every story merged records the verdicts it needs' : 'no story is merged', story, judged);
@@ -1212,7 +1250,7 @@ function judgeStories(root, branch, commits, { prefixes = [], info, strictFetch 
 // ref-update gate refuses the octopus commit. story is true once a story merge into an integration
 // branch is certain. Fails open on an internal error before that, and closed after it.
 // DELIVER_NO_ENFORCE=1 allows.
-export function judgeMerge(root, { target, commits, prefixes = [] }) {
+export function judgeMerge(root, { target, commits, prefixes = [], strictFetch = true }) {
   if (process.env.DELIVER_NO_ENFORCE === '1') return ALLOW('DELIVER_NO_ENFORCE=1 is set');
   let certain = false;
   try {
@@ -1221,7 +1259,7 @@ export function judgeMerge(root, { target, commits, prefixes = [] }) {
     const list = (commits || []).filter(Boolean);
     if (!list.length) return ALLOW('nothing is being merged');
     certain = true;
-    const v = judgeStories(root, branch, list, { prefixes });
+    const v = judgeStories(root, branch, list, { prefixes, strictFetch });
     certain = v.story;
     if (v.allow && new Set(v.judged.map((j) => j.tip)).size > 1) return DENY(ONE_AT_A_TIME);
     return v;
@@ -1290,59 +1328,132 @@ function storyTips(root) {
   return [...new Map(tips.map((t) => [`${t.name} ${t.tip}`, t])).values()];
 }
 
-// introducedStories(root, { tips, next, reached, partials }): the stories an update brings in by
+// introducedStories(root, { tips, next, reached, held }): the stories an update brings in by
 // ancestry: introduced, the exact tips next holds and the update's base does not, where a tip
 // another introduced tip of the same story holds (a remote-tracking ref pushed before the verdict,
-// say) is superseded and dropped, so only the newest is judged; partials, with `partials` set, each
-// commit inside a tip short of it that next holds, unless an introduced tip already holds it (a
-// story stacked on another); rest, the tips the update does not reach.
-function introducedStories(root, { tips, next, reached, partials: withPartials }) {
+// say) is superseded and dropped, so only the newest is judged; partials, each commit inside a tip
+// short of it that next holds and the base does not, unless an introduced tip already holds it (a
+// story stacked on another) or `held` says a non-story ref does (used for a creation); rest, the
+// tips the update does not reach.
+function introducedStories(root, { tips, next, reached, held = () => false }) {
   const live = tips.filter((t) => !reached(t.tip));
   const inNext = live.filter((t) => contains(root, t.tip, next));
   const introduced = [...new Set(inNext.filter((t) => !inNext.some((o) => o.name === t.name && o.tip !== t.tip && contains(root, t.tip, o.tip))).map((t) => t.tip))];
   const rest = live.filter((t) => !inNext.includes(t));
   const partials = new Set();
-  if (withPartials) {
-    for (const t of rest) {
-      for (const mb of chomp(git(root, ['merge-base', '--all', t.tip, next]) || '').split(/\s+/).filter(Boolean)) {
-        if (!reached(mb) && !introduced.some((x) => contains(root, mb, x))) partials.add(mb);
-      }
+  for (const t of rest) {
+    for (const mb of chomp(git(root, ['merge-base', '--all', t.tip, next]) || '').split(/\s+/).filter(Boolean)) {
+      if (!reached(mb) && !introduced.some((x) => contains(root, mb, x)) && !held(mb)) partials.add(mb);
     }
   }
   return { introduced, partials: [...partials], rest };
 }
 
-// patchIds(root, args): the `git patch-id --stable` of each patch `git <args>` prints, as a Set;
-// null when either command fails.
-const PATCH = ['--no-color', '--no-ext-diff', '--no-textconv'];
-function patchIds(root, args) {
-  const opts = { encoding: 'utf8', windowsHide: true, timeout: 10000, maxBuffer: 256 * 1024 * 1024 };
-  const out = spawnSync('git', ['-C', root, ...args], { ...opts, stdio: ['ignore', 'pipe', 'ignore'] });
-  if (out.error || out.status !== 0) return null;
-  if (!out.stdout.trim()) return new Set();
-  const r = spawnSync('git', ['-C', root, 'patch-id', '--stable'], { ...opts, input: out.stdout, stdio: ['pipe', 'pipe', 'ignore'] });
-  if (r.error || r.status !== 0) return null;
-  return new Set(r.stdout.split(/\r?\n/).map((l) => l.split(' ')[0]).filter(Boolean));
+// heldOutsideStories(root, commit, local): a branch, remote-tracking ref, or tag other than `local`
+// and every pm/* ref holds commit.
+function heldOutsideStories(root, commit, local) {
+  const refs = (git(root, ['for-each-ref', '--format=%(refname)', '--contains', commit, 'refs/heads/', 'refs/remotes/', 'refs/tags/']) || '').split(/\r?\n/).filter(Boolean);
+  return refs.some((r) => r !== local && !/^refs\/(heads|remotes\/[^/]+)\/pm\//.test(r) && !r.endsWith('/HEAD'));
 }
 
-// copiedStories(root, { rest, next, exclude, introduced }): the tips in `rest` whose changes the
-// update copies in (a cherry-pick, or a squash merge): the patch-id of a non-merge commit the update
-// brings in, outside every introduced tip, equals the patch-id of one of the tip's own non-merge
-// commits past the update's base, or of the tip's whole diff from that base. Only commits the
-// update brings in and only tips it does not reach are read; nothing when either is empty. Fails
-// open (no copy) when the patches cannot be read.
-function copiedStories(root, { rest, next, exclude, introduced }) {
+// patchIds(root, args): the `git patch-id --stable` of each patch `git <args>` prints, as a Map
+// from patch-id to the commits that carry it (the zero id for a plain diff); null when either
+// command fails.
+const PATCH = ['--no-color', '--no-ext-diff', '--no-textconv'];
+function patchIds(root, args) {
+  const out = spawnGit(root, args);
+  if (out.error || out.status !== 0) return null;
+  const ids = new Map();
+  if (!out.stdout.trim()) return ids;
+  const r = spawnGit(root, ['patch-id', '--stable'], { input: out.stdout });
+  if (r.error || r.status !== 0) return null;
+  for (const line of r.stdout.split(/\r?\n/)) {
+    const [id, commit] = line.split(' ');
+    if (id) ids.set(id, [...(ids.get(id) ?? []), commit]);
+  }
+  return ids;
+}
+
+// recordSpecs(info): pathspecs for the PM state paths onlyRecords treats as records, the story
+// files and handoff notes of every project judged: { code }, everything else, and { stories }, the
+// story files alone.
+function recordSpecs(info) {
+  const prefixes = [...new Set((info?.projects ?? []).map((p) => p.prefix ?? ''))];
+  if (!prefixes.length) prefixes.push('');
+  return {
+    code: ['--', '.', ...prefixes.flatMap((p) => [`:(exclude,glob)${p}docs/stories/*.md`, `:(exclude,glob)${p}docs/handoff/*.md`])],
+    stories: ['--', ...prefixes.map((p) => `:(glob)${p}docs/stories/*.md`)],
+  };
+}
+
+const commitTime = (root, c) => Number(chomp(git(root, ['show', '-s', '--format=%ct', c]) || '0'));
+
+// copiedStories(root, { rest, next, exclude, introduced, info, local }): the tips in `rest` whose
+// changes the update copies in (a cherry-pick, or a squash merge). Patches are compared on code
+// alone, the PM state paths (recordSpecs) left out on both sides, so a squash whose story record
+// conflicted still matches. A copy is a non-merge commit the update brings in, outside every
+// introduced tip and outside the tip itself (a commit of the story is no copy of it; that is a
+// partial), whose `git patch-id --stable` equals the tip's whole code diff from the update's base
+// (a squash), or one of the tip's own non-merge commits past that base (a cherry-pick) unless the
+// story did not author it: the update's commit is held by a non-story ref and is no newer than the
+// story's (a hotfix cherry-picked onto the story, then merged itself). Cost is bounded: nothing
+// when the update brings no code commit, a tip whose changed paths miss the update's is skipped
+// after two calls, and patches are read once per tip commit. Fails open (no copy) when the
+// patches cannot be read.
+function copiedStories(root, { rest, next, exclude, introduced, info, local }) {
   if (!rest.length) return [];
-  const mine = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', next, '--not', ...exclude, ...introduced]);
+  const { code } = recordSpecs(info);
+  const range = [next, '--not', ...exclude, ...introduced];
+  const mine = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', ...range, ...code]);
   if (!mine?.size) return [];
+  const touched = new Set(listing(root, ['log', '--no-merges', '--name-only', '-z', '--format=', ...range, ...code]) ?? []);
+  const seen = new Map();
   const out = [];
   for (const t of rest) {
-    const ids = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', t.tip, '--not', ...exclude]) ?? new Set();
-    const mb = exclude.length === 1 ? chomp(git(root, ['merge-base', exclude[0], t.tip]) || '') : '';
-    if (mb) for (const id of patchIds(root, ['diff', ...PATCH, mb, t.tip]) ?? []) ids.add(id);
-    if ([...ids].some((id) => mine.has(id))) out.push(t);
+    if (!seen.has(t.tip)) {
+      const paths = listing(root, ['log', '--no-merges', '--name-only', '-z', '--format=', t.tip, '--not', ...exclude, ...code]) ?? [];
+      if (!paths.some((p) => touched.has(p))) { seen.set(t.tip, false); continue; }
+      const own = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', t.tip, '--not', ...exclude, ...code]) ?? new Map();
+      const mb = exclude.length === 1 ? chomp(git(root, ['merge-base', exclude[0], t.tip]) || '') : '';
+      const whole = new Set(mb ? patchIds(root, ['diff', ...PATCH, mb, t.tip, ...code])?.keys() ?? [] : []);
+      const copies = (c) => !contains(root, c, t.tip);
+      let hit = [...whole].some((id) => (mine.get(id) ?? []).some(copies));
+      for (const [id, theirs] of own) {
+        if (hit) break;
+        hit = (mine.get(id) ?? []).filter(copies).some((c) => !(heldOutsideStories(root, c, local) && theirs.some((sc) => commitTime(root, c) <= commitTime(root, sc))));
+      }
+      seen.set(t.tip, hit);
+    }
+    if (seen.get(t.tip)) out.push(t);
   }
   return out;
+}
+
+// rewriteCheck(root, { old, next, base, info, trusted }): for an update that rewrites history (old
+// is not an ancestor of next, and next is not an ancestor of old), whether the replaced range
+// base..old held shipped story work, a commit that records a story's verifier in its story file,
+// as { found }, and, when it did, { bad }, the refusal when the rewrite changes code: the code diff
+// (recordSpecs) from base to old must equal the code diff from the commit next builds on (the
+// newest of its first-parent history that old or a trusted remote copy holds) to next. A reword,
+// a record edit, or a clean rebase onto the remote keeps that diff and passes.
+const REWRITE = 'rewriting shipped story history changes code; ship the change as a story';
+function rewriteCheck(root, { old, next, base, info, trusted }) {
+  if (contains(root, next, old)) return { found: false };
+  const { code, stories } = recordSpecs(info);
+  const touched = (git(root, ['log', '--no-merges', '--format=%H', old, '--not', base, ...stories]) || '').split(/\s+/).filter(Boolean);
+  const found = touched.some((c) => (listing(root, ['diff-tree', '-z', '-r', '--no-commit-id', '--name-only', c, ...stories]) ?? []).some((f) => {
+    const exec = parseExec(git(root, ['show', `${c}:${f}`]) ?? '');
+    return Boolean(exec?.verifier);
+  }));
+  if (!found) return { found: false };
+  const gone = (git(root, ['rev-list', '--first-parent', next, '--not', old, ...trusted]) || '').split(/\s+/).filter(Boolean);
+  const from = gone.length ? resolve(root, `${gone.at(-1)}^1`) : resolve(root, next);
+  if (!from) return { found: true, bad: `${REWRITE} (the commit it builds on cannot be read)` };
+  const before = patchIds(root, ['diff', ...PATCH, base, old, ...code]);
+  const after = patchIds(root, ['diff', ...PATCH, from, next, ...code]);
+  if (!before || !after) return { found: true, bad: `${REWRITE} (the diffs cannot be read)` };
+  const same = before.size === after.size && [...before.keys()].every((k) => after.has(k));
+  return same ? { found: true } : { found: true, bad: REWRITE };
 }
 
 // copyVerdict(root, branch, copies, info): the refusal of a story copied into `branch`. An
@@ -1382,8 +1493,10 @@ function carriedStories(root, carried, tips, info) {
 // excludeFor's; the stories it brings in by ancestry (introducedStories: a pm/* tip, local, remote,
 // or named in FETCH_HEAD, that next reaches and the base does not, or a commit inside such a tip
 // short of it) are judged by judgeStories, then resultCheck judges what the update builds on top of
-// them; a story it copies (copiedStories) is refused (copyVerdict). A creation counts only exact
-// tips the trusted base refs lack. Same failure model as judgeMerge.
+// them; a story it copies (copiedStories) is refused (copyVerdict). An update that states no old
+// value is judged from the ref's current value; only a ref that does not exist is a creation,
+// judged against the trusted base refs, partials included. A ref counts as shipped only as
+// `refs/remotes/<remote>/<target>` (integrationRefs). Same failure model as judgeMerge.
 export function judgeRefUpdate(root, { target, old, new: next }) {
   if (process.env.DELIVER_NO_ENFORCE === '1') return ALLOW('DELIVER_NO_ENFORCE=1 is set');
   let certain = false;
@@ -1392,20 +1505,34 @@ export function judgeRefUpdate(root, { target, old, new: next }) {
     if (!branch || branch.startsWith('pm/')) return ALLOW('not an integration branch');
     if (!next || ZERO.test(next)) return ALLOW('a deletion brings nothing in');
     const local = `refs/heads/${branch}`;
-    const oldSha = old && !ZERO.test(old) ? old : null;
     const full = resolve(root, next);
-    if (oldSha === next || (!oldSha && full && resolve(root, local) === full)) return ALLOW('the update moves nothing');
+    // An update that states no old value is judged from the ref as it stands: in the prepared
+    // phase the ref still holds its old value. Only a ref that does not exist is a creation.
+    const oldSha = (old && !ZERO.test(old) ? old : null) ?? (resolve(root, local) || null);
+    if (oldSha && (oldSha === next || oldSha === full)) return ALLOW('the update moves nothing');
     const info = integrationProjects(root, branch);
     if (!info.projects.length && !(info.failed && baseBranches(root).includes(branch))) return ALLOW(`${branch} is no deliver project's integration branch`);
     const integ = { name: branch, ref: refFor(root, branch) };
-    const shipped = integrationRefs(root, integ).filter((r) => r !== local).find((r) => contains(root, next, r));
+    const shipped = integrationRefs(root, integ).filter((r) => r !== local && sameBranch(r, branch)).find((r) => contains(root, next, r));
     if (shipped) return ALLOW(`${shipped} already holds it`);
     const exclude = excludeFor(root, oldSha, next, local);
     const reached = (c) => exclude.some((x) => contains(root, c, x));
     const tips = storyTips(root);
-    const { introduced, partials, rest } = introducedStories(root, { tips, next, reached, partials: Boolean(oldSha) });
-    const copies = copiedStories(root, { rest, next, exclude, introduced });
-    if (!introduced.length && !partials.length && !copies.length) return ALLOW('the update brings in no story');
+    // A creation has only the trusted base refs to build on, so a commit another non-story ref
+    // holds is not counted as part of a story there.
+    const held = oldSha ? () => false : (c) => heldOutsideStories(root, c, local);
+    const { introduced, partials, rest } = introducedStories(root, { tips, next, reached, held });
+    // A rewrite (an amend, a rebase, a reset elsewhere) is also checked for shipped story work it
+    // replaces, whether or not a story tip is still live.
+    const trusted = integrationRefs(root, integ).filter((r) => r !== local && sameBranch(r, branch));
+    const finish = (v) => {
+      if (!v.allow || !oldSha || contains(root, oldSha, next)) return v;
+      const r = rewriteCheck(root, { old: oldSha, next, base: exclude[0], info, trusted });
+      if (r.found) certain = true;
+      return r.bad ? DENY(r.bad) : v;
+    };
+    const copies = copiedStories(root, { rest, next, exclude, introduced, info, local });
+    if (!introduced.length && !partials.length && !copies.length) return finish(ALLOW('the update brings in no story'));
     certain = true;
     if (copies.length) {
       const c = copyVerdict(root, branch, copies, info);
@@ -1416,10 +1543,10 @@ export function judgeRefUpdate(root, { target, old, new: next }) {
     const carried = oldSha ? introduced.filter((tip) => contains(root, tip, oldSha)) : [];
     const fresh = introduced.filter((tip) => !carried.includes(tip));
     const v = judgeStories(root, branch, [...fresh, ...partials], { info, strictFetch: false });
-    if (!v.allow || !introduced.length) return v;
+    if (!v.allow || !introduced.length) return finish(v);
     const judged = [...v.judged, ...carriedStories(root, carried, tips, info)];
     const bad = resultCheck(root, next, exclude, introduced, judged);
-    return bad ? DENY(bad) : ALLOW(v.reason, true, judged);
+    return bad ? DENY(bad) : finish(ALLOW(v.reason, true, judged));
   } catch (e) {
     return certain ? DENY(`cannot establish the verdict for this story merge (${oneLine(e?.message ?? e)})`) : ALLOW('the gate could not read the update');
   }

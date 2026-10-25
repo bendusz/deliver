@@ -41,7 +41,10 @@ if (!st.legacy) {
   // The git-level ship gate. Any failure drops it silently, like every line here.
   try {
     const { installGitHook } = await import('./git-hook-install.mjs');
-    for (const note of installGitHook(cwd).notes) out.splice(Math.max(0, out.length - 1), 0, oneLine(note).slice(0, 400));
+    // The brief notes point to the installer for any chaining command instead of carrying it, and
+    // are never cut, so no command they name is shown broken.
+    const r = installGitHook(cwd);
+    for (const note of r.brief ?? r.notes) out.splice(Math.max(0, out.length - 1), 0, oneLine(note));
   } catch { /* fail open */ }
 }
 finish();

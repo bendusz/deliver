@@ -24,7 +24,9 @@ code at the branch head and, at `T1` and `T2`, `integrity: pass <sha>`. It reads
 integration branch, never from the working tree. It fails open on unreadable hook input, with the
 kill switch set, or outside a deliver project; the hook header lists the remaining known limits.
 Once a story merge is certain, whatever it cannot establish blocks. The merge's own directory,
-after `cd` or `git -C`, identifies the project. Run from a directory that is in no deliver project
+after `cd` or `git -C`, identifies the project for a story one project claims; a story several
+projects claim must be verified in each, and both gates refuse it otherwise ("two projects claim
+this story; verify it in each or rename the branch"). Run from a directory that is in no deliver project
 (for example a monorepo root), a story-like merge blocks with "run the merge from the project
 directory, or with git -C <project>", unless the checked-out target is a non-base branch that no project integrates on. `implementation-loop.md` state 6
 describes it.
@@ -46,20 +48,26 @@ octopus merge of a story is refused: merge one story at a time. The merged-resul
 `git merge-tree --write-tree`, git 2.38 or newer; on git 2.28 to 2.37 that comparison alone is
 skipped (the verdicts still apply), and session start and `--check` say "merged-tree check needs
 git 2.38; merges are not compared with the verified automatic merge". On git older than 2.28 it
-falls back to `pre-merge-commit` and `pre-commit` hooks, which miss fast-forwards and compare a merge
-commit's staged result only where git needs no content merge (against `git read-tree -m` of the
+falls back to `pre-merge-commit` and `pre-commit` hooks, which miss fast-forwards, squash merges, and
+cherry-picks (none makes a merge commit), refuse a story merged with any other head, and compare a
+merge commit's staged result only where git needs no content merge (against `git read-tree -m` of the
 merge base and both heads), and says so. The installer never overwrites a hook without the marker,
 a symlink, or an unreadable file, and never writes a hooks directory in the working tree, one whose
 real path (symlinks resolved) leaves the git directory, or one set by global or system
-`core.hooksPath`; it reports each, with the lines to add right after the existing hook's `#!` line.
-They stop with the gate's status on a refusal and, for `reference-transaction`, hand the same stdin
-records to the rest of the hook. `/deliver:doctor` checks and repairs the install.
+`core.hooksPath`; it reports each, with the lines to add right after the existing hook's `#!` line
+(session start names the command that prints them, and never cuts a note). They stop with status 1
+only on a refusal, do nothing once deliver's copy is gone, and, for `reference-transaction`, hand
+the same stdin records to the rest of the hook; `--uninstall` says to remove them. `/deliver:doctor` checks and repairs the install.
 `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --uninstall <project>` removes it and sets
 `git config deliver.mergeGate off` in the repository's local config, so session start does not
 reinstall it and `--check` reports it disabled; running the same command without a flag installs
 it again and clears the setting. After a refusal, git's own message says how to recover: `git merge
---abort` for a merge in progress, else `git reset --merge` when the refused changes were left
-staged.
+--abort`, `git rebase --abort`, or `git cherry-pick --abort` for an operation in progress, else
+`git reset --merge` only when the index is exactly the refused commit's tree. Copies are compared
+on code alone, story files and handoff notes left out, so a squash whose story record conflicted is
+still found; a commit merged from a non-story branch that a story only cherry-picked is not a copy.
+Rewriting shipped story history (amending or rebasing over a commit that recorded a verifier) must
+keep the code diff: "rewriting shipped story history changes code; ship the change as a story".
 
 Both catch a PM's honest mistakes, such as a forgotten or stale verdict, a careless command chain,
 or a mis-stated tier. Out of the git-level gate's reach are deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, the merged-result comparison on git older than 2.38 (the verdicts still apply), and pushing straight to the remote. Neither is a

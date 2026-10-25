@@ -52,7 +52,9 @@ Inspect (whichever apply):
   names the current integration branches. It prints the git version against 2.28, and below git
   2.38 the line "merged-tree check needs git 2.38; merges are not compared with the verified
   automatic merge" (the verdicts are still checked; below 2.28 the fallback also misses
-  fast-forwards and compares a merge's staged result only where git needs no content merge). It
+  fast-forwards, squash merges, and cherry-picks, and compares a merge's staged result only where
+  git needs no content merge). A foreign hook that already runs deliver's lines shows as
+  `chained`, which is in place. It
   reports `merge gate: disabled` and exits 1 when `git config deliver.mergeGate` is `off`, which
   `--uninstall` sets; ask before re-enabling, since the user turned it off. It also reports a
   deliver shim it cannot remove, such as a v1 shim in an in-tree `core.hooksPath`. On any other
