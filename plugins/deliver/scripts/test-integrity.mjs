@@ -25,7 +25,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../hooks/lib.mjs';
 
 export const KINDS = ['test-deleted', 'skip-added', 'assertions-dropped', 'config-weakened', 'pragma-added', 'protected-changed'];
 
@@ -473,6 +473,5 @@ function main() {
   }
 }
 
-const real = (p) => { try { return fs.realpathSync.native(p); } catch { return null; } };
-const invoked = process.argv[1] ? real(process.argv[1]) : null;
-if (invoked && invoked === real(fileURLToPath(import.meta.url))) main();
+// isMain compares real paths, so a symlinked path to this file still runs it.
+if (isMain(import.meta.url)) main();

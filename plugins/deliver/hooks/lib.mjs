@@ -29,6 +29,28 @@ export function git(cwd, args) {
   }
 }
 
+// deliverVersion(v): a deliver stamp "X.Y.Z" as [X, Y, Z], or null when it does not parse.
+export function deliverVersion(v) {
+  const m = typeof v === 'string' ? v.match(/^(\d+)\.(\d+)\.(\d+)$/) : null;
+  return m ? m.slice(1).map(Number) : null;
+}
+
+// versionAtLeast(v, min): whether the stamp v is at or after min ([X, Y, Z]); null when v does
+// not parse. The one comparison the ship gate and the trust report share.
+export function versionAtLeast(v, min) {
+  const p = deliverVersion(v);
+  if (!p) return null;
+  for (let i = 0; i < 3; i++) if (p[i] !== min[i]) return p[i] > min[i];
+  return true;
+}
+
+// isMain(metaUrl): whether this process was started on the module at metaUrl. Real paths are
+// compared, so a symlinked path to a script still runs its CLI.
+export function isMain(metaUrl) {
+  const invoked = process.argv[1] ? realpath(process.argv[1]) : null;
+  return Boolean(invoked && invoked === realpath(fileURLToPath(metaUrl)));
+}
+
 export function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch { return false; }
 }
@@ -367,8 +389,7 @@ export function inspectState(root) {
   return out;
 }
 
-const invoked = process.argv[1] ? realpath(process.argv[1]) : null;
-if (invoked && invoked === realpath(fileURLToPath(import.meta.url))) {
+if (isMain(import.meta.url)) {
   const cmd = process.argv[2];
   if (cmd === 'scan') {
     let text = '';

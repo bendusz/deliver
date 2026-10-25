@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs, UsageError } from '../codex/lib/args.mjs';
 import { lockedExecArgs } from '../codex/lib/argv.mjs';
 import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
-import { parseStory } from '../codex/lib/story.mjs';
+import { parseStory, parseProtected } from '../codex/lib/story.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../codex/lib/snapshot.mjs';
 import { runCodex } from '../codex/lib/spawn.mjs';
 import { cmdFallbackPrefix, CMD_FALLBACK_SUFFIX, requireCodex, BUILD_FLAGS, EXEC_FLAGS, REVIEW_FLAGS } from '../codex/lib/preflight.mjs';
@@ -955,4 +955,76 @@ test('advise: missing prompt file, auth failure, and non-zero exit', () => {
   const failed = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_EXEC_EXIT: '5' } });
   assert.equal(failed.status, 70);
   assert.equal(failed.out.codex_exit, '5');
+});
+
+// A build project whose story's Execution block records protected acceptance paths inside its
+// touches, as the protect commit leaves it.
+function protectedBuildProject(prot = ['src/acceptance', 'src/limits.test.mjs']) {
+  const p = newBuildProject(true);
+  const exec = { owner: 'casey', builder: 'codex-builder', branch: 'pm/S1-1-fix', status: 'claimed', tier: 'T1', protected: prot, protected_base: 'a'.repeat(40), deliver: '0.29.0' };
+  fs.writeFileSync(path.join(p, 'docs', 'stories', 'S1-1-fix.md'), `${STORY_V2}\n## Execution\n<!-- pm-exec: ${JSON.stringify(exec)} -->\n`);
+  fs.mkdirSync(path.join(p, 'src', 'acceptance'), { recursive: true });
+  fs.writeFileSync(path.join(p, 'src', 'acceptance', 'a.test.mjs'), 'red\n');
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'chore(S1-1): protect']);
+  return p;
+}
+
+test('build 32: a change to a protected acceptance path is rejected like an out-of-scope one, and the prompt forbids it', () => {
+  for (const rel of ['src/acceptance/a.test.mjs', 'src/acceptance/new.test.mjs', 'src/limits.test.mjs']) {
+    const p = protectedBuildProject(); const s = makeStub();
+    const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: rel, STUB_REPORT_PATH: rel } });
+    assert.equal(r.status, 74, `${rel}: ${JSON.stringify(r.out)}`);
+    assert.equal(r.out.runner_status, 'safety-violation');
+    assert.match(r.out.reason, /protected path/, rel);
+    assert.ok(r.out.actual_files_changed.includes(rel), rel);
+    const prompt = fs.readFileSync(s.promptFile, 'utf8');
+    assert.match(prompt, /- edit these protected acceptance paths, which the test engineer wrote before the build: src\/acceptance, src\/limits\.test\.mjs\./);
+  }
+  const p = protectedBuildProject(); const s = makeStub();
+  const ok = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/acceptance-notes.txt' } });
+  assert.equal(ok.status, 0, 'a sibling that only shares the prefix is not protected: ' + JSON.stringify(ok.out));
+});
+
+test('build 32b: a story with no protected paths gets no protected line; a malformed list blocks', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const ok = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+  assert.equal(ok.status, 0, JSON.stringify(ok.out));
+  assert.doesNotMatch(fs.readFileSync(s.promptFile, 'utf8'), /protected acceptance paths/);
+  for (const bad of [['../outside'], ['/abs'], [''], 'src/acceptance']) {
+    const q = protectedBuildProject(bad); const t = makeStub();
+    const r = runRunner(['--mode', 'build'], { project: q, stub: t, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+    assert.equal(r.out.runner_status, 'blocked', JSON.stringify(bad));
+    assert.match(r.out.reason, /protected/, JSON.stringify(bad));
+    assert.equal(stubActions(t).includes('exec -'), false, 'Codex never ran');
+  }
+});
+
+test('build 33: a pm-exec comment that does not parse refuses before dispatch; no pm-exec stays allowed', () => {
+  const p = protectedBuildProject(); const s = makeStub();
+  const story = path.join(p, 'docs', 'stories', 'S1-1-fix.md');
+  fs.writeFileSync(story, fs.readFileSync(story, 'utf8').replace(/"deliver":"0\.29\.0"\}/, '"deliver":"0.29.0",}'));
+  gitIn(p, ['commit', '-qam', 'a trailing comma']);
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/acceptance/a.test.mjs', STUB_REPORT_PATH: 'src/acceptance/a.test.mjs' } });
+  assert.equal(r.out.runner_status, 'blocked', JSON.stringify(r.out));
+  assert.match(r.out.reason, /pm-exec/);
+  assert.equal(stubActions(s).includes('exec -'), false, 'Codex never ran');
+  const legacy = newBuildProject(true); const t = makeStub();
+  const ok = runRunner(['--mode', 'build'], { project: legacy, stub: t, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+  assert.equal(ok.status, 0, JSON.stringify(ok.out));
+});
+
+test('story: protected paths are normalised lexically, never through a symlink', (t) => {
+  const p = protectedBuildProject(['src/link', 'src//acceptance/']);
+  if (!canSymlink('acceptance', path.join(p, 'src', 'link'))) { t.skip('symlinks are unavailable here'); return; }
+  assert.deepEqual(parseProtected(p, 'docs/stories/S1-1-fix.md'), ['src/acceptance', 'src/link']);
+});
+
+test('story: a leading ./ in a protected path is normalised away; inner . or .. still blocks', () => {
+  const p = protectedBuildProject(['./src/acceptance', './src/limits.test.mjs']);
+  assert.deepEqual(parseProtected(p, 'docs/stories/S1-1-fix.md'), ['src/acceptance', 'src/limits.test.mjs']);
+  for (const bad of [['src/./acceptance'], ['./../outside'], ['./']]) {
+    const q = protectedBuildProject(bad);
+    assert.throws(() => parseProtected(q, 'docs/stories/S1-1-fix.md'), (e) => e instanceof RunnerError && e.status === 'blocked' && /protected/.test(e.message), JSON.stringify(bad));
+  }
 });

@@ -3,3 +3,5 @@
 # The agent-eval fixtures are hashed into a manifest, so their bytes must not vary by platform.
 plugins/deliver/benchmarks/agent-evals/** text eol=lf
 plugins/deliver/benchmarks/assurance/** text eol=lf
+# Lens prompts are hashed into panels.json stamps, so their bytes must not vary by platform either.
+plugins/deliver/agents/*.md text eol=lf

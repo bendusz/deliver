@@ -7,13 +7,14 @@
 // Without --sprint it reports every sprint. --audit instead reports the learned lines in
 // AGENTS.md against the retro records. --trust prints the trust report: per risk tier, what
 // shipped, the panel it ran, the calibrated bound, and the escapes observed since, counted from
-// `Escaped-From: <story-id>` trailers on the integration branch. Exit 64 usage, 66 no
-// docs/stories directory.
+// `Escaped-From: <story-id>` trailers on the integration branch. Targets are docs/plan.md's
+// `- Assurance targets:` line, else 10/5/2%; --targets overrides. A shipped story whose recorded
+// `panel` lacks a member of its tier's panel in force is counted below panel, and withholds the
+// calibrated bound. Exit 64 usage, 66 no docs/stories directory.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { parseExec, listDir, readText } from '../hooks/lib.mjs';
+import { parseExec, listDir, readText, isMain, versionAtLeast } from '../hooks/lib.mjs';
 import { upperBound, staleness, boundStaleness, parseUtc, parseTargets, DEFAULT_TARGETS, CORPUS_ROOT } from './assurance.mjs';
 
 const count = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
@@ -144,22 +145,25 @@ function gitRead(root, args, input) {
   }
 }
 
-// The Execution section's dated note lines: below the pm-exec comment, up to the next heading.
-export function execNotes(text) {
-  const lines = String(text).split(/\r?\n/);
-  const at = lines.findIndex((l) => /^## Execution\s*$/.test(l));
-  if (at < 0) return [];
-  const out = [];
-  for (const l of lines.slice(at + 1)) {
-    if (/^#{1,2} /.test(l)) break;
-    if (/^\s*-\s/.test(l)) out.push(l);
-  }
-  return out;
-}
+// The Claude review lenses; the maximum panel runs every one plus the opposite family.
+export const LENSES = ['code-integrity-reviewer', 'architecture-reviewer', 'security-auditor', 'performance-reviewer'];
 
-// A holdout note reports a failure when it says FAIL, failed, or failures, unless every such word
-// follows a zero: "holdout: 0 failures", "0 failed", and "no failures" are passes.
-const holdoutFailed = (l) => /\bfail(?:ed|ures?)?\b/i.test(String(l).replace(/\b(?:0|no|zero)\s+fail(?:ed|ures?)?\b/gi, ''));
+// maximumPanel(builder): the lens names of the maximum panel for a story its builder wrote. The
+// opposite family of a codex-builder story is code-integrity-reviewer, already a lens; every other
+// builder is Claude, so codex-reviewer joins.
+export const maximumPanel = (builder) => (builder === 'codex-builder' ? [...LENSES] : [...LENSES, 'codex-reviewer']);
+
+// The lens from the family that did not write the code: every panel carries it.
+export const oppositeLens = (builder) => (builder === 'codex-builder' ? 'code-integrity-reviewer' : 'codex-reviewer');
+
+// A stamp of 0.29.0 or later, or a tier with no stamp, which only 0.29 writes.
+const isModern = (exec) => {
+  if (!exec) return false;
+  if (typeof exec.deliver !== 'string') return TIERS.includes(exec.tier);
+  return versionAtLeast(exec.deliver, [0, 29, 0]) === true;
+};
+
+const counter = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
 
 // storyTexts(root, ref): [{ name, text }] for docs/stories at ref, read from git so the stories
 // and the trailers come from the same history; the working tree when ref cannot be read.
@@ -193,16 +197,16 @@ function storyTexts(root, ref) {
   return named(listDir(dir)).map((name) => ({ name, text: readText(path.join(dir, name)) }));
 }
 
-// mergeTimes(root, ref): story id to the committer time (ms, UTC) of the first `chore(<id>):
-// merged` commit on ref, or null when the history cannot be read. A batch commit naming several
-// ids, `chore(S1-1,S1-2): merged`, counts for each.
-function mergeTimes(root, ref) {
-  const log = gitRead(root, ['log', '-E', '--grep=^chore\\([^)]*\\): merged', '--format=%cI%x1f%s', '--end-of-options', ref, '--']);
+// recordTimes(root, ref, word): story id to the committer time (ms, UTC) of the first
+// `chore(<id>): <word>` commit on ref (`merged`, `claim`), or null when the history cannot be read.
+// A batch commit naming several ids, `chore(S1-1,S1-2): merged`, counts for each.
+function recordTimes(root, ref, word) {
+  const log = gitRead(root, ['log', '-E', `--grep=^chore\\([^)]*\\): ${word}`, '--format=%cI%x1f%s', '--end-of-options', ref, '--']);
   if (log === null) return null;
   const out = new Map();
   for (const line of log.split(/\r?\n/)) {
     const [when, subject = ''] = line.split('\x1f');
-    const m = subject.match(/^chore\(([^)]*)\): merged\b/);
+    const m = subject.match(new RegExp(`^chore\\(([^)]*)\\): ${word}\\b`));
     const at = Date.parse(when);
     if (!m || !Number.isFinite(at)) continue;
     for (const id of m[1].split(/[,\s]+/)) if (/^S\d+-\d+$/.test(id) && (!out.has(id) || at < out.get(id))) out.set(id, at);
@@ -218,49 +222,59 @@ const updatedAt = (v) => {
   return Number.isFinite(at) ? at : null;
 };
 
-// readStories(root, ref): every story with its tier, status, merge time, counters, and gate
-// notes. A story with no valid `tier` in its Execution block is `untiered`. The merge time is the
-// first merged commit's committer time on ref, else the Execution block's `updated`, else null.
+// readStories(root, ref): every story with its tier, status, merge time, and counters. A story
+// with no valid `tier` in its Execution block is `untiered`. The merge time is the first merged
+// commit's committer time on ref, else the Execution block's `updated`, else null. Integrity
+// blocks are the committed `integrity_fails` counter, else 1 for an `integrity` verdict of fail,
+// else unknown (null) for a 0.29 T1 or T2 story, whose gate ran but whose count is lost, and 0
+// otherwise. Holdout failures are `holdout_fails`, or null when it is missing. `panel` is the lens
+// names the first review ran, one entry per trial, or null.
 function readStories(root, ref) {
-  const merges = ref ? mergeTimes(root, ref) : null;
+  const merges = ref ? recordTimes(root, ref, 'merged') : null;
   return storyTexts(root, ref).map(({ name, text }) => {
     const id = name.match(/^(S\d+-\d+)-/)[1];
     const exec = text === null ? null : parseExec(text);
-    const notes = text === null ? [] : execNotes(text);
-    const integrityNotes = notes.filter((l) => /\bintegrity:\s*fail/i.test(l)).length;
-    const holdoutNotes = notes.filter((l) => /\bholdout\b/i.test(l));
     const merged = Boolean(exec && exec.status === 'merged');
+    const tier = exec && TIERS.includes(exec.tier) ? exec.tier : 'untiered';
+    const modern = isModern(exec);
+    const integrityCount = counter(exec && exec.integrity_fails);
+    const integrityFailed = Boolean(exec && typeof exec.integrity === 'string' && /^fail\b/.test(exec.integrity.trim()));
     return {
       id,
       sprint: Number(id.match(/^S(\d+)-/)[1]),
-      tier: exec && TIERS.includes(exec.tier) ? exec.tier : 'untiered',
+      tier,
       merged,
       mergedAt: !merged ? null : (merges && merges.has(id) ? merges.get(id) : updatedAt(exec.updated)),
       rounds: count(exec && exec.rounds),
       retries: count(exec && exec.retries),
-      integrityBlocks: integrityNotes || (exec && exec.integrity === 'fail' ? 1 : 0),
-      holdoutRecorded: holdoutNotes.length > 0 || Boolean(exec && exec.holdout),
-      holdoutFailures: holdoutNotes.filter(holdoutFailed).length || (exec && exec.holdout === 'fail' ? 1 : 0),
+      builder: exec && typeof exec.builder === 'string' ? exec.builder : null,
+      modern,
+      panel: exec && Array.isArray(exec.panel) && exec.panel.every((l) => typeof l === 'string') ? exec.panel : null,
+      integrityBlocks: integrityCount !== null ? integrityCount : integrityFailed ? 1 : modern && (tier === 'T1' || tier === 'T2') ? null : 0,
+      holdoutFailures: counter(exec && exec.holdout_fails),
     };
   });
 }
 
-// escapesOn(root, ref): one { commit, story } per story named on an `Escaped-From:` line in a
+// escapesOn(root, ref): one { commit, story, at, sprint } per story named on an `Escaped-From:` line in a
 // commit message reachable from ref, or null when the history cannot be read. git does the
 // filtering, so a long history never passes through here whole.
 export function escapesOn(root, ref) {
   if (String(ref).startsWith('-')) throw new Error(`refusing ref ${ref}`);
-  const log = gitRead(root, ['log', '-i', '-E', '--grep=^Escaped-From:', '--format=%H%x1f%B%x1e', '--end-of-options', ref, '--']);
+  const log = gitRead(root, ['log', '-i', '-E', '--grep=^Escaped-From:', '--format=%H%x1f%cI%x1f%B%x1e', '--end-of-options', ref, '--']);
   if (log === null) return null;
   const out = [];
   for (const entry of log.split('\x1e')) {
-    const [sha, body = ''] = entry.replace(/^\s+/, '').split('\x1f');
+    const [sha, when = '', body = ''] = entry.replace(/^\s+/, '').split('\x1f');
+    const at = Date.parse(when);
     if (!sha) continue;
     const ids = new Set();
     for (const m of body.matchAll(/^Escaped-From:[ \t]*(.+)$/gim)) {
       for (const id of m[1].split(/[,\s]+/)) if (/^S\d+-\d+$/.test(id)) ids.add(id);
     }
-    for (const story of ids) out.push({ commit: sha.trim(), story });
+    // The sprint the fix commit's subject names, `fix(S2-1): ...`, when it names one.
+    const scope = body.split(/\r?\n/)[0].match(/^[\w-]+!?\(\s*S(\d+)-\d+/);
+    for (const story of ids) out.push({ commit: sha.trim(), story, at: Number.isFinite(at) ? at : null, sprint: scope ? Number(scope[1]) : null });
   }
   return out;
 }
@@ -269,6 +283,30 @@ const planBranch = (root) => {
   const m = (readText(path.join(root, 'docs', 'plan.md')) || '').match(/^\s*-\s*Integration branch:\s*`?([A-Za-z0-9._/][A-Za-z0-9._/-]*)`?/m);
   return m ? m[1] : null;
 };
+
+// planTargets(text): { targets, problem } from docs/plan.md's Delivery mode line, found by its
+// label `- Assurance targets:` whatever follows, such as `T0=0.10, T1=0.05, T2=0.02`. Backticks
+// are dropped before parsing. No line gives { {}, null }. A line that does not parse whole, with
+// a malformed part or a tier given twice, fails closed per tier: each tier takes the smallest of
+// its default and every value for it that did parse, and `problem` names what was wrong.
+export function planTargets(text) {
+  const m = String(text ?? '').match(/^\s*-\s*Assurance targets:(.*)$/m);
+  if (!m) return { targets: {}, problem: null };
+  const values = {};
+  const bad = [];
+  for (const raw of m[1].replace(/`/g, '').split(',')) {
+    const part = raw.trim();
+    let t = null;
+    try { t = parseTargets(part); } catch { t = null; }
+    const [k, v] = t ? Object.entries(t)[0] : [];
+    if (!k || !TIERS.includes(k)) { bad.push(part || '(empty)'); continue; }
+    (values[k] ||= []).push(v);
+  }
+  for (const [k, vs] of Object.entries(values)) if (vs.length > 1) bad.push(`${k} given ${vs.length} times`);
+  if (!bad.length) return { targets: Object.fromEntries(Object.entries(values).map(([k, vs]) => [k, vs[0]])), problem: null };
+  const targets = Object.fromEntries(TIERS.map((k) => [k, Math.min(DEFAULT_TARGETS[k], ...(values[k] || []))]));
+  return { targets, problem: bad.join(', ') };
+}
 
 // observed(shipped, escapes, tierOf, tier, target): escaped stories over stories shipped, with
 // the one-sided 95% bound. Zero escapes over a few stories still leaves a wide bound; that is a
@@ -304,12 +342,27 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
   // calibration at all.
   if (panels && panels.stamp && !Number.isFinite(parseUtc(panels.stamp.calibratedAt))) stale.push(`calibratedAt ${JSON.stringify(panels.stamp.calibratedAt ?? null)} is not an ISO UTC time (YYYY-MM-DDTHH:MM:SS.sssZ)`);
   const valid = Boolean(panels && panels.tiers && stale.length === 0);
-  const tgt = { ...DEFAULT_TARGETS };
-  if (panels && panels.tiers) for (const t of TIERS) if (panels.tiers[t] && typeof panels.tiers[t].target === 'number') tgt[t] = panels.tiers[t].target;
-  Object.assign(tgt, targets || {});
+  // The project's targets: the plan's, read from the integration branch when it resolves, else the
+  // defaults; --targets overrides. panels.json's own targets are what it was calibrated for, never
+  // what the project requires.
+  const planText = (resolved ? gitRead(root, ['show', `${ref}:./docs/plan.md`]) : null) ?? readText(path.join(root, 'docs', 'plan.md'));
+  const fromPlan = planTargets(planText);
+  const tgt = { ...DEFAULT_TARGETS, ...fromPlan.targets, ...(targets || {}) };
   const sinceMs = valid ? parseUtc(panels.stamp.calibratedAt) : NaN;
   const since = Number.isFinite(sinceMs) ? panels.stamp.calibratedAt : null;
   const escapes = resolved ? escapesOn(root, ref) : null;
+  const claims = resolved ? recordTimes(root, ref, 'claim') : null;
+  const sprintOf = (id) => Number(String(id).match(/^S(\d+)-/)?.[1] ?? NaN);
+  // escapeSprint(e): the sprint an escape fell in: the latest of the escaped story's sprint, the
+  // sprint its fix commit names, and every sprint with a story merged or claimed by then.
+  const escapeSprint = (e) => {
+    const by = e.at === null ? [] : [
+      ...stories.filter((s) => s.merged && s.mergedAt !== null && s.mergedAt <= e.at).map((s) => s.sprint),
+      ...(claims ? [...claims].filter(([, at]) => at <= e.at).map(([id]) => sprintOf(id)) : []),
+    ];
+    const all = [sprintOf(e.story), e.sprint ?? NaN, ...by].filter(Number.isFinite);
+    return all.length ? Math.max(...all) : null;
+  };
   const tierOf = new Map(stories.map((s) => [s.id, s.tier]));
   const tiers = {};
   for (const t of [...TIERS, 'untiered']) {
@@ -319,30 +372,79 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
     const entry = panels && panels.tiers ? panels.tiers[t] : null;
     // A bound shows only while every lens behind it, panel or best panel, is still the one measured.
     const certify = valid && entry && typeof entry.certifyBound === 'number' && boundStaleness(panels, t, { docReasons: docStale }).length === 0 ? entry.certifyBound : null;
-    const calibrated = Boolean(valid && entry && entry.status === 'measured' && certify !== null && tgt[t] !== undefined && certify <= tgt[t]);
+    const calibrated = Boolean(valid && entry && entry.status === 'measured' && Array.isArray(entry.panel) && certify !== null && tgt[t] !== undefined && certify <= tgt[t]);
+    let observedNow = null;
+    // The sprint OVER TARGET first fired in: walking the window's escapes in time order, the first
+    // at which the stories merged by then, with the escapes by then, exceed the target. Maximum
+    // panels start the sprint after it (retrospective.md) and hold until recalibration; that sprint
+    // and earlier ones kept the measured panel.
+    let firedSprint = null;
+    if (escapes !== null && t !== 'untiered') {
+      const window = since === null ? shippedAll : shippedAll.filter((s) => s.mergedAt === null || s.mergedAt >= sinceMs);
+      observedNow = { since, ...observed(window, escapes, tgt[t] ?? null) };
+      const ids = new Set(window.map((s) => s.id));
+      const mine = escapes.filter((e) => ids.has(e.story)).sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity));
+      for (const e of mine) {
+        const upTo = e.at ?? Infinity;
+        const shippedBy = window.filter((s) => s.mergedAt !== null && s.mergedAt <= upTo);
+        if (observed(shippedBy, mine.filter((x) => (x.at ?? Infinity) <= upTo), tgt[t] ?? null).overTarget) { firedSprint = escapeSprint(e); break; }
+      }
+    }
+    // A story whose sprint cannot be read counts as after it.
+    const forced = (s) => firedSprint !== null && !(Number.isFinite(s.sprint) && s.sprint <= firedSprint);
+    // The panel in force, as lens to trials required. Calibrated and not forced: the measured panel
+    // plus the builder's opposite-family lens. Otherwise the maximum panel: every lens plus the
+    // opposite family, and at T2 code-integrity-reviewer twice. A 0.29 story whose recorded panel,
+    // one entry per trial, falls short of it, or that records none, ran below panel, and the
+    // calibrated bound does not cover it.
+    const inForce = (s) => {
+      const need = new Map();
+      const add = (lens, n) => need.set(lens, Math.max(need.get(lens) || 0, n));
+      if (calibrated && !forced(s)) {
+        for (const m of entry.panel) add(m.lens, Number.isInteger(m.trials) && m.trials > 0 ? m.trials : 1);
+        add(oppositeLens(s.builder), 1);
+      } else {
+        for (const l of maximumPanel(s.builder)) add(l, 1);
+        if (t === 'T2') add('code-integrity-reviewer', 2);
+      }
+      return need;
+    };
+    const short = (s) => !s.panel || [...inForce(s)].some(([lens, n]) => s.panel.filter((l) => l === lens).length < n);
+    const belowPanel = t === 'untiered' ? 0 : inSprint.filter((s) => s.modern && short(s)).length;
+    const withheld = calibrated && belowPanel > 0 ? `${belowPanel} ${belowPanel === 1 ? 'story' : 'stories'} ran below panel` : null;
+    // Unknown counts make the total unknown, never zero. Holdouts run at T2 only: with no 0.29 T2
+    // story here, they were not recorded.
+    const sumOrNull = (vals) => (vals.some((v) => v === null) ? null : vals.reduce((n, v) => n + v, 0));
+    const modernT2 = inSprint.filter((s) => s.tier === 'T2' && s.modern);
+    const holdoutFailures = modernT2.length ? sumOrNull(inSprint.map((s) => (s.tier === 'T2' && s.modern ? s.holdoutFailures : s.holdoutFailures ?? 0))) : null;
     const row = {
       shipped: inSprint.length,
       panel: calibrated ? entry.panel : null,
-      calibratedBound: calibrated ? certify : null,
+      calibratedBound: calibrated && !withheld ? certify : null,
       // Only a certify-split bound is ever shown; a select-split figure is not assurance.
       bestBound: !calibrated && valid ? certify : null,
       target: tgt[t] ?? null,
+      belowPanel,
+      withheld,
+      maximumForced: false,
       firstPass: inSprint.filter((s) => s.rounds === 0 && s.retries === 0).length,
       fixRounds: inSprint.reduce((n, s) => n + s.rounds, 0),
-      integrityBlocks: inSprint.reduce((n, s) => n + s.integrityBlocks, 0),
-      holdoutFailures: inSprint.some((s) => s.holdoutRecorded) ? inSprint.reduce((n, s) => n + s.holdoutFailures, 0) : null,
+      integrityBlocks: sumOrNull(inSprint.map((s) => s.integrityBlocks)),
+      holdoutFailures,
       observed: null,
       observedToDate: null,
     };
-    if (escapes !== null && t !== 'untiered') {
-      const window = since === null ? shippedAll : shippedAll.filter((s) => s.mergedAt === null || s.mergedAt >= sinceMs);
-      row.observed = { since, ...observed(window, escapes, row.target) };
+    if (observedNow) {
+      row.observed = observedNow;
       row.observedToDate = observed(shippedAll, escapes, row.target);
     }
+    // The report names the maximum panel only for the sprints it was in force.
+    row.maximumForced = firedSprint !== null && (sprint === null || sprint > firedSprint);
+    if (t === 'untiered') delete row.belowPanel;
     tiers[t] = row;
   }
   const unmapped = escapes === null ? [] : escapes.filter((e) => !tierOf.has(e.story) || tierOf.get(e.story) === 'untiered');
-  return { sprint, branch: ref, panels: { file: panelsFile, found: Boolean(panels), valid, stale, since }, tiers, escapes, unmapped };
+  return { sprint, branch: ref, panels: { file: panelsFile, found: Boolean(panels), valid, stale, since }, targetsProblem: fromPlan.problem, tiers, escapes, unmapped };
 }
 
 const pctOf = (x) => (x === null || x === undefined ? '-' : `${(x * 100).toFixed(1)}%`);
@@ -351,14 +453,21 @@ export function renderTrust(r) {
   const out = [`Trust report, ${r.sprint === null ? 'all sprints' : `sprint ${r.sprint}`}.`];
   if (!r.panels.found) out.push(`No calibration at ${r.panels.file}: every tier is unmeasured and runs the maximum panel.`);
   else if (r.panels.stale.length) out.push(`panels.json is stale (${r.panels.stale.join('; ')}): every tier runs the maximum panel until /deliver:calibrate re-runs.`);
+  if (r.targetsProblem) out.push(`The Assurance targets line in docs/plan.md does not parse (${r.targetsProblem}): each tier uses the stricter of its default and any value that parsed. Fix the line.`);
   out.push('', '| tier | shipped | panel | calibrated bound | target | first pass | fix rounds | integrity blocks | holdout failures |',
     '|------|---------|-------|------------------|--------|------------|------------|------------------|------------------|');
   for (const [t, row] of Object.entries(r.tiers)) {
-    const panel = row.panel ? row.panel.map((m) => (m.trials > 1 ? `${m.lens} x${m.trials}` : m.lens)).join(' + ') : t === 'untiered' ? '-' : 'unmeasured, maximum panel';
-    const bound = row.calibratedBound !== null ? pctOf(row.calibratedBound) : row.bestBound !== null ? `unmeasured (best ${pctOf(row.bestBound)})` : '-';
+    const panel = row.maximumForced && row.panel ? 'maximum panel (OVER TARGET)'
+      : row.panel ? row.panel.map((m) => (m.trials > 1 ? `${m.lens} x${m.trials}` : m.lens)).join(' + ') : t === 'untiered' ? '-' : 'unmeasured, maximum panel';
+    const bound = row.calibratedBound !== null ? pctOf(row.calibratedBound) : row.withheld ? `- (${row.withheld})` : row.bestBound !== null ? `unmeasured (best ${pctOf(row.bestBound)})` : '-';
     const holdout = row.holdoutFailures === null ? 'not recorded' : row.holdoutFailures;
-    out.push(`| ${t} | ${row.shipped} | ${panel} | ${bound} | ${pctOf(row.target)} | ${row.firstPass}/${row.shipped} | ${row.fixRounds} | ${row.integrityBlocks} | ${holdout} |`);
+    const integrity = row.integrityBlocks === null ? 'not recorded' : row.integrityBlocks;
+    out.push(`| ${t} | ${row.shipped} | ${panel} | ${bound} | ${pctOf(row.target)} | ${row.firstPass}/${row.shipped} | ${row.fixRounds} | ${integrity} | ${holdout} |`);
   }
+  out.push('');
+  // A story whose first review ran fewer lenses than its tier's panel in force is not covered by
+  // that tier's calibration.
+  for (const [t, row] of Object.entries(r.tiers)) if (row.belowPanel !== undefined) out.push(`${t} below panel: ${row.belowPanel}`);
   out.push('');
   if (r.escapes === null) out.push(`Observed escapes: unknown, could not read history at ${r.branch}.`);
   else {
@@ -379,7 +488,8 @@ export function renderTrust(r) {
   return out.join('\n') + '\n';
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// isMain compares real paths, so a symlinked path to this file still runs it.
+if (isMain(import.meta.url)) {
   const die = (message, code) => { fs.writeSync(2, `${message}\n`); process.exit(code); };
   const usage = () => die('usage: retro-stats.mjs <project-root> [--sprint <n>] [--json] [--audit | --trust [--branch <ref>] [--panels <file>] [--targets T0=0.10,T1=0.05,T2=0.02]]', 64);
   const argv = process.argv.slice(2);

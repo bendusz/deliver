@@ -26,16 +26,24 @@
 // Nothing is read from the working tree, which the story checkout controls. Candidate trusted
 // branches are main, master, the origin/HEAD target, init.defaultBranch, and any local non-`pm/*`
 // branch whose committed docs/plan.md names itself as the integration branch. The repository is a
-// deliver project when one of them holds docs/approval.json; their plans' `Integration branch:`
-// lines must agree, and the branch named may not be `pm/*` or already contain the story tip. The
-// claim is the story on that branch, at docs/stories/<branch minus pm/>.md or found by its
-// Execution block's `branch`. A claim with neither `deliver` nor `tier` predates these fields and
-// passes; otherwise `deliver`, when present, must parse, `tier` must be T0, T1, or T2, and
-// `tier`, `deliver`, `branch`, `protected`, `protected_base`, and pm-meta `integrity_allow` must
-// be the same at the branch tip (an absent `protected` equals [], an absent `protected_base` equals
-// ""). A T1 or T2 claim needs non-empty `protected` and a
-// `protected_base`. From the tip only `verifier` and `integrity` are read. The merge is allowed
-// only when:
+// deliver project when one of them holds docs/approval.json, at the top level or below it; every
+// docs/ path below then carries that prefix. The project that owns a merge is the one the merge's
+// own directory (after cd and -C) sits in; else a deliver project at the top level; else, for an
+// operand that looks like a story branch (a pm/* name, or the tip of a pm/* branch here or on any
+// remote), the one project at any depth whose committed claim on its integration branch names it.
+// When several projects claim it, or none does while any deliver project exists in the repository
+// (a project whose plans disagree or whose integration branch does not resolve counts as unable to
+// say), the merge blocks. Otherwise the session's project (CLAUDE_PROJECT_DIR, else the cwd). Its
+// plans' `Integration branch:` lines must agree, and the branch named may not be `pm/*` or already
+// contain the story tip. The claim is the
+// story on that branch, at docs/stories/<branch minus pm/>.md or found by its Execution block's
+// `branch`. A claim with neither `deliver` nor `tier` predates these fields and passes, unless
+// another story on that branch records `deliver` 0.29.0 or later; otherwise `deliver`, when
+// present, must parse, `tier` must be T0, T1, or T2, and `tier`, `deliver`, `branch`,
+// `protected`, `protected_base`, and pm-meta `integrity_allow` must be the same at the branch tip
+// (an absent `protected` equals [], an absent `protected_base` equals ""). A T1 or T2 claim needs
+// non-empty `protected` and a `protected_base`. From the tip only `verifier` and `integrity` are
+// read. The merge is allowed only when:
 //   - `verifier` is "PASS <sha>", <sha> 7 or more hex digits naming the tip or an ancestor of it;
 //   - each commit after <sha> that the integration branch lacks changes only the story file and
 //     handoff notes (docs/handoff/*.md), or
@@ -45,7 +53,11 @@
 //
 // FAIL-OPEN only where the hook cannot tell what is being run: the kill switch, unparseable hook
 // input, a command with no merge of a story branch, or a repository that is not a deliver
-// project. Blocks exit 2 with the reason on stderr.
+// project. A pm-looking merge in a directory the hook cannot read blocks only when the session's
+// own project is a deliver project. Known limit: that check looks at the session directory and
+// the directories above it, never below, so a session opened at a monorepo root whose deliver
+// projects all sit in subdirectories fails open there; open the session in the project, or run
+// the merge without a computed cd. Blocks exit 2 with the reason on stderr.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -55,7 +67,7 @@ if (process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
 
 let lib;
 try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
-const { readHookInput, parseExec, git, chomp } = lib;
+const { readHookInput, parseExec, git, chomp, deliverVersion, versionAtLeast } = lib;
 
 const UNKNOWN = Symbol('unknown');
 
@@ -313,32 +325,48 @@ function refFor(root, name) {
 
 const planName = (text) => (String(text ?? '').match(/^\s*-\s*Integration branch:\s*`?<?([A-Za-z0-9._/-]+)>?`?/m) || [])[1] || null;
 
-// project(root): null when no trusted branch marks a deliver project; else the integration branch
-// as { name, ref }, ref null when it resolves nowhere, or { error } when the plans disagree.
-function project(root) {
+// project(root, prefixes): the deliver project at the deepest of `prefixes` (each "" or a
+// "dir/" path below the top level) that a trusted branch marks; null when none does. Else the
+// integration branch as { name, ref, prefix }, ref null when it resolves nowhere, or
+// { error, prefix } when the plans disagree.
+function project(root, prefixes = ['']) {
+  for (const prefix of prefixes) {
+    const found = projectAt(root, prefix);
+    if (found) return { ...found, prefix };
+  }
+  return null;
+}
+
+// baseBranches(root): the branch names every project may trust without its plan's say-so: main,
+// master, origin/HEAD's target, and init.defaultBranch.
+function baseBranches(root) {
+  const originHead = chomp(git(root, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']) || '');
+  return ['main', 'master', originHead.startsWith('refs/remotes/origin/') ? originHead.slice('refs/remotes/origin/'.length) : '', chomp(git(root, ['config', '--get', 'init.defaultBranch']) || '')]
+    .filter((n) => n && !n.startsWith('pm/'));
+}
+
+const localBranches = (root) => (git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']) || '').split(/\r?\n/).filter(Boolean);
+
+function projectAt(root, prefix) {
   const cands = [];
   const add = (name) => {
     if (!name || name.startsWith('pm/')) return;
     const ref = refFor(root, name);
     if (ref && !cands.some((c) => c.ref === ref)) cands.push({ name, ref });
   };
-  add('main');
-  add('master');
-  const originHead = chomp(git(root, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']) || '');
-  if (originHead.startsWith('refs/remotes/origin/')) add(originHead.slice('refs/remotes/origin/'.length));
-  add(chomp(git(root, ['config', '--get', 'init.defaultBranch']) || ''));
-  for (const name of (git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']) || '').split(/\r?\n/).filter(Boolean)) {
+  for (const name of baseBranches(root)) add(name);
+  for (const name of localBranches(root)) {
     if (name.startsWith('pm/') || cands.some((c) => c.name === name)) continue;
-    if (planName(git(root, ['show', `refs/heads/${name}:docs/plan.md`])) === name) add(name);
+    if (planName(git(root, ['show', `refs/heads/${name}:${prefix}docs/plan.md`])) === name) add(name);
   }
   for (const c of cands) {
-    c.approved = git(root, ['cat-file', '-e', `${c.ref}:docs/approval.json`]) !== null;
-    c.plan = c.approved ? planName(git(root, ['show', `${c.ref}:docs/plan.md`])) : null;
+    c.approved = git(root, ['cat-file', '-e', `${c.ref}:${prefix}docs/approval.json`]) !== null;
+    c.plan = c.approved ? planName(git(root, ['show', `${c.ref}:${prefix}docs/plan.md`])) : null;
   }
   const approved = cands.filter((c) => c.approved);
   if (!approved.length) return null;
   const names = [...new Set(approved.map((c) => c.plan).filter(Boolean))];
-  if (names.length > 1) return { error: `the committed plans on ${approved.filter((c) => c.plan).map((c) => c.name).join(', ')} disagree on the integration branch (${names.join(', ')}); make docs/plan.md agree` };
+  if (names.length > 1) return { error: `the committed plans on ${approved.filter((c) => c.plan).map((c) => c.name).join(', ')} disagree on the integration branch (${names.join(', ')}); make ${prefix}docs/plan.md agree` };
   const name = names[0] ?? approved[0].name;
   return { name, ref: refFor(root, name) };
 }
@@ -374,15 +402,23 @@ function integrationRefs(root, integ) {
 // storyBranches(root, op, integ, target): { branches: [{ name, tip }] } for the pm/* branches a
 // merge operand stands for, { noop } when merging it into the target changes nothing, or
 // { reason } when the operand must be refused outright.
-function storyBranches(root, op, integ, target) {
+// operandOf(root, op): what a merge operand names, as { bare, name, commit }: bare is the operand
+// without revision suffixes or refs/tags/, name the branch it spells (a local branch, or a
+// remote's branch without the remote), null for a SHA, tag, or FETCH_HEAD; commit what it resolves
+// to, or ''.
+function operandOf(root, op) {
   const bare = op.replace(/[~^@].*$/, '').replace(/^refs\/tags\//, '');
-  const tag = bare && git(root, ['show-ref', '--verify', '--quiet', `refs/tags/${bare}`]) !== null;
-  if (tag && (looksPm(bare) || refFor(root, bare))) return { reason: `${bare} is ambiguous: a tag shadows a branch of that name; delete the tag or merge refs/heads/${bare}` };
   const sym = chomp(git(root, ['rev-parse', '--symbolic-full-name', op]) || '');
   let name = null;
   if (sym.startsWith('refs/heads/')) name = sym.slice('refs/heads/'.length);
   else if (sym.startsWith('refs/remotes/')) name = sym.split('/').slice(3).join('/');
-  const commit = resolve(root, op);
+  return { bare, name, commit: resolve(root, op) };
+}
+
+function storyBranches(root, op, integ, target) {
+  const { bare, name, commit } = operandOf(root, op);
+  const tag = bare && git(root, ['show-ref', '--verify', '--quiet', `refs/tags/${bare}`]) !== null;
+  if (tag && (looksPm(bare) || refFor(root, bare))) return { reason: `${bare} is ambiguous: a tag shadows a branch of that name; delete the tag or merge refs/heads/${bare}` };
   // A story the integration branch already holds merges nothing into it.
   if (name && name.startsWith('pm/') && commit && integ.ref && target === integ.name && contains(root, commit, integ.ref)) return { branches: [], noop: true };
   if (name && name.startsWith('pm/')) return { branches: commit ? [{ name, tip: commit }] : [] };
@@ -405,29 +441,30 @@ function parseMeta(text) {
   try { return JSON.parse(m[1]); } catch { return null; }
 }
 
-// claimOf(root, ref, branch): the story on the integration branch that claims `branch`, as
+// storyFiles(root, ref, prefix): the story files on `ref`, as paths from the top level.
+function storyFiles(root, ref, prefix) {
+  const dir = `${prefix}docs/stories/`;
+  const listing = git(root, ['ls-tree', '--name-only', ref, dir]) || '';
+  return listing.split(/\r?\n/).filter((x) => x.startsWith(dir) && /^[^/]+\.md$/.test(x.slice(dir.length)));
+}
+
+// claimOf(root, ref, branch, prefix): the story on the integration branch that claims `branch`, as
 // { file, text, exec }, exec null when the exact-path story's block does not parse; or null.
-function claimOf(root, ref, branch) {
-  const exact = `docs/stories/${branch.slice('pm/'.length)}.md`;
+function claimOf(root, ref, branch, prefix) {
+  const exact = `${prefix}docs/stories/${branch.slice('pm/'.length)}.md`;
   const text = git(root, ['show', `${ref}:${exact}`]);
   if (text !== null) {
     const exec = parseExec(text);
     if (!exec) return { file: exact, text, exec: null };
     if (exec.branch === branch) return { file: exact, text, exec };
   }
-  const listing = git(root, ['ls-tree', '--name-only', ref, 'docs/stories/']) || '';
-  for (const f of listing.split(/\r?\n/).filter((x) => /^docs\/stories\/[^/]+\.md$/.test(x) && x !== exact)) {
+  for (const f of storyFiles(root, ref, prefix).filter((x) => x !== exact)) {
     const t = git(root, ['show', `${ref}:${f}`]);
     const exec = t === null ? null : parseExec(t);
     if (exec && exec.branch === branch) return { file: f, text: t, exec };
   }
   return null;
 }
-
-const version = (v) => {
-  const m = typeof v === 'string' ? v.match(/^(\d+)\.(\d+)\.(\d+)$/) : null;
-  return m ? m.slice(1).map(Number) : null;
-};
 
 function run(root, args) {
   return spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true, timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -441,10 +478,11 @@ function noteGitVersion(root) {
   if (v.length === 2 && (v[0] < 2 || (v[0] === 2 && v[1] < 38))) oldGit = v.join('.');
 }
 
-const HANDOFF = /^docs\/handoff\/[^/]+\.md$/;
-// onlyRecords(list, file, handoff): every path in the list is the story file, or with handoff also
-// a handoff note.
-const onlyRecords = (list, file, handoff = true) => list.split(/\r?\n/).filter(Boolean).every((p) => p === file || (handoff && HANDOFF.test(p)));
+// isHandoff(p, prefix): p is a handoff note of the project at prefix ("" or "dir/").
+const isHandoff = (p, prefix) => p.startsWith(`${prefix}docs/handoff/`) && /^[^/]+\.md$/.test(p.slice(`${prefix}docs/handoff/`.length));
+// onlyRecords(list, file, prefix): every path in the list is the story file, or, when prefix is a
+// string, a handoff note of the project there.
+const onlyRecords = (list, file, prefix = null) => list.split(/\r?\n/).filter(Boolean).every((p) => p === file || (prefix !== null && isHandoff(p, prefix)));
 
 // mergeMatches(root, commit, parents, file): true when a merge commit's tree is the automatic
 // merge of its two parents, apart from the story file.
@@ -455,13 +493,13 @@ function mergeMatches(root, commit, parents, file) {
   const [tree, ...conflicted] = r.stdout.split(/\r?\n/).filter(Boolean);
   if (!/^[0-9a-f]{40,64}$/.test(tree || '') || !conflicted.every((p) => p === file)) return false;
   const diff = git(root, ['diff', '--name-only', tree, commit, '--']);
-  return diff !== null && onlyRecords(diff, file, false);
+  return diff !== null && onlyRecords(diff, file);
 }
 
-// afterVerdict(root, sha, tip, integrationRef, file): true when the commits between the verdict
-// and the tip that the integration branch lacks only record state (the story file and handoff
-// notes) or merge it automatically.
-function afterVerdict(root, sha, tip, integrationRef, file) {
+// afterVerdict(root, sha, tip, integrationRef, file, prefix): true when the commits between the
+// verdict and the tip that the integration branch lacks only record state (the story file and the
+// project's handoff notes) or merge it automatically.
+function afterVerdict(root, sha, tip, integrationRef, file, prefix) {
   if (tip.startsWith(sha)) return true;
   const full = resolve(root, sha);
   if (!full || !contains(root, full, tip)) return false;
@@ -474,7 +512,7 @@ function afterVerdict(root, sha, tip, integrationRef, file) {
       continue;
     }
     const changed = git(root, ['diff-tree', '--root', '--name-only', '--no-commit-id', '-r', commit]);
-    if (changed === null || !onlyRecords(changed, file)) return false;
+    if (changed === null || !onlyRecords(changed, file, prefix)) return false;
   }
   return true;
 }
@@ -493,19 +531,25 @@ const atCommit = (value, word) => (typeof value === 'string' ? value.trim().matc
 
 // verdictFor(root, branch, tip, integ): null to allow, or the reason to block.
 function verdictFor(root, branch, tip, integ) {
-  if (!integ.ref) return `the integration branch ${integ.name} (docs/plan.md, default main) does not resolve, so the claim cannot be read`;
-  if (integ.name.startsWith('pm/')) return `the integration branch ${integ.name} is itself a story branch; fix docs/plan.md`;
+  const prefix = integ.prefix ?? '';
+  if (!integ.ref) return `the integration branch ${integ.name} (${prefix}docs/plan.md, default main) does not resolve, so the claim cannot be read`;
+  if (integ.name.startsWith('pm/')) return `the integration branch ${integ.name} is itself a story branch; fix ${prefix}docs/plan.md`;
   if (contains(root, tip, integ.ref)) return `the integration branch ${integ.name} already contains ${branch}, so it cannot judge the merge`;
-  const claim = claimOf(root, integ.ref, branch);
+  const claim = claimOf(root, integ.ref, branch, prefix);
   if (!claim) return `no story on ${integ.name} claims ${branch}; claim it per state.md before merging`;
   if (!claim.exec) return `${claim.file} on ${integ.name} has an Execution block that does not parse`;
   const has = (k) => Object.hasOwn(claim.exec, k);
-  // A claim with neither field was made before they existed.
-  if (!has('deliver') && !has('tier')) return null;
+  // A claim with neither field was made before they existed, unless the project already records
+  // 0.29 or later on another story, when the missing tier is a mistake.
+  if (!has('deliver') && !has('tier')) {
+    const modern = storyFiles(root, integ.ref, prefix).filter((f) => f !== claim.file).some((f) => {
+      return versionAtLeast(parseExec(git(root, ['show', `${integ.ref}:${f}`]) ?? '')?.deliver, [0, 29, 0]) === true;
+    });
+    return modern ? `${claim.file} on ${integ.name}: the claim records no tier, and other stories there record deliver 0.29 or later; set tier and deliver on the claim` : null;
+  }
   if (has('deliver')) {
-    const v = version(claim.exec.deliver);
-    if (!v) return `${claim.file} on ${integ.name} records no parseable deliver version`;
-    if (v[0] === 0 && v[1] < 29) return null;
+    if (!deliverVersion(claim.exec.deliver)) return `${claim.file} on ${integ.name} records no parseable deliver version`;
+    if (!versionAtLeast(claim.exec.deliver, [0, 29, 0])) return null;
   }
   const tier = claim.exec.tier;
   if (!TIERS.has(tier)) return `${claim.file} on ${integ.name} records tier ${sanitize(tier ?? 'unset')}, not T0, T1, or T2`;
@@ -528,11 +572,11 @@ function verdictFor(root, branch, tip, integ) {
   if (!m) return `${file} records no verifier verdict at a commit ("verifier": "PASS <sha>")`;
   if (m[1] !== 'PASS') return `${file} records verifier ${m[1]}, and only PASS ships`;
   const sha = m[2].toLowerCase();
-  if (!afterVerdict(root, sha, tip, integ.ref, file)) return staleReason('verifier PASS', sha, branch, tip, 're-verify');
+  if (!afterVerdict(root, sha, tip, integ.ref, file, prefix)) return staleReason('verifier PASS', sha, branch, tip, 're-verify');
   if (tier === 'T1' || tier === 'T2') {
     const ig = atCommit(exec.integrity, 'pass');
     if (!ig) return `${file} is tier ${tier} and records integrity ${sanitize(exec.integrity ?? 'unset')}, not "pass <sha>"`;
-    if (!afterVerdict(root, ig[2].toLowerCase(), tip, integ.ref, file)) return staleReason('integrity pass', ig[2], branch, tip, 're-run test-integrity.mjs');
+    if (!afterVerdict(root, ig[2].toLowerCase(), tip, integ.ref, file, prefix)) return staleReason('integrity pass', ig[2], branch, tip, 're-run test-integrity.mjs');
   }
   return null;
 }
@@ -545,15 +589,107 @@ function block(what, reason) {
 }
 
 let calls;
+// The session's project directory: CLAUDE_PROJECT_DIR when it names a directory, else the cwd.
+let sessionDir;
 try {
   const input = readHookInput();
   const cmd = input?.tool_input?.command;
   if (typeof cmd !== 'string' || !/\b(merge|pull)\b/.test(cmd)) process.exit(0);
   const cwd = typeof input.cwd === 'string' && path.isAbsolute(input.cwd) ? input.cwd : process.cwd();
+  const env = process.env.CLAUDE_PROJECT_DIR;
+  sessionDir = env && path.isAbsolute(env) && fs.existsSync(env) && fs.statSync(env).isDirectory() ? path.resolve(env) : cwd;
   calls = gitCalls(cmd, cwd);
 } catch {
   process.exit(0);
 }
+
+const commonDir = (dir) => {
+  const d = chomp(git(dir, ['rev-parse', '--git-common-dir']) || '');
+  return d ? (fs.realpathSync.native?.(path.resolve(dir, d)) ?? path.resolve(dir, d)) : null;
+};
+
+// prefixesOf(root, dir): where a deliver project holding dir may sit, as "a/b/" paths from the top
+// level, deepest first; [] when dir is the top level or not in root's repository. A project below
+// the git top level keeps docs/ there, so every path the gate reads carries the prefix.
+function prefixesOf(root, dir) {
+  const repo = commonDir(root);
+  if (!dir || dir === UNKNOWN || !repo || commonDir(dir) !== repo) return [];
+  const parts = chomp(git(dir, ['rev-parse', '--show-prefix']) || '').replace(/\\/g, '/').split('/').filter(Boolean);
+  const out = [];
+  for (let n = parts.length; n > 0; n--) out.push(`${parts.slice(0, n).join('/')}/`);
+  return out;
+}
+
+// discoveryRefs(root): the refs a deliver project's approval may sit on: the base branches and
+// every local branch outside pm/*. Discovery only: projectAt still decides which a project trusts.
+function discoveryRefs(root) {
+  const refs = new Set();
+  for (const name of [...baseBranches(root), ...localBranches(root)]) {
+    const ref = name.startsWith('pm/') ? null : refFor(root, name);
+    if (ref) refs.add(ref);
+  }
+  return [...refs];
+}
+
+// deliverPrefixes(root): every directory, at any depth, that holds docs/approval.json on one of the
+// discovery refs, as "" or "a/b/".
+function deliverPrefixes(root) {
+  const out = new Set();
+  const tail = 'docs/approval.json';
+  for (const ref of discoveryRefs(root)) {
+    for (const p of (git(root, ['ls-tree', '-r', '--name-only', ref]) || '').split(/\r?\n/)) {
+      if (p === tail) out.add('');
+      else if (p.endsWith(`/${tail}`)) out.add(p.slice(0, p.length - tail.length));
+    }
+  }
+  return [...out];
+}
+
+// storyOperands(root, ops, tips): the operands that look like a story branch, each as
+// { text, name, commit }: a pm/* name, or a commit that is the tip of a pm/* branch here or on any
+// remote. tips is pmTips(root), one for-each-ref.
+function storyOperands(root, ops, tips) {
+  const out = [];
+  for (const op of ops) {
+    if (op.dynamic) continue;
+    const o = operandOf(root, op.text);
+    const name = o.name && o.name.startsWith('pm/') ? o.name : (o.bare.match(/(?:^|\/)(pm\/.+)$/) || [])[1] || null;
+    if (name || (o.commit && tips.some((t) => t.tip === o.commit))) out.push({ text: op.text, name, commit: o.commit });
+  }
+  return out;
+}
+
+// owners(root, wanted, tips): the deliver projects whose committed claims own the story operands. A
+// claim owns a pm/* operand whose branch it names, and any other operand that is the tip, here or
+// on any remote, of the branch it names. Returns { owners, prefixes, broken }: the owning projects
+// with their prefix, every prefix holding a deliver project, and the projects whose claims cannot
+// be read, as { prefix, error }.
+function owners(root, wanted, tips) {
+  const found = new Map();
+  const prefixes = deliverPrefixes(root);
+  const broken = [];
+  for (const prefix of prefixes) {
+    const integ = projectAt(root, prefix);
+    if (!integ) continue;
+    if (integ.error || !integ.ref) {
+      broken.push({ prefix, error: integ.error || `its integration branch ${integ.name} does not resolve` });
+      continue;
+    }
+    const branches = storyFiles(root, integ.ref, prefix)
+      .map((f) => parseExec(git(root, ['show', `${integ.ref}:${f}`]) ?? '')?.branch)
+      .filter((b) => typeof b === 'string' && b.startsWith('pm/'));
+    for (const w of wanted) {
+      const owns = w.name ? branches.includes(w.name) : tips.some((t) => t.tip === w.commit && branches.includes(t.name));
+      if (owns) found.set(prefix, { ...integ, prefix });
+    }
+  }
+  return { owners: [...found.values()], prefixes, broken };
+}
+
+const where = (prefix) => prefix.replace(/\/$/, '') || 'the top level';
+
+// candidates(lists): the prefixes in priority order, each once, ending with the top level.
+const candidates = (...lists) => [...new Set([...lists.flat(), ''])];
 
 const DYNAMIC = 'the shell computes this operand, so the gate cannot see which branch merges; name the branch literally';
 const SEPARATE = 'an earlier git command in the same call can move the refs this merge reads; run the merge as its own command';
@@ -566,6 +702,15 @@ try {
     if (dir === UNKNOWN) return null;
     const top = chomp(git(dir, ['rev-parse', '--show-toplevel']) || '');
     return top ? path.resolve(top) : null;
+  };
+  // Whether the session's own project is a deliver project, decided once, on first need.
+  let sessionDeliver;
+  const inDeliverSession = () => {
+    if (sessionDeliver === undefined) {
+      const root = rootOf(sessionDir);
+      sessionDeliver = Boolean(root && project(root, candidates(prefixesOf(root, sessionDir))));
+    }
+    return sessionDeliver;
   };
   let earlierChange = false;
   for (const { dir, sub, args, ops } of calls) {
@@ -590,16 +735,42 @@ try {
     earlierChange = true;
     const dyn = ops.find((o) => o.dynamic);
     const suspect = dyn || ops.find((o) => looksPm(o.text) || o.text === 'FETCH_HEAD');
+    // Where the repository cannot be read, a pm-looking merge is suspect only from a deliver
+    // session; anywhere else the gate has nothing to protect and fails open.
     if (dir === UNKNOWN) {
-      if (suspect) block(suspect.text, 'the directory this git command runs in cannot be determined, so the story cannot be checked; run it from the project root');
+      if (suspect && inDeliverSession()) block(suspect.text, 'the directory this git command runs in cannot be determined, so the story cannot be checked; run it from the project root');
       continue;
     }
     const root = rootOf(dir);
     if (!root) {
-      if (suspect) block(suspect.text, `${dir} is not a git repository, so the story cannot be checked; run the merge from the project`);
+      if (suspect && inDeliverSession()) block(suspect.text, `${dir} is not a git repository, so the story cannot be checked; run the merge from the project`);
       continue;
     }
-    const integ = project(root);
+    // The project that owns the merge: the one the merge's own directory sits in; else the one whose
+    // committed claim names the operand, refused when several do; else the session's project.
+    // A story merge the gate cannot tie to exactly one healthy deliver project blocks; it never
+    // falls through to allow while any deliver project exists here.
+    const dirPrefixes = prefixesOf(root, dir);
+    let integ = dirPrefixes.length ? project(root, dirPrefixes) : null;
+    // A deliver project at the top level owns every merge its directory does not place elsewhere.
+    if (!integ) { const top = projectAt(root, ''); if (top) integ = { ...top, prefix: '' }; }
+    let stories = null;
+    if (!integ) {
+      const tips = pmTips(root);
+      const wanted = storyOperands(root, ops, tips);
+      if (wanted.length) {
+        stories = new Set(wanted.map((w) => w.text));
+        const own = owners(root, wanted, tips);
+        const names = wanted.map((w) => w.name || w.text).join(', ');
+        if (own.owners.length === 1) integ = own.owners[0];
+        else if (own.owners.length > 1) integ = { error: `more than one deliver project claims ${names} (${own.owners.map((o) => where(o.prefix)).join(', ')}), so which one ships it is ambiguous; run the merge with git -C <project>` };
+        else if (own.prefixes.length) {
+          const brokenNote = own.broken.length ? ` (or ${own.broken.map((b) => `${where(b.prefix)} has: ${b.error}`).join('; ')})` : '';
+          integ = { error: `no deliver project in this repository claims ${names}${brokenNote}; claim it, or run with git -C <project>` };
+        }
+      }
+      if (!integ) integ = project(root, candidates(prefixesOf(root, sessionDir)));
+    }
     if (!integ) continue;
     const target = targets.has(root) ? targets.get(root) : currentBranch(root);
     // Merging into a story branch, such as the integration tip into it, is not a ship.
@@ -614,7 +785,7 @@ try {
       const found = integ.error ? { branches: [] } : storyBranches(root, op.text, integ, target);
       // A no-op judged on refs an earlier command may move is no judgement; fall through to SEPARATE.
       if (found.noop && !prior) continue;
-      const story = Boolean(found.reason || found.branches.length || looksPm(op.text) || op.text === 'FETCH_HEAD');
+      const story = Boolean(found.reason || found.branches.length || looksPm(op.text) || op.text === 'FETCH_HEAD' || Boolean(stories?.has(op.text)));
       if (!story) continue;
       if (prior) block(op.text, SEPARATE);
       if (integ.error) block(op.text, integ.error);

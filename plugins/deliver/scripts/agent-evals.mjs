@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { isMain } from '../hooks/lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EVAL_ROOT = path.join(HERE, '..', 'benchmarks', 'agent-evals');
@@ -100,7 +101,8 @@ export function compare(base, cand) {
 
 const summary = (s) => ({ ref: s.ref, prompt_bytes: s.prompt_bytes, dev: s.dev, heldout: s.heldout, seeded: s.seeded, clean: s.clean });
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// isMain compares real paths, so a symlinked path to this file still runs it.
+if (isMain(import.meta.url)) {
   const die = (message, code) => { fs.writeSync(2, `${message}\n`); process.exit(code); };
   const usage = () => die('usage: agent-evals.mjs list [--split dev|heldout|all] [--agent <name>] | manifest --check|--write | score <results.json> | compare <base.json> <candidate.json>', 64);
   const read = (file) => {
