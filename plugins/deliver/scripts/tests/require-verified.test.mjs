@@ -1142,3 +1142,79 @@ test('directory rule: a repository with no deliver project is never blocked', ()
     assert.equal(r.status, 0, `${cmd}: ${r.stderr}`);
   }
 });
+
+// --- WP-F fix round 1 ---
+
+test('directory rule: FETCH_HEAD after a fetch of a story branch blocks at a monorepo root', () => {
+  const s = verifiedSiblings();
+  const r = hook(s.top, `git fetch origin ${BRANCH} && git merge --no-ff FETCH_HEAD`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.equal(hook(s.top, 'git merge --no-ff FETCH_HEAD').status, 2, 'FETCH_HEAD alone is story-like too');
+});
+
+test('directory rule: after a ref-changing command, a merge of anything but a base branch at the root is SEPARATE', () => {
+  const s = verifiedSiblings();
+  gitIn(s.top, ['branch', 'feature', 'main']);
+  const r = hook(s.top, 'git fetch && git merge --no-ff feature');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /run the merge as its own command/);
+  assert.equal(hook(s.top, 'git merge --no-ff feature').status, 0, 'on its own, a non-story branch merges');
+  for (const cmd of ['git fetch && git merge origin/main', 'git fetch && git merge main']) assert.equal(hook(s.top, cmd).status, 0, cmd);
+});
+
+// developProject(): main holds no deliver project; develop adds packages/bar, whose plan names
+// develop, and a story branch cut from develop changes bar's code. Checked out on main.
+function developProject() {
+  const top = tmpDir('pmdev-');
+  const bar = path.join(top, 'packages', 'bar');
+  gitIn(top, ['init', '-q']);
+  gitIn(top, ['config', 'user.email', 'casey@example.com']);
+  gitIn(top, ['config', 'user.name', 'Casey Example']);
+  commitOn(top, 'README.md', 'monorepo\n', 'init');
+  gitIn(top, ['branch', '-M', 'main']);
+  gitIn(top, ['checkout', '-qb', 'develop']);
+  fs.mkdirSync(path.join(bar, 'docs', 'stories'), { recursive: true });
+  fs.mkdirSync(path.join(bar, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(bar, 'docs', 'approval.json'), JSON.stringify({ status: 'approved', approver: 'Casey', approved_date: '2026-09-01', plan_digest: null, updated: '2026-09-01 10:00' }) + '\n');
+  fs.writeFileSync(path.join(bar, 'docs', 'plan.md'), '# Plan\n- Integration branch: develop\n');
+  fs.writeFileSync(path.join(bar, STORY), storyText(CLAIM));
+  fs.writeFileSync(path.join(bar, 'src', 'fix.js'), lines('base'));
+  gitIn(top, ['add', '.']);
+  gitIn(top, ['commit', '-qm', 'bar integrates on develop']);
+  gitIn(top, ['checkout', '-qb', BRANCH]);
+  fs.writeFileSync(path.join(bar, 'src', 'fix.js'), lines('base').replace('line 1 base', 'line 1 fixed'));
+  gitIn(top, ['commit', '-qam', 'build(S1-1): fix']);
+  gitIn(top, ['checkout', '-q', 'main']);
+  return { top, bar };
+}
+
+test('directory rule: a project integrating on develop is found from the root though main lacks it', () => {
+  const d = developProject();
+  const r = hook(d.top, `git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /found deliver projects: packages\/bar/);
+  assert.equal(hook(d.top, 'git merge --no-ff develop').status, 2, 'develop carries story-free work into main, a base branch, but holds bar');
+});
+
+test('directory rule: a listing that fails while a story-like operand is present blocks', () => {
+  const s = verifiedSiblings();
+  // Drop a subtree object main needs, so the recursive listing of main fails.
+  const oid = gitIn(s.top, ['rev-parse', 'main:packages/foo/src']).trim();
+  fs.rmSync(path.join(s.top, '.git', 'objects', oid.slice(0, 2), oid.slice(2)));
+  const r = hook(s.top, `git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /cannot list the repository to look for deliver projects/);
+});
+
+test('directory rule: the root rule skips a target no project integrates on, and keeps any that could be one', () => {
+  const s = verifiedSiblings();
+  gitIn(s.top, ['checkout', '-qb', 'feat/x']);
+  const r = hook(s.top, 'git merge -');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(hook(s.top, `git merge --no-ff ${BRANCH}`).status, 0, 'feat/x is not an integration branch');
+  // A checkout earlier in the call sets the target: main is a base branch.
+  assert.equal(hook(s.top, `git checkout main && git merge --no-ff ${BRANCH}`).status, 2);
+  const d = developProject();
+  gitIn(d.top, ['checkout', '-q', 'develop']);
+  assert.equal(hook(d.top, 'git merge -').status, 2, 'develop is bar\'s integration branch, though a working-tree project resolves only below');
+});

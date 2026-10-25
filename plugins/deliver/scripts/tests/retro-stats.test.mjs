@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { tmpDir, gitIn, PLUGIN_ROOT } from './helpers.mjs';
-import { collect, render, auditLessons, renderAudit, trust, renderTrust } from '../retro-stats.mjs';
+import { collect, render, auditLessons, renderAudit, trust, renderTrust, firingSprint } from '../retro-stats.mjs';
 import { upperBound, CORPUS_ROOT, REVIEW_DEFAULTS } from '../assurance.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'retro-stats.mjs');
@@ -616,4 +616,33 @@ test('retro-stats --trust: the shipped plan template\'s Assurance targets line p
     assert.equal(r.targetsProblem, null, form);
     assert.equal(r.tiers.T2.target, 0.01, form);
   }
+});
+
+// --- WP-F fix round 1 ---
+
+test('retro-stats --trust: an undated story stays out of the walk\'s denominators, so 1 escape in 45 still fires', () => {
+  const stories = [];
+  for (let i = 1; i <= 45; i += 1) stories.push([`S1-${i}`, t0('2026-10-05 10:00')]);
+  const { updated, ...noTime } = t0('');
+  stories.push(['S2-1', noTime], ['S3-1', t0('2026-10-20 10:00')]);
+  const p = soloProject(stories);
+  commitAt(p, 'fix: one\n\nEscaped-From: S1-1', '2026-10-06T10:00:00Z');
+  fs.writeFileSync(path.join(p, 'p.json'), JSON.stringify(PANELS));
+  const r = trust(p, { panelsFile: path.join(p, 'p.json') });
+  assert.equal(r.tiers.T0.observed.shipped, 47, 'the final figure still counts the undated story');
+  assert.equal(r.tiers.T0.observed.overTarget, false);
+  assert.equal(r.tiers.T0.maximumForced, true, '1 in 45 crossed 10% in sprint 1');
+  assert.equal(r.tiers.T0.belowPanel, 2, 'S2-1 and S3-1 ran after the firing sprint');
+  assert.equal(trust(p, { panelsFile: path.join(p, 'p.json'), sprint: 1 }).tiers.T0.maximumForced, false);
+});
+
+test('retro-stats: firingSprint counts an undated story\'s escapes from the window start, and dates by the earliest known sprint at or after the firing step', () => {
+  const window = [{ id: 'S1-1', mergedAt: 1 }, { id: 'S1-2', mergedAt: 2 }, { id: 'S1-3', mergedAt: null }];
+  const esc = (story, at, sprint) => ({ commit: `c${at}`, story, at, sprint });
+  // The undated S1-3's escape counts from the start: 1 escape in 1 dated story fires at once.
+  assert.equal(firingSprint(window, [esc('S1-3', 1.5, 2)], 0.1, (e) => e.sprint), 2);
+  // The firing escape has no known sprint; the earliest known one after it wins, not the latest.
+  const later = [esc('S1-1', 3, null), esc('S1-2', 4, 4), esc('S1-1', 5, 2)];
+  assert.equal(firingSprint(window, later, 0.1, (e) => e.sprint), 2);
+  assert.equal(firingSprint(window, [], 0.1, (e) => e.sprint), null);
 });
