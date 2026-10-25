@@ -164,7 +164,7 @@ conflict resolution in code included, needs a fresh verdict. Run the merge as it
 from the project directory or with `git -C <project>`, after at most a plain `git checkout` or
 `git switch` of the integration branch, and name the story branch literally. The merge's own
 directory identifies the project; from a directory that is in no deliver project (for example a
-monorepo root), a story-like merge blocks.
+monorepo root), a story-like merge blocks, unless the checked-out target is a non-base branch that no project integrates on.
 
 ```
 git checkout <integration> && git merge --no-ff pm/S1-2-x -m "$(cat <<'EOF'

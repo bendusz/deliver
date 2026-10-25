@@ -1283,3 +1283,25 @@ test('directory rule: with no pm/* tips, a merge after a ref-writing call still 
     assert.equal(/ls-tree -r|ls-files/.test(g.calls()), false, `${cmd}: no discovery`);
   }
 });
+
+// --- WP-F final micro-fix ---
+
+test('directory rule: with no pm/* tips known, a merge after a fetch still reaches discovery and blocks', { skip: process.platform === 'win32' && 'POSIX stub' }, () => {
+  const s = verifiedSiblings();
+  const origin = tmpDir('pmorigin-');
+  gitIn(origin, ['init', '-q', '--bare']);
+  gitIn(s.top, ['remote', 'add', 'origin', origin]);
+  gitIn(s.top, ['push', '-q', 'origin', 'main', BRANCH]);
+  const tip = gitIn(s.top, ['rev-parse', BRANCH]).trim();
+  // The story exists only on the remote: no local branch, no remote-tracking ref yet.
+  gitIn(s.top, ['branch', '-qD', BRANCH]);
+  gitIn(s.top, ['update-ref', '-d', `refs/remotes/origin/${BRANCH}`]);
+  const r = hook(s.top, `git fetch origin && git merge --no-ff ${tip}`);
+  assert.equal(r.status, 2, r.stderr);
+  const g = gitLog();
+  for (const cmd of ['git merge --abort', 'git pull']) {
+    g.reset();
+    assert.equal(hook(s.top, cmd, g.env).status, 0, cmd);
+    assert.equal(/ls-tree -r|ls-files/.test(g.calls()), false, `${cmd}: no discovery`);
+  }
+});

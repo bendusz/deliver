@@ -61,13 +61,13 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   a forgotten verification or a stale verdict. It is not a boundary against an agent that evades
   it on purpose. The merge's own directory, after `cd` or `git -C`, identifies the project; from a
   directory that is in no deliver project (for example a monorepo root), a story-like merge blocks
-  with "run the merge from the project directory, or with git -C <project>". The hook does not see
+  with "run the merge from the project directory, or with git -C <project>", unless the checked-out target is a non-base branch that no project integrates on. The hook does not see
   a remote PR merge. Before `gh pr merge` or a UI merge, the PM applies the same rule by hand: the
   recorded verdicts must name the PR head, or an ancestor of it followed only by story-file and
   handoff commits or automatic merges of the integration branch. `environment.md` gives the
   checks: `git merge-base --is-ancestor`, `git log --stat` for the non-merge commits, and
-  `git merge-tree --write-tree` matched against each merge commit's tree, differing at most in the
-  story file, as the hook allows. That path stays a residual risk.
+  `git merge-tree --write-tree` for each merge commit, passing when every conflicted path and every
+  path that differs from the merge's tree is the story file, exactly as the hook allows. That path stays a residual risk.
   `DELIVER_NO_ENFORCE=1` turns it off.
 - **Review is opposite-family.** The panel includes a lens from a family other than the
   builder's: an `expert-builder` story gets `codex-reviewer`, and a `codex-builder` story gets the
@@ -106,8 +106,12 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   unmeasured and runs the maximum panel until the corpus reaches 149 certify cases. The bound holds
   for defects a careful reviewer can catch from the story and the diff; observed escapes correct it
   on real projects.
-- **Known issues.** The corpus README says batch 1's 65 certify cases prove 4.5042%. That is true
-  of batch 1 alone; the calibrated set is 66 certify cases including batch 0, at 4.4%. The README
+- **Known issues.** At the root of a repository holding deliver projects, a merge into a base
+  branch that is chained after another git command can be blocked with "run the merge as its own
+  command", even when it merges no story. This happens after a ref-writing command or a fetch.
+  Once any `pm/*` branch exists, it happens after any git command other than a plain checkout or
+  switch, unless the merge names a base branch. Run such a merge as its own command. The corpus README says batch 1's 65 certify cases prove 4.5042%. That
+  is true of batch 1 alone; the calibrated set is 66 certify cases including batch 0, at 4.4%. The README
   is in the corpus manifest, so editing it would invalidate the calibration; the next corpus batch
   fixes it. The corpus identity also hashes the whole manifest, README included; a later release
   should hash only the fixtures and `cases.json`.

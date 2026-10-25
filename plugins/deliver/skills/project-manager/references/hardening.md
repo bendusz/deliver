@@ -26,7 +26,7 @@ kill switch set, or outside a deliver project; the hook header lists the remaini
 Once a story merge is certain, whatever it cannot establish blocks. The merge's own directory,
 after `cd` or `git -C`, identifies the project. Run from a directory that is in no deliver project
 (for example a monorepo root), a story-like merge blocks with "run the merge from the project
-directory, or with git -C <project>". `implementation-loop.md` state 6
+directory, or with git -C <project>", unless the checked-out target is a non-base branch that no project integrates on. `implementation-loop.md` state 6
 describes it. It catches a PM's honest mistakes,
 such as a forgotten or stale verdict, a careless command chain, or a mis-stated tier. It is not a
 boundary against a deliberately evasive agent with Bash; that protection is the 0.30 sandbox.
