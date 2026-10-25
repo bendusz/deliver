@@ -205,20 +205,57 @@ export const addLine = (name, copy) => {
     : `if [ -f ${c} ]; then sh ${c} "$@"; [ $? = 1 ] && exit 1; fi`;
 };
 
+// shCompatible(text): an existing hook's interpreter runs POSIX sh lines: a #! naming sh, bash,
+// dash, zsh, or ksh (directly or through env), or no #! at all.
+const SH_LIKE = new Set(['sh', 'bash', 'dash', 'zsh', 'ksh']);
+export function shCompatible(text) {
+  const first = String(text ?? '').split(/\r?\n/)[0];
+  if (!first.startsWith('#!')) return true;
+  const words = first.slice(2).trim().split(/\s+/).filter(Boolean);
+  const base = (w) => (w ?? '').split('/').at(-1);
+  const prog = base(words[0]) === 'env' ? base(words.find((w, i) => i > 0 && !w.startsWith('-'))) : base(words[0]);
+  return SH_LIKE.has(prog);
+}
+
+// wrapper(name, copy): an sh script to stand in for a `name` hook whose interpreter is not sh
+// (python, node, ...), renamed to `<name>.local`: it runs deliver's gate as addLine does (failing
+// open the same way), then execs `<name>.local` with the same arguments and, for
+// reference-transaction, the same stdin.
+export function wrapper(name, copy) {
+  const c = shQuote(slash(copy));
+  const local = `"$(dirname "$0")/${name}.local"`;
+  const body = name === RT_HOOK
+    ? [
+      'deliver_in=$(mktemp 2>/dev/null) || deliver_in=',
+      'if [ -n "$deliver_in" ]; then',
+      '  cat > "$deliver_in"',
+      `  if [ -f ${c} ]; then sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; }; fi`,
+      '  exec < "$deliver_in"; rm -f "$deliver_in"',
+      'fi',
+    ]
+    : [`if [ -f ${c} ]; then sh ${c} "$@"; [ $? = 1 ] && exit 1; fi`];
+  return ['#!/bin/sh', `# deliver's merge gate, then the original hook, ${name}.local.`, ...body, `exec ${local} "$@"`, ''].join('\n');
+}
+
 // hookFiles(top, { wanted, check, uninstall, doctor }): install, inspect, or remove the hook
 // files. Returns { hooks: { name: state }, notes, brief, sawV1 }: notes in full, and brief, the
 // same with each chaining command replaced by `doctor`, the command that prints it, for session
 // start. A deliver shim that is not wanted (an earlier install's, or every one when uninstalling)
 // is removed; where it cannot be (check mode, a hooks directory deliver may not write, a failed
 // removal) it is reported: `obsolete` in check mode, else `not-removed` or `error`. A foreign hook
-// that already calls the private copy is `chained`, which counts as in place; uninstalling says to
-// remove those lines, which then do nothing.
+// that already calls the private copy, from an sh-compatible interpreter, is `chained`, which counts
+// as in place once it is executable (else `chained-inactive`) and, in check mode, once the copy it
+// calls is current (else `copy-missing`, `copy-stale`, or the copy's checkShim state);
+// uninstalling says to remove those lines, which then do nothing. A hook whose interpreter is not
+// sh gets the wrapper to install instead of inline lines.
 function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/deliver:doctor' }) {
   const res = { hooks: {}, notes: [], brief: [], sawV1: false, layout: layout(top) };
   const { dir, privateDir, writable, why } = res.layout;
   const note = (full, brief = full) => { res.notes.push(full); res.brief.push(brief); };
-  const chain = (name, copy) => `add these as the lines right after its #! line: ${addLine(name, copy)}`;
-  const pointer = `for the lines to add right after its #! line, run ${doctor}`;
+  const chain = (name, copy, text) => (text !== undefined && !shCompatible(text)
+    ? `its interpreter is not sh, so deliver's lines cannot go inside it; rename it to ${name}.local in the same directory, and write this sh wrapper as ${name}, executable:\n${wrapper(name, copy)}`
+    : `add these as the lines right after its #! line: ${addLine(name, copy)}`);
+  const pointer = `for what to add to it, run ${doctor}`;
   for (const name of ALL_HOOKS) {
     const file = path.join(dir, name);
     const copy = path.join(privateDir, name);
@@ -226,7 +263,7 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
     const cur = readHook(file);
     if (cur.v1) res.sawV1 = true;
     const whose = cur.v1 ? "an earlier deliver install's" : "deliver's";
-    const chained = cur.state === 'foreign' && typeof cur.text === 'string' && cur.text.includes(slash(copy));
+    const chained = cur.state === 'foreign' && typeof cur.text === 'string' && cur.text.includes(slash(copy)) && shCompatible(cur.text);
     try {
       if (want === null) {
         // Not wanted in this mode (or uninstalling): remove only what is ours.
@@ -242,25 +279,31 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
             res.hooks[name] = 'removed';
           }
         }
-        if (chained && !check) note(`merge gate: ${slash(file)} still calls deliver's gate; those lines now do nothing, so remove the deliver lines you added to it`);
+        if (chained && !check) note(`merge gate: ${slash(file)} still calls deliver's gate; those lines now do nothing, so remove the deliver lines you added to it (or, for deliver's wrapper, move ${name}.local back)`);
         if (!check && fs.existsSync(copy)) fs.rmSync(copy);
         continue;
       }
       if (!check) writeAtomic(copy, want);
+      // A hook that already runs deliver's lines is in place wherever it lives, a hooks directory
+      // deliver may not write (husky's .husky, a global core.hooksPath) included; check mode also
+      // needs the private copy it calls to be current.
+      if (chained) {
+        const executable = process.platform === 'win32' || Boolean(fs.statSync(file).mode & 0o111);
+        res.hooks[name] = !executable ? 'chained-inactive' : check ? copyState(copy, want) : 'chained';
+        if (res.hooks[name] === 'chained-inactive') note(`merge gate: ${slash(file)} runs deliver's lines but is not executable, so git skips it; run chmod +x ${shQuote(slash(file))}`);
+        else if (res.hooks[name] !== 'chained') note(`merge gate: ${slash(file)} runs deliver's lines, but its copy ${slash(copy)} is ${res.hooks[name]}; run the installer without --check to refresh it`);
+        continue;
+      }
       if (!writable) {
         res.hooks[name] = 'skipped';
-        note(`merge gate: ${why}, so deliver did not write its ${name} hook there; add deliver's gate to your hook manager's ${name} hook: ${chain(name, copy)}`,
+        note(`merge gate: ${why}, so deliver did not write its ${name} hook there; add deliver's gate to your hook manager's ${name} hook: ${chain(name, copy, cur.text)}`,
           `merge gate: ${why}, so deliver did not write its ${name} hook there; add deliver's gate to your hook manager's ${name} hook (${pointer})`);
         if (cur.state === 'ours' && cur.text !== want) note(`merge gate: ${slash(file)} is ${whose} ${name} shim and out of date; delete it, or replace it with deliver's lines`);
         continue;
       }
-      if (chained) {
-        res.hooks[name] = 'chained';
-        continue;
-      }
       if (cur.state === 'foreign') {
         res.hooks[name] = 'foreign';
-        note(`merge gate: ${slash(file)} ${cur.why}, so it was left alone and deliver's git-level gate is not installed; ${chain(name, copy)} (and run /deliver:doctor after plugin updates)`,
+        note(`merge gate: ${slash(file)} ${cur.why}, so it was left alone and deliver's git-level gate is not installed; ${chain(name, copy, cur.text)} (and run /deliver:doctor after plugin updates)`,
           `merge gate: ${slash(file)} ${cur.why}, so it was left alone and deliver's git-level gate is not installed; ${pointer}`);
         continue;
       }
@@ -281,6 +324,17 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
     }
   }
   return res;
+}
+
+// copyState(copy, want): `chained` when the private copy a chained hook calls exists and is what
+// install writes, else `copy-missing` or `copy-stale`.
+function copyState(copy, want) {
+  let text;
+  try { text = fs.readFileSync(copy, 'utf8'); } catch { return 'copy-missing'; }
+  if (text !== want) return 'copy-stale';
+  // The copy runs as `sh <copy>`, so its own exec bit does not matter; its gate and node do.
+  const state = checkShim(copy, { state: 'ours', text, mode: 0o755 }, want);
+  return state === 'current' ? 'chained' : `copy-${state}`;
 }
 
 // checkShim(file, cur, want): a shim's readiness: missing, stale (differs from what install

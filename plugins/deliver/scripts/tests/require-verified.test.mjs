@@ -999,6 +999,35 @@ test('directory rule: a story two projects claim is judged in each, by both gate
   assert.equal(hook(one.top, `git -C packages/bar merge --no-ff ${BRANCH}`).status, 0);
 });
 
+test('directory rule: a shared story whose two story files conflicted and were resolved merges; a handoff note in one claimant keeps the other verified', async () => {
+  const { judgeRefUpdate } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+  const both = siblings({ barStory: STORY, fooClaims: true });
+  for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${both.code}` }));
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'chore(S1-1): record']);
+  // A handoff note in packages/bar after the verdict.
+  fs.mkdirSync(path.join(both.bar, 'docs', 'handoff'), { recursive: true });
+  fs.writeFileSync(path.join(both.bar, 'docs', 'handoff', 'casey.md'), 'notes\n');
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'docs: handoff']);
+  gitIn(both.top, ['checkout', '-q', 'main']);
+  for (const dir of ['packages/foo', 'packages/bar']) {
+    const r = hook(both.top, `git -C ${dir} merge --no-ff ${BRANCH}`);
+    assert.equal(r.status, 0, `${dir}: ${r.stderr}`);
+  }
+  // main records something else in both story files, so the merge conflicts in both.
+  for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, updated: '2026-10-25 08:00' }));
+  gitIn(both.top, ['commit', '-qam', 'chore(S1-1): note']);
+  const main = gitIn(both.top, ['rev-parse', 'main']).trim();
+  gitIn(both.top, ['checkout', '-qb', 'stage', 'main']);
+  assert.notEqual(spawnSync('git', ['-C', both.top, 'merge', BRANCH, '-m', 'm'], { encoding: 'utf8' }).status, 0);
+  for (const dir of ['packages/bar', 'packages/foo']) gitIn(both.top, ['checkout', '--theirs', `${dir}/${STORY}`]);
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'm']);
+  const v = judgeRefUpdate(both.top, { target: 'main', old: main, new: gitIn(both.top, ['rev-parse', 'stage']).trim() });
+  assert.equal(v.allow, true, v.reason);
+});
+
 // --- fix round 3 ---
 
 test('verified: a root merge of a branch the top level and a nested project both claim needs the verdict in each', () => {
