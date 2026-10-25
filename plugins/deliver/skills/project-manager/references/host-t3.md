@@ -58,8 +58,10 @@ id in `tmp/log.md`. Delete it with `delete_scheduled_task` when the project comp
 When `environment.md` opens a real PR, attach it with `link_pull_request`, then
 `watch_pull_request`. A CI wake is news, not a merge decision: re-run the gates locally, and merge
 only on a verifier `PASS` as usual. Before `gh pr merge` or a merge in the UI, confirm the recorded
-`verifier: PASS <sha>` and, at `T1` and `T2`, `integrity: pass <sha>` name the PR's head commit.
-The ship gate does not cover this path, so that check is yours alone; treat it as a residual risk.
+`verifier: PASS <sha>` and, at `T1` and `T2`, `integrity: pass <sha>` name the PR head, or an
+ancestor of it followed only by story-file and handoff commits or automatic merges of the
+integration branch. Run the checks `environment.md` lists, and re-verify if any fails. The ship gate hook does not see this path, so
+that check is yours alone; treat it as a residual risk.
 Call `unwatch_pull_request` once the PR is merged or closed.
 
 ## Restart and Stop
