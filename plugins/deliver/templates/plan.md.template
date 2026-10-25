@@ -14,6 +14,7 @@
 - Checkpoint policy: <story-level | sprint-level | autonomous>
 - Integration branch: <main>  <!-- the branch every story branch is cut from and merged back into -->
 - Skeleton: <specdd | none>  <!-- specdd writes .sdd contracts per sprint before decomposition; default none below large -->
+- Assurance targets: T0=0.10, T1=0.05, T2=0.02  <!-- escape-bound target per tier; omit for these defaults (references/review-gates.md) -->
 
 <!-- Omit Goals and Target users when docs/spec.md exists; the spec owns them. -->
 ## Goals

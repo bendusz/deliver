@@ -11,7 +11,9 @@
 <!-- Paste the output of scripts/retro-stats.mjs --trust --sprint <n> unedited. This is what the user reads instead of the code. -->
 | tier | shipped | panel | calibrated bound | target | first pass | fix rounds | integrity blocks | holdout failures |
 |------|---------|-------|------------------|--------|------------|------------|------------------|------------------|
-| T<0-2> | <n> | <panel or "unmeasured, maximum panel"> | <bound or -> | <target> | <n>/<n> | <n> | <n> | <n or not recorded> |
+| T<0-2> | <n> | <panel, "unmeasured, maximum panel", or "maximum panel (OVER TARGET)"> | <bound, or "- (N stories ran below panel)" when withheld> | <target> | <n>/<n> | <n> | <n> | <n or not recorded> |
+
+T<0-2> below panel: <n>
 
 - Observed escapes (`Escaped-From:` trailers), since the calibration of <calibratedAt, UTC>: <per tier: escaped stories / stories shipped, bound, flag, and the to-date figure; or "none">
 - Next sprint at the maximum panel: <tiers flagged OVER TARGET, or a stale panels.json; "none"> · until `/deliver:calibrate` re-runs

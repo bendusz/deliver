@@ -10,7 +10,7 @@ identical.
 | Fact | Where |
 | --- | --- |
 | The plan is approved, by whom, when | `docs/approval.json` |
-| Scale, checkpoint policy, integration branch, skeleton | `docs/plan.md`, Delivery mode |
+| Scale, checkpoint policy, integration branch, skeleton, assurance targets | `docs/plan.md`, Delivery mode |
 | What each story must do | `docs/stories/*.md` |
 | Who holds a story, its builder, branch, status, tier, protected paths, gate verdicts, and loop counters | the story's `## Execution` block |
 | What a story changed, why, and how it was verified | the `--no-ff` merge commit body |
@@ -62,7 +62,7 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
 
 ```
 ## Execution
-<!-- pm-exec: {"owner":"v-bende-a1b2c3d4e5f6","builder":"expert-builder","branch":"pm/S1-2-add-and-list","status":"in-review","tier":"T1","protected":["tests/acceptance/add-and-list.test.js"],"protected_base":"3f2a9c1e5b7d4f60a8e2c9b1d3f5a7c9e1b3d5f7","integrity":"pass 8c4e1a7b2d9f3e6c5a1b8d7e4f2a9c3b6d1e5f80","rounds":0,"retries":0,"deliver":"0.29.0","updated":"2026-09-07 10:15"} -->
+<!-- pm-exec: {"owner":"v-bende-a1b2c3d4e5f6","builder":"expert-builder","branch":"pm/S1-2-add-and-list","status":"in-review","tier":"T1","protected":["tests/acceptance/add-and-list.test.js"],"protected_base":"3f2a9c1e5b7d4f60a8e2c9b1d3f5a7c9e1b3d5f7","integrity":"pass 8c4e1a7b2d9f3e6c5a1b8d7e4f2a9c3b6d1e5f80","panel":["code-integrity-reviewer","codex-reviewer"],"rounds":0,"retries":0,"integrity_fails":0,"holdout_fails":0,"deliver":"0.29.0","updated":"2026-09-07 10:15"} -->
 - 2026-09-07 11:02 external review skipped: codex CLI absent on this machine.
 ```
 
@@ -86,13 +86,26 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
   `integrity_allow` are set on the integration branch: the first three in the claim commit, the
   protected pair in a `chore(<story-id>): protect` commit that you then merge into the story
   branch. The ship gate and the integrity gate read the integration copy, and the hook blocks a
-  branch whose copy differs. Only `verifier` and `integrity` are trusted from the story branch. A
-  claim with neither `deliver` nor `tier` predates these fields and ships on the old rules. Any
-  other claim needs a parseable `deliver` when it has one and a `tier` of exactly `T0`, `T1`, or
-  `T2`, and at `T1` and `T2` a non-empty `protected` and a `protected_base`.
+  branch whose copy differs. Only `verifier` and `integrity` are trusted from the story branch.
+- **Pre-0.29 claims.** A claim ships on the old rules as legacy when its `deliver` is below 0.29,
+  or when it has neither `deliver` nor `tier` and no other story on the integration branch records
+  a `deliver` of 0.29 or later. Any other claim needs a parseable `deliver` when it has one and a
+  `tier` of exactly `T0`, `T1`, or `T2`, and at `T1` and `T2` a non-empty `protected` and a
+  `protected_base`.
+- `panel` is a JSON array of the lens names that ran on every review round of the story,
+  recorded at state 3 after the first review. When a fix round's re-review runs without a lens,
+  drop that lens from `panel` in the round's commit. A lens appears once per trial that ran, so
+  one dispatched twice in a round appears twice:
+  `["code-integrity-reviewer","code-integrity-reviewer","codex-reviewer"]`. It may fall short of the tier panel only
+  through `review-gates.md`'s missing-Codex-lens exception, and the trust report counts such a
+  story as below panel.
 - `rounds` (fix and re-review rounds) and `retries` (builder retries) bound the loop across
   sessions. Increment and commit **before** the dispatch they count, so a builder that dies before
   committing still spent its attempt. The **caps** are 3 rounds and 2 retries.
+- `integrity_fails` and `holdout_fails` are integers, default 0. Increment and commit
+  `integrity_fails` on each failing integrity verdict (state 2) and `holdout_fails` on each failing
+  holdout run (state 5). They have no cap; the trust report sums them.
+- `updated` is the time of the block's last change, `YYYY-MM-DD HH:MM` in UTC.
 - `deliver` is the plugin version that claimed the story: the `version` in
   `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`, read at the claim and never changed after.
   It lets `retro-stats.mjs` compare loop counters across plugin versions.

@@ -24,7 +24,7 @@ larger sets in waves.
 - Resolve every `auto` builder by loop state 0 before dispatch. Then, in the clean integration
   checkout, claim **every** batch story at once: append each story's Execution block per `state.md`,
   with its `owner`, the resolved `builder`, the branch name, `status: claimed`, the story's `tier`,
-  both counters at `0`, and the `deliver` version, and commit them together as
+  every counter at `0`, and the `deliver` version, and commit them together as
   `chore(<ids>): claim batch`.
 - Give each story its own branch and worktree. By default,
   `git worktree add tmp/worktrees/<slug> -b pm/S<sprint>-<n>-<slug> <integration_branch>`, having
@@ -66,8 +66,10 @@ since git refuses to check the integration branch out twice.
 
 1. Run loop states 2 to 5 in the worktree, in order, against the committed diff
    `git diff <integration>...HEAD`. Each fix round commits to the story branch before the gates
-   re-run, as in the loop. If the worktree lacks runtime deps such as `node_modules` or `.env`,
-   install them first, **never** committing those artifacts.
+   re-run, as in the loop. The integrity gate runs as
+   `test-integrity.mjs … --root <worktree>`, and the SHA it records comes from
+   `git -C <worktree> rev-parse HEAD`. If the worktree lacks runtime deps such as `node_modules` or
+   `.env`, install them first, **never** committing those artifacts.
 2. On `pm-verifier` `PASS`, merge the latest integration tip into the story branch, then re-gate
    the merged result per loop state 6. A failure re-enters loop state 4 in this worktree. If the
    merge conflicts and you cannot resolve it cleanly, **stop** rather than forcing it: escalate to

@@ -15,7 +15,8 @@ Otherwise take one story at a time.
 ### 0. Ready, then claim
 Confirm the story is build-ready against `decomposition.md`'s readiness section and checklist
 template; fix an unready story first. A pre-0.13 story needs `pm-meta` added and committed first,
-per `migrations.md`. The working tree must be clean before you claim; unrelated changes mean stop
+and a pre-0.29 story with no `Tier` needs one set and committed before the claim, both per
+`migrations.md`. The working tree must be clean before you claim; unrelated changes mean stop
 and ask.
 
 Resolve a `pm-meta` builder of `auto` now, by `decomposition.md`'s rules for the field; without
@@ -25,7 +26,7 @@ never switches workers silently.
 **Claim.** Pull or rebase the integration branch. Confirm no `pm/<story-id>-*` branch exists locally
 or on the remote and that the story has no Execution block owned by someone else. Append the
 `## Execution` section per `state.md`, with your `owner`, the resolved `builder`, the branch name,
-`status: claimed`, the story's `tier`, both counters at `0`, and the `deliver` version, and commit
+`status: claimed`, the story's `tier`, every counter at `0`, and the `deliver` version, and commit
 it on the integration branch as `chore(<story-id>): claim`. Push it only under a standing push
 permission, then create and check out `pm/S<sprint>-<n>-<slug>`.
 
@@ -36,10 +37,10 @@ story branch as `test(<story-id>): acceptance`; that commit is the protected bas
 `protected` (their paths) and `protected_base` (that commit's full SHA) to the Execution block on
 the integration branch as `chore(<story-id>): protect`, where the ship gate reads them. Merge the
 integration branch into the story branch before the first builder dispatch, so the story branch
-carries the same fields and the ship merge base includes the protect commit; set `status:
-building` only after that merge. The builder makes the protected tests pass and adds only *further*
-coverage. Its brief lists the protected paths and says that any change to them, or to any story
-file, stops the story.
+carries the same fields and the ship merge base includes the protect commit; set and commit `status:
+building` only after that merge, or after the claim when the story has no acceptance tests. The
+builder makes the protected tests pass and adds only *further* coverage. Its brief lists the
+protected paths and says that any change to them, or to any story file, stops the story.
 
 **Holdout checks, at `T2`.** In the same dispatch, give `test-engineer` a new empty directory
 under the OS temp directory, outside every checkout, for holdout checks and their `RUN` file. Store
@@ -48,11 +49,10 @@ commits them to the private ref `refs/deliver/holdout/<story-id>` without checki
 then delete the directory. Never push that ref. Never name it, the checks, or their directory in a
 builder brief, fix brief, or continuation.
 
-Set `status: building` and commit. Dispatch the persisted `builder` with the inputs its agent
-file lists, plus the absolute repository or worktree root for every `codex-builder` and for
-`expert-builder` outside the main checkout. Run Codex's quota-free `--preflight` first when
-readiness is not established. Pass the story's `Specs` when it has any. Builders edit the working
-tree; you own every git command.
+Dispatch the persisted `builder` with the inputs its agent file lists, plus the absolute repository
+or worktree root for every `codex-builder` and for `expert-builder` outside the main checkout. Run
+Codex's quota-free `--preflight` first when readiness is not established. Pass the story's `Specs`
+when it has any. Builders edit the working tree; you own every git command.
 
 **Scope check, after every writer run.** Two checks, from the repository and never from the
 summary. First, the cumulative set: `git diff --name-only --diff-filter=ACDMRTUXB
@@ -97,23 +97,28 @@ subagent's word.
 **Integrity gate, at `T1` and `T2`.** After every writer run, once its changes are committed, run
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/test-integrity.mjs" <integration> HEAD --protected <paths>
 --protected-base <protected_base>`, adding `--allow <kind>` for each `pm-meta.integrity_allow`
-entry. Take `protected`, `protected_base`, and `integrity_allow` from the integration branch's
-copy of the story (`git show <integration>:docs/stories/<file>`), never from the story branch.
-Record its verdict and the commit it judged as `integrity: "<pass|fail> <sha>"`, the full
-`git rev-parse HEAD`, and commit it. Exit 1 is `fail`. Exit 64 means the command could not judge
-the diff: fix the invocation, and never record `pass`.
+entry, and `--root <worktree>` in parallel mode. Take `protected`, `protected_base`, and
+`integrity_allow` from the integration branch's copy of the story
+(`git show <integration>:docs/stories/<file>`), never from the story branch. Record its verdict and
+the commit it judged as `integrity: "<pass|fail> <sha>"`, the full `git rev-parse HEAD`, or
+`git -C <worktree> rev-parse HEAD` in parallel mode, and commit it. Exit 1 is `fail`: increment
+`integrity_fails` in the same commit. Exit 64 means the command could not judge the diff: fix the
+invocation, and never record `pass`.
 
 A failing gate, the integrity gate included, loads `fix-loop.md`.
 
 ### 3. Review, then fix or verify
 Re-derive and scope-check the paths, then produce the diff yourself, since reviewers have no Bash:
-`git diff <integration>...HEAD -- <paths>`, plus `git add -N -- <paths> && git diff -- <paths>`
-for anything still uncommitted, **never** `git add -A`. Set `status: in-review` and commit.
-Dispatch the panel per `review-gates.md`: the story's tier panel, which always includes
-`code-integrity-reviewer`, plus the lenses its risk triggers add. `architecture-reviewer` also
-gets the plan's Architecture section, and `performance-reviewer` its Non-functional requirements.
-Every lens gets the story file, that diff text, and the story's `Specs`. Aggregate the lenses'
-findings; any open `block` or `major` loads `fix-loop.md`.
+`git diff <integration>...HEAD -- <paths>`, plus `git add -N -- <paths> && git diff -- <paths>` for
+anything still uncommitted, **never** `git add -A`. Set `status: in-review` and commit. Dispatch the
+panel per `review-gates.md`: the story's tier panel, which always includes
+`code-integrity-reviewer`, plus the lenses its risk triggers add. Once the first review returns,
+record the lenses that actually ran as `panel` and commit it. When a fix round's re-review runs
+without one of those lenses, drop it from `panel` in that round's commit. List a lens once per trial
+that ran, so two trials of one lens appear twice. `architecture-reviewer` also gets the plan's
+Architecture section, and `performance-reviewer` its Non-functional requirements. Every lens gets
+the story file, that diff text, and the story's `Specs`. Aggregate the lenses' findings; any open
+`block` or `major` loads `fix-loop.md`.
 
 **Opposite-family review.** `review-gates.md` owns which family's lens each round needs. Dispatch
 `codex-reviewer` with `Scope: branch`, `Base:` the integration branch, at
@@ -121,7 +126,8 @@ the runner's default model and effort, after the secret scan and preflight that
 `/deliver:codex-review` describes. Grade its findings yourself against `review-gates.md`'s
 severities and aggregate them with the panel's. When `review-gates.md` calls for `codex-reviewer`
 this round and Codex is absent or refuses, note the gap in the story's Execution notes. At `T0` and
-`T1`, continue. At `T2`, set `status: blocked` and escalate.
+`T1`, continue under `review-gates.md`'s missing-Codex-lens exception, so `panel` lists only the
+lenses that ran. At `T2`, set `status: blocked` and escalate.
 
 ### 4. Fix
 `fix-loop.md` owns this state. Every fix lands on the story branch as
@@ -133,8 +139,10 @@ inputs its agent file lists and its `Specs`. At `T2`, run the holdout checks you
 commit:
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" run <story-id> --target <story checkout root>`
 materialises them under the OS temp directory, runs them, and deletes the copy. A `fail` makes the
-verdict `FAIL`. Exit 66 means the ref is missing, as in a fresh clone: dispatch `test-engineer` to
-regenerate the checks, store them, then verify. Record the verdict and the commit it judged as
+verdict `FAIL` and increments `holdout_fails`, committed with the verdict. Exit 66 means the ref is
+missing, as in a fresh clone: dispatch `test-engineer` to regenerate the checks into a new temporary
+directory, with a brief that says holdout directory only, never touch the repository; store them,
+then verify. Record the verdict and the commit it judged as
 `verifier: "<verdict> <sha>"`, the full `git rev-parse HEAD`, and commit it on the story branch.
 `PASS` alone permits shipping. `FAIL` loads `fix-loop.md`, then re-verify; a fix brief for a holdout
 failure names the broken behaviour and the criterion, never the holdout check. `UNKNOWN` means you
@@ -154,9 +162,19 @@ after either `<sha>` may only record state in the story file and `docs/handoff/*
 integration tip exactly as git would automatically, which the re-gate covers. Any other change, a
 conflict resolution in code included, needs a fresh verdict. Run the merge as its own Bash command,
 after at most a plain `git checkout` or `git switch` of the integration branch, and name the story
-branch literally: the hook refuses a shell variable or substitution, `-` or `@{-1}`, a `git pull` of
-a story branch, a commit short of the branch tip, and a tag that shadows the branch. The
-`-m "$(cat <<'EOF' ...)"` message form above is fine. The hook catches honest mistakes such as a
+branch literally:
+
+```
+git checkout <integration> && git merge --no-ff pm/S1-2-x -m "$(cat <<'EOF'
+feat(todo): add and list items
+...
+EOF
+)"
+```
+
+The hook refuses a shell variable or substitution, `-` or `@{-1}`, a `git pull` of a story branch, a
+commit short of the branch tip, and a tag that shadows the branch; the quoted heredoc message is
+fine. The hook catches honest mistakes such as a
 missed or stale verdict, a careless chain, or a wrong tier; it is not a boundary against an agent
 set on evading it, which is the 0.30 sandbox's job. A block means a state was skipped: go back to
 it, and never set `DELIVER_NO_ENFORCE` to get past it.

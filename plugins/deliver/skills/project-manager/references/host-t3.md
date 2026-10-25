@@ -39,10 +39,13 @@ none of this file applies.
 When a story blocks:
 1. Escalate with the story and the decision you need. Use a push-notification tool if the host
    offers one, otherwise the escalation message.
-2. Take the next build-ready story in the current sprint, the lowest sprint with an unmerged
+2. Set the blocked story aside. Commit its preserved tree to its own branch as
+   `wip(<story-id>): blocked`; that commit never ships without a fresh verdict. Then check out the
+   integration branch.
+3. Take the next build-ready story in the current sprint, the lowest sprint with an unmerged
    story (`state.md`), that does not depend on the blocked one. Never start a later sprint's
    story to keep busy.
-3. When every remaining story in the current sprint is blocked or depends on a blocked one, stop
+4. When every remaining story in the current sprint is blocked or depends on a blocked one, stop
    at the escalation and wait, as `planning-and-signoff.md`'s checkpoint policy says.
 
 ## Heartbeat
@@ -54,7 +57,10 @@ id in `tmp/log.md`. Delete it with `delete_scheduled_task` when the project comp
 ## Remote PR mode
 When `environment.md` opens a real PR, attach it with `link_pull_request`, then
 `watch_pull_request`. A CI wake is news, not a merge decision: re-run the gates locally, and merge
-only on a verifier `PASS` as usual. Call `unwatch_pull_request` once the PR is merged or closed.
+only on a verifier `PASS` as usual. Before `gh pr merge` or a merge in the UI, confirm the recorded
+`verifier: PASS <sha>` and, at `T1` and `T2`, `integrity: pass <sha>` name the PR's head commit.
+The ship gate does not cover this path, so that check is yours alone; treat it as a residual risk.
+Call `unwatch_pull_request` once the PR is merged or closed.
 
 ## Restart and Stop
 A T3 server restart or a user Stop cancels any in-flight children. Git is the record, so nothing

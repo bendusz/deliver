@@ -23,17 +23,20 @@ ones tagged `[L<sprint>-<n>]`, with the sprint it is due for review and the last
 it. Step 2 decides each `due` and `orphan` line.
 
 ## 0b. The trust report
-The user does not read the code. The trust report is what they read instead, so it opens the
-checkpoint message. At `tiny` and `small`, which skip the rest of this file, run this step alone
-at every sprint checkpoint.
+The user does not read the code. The trust report is what they read instead, so it opens every
+checkpoint report at every scale (`planning-and-signoff.md`). At `tiny` and `small`, which skip
+the rest of this file, run this step alone at every sprint boundary and checkpoint, with no record
+file.
 
-Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/retro-stats.mjs" . --trust --sprint <n>`, adding
-`--targets T0=<x>,T1=<y>,T2=<z>` when the plan's Delivery mode changes the default targets. Per
-risk tier, it prints:
+Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/retro-stats.mjs" . --trust --sprint <n>`. It takes each
+tier's target from the plan's `- Assurance targets:` line in Delivery mode, defaulting to 10%, 5%,
+and 2%. Per tier, it prints:
 - the stories shipped this sprint;
 - the panel the tier ran, from `benchmarks/assurance/panels.json`, or "unmeasured, maximum panel";
 - the calibrated bound, the certify-split bound, which counts only when it meets the tier's
-  target as given by `--targets`;
+  target;
+- `below panel: N`, the stories whose recorded `panel` fell short of the tier panel; while N is
+  above 0 the report withholds the tier's bound;
 - first-pass stories, fix rounds, integrity blocks, and holdout failures;
 - observed escapes for the stories merged since the calibration in force, with their one-sided 95%
   bound against the tier's target, and the same figure for every story to date beside it.
