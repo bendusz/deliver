@@ -257,3 +257,15 @@ test('holdout: a project directory whose name starts with .. is still inside the
   const run = cli(['run', 'S1-2', '--target', odd, '--root', odd]);
   assert.equal(run.status, 0, run.stderr);
 });
+
+test('holdout: only a bad stored RUN names RUN in its exit-64 message, so the PM regenerates for that alone', () => {
+  const { a, b } = twoProjects();
+  cli(['store', 'S1-1', checks('node -e "process.exit(0)"'), '--root', a]);
+  const bad = cli(['run', 'S1-1', '--target', b, '--root', a]);
+  assert.equal(bad.status, 64);
+  assert.doesNotMatch(bad.stderr, /\bRUN\b/, 'a wrong --target is the command\'s mistake');
+  handRef(path.dirname(a), `refs/deliver/holdout/_/S1-1`, { RUN: 'a\nb\n' });
+  const multi = cli(['run', 'S1-1', '--target', path.dirname(a), '--root', path.dirname(a)]);
+  assert.equal(multi.status, 64);
+  assert.match(multi.stderr, /\bRUN\b/);
+});

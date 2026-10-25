@@ -203,7 +203,8 @@ function storyTexts(root, ref) {
 // hold several deliver projects. A project is a directory with docs/stories/S<n>-<m>-*.md at ref,
 // or root itself; `prefix` is root's path below the git top level, `a/b/` or ''. Each file belongs
 // to the deepest project holding it, so a top-level project owns the files outside every nested
-// one. `solo` when root is the only project, where every commit is its own.
+// one. `solo` when root is the only project, where every commit is its own; `hasTop` when a
+// project sits at the top level.
 export function projectScope(root, ref) {
   const prefix = (gitRead(root, ['rev-parse', '--show-prefix']) ?? '').trim();
   const projects = new Set([prefix]);
@@ -213,7 +214,7 @@ export function projectScope(root, ref) {
     if (m) projects.add(m[1]);
   }
   const deepest = [...projects].sort((a, b) => b.length - a.length);
-  return { prefix, label: prefix.replace(/\/$/, ''), solo: projects.size === 1, owner: (file) => deepest.find((p) => file.startsWith(p)) ?? '' };
+  return { prefix, label: prefix.replace(/\/$/, ''), solo: projects.size === 1, hasTop: projects.has(''), owner: (file) => deepest.find((p) => file.startsWith(p)) ?? '' };
 }
 
 // touched(root, commits): sha to the paths, from the top level, that each { sha, parent } changes
@@ -234,25 +235,28 @@ function touched(root, commits) {
   return out;
 }
 
-// ownCommits(root, scope, commits, { touchedBy }): the shas among commits that count for scope's
-// project: every one when it is the only project, else those changing a file the project owns. A
-// commit changing no path at all, as `--allow-empty` makes, is the top-level project's. When the
-// paths cannot be read, every commit counts for every project: an escape is never dropped silently.
-export function ownCommits(root, scope, commits, { touchedBy = touched } = {}) {
+// ownCommits(root, scope, commits, { touchedBy, unreadable }): the shas among commits that count
+// for scope's project: every one when it is the only project, else those changing a file the
+// project owns. A commit changing no path at all, as `--allow-empty` makes, is the top-level
+// project's, or every project's when none sits at the top level. When the paths cannot be read,
+// the result is `unreadable`: by default every commit, so an escape is never dropped silently.
+export function ownCommits(root, scope, commits, { touchedBy = touched, unreadable = 'all' } = {}) {
   const all = () => new Set(commits.map((c) => c.sha));
   if (scope.solo) return all();
   const files = touchedBy(root, commits);
-  if (!files) return all();
+  if (!files) return unreadable === 'all' ? all() : null;
   return new Set(commits.filter((c) => {
     const paths = files.get(c.sha) || [];
-    return paths.length ? paths.some((f) => scope.owner(f) === scope.prefix) : scope.prefix === '';
+    if (paths.length) return paths.some((f) => scope.owner(f) === scope.prefix);
+    return scope.hasTop ? scope.prefix === '' : true;
   }).map((c) => c.sha));
 }
 
 // recordTimes(root, ref, word, scope): story id to the committer time (ms, UTC) of the first
 // `chore(<id>): <word>` commit on ref (`merged`, `claim`) that belongs to scope's project, or null
 // when the history cannot be read. A batch commit naming several ids, `chore(S1-1,S1-2): merged`,
-// counts for each.
+// counts for each. When the paths its commits touch cannot be read, null, so merge times fall
+// back to the Execution block's `updated` rather than borrow another project's record.
 function recordTimes(root, ref, word, scope = projectScope(root, ref)) {
   const log = gitRead(root, ['log', '-E', `--grep=^chore\\([^)]*\\): ${word}`, '--format=%H%x1f%P%x1f%cI%x1f%s', '--end-of-options', ref, '--']);
   if (log === null) return null;
@@ -260,7 +264,8 @@ function recordTimes(root, ref, word, scope = projectScope(root, ref)) {
     const [sha, parents = '', when = '', subject = ''] = line.split('\x1f');
     return { sha, parent: parents.split(' ')[0] || null, when, subject };
   });
-  const own = ownCommits(root, scope, rows);
+  const own = ownCommits(root, scope, rows, { unreadable: null });
+  if (own === null) return null;
   const out = new Map();
   for (const { sha, when, subject } of rows) {
     const m = subject.match(new RegExp(`^chore\\(([^)]*)\\): ${word}\\b`));

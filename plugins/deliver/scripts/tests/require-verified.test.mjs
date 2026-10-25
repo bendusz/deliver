@@ -1327,3 +1327,51 @@ test('verified: a # inside quotes or inside a word is not a comment', () => {
   assert.equal(merge(p, `git merge -m 'fix #1' --no-ff ${BRANCH}`).status, 2);
   assert.equal(merge(p, `echo a#b; git merge --no-ff ${BRANCH}`).status, 2, 'a#b is one word, so the merge still runs');
 });
+
+// --- WP-H fix round 2 ---
+
+test('verified: for git switch, -- ends the options and the next word is still the branch', () => {
+  const { p } = project();
+  record(p, {});
+  // From the story checkout: switch reaches main, so the merge ships the story.
+  const r = merge(p, `git switch -- main && git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+});
+
+test('verified: a merge or pull with no operand judges the target branch\'s configured upstream', () => {
+  const { p, code } = project();
+  record(p, {});
+  toMain(p);
+  gitIn(p, ['branch', '--set-upstream-to', BRANCH, 'main']);
+  for (const command of ['git merge --no-ff', 'git pull --no-rebase', 'git pull']) {
+    const r = merge(p, command);
+    assert.equal(r.status, 2, `${command}: ${r.stderr}`);
+    assert.match(r.stderr, /pm\/S1-1-fix/);
+  }
+  assert.equal(merge(p, 'git merge --abort').status, 0, 'merge-control forms stay exempt');
+  toBranch(p);
+  record(p, { verifier: `PASS ${code}` });
+  toMain(p);
+  for (const command of ['git merge --no-ff', 'git pull --no-rebase']) assert.equal(merge(p, command).status, 0, `${command} once verified`);
+});
+
+test('verified: a bare merge on the integration branch with no upstream asks for the branch by name', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  const r = merge(p, 'git merge --no-ff');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /name the branch to merge explicitly/);
+  assert.equal(merge(p, 'git merge --continue').status, 0);
+});
+
+test('verified: a comment inside a command substitution cannot swallow the merge after it', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  // The ( sits in a comment, so the substitution closes on the next line and the merge runs.
+  const r = merge(p, `echo $(true # (\n); git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  const quoted = merge(p, `echo "$(true # (\n)"; git merge --no-ff ${BRANCH}`);
+  assert.equal(quoted.status, 2, quoted.stderr);
+});
