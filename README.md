@@ -297,7 +297,8 @@ this workflow: `pm-verifier` is an ordinary read-only Claude Code subagent the P
 
 ### Running inside T3 Code
 
-The PM detects T3 Code at session start and then follows
+T3 Code is optional. Under plain Claude Code the probe finds nothing and deliver runs unchanged;
+a test keeps every T3-only step behind the probe. The PM detects T3 Code at session start and then follows
 [`host-t3.md`](plugins/deliver/skills/project-manager/references/host-t3.md). It still dispatches
 its own agents through `Agent`, so reviewers stay read-only, and uses T3's `delegate_task` only
 for Codex advisory and research opinions. It counts only its own worktrees and
