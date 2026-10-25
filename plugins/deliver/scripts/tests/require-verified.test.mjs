@@ -1218,3 +1218,68 @@ test('directory rule: the root rule skips a target no project integrates on, and
   gitIn(d.top, ['checkout', '-q', 'develop']);
   assert.equal(hook(d.top, 'git merge -').status, 2, 'develop is bar\'s integration branch, though a working-tree project resolves only below');
 });
+
+// --- WP-F fix round 2 ---
+
+// gitLog(): a PATH whose git records each invocation's arguments, one line each, then runs git.
+function gitLog() {
+  const bin = tmpDir('pmgitlog-');
+  const log = path.join(bin, 'calls.log');
+  const real = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
+  fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> "${log}"\nexec "${real}" "$@"\n`, { mode: 0o755 });
+  return { env: { PATH: `${bin}${path.delimiter}${process.env.PATH}` }, calls: () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '') , reset: () => fs.rmSync(log, { force: true }) };
+}
+
+test('directory rule: no discovery at the root when nothing can be a story', { skip: process.platform === 'win32' && 'POSIX stub' }, () => {
+  const s = siblings();
+  gitIn(s.top, ['checkout', '-q', 'main']);
+  const g = gitLog();
+  const listed = () => /ls-tree -r|ls-files/.test(g.calls());
+  for (const cmd of ['git merge --abort', 'git pull']) {
+    g.reset();
+    assert.equal(hook(s.top, cmd, g.env).status, 0, cmd);
+    assert.equal(listed(), false, `${cmd}: nothing to merge, so no discovery`);
+  }
+  // With no pm/* tips and no named story operand, nothing can block.
+  gitIn(s.top, ['branch', '-qD', BRANCH]);
+  gitIn(s.top, ['branch', 'feature', 'main']);
+  g.reset();
+  assert.equal(hook(s.top, 'git merge --no-ff feature', g.env).status, 0);
+  assert.equal(listed(), false, 'no pm/* tips and no named story: no discovery');
+  // A named story still triggers it.
+  g.reset();
+  assert.equal(hook(s.top, `git merge --no-ff ${BRANCH}`, g.env).status, 2);
+  assert.equal(listed(), true);
+});
+
+test('directory rule: a base-named operand is exempt from SEPARATE only after calls that cannot write refs', () => {
+  const s = verifiedSiblings();
+  for (const cmd of ['git fetch origin main:main && git merge main', 'git update-ref refs/heads/main HEAD && git merge main', 'git branch -f main HEAD && git merge main', 'git reset --hard && git merge main', 'git fetch origin +refs/heads/*:refs/remotes/origin/* && git merge origin/main', 'git checkout -B main && git merge main']) {
+    const r = hook(s.top, cmd);
+    assert.equal(r.status, 2, `${cmd}: ${r.stderr}`);
+    assert.match(r.stderr, /run the merge as its own command/, cmd);
+  }
+  for (const cmd of ['git fetch && git merge origin/main', 'git fetch origin main && git merge origin/main', 'git status && git log -1 && git diff && git show HEAD && git rev-parse HEAD && git merge main', 'git checkout main && git merge main']) {
+    const r = hook(s.top, cmd);
+    assert.equal(r.status, 0, `${cmd}: ${r.stderr}`);
+  }
+});
+
+// --- WP-F fix round 3 ---
+
+test('directory rule: with no pm/* tips, a merge after a ref-writing call still reaches discovery and blocks SEPARATE', { skip: process.platform === 'win32' && 'POSIX stub' }, () => {
+  const s = siblings();
+  gitIn(s.top, ['checkout', '-q', 'main']);
+  gitIn(s.top, ['branch', '-qD', BRANCH]);
+  commitOn(s.top, 'notes.txt', 'x\n', 'more work');
+  const sha = gitIn(s.top, ['rev-parse', 'HEAD~1']).trim();
+  const r = hook(s.top, `git branch pm/S1-9-x HEAD~1 && git merge --no-ff ${sha}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /run the merge as its own command/);
+  const g = gitLog();
+  for (const cmd of ['git merge --abort', 'git pull', `git status && git merge --no-ff ${sha}`]) {
+    g.reset();
+    assert.equal(hook(s.top, cmd, g.env).status, 0, cmd);
+    assert.equal(/ls-tree -r|ls-files/.test(g.calls()), false, `${cmd}: no discovery`);
+  }
+});
