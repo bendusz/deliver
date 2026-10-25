@@ -358,9 +358,22 @@ function deletedConfig(file, oldText) {
   return details;
 }
 
-function configFindings(file, rawOld, rawNew) {
+// configRoles(file): the checks a file's name gives it a role in: coverage, lint, tsconfig, toolchain.
+function configRoles(file) {
   const base = file.split('/').at(-1);
-  const oldText = configCode(rawOld, base);
+  const roles = new Set();
+  if (COVERAGE_FILE.test(base)) roles.add('coverage');
+  if (ESLINT_FILE.test(base) || BIOME_FILE.test(base)) roles.add('lint');
+  if (TSCONFIG_FILE.test(base)) roles.add('tsconfig');
+  if (TOOLCHAIN_FILE.has(base) || /^rust-toolchain(?:\.toml)?$/.test(base)) roles.add('toolchain');
+  return roles;
+}
+
+// configFindings(file, rawOld, rawNew, oldFile): the reasons a changed config weakens a check.
+// oldFile is the name before a rename, whose comment syntax the old text is read with.
+function configFindings(file, rawOld, rawNew, oldFile = file) {
+  const base = file.split('/').at(-1);
+  const oldText = configCode(rawOld, oldFile.split('/').at(-1));
   const newText = configCode(rawNew, base);
   const details = [];
   if (COVERAGE_FILE.test(base)) details.push(...coverageWeakened(oldText, newText));
@@ -440,8 +453,13 @@ export function check(root, base, head, protectedPaths = [], protectedBase = nul
       if (after < before) findings.push({ kind: 'assertions-dropped', path: newPath, detail: `assertion-like calls fell from ${before} to ${after}` });
     }
 
-    if (status === 'M' || status === 'R') {
-      for (const detail of configFindings(newPath, oldText, newText)) findings.push({ kind: 'config-weakened', path: newPath, detail });
+    // A rename that takes a config's role away, `.nycrc` to `.nycrc.disabled`, removes it; one
+    // between two names of the same role is judged by content.
+    const lostRole = status === 'R' && [...configRoles(oldPath)].some((r) => !configRoles(newPath).has(r));
+    if (lostRole) {
+      for (const detail of deletedConfig(oldPath, oldText)) findings.push({ kind: 'config-weakened', path: oldPath, detail: `${detail} (renamed to ${newPath})` });
+    } else if (status === 'M' || status === 'R') {
+      for (const detail of configFindings(newPath, oldText, newText, oldPath)) findings.push({ kind: 'config-weakened', path: newPath, detail });
     }
     if (status === 'A' || status === 'C') {
       for (const detail of addedConfig(newPath, newText)) findings.push({ kind: 'config-weakened', path: newPath, detail });

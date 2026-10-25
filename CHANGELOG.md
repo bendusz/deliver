@@ -34,7 +34,7 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   panel each tier ran, the stories reviewed below panel, the calibrated bound or "unmeasured,
   maximum panel", first-pass stories (no fix rounds, no retries), fix rounds, integrity blocks,
   holdout failures, and observed escapes. A tier with any story below panel has its bound
-  withheld. A fix for a defect an earlier story shipped carries an `Escaped-From: <story-id>` trailer. A tier is OVER TARGET when at least one escape
+  withheld. A fix for a defect an earlier story shipped carries an `Escaped-From: <story-id>` trailer, or `Escaped-From: <project>/<story-id>` to name one of several projects in a repository; a bare trailer counts only for the project whose files the fix changes. A tier is OVER TARGET when at least one escape
   was observed since the calibration in force and the escape bound over those stories exceeds the
   target; the PM reads the report at sprint start and runs that tier at the maximum panel until
   `/deliver:calibrate` re-runs.
@@ -42,7 +42,8 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   red acceptance tests before the build, and the Execution block lists them under `protected`. Any
   change to a protected path fails the scope check, and the Codex runner refuses it. At `T2`, `test-engineer` also writes extra
   acceptance checks, which the PM stores with `scripts/holdout.mjs` on the private ref
-  `refs/deliver/holdout/<story-id>`. The ref is never checked out or pushed, and no builder brief
+  `refs/deliver/holdout/<project-key>/<story-id>`, namespaced so sibling projects in one
+  repository keep their own checks; `RUN` must be one line. The ref is never checked out or pushed, and no builder brief
   names it. The PM runs the checks beside the verifier, and a failure is a `FAIL`.
 - **New `scripts/test-integrity.mjs`.** At `T1` and `T2`, the PM runs it after every writer run.
   It fails on a deleted or renamed test file, added skip or focus markers, a net drop in

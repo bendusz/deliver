@@ -48,7 +48,8 @@ story checkout as the working directory, so reach the code only through its publ
 locate it through the `HOLDOUT_TARGET` environment variable, never a relative path from the checks.
 Put the one command that runs them on the single line of a `RUN` file in that directory, writing
 `{holdout}` for the checks' directory and `{target}` for the checkout, each in double quotes so
-`cmd.exe` on Windows reads them too. A run longer than 10 minutes is killed and fails. `RUN` must
+`cmd.exe` on Windows reads them too. A blank or multiline `RUN` is refused, so chain any setup
+into that line with `&&`. A run longer than 10 minutes is killed and fails. `RUN` must
 not leave background processes: on Windows they are not killed when it exits and may survive. Run
 them once with both set to see their real result. Write nothing about them anywhere else.
 

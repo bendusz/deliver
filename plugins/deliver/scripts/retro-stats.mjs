@@ -7,7 +7,8 @@
 // Without --sprint it reports every sprint. --audit instead reports the learned lines in
 // AGENTS.md against the retro records. --trust prints the trust report: per risk tier, what
 // shipped, the panel it ran, the calibrated bound, and the escapes observed since, counted from
-// `Escaped-From: <story-id>` trailers on the integration branch. Targets are docs/plan.md's
+// `Escaped-From: <story-id>` trailers on the integration branch, or `Escaped-From:
+// <project>/<story-id>` to name a project in a repository holding several. Targets are docs/plan.md's
 // `- Assurance targets:` line, else 10/5/2%; --targets overrides. A shipped story whose recorded
 // `panel` lacks a member of its tier's panel in force is counted below panel, and withholds the
 // calibrated bound. Exit 64 usage, 66 no docs/stories directory.
@@ -170,9 +171,10 @@ const counter = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
 function storyTexts(root, ref) {
   const named = (names) => names.filter((n) => /^S\d+-\d+-.*\.md$/.test(n));
   if (ref) {
-    const ls = gitRead(root, ['ls-tree', '--name-only', ref, 'docs/stories/']);
+    // -z: names in their real bytes, never quoted as core.quotePath would quote S1-1-café.md.
+    const ls = gitRead(root, ['ls-tree', '-z', '--name-only', ref, 'docs/stories/']);
     if (ls !== null) {
-      const names = named(ls.split(/\r?\n/).filter(Boolean).map((p) => p.split('/').pop()));
+      const names = named(ls.split('\0').filter(Boolean).map((p) => p.split('/').pop()));
       if (!names.length) return [];
       // `ref:./path` resolves against the working directory, as ls-tree's path above does, so a
       // project inside a larger repository reads its own docs/stories.
@@ -197,18 +199,65 @@ function storyTexts(root, ref) {
   return named(listDir(dir)).map((name) => ({ name, text: readText(path.join(dir, name)) }));
 }
 
-// recordTimes(root, ref, word): story id to the committer time (ms, UTC) of the first
-// `chore(<id>): <word>` commit on ref (`merged`, `claim`), or null when the history cannot be read.
-// A batch commit naming several ids, `chore(S1-1,S1-2): merged`, counts for each.
-function recordTimes(root, ref, word) {
-  const log = gitRead(root, ['log', '-E', `--grep=^chore\\([^)]*\\): ${word}`, '--format=%cI%x1f%s', '--end-of-options', ref, '--']);
+// projectScope(root, ref): which project's history a commit belongs to, in a repository that may
+// hold several deliver projects. A project is a directory with docs/stories/S<n>-<m>-*.md at ref,
+// or root itself; `prefix` is root's path below the git top level, `a/b/` or ''. Each file belongs
+// to the deepest project holding it, so a top-level project owns the files outside every nested
+// one. `solo` when root is the only project, where every commit is its own.
+export function projectScope(root, ref) {
+  const prefix = (gitRead(root, ['rev-parse', '--show-prefix']) ?? '').trim();
+  const projects = new Set([prefix]);
+  const ls = ref ? gitRead(root, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', ref]) : null;
+  for (const p of (ls ?? '').split('\0')) {
+    const m = p.match(/^((?:.*\/)?)docs\/stories\/S\d+-\d+-[^/]*\.md$/);
+    if (m) projects.add(m[1]);
+  }
+  const deepest = [...projects].sort((a, b) => b.length - a.length);
+  return { prefix, label: prefix.replace(/\/$/, ''), solo: projects.size === 1, owner: (file) => deepest.find((p) => file.startsWith(p)) ?? '' };
+}
+
+// touched(root, commits): sha to the paths, from the top level, that each { sha, parent } changes
+// against its first parent (every path for a root commit), read NUL-delimited in one git call.
+function touched(root, commits) {
+  const out = new Map(commits.map((c) => [c.sha, []]));
+  if (!commits.length) return out;
+  const raw = gitRead(root, ['diff-tree', '-r', '-z', '--name-only', '--root', '--no-renames', '--stdin'], Buffer.from(commits.map((c) => (c.parent ? `${c.sha} ${c.parent}` : c.sha)).join('\n') + '\n'));
+  if (raw === null) return out;
+  const order = new Map(commits.map((c, i) => [c.sha, i]));
+  let at = -1;
+  for (const tok of raw.toString('utf8').split('\0')) {
+    if (!tok) continue;
+    if (order.has(tok) && order.get(tok) > at) { at = order.get(tok); continue; }
+    if (at >= 0) out.get(commits[at].sha).push(tok);
+  }
+  return out;
+}
+
+// ownCommits(root, scope, commits): the shas among commits that count for scope's project: every
+// one when it is the only project, else those changing a file the project owns.
+function ownCommits(root, scope, commits) {
+  if (scope.solo) return new Set(commits.map((c) => c.sha));
+  const files = touched(root, commits);
+  return new Set(commits.filter((c) => files.get(c.sha).some((f) => scope.owner(f) === scope.prefix)).map((c) => c.sha));
+}
+
+// recordTimes(root, ref, word, scope): story id to the committer time (ms, UTC) of the first
+// `chore(<id>): <word>` commit on ref (`merged`, `claim`) that belongs to scope's project, or null
+// when the history cannot be read. A batch commit naming several ids, `chore(S1-1,S1-2): merged`,
+// counts for each.
+function recordTimes(root, ref, word, scope = projectScope(root, ref)) {
+  const log = gitRead(root, ['log', '-E', `--grep=^chore\\([^)]*\\): ${word}`, '--format=%H%x1f%P%x1f%cI%x1f%s', '--end-of-options', ref, '--']);
   if (log === null) return null;
+  const rows = log.split(/\r?\n/).filter(Boolean).map((line) => {
+    const [sha, parents = '', when = '', subject = ''] = line.split('\x1f');
+    return { sha, parent: parents.split(' ')[0] || null, when, subject };
+  });
+  const own = ownCommits(root, scope, rows);
   const out = new Map();
-  for (const line of log.split(/\r?\n/)) {
-    const [when, subject = ''] = line.split('\x1f');
+  for (const { sha, when, subject } of rows) {
     const m = subject.match(new RegExp(`^chore\\(([^)]*)\\): ${word}\\b`));
     const at = Date.parse(when);
-    if (!m || !Number.isFinite(at)) continue;
+    if (!own.has(sha) || !m || !Number.isFinite(at)) continue;
     for (const id of m[1].split(/[,\s]+/)) if (/^S\d+-\d+$/.test(id) && (!out.has(id) || at < out.get(id))) out.set(id, at);
   }
   return out;
@@ -229,8 +278,8 @@ const updatedAt = (v) => {
 // else unknown (null) for a 0.29 T1 or T2 story, whose gate ran but whose count is lost, and 0
 // otherwise. Holdout failures are `holdout_fails`, or null when it is missing. `panel` is the lens
 // names that ran on every review round, one entry per trial, or null.
-function readStories(root, ref) {
-  const merges = ref ? recordTimes(root, ref, 'merged') : null;
+function readStories(root, ref, scope) {
+  const merges = ref ? recordTimes(root, ref, 'merged', scope) : null;
   return storyTexts(root, ref).map(({ name, text }) => {
     const id = name.match(/^(S\d+-\d+)-/)[1];
     const exec = text === null ? null : parseExec(text);
@@ -256,25 +305,37 @@ function readStories(root, ref) {
   });
 }
 
-// escapesOn(root, ref): one { commit, story, at, sprint } per story named on an `Escaped-From:` line in a
-// commit message reachable from ref, or null when the history cannot be read. git does the
-// filtering, so a long history never passes through here whole.
-export function escapesOn(root, ref) {
+// escapesOn(root, ref, scope): one { commit, story, at, sprint } per story of scope's project named
+// on an `Escaped-From:` line in a commit message reachable from ref, or null when the history
+// cannot be read. git does the filtering, so a long history never passes through here whole. A
+// project-qualified id, `Escaped-From: packages/api/S1-1`, counts for the project at that path
+// below the git top level (`./S1-1` for the top level) and no other. A bare id counts when the
+// commit belongs to the project (ownCommits): with sibling projects in one repository, when it
+// changes a file the project owns.
+export function escapesOn(root, ref, scope = projectScope(root, ref)) {
   if (String(ref).startsWith('-')) throw new Error(`refusing ref ${ref}`);
-  const log = gitRead(root, ['log', '-i', '-E', '--grep=^Escaped-From:', '--format=%H%x1f%cI%x1f%B%x1e', '--end-of-options', ref, '--']);
+  const log = gitRead(root, ['log', '-i', '-E', '--grep=^Escaped-From:', '--format=%H%x1f%P%x1f%cI%x1f%B%x1e', '--end-of-options', ref, '--']);
   if (log === null) return null;
+  const entries = log.split('\x1e').map((entry) => {
+    const [sha = '', parents = '', when = '', body = ''] = entry.replace(/^\s+/, '').split('\x1f');
+    return { sha: sha.trim(), parent: parents.split(' ')[0] || null, when, body };
+  }).filter((e) => e.sha);
+  const own = ownCommits(root, scope, entries);
   const out = [];
-  for (const entry of log.split('\x1e')) {
-    const [sha, when = '', body = ''] = entry.replace(/^\s+/, '').split('\x1f');
+  for (const { sha, when, body } of entries) {
     const at = Date.parse(when);
-    if (!sha) continue;
     const ids = new Set();
     for (const m of body.matchAll(/^Escaped-From:[ \t]*(.+)$/gim)) {
-      for (const id of m[1].split(/[,\s]+/)) if (/^S\d+-\d+$/.test(id)) ids.add(id);
+      for (const tok of m[1].split(/[,\s]+/)) {
+        const q = tok.match(/^(?:(.*)\/)?(S\d+-\d+)$/);
+        if (!q) continue;
+        const where = q[1] === undefined ? null : q[1].replace(/^\.\/?/, '').replace(/\/+$/, '');
+        if (where === null ? own.has(sha) : where === scope.label) ids.add(q[2]);
+      }
     }
     // The sprint the fix commit's subject names, `fix(S2-1): ...`, when it names one.
-    const scope = body.split(/\r?\n/)[0].match(/^[\w-]+!?\(\s*S(\d+)-\d+/);
-    for (const story of ids) out.push({ commit: sha.trim(), story, at: Number.isFinite(at) ? at : null, sprint: scope ? Number(scope[1]) : null });
+    const fixScope = body.split(/\r?\n/)[0].match(/^[\w-]+!?\(\s*S(\d+)-\d+/);
+    for (const story of ids) out.push({ commit: sha, story, at: Number.isFinite(at) ? at : null, sprint: fixScope ? Number(fixScope[1]) : null });
   }
   return out;
 }
@@ -365,7 +426,8 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
   if (branch !== null && String(branch).startsWith('-')) throw new Error(`refusing ref ${branch}`);
   const ref = branch || planBranch(root) || 'HEAD';
   const resolved = gitRead(root, ['rev-parse', '--verify', '--quiet', '--end-of-options', `${ref}^{commit}`]) !== null;
-  const stories = readStories(root, resolved ? ref : null);
+  const scope = projectScope(root, resolved ? ref : null);
+  const stories = readStories(root, resolved ? ref : null, scope);
   let panels = null;
   try { panels = JSON.parse(fs.readFileSync(panelsFile, 'utf8')); } catch { panels = null; }
   const docStale = panels ? staleness(panels) : [];
@@ -382,8 +444,8 @@ export function trust(root, { sprint = null, branch = null, panelsFile = DEFAULT
   const tgt = { ...DEFAULT_TARGETS, ...fromPlan.targets, ...(targets || {}) };
   const sinceMs = valid ? parseUtc(panels.stamp.calibratedAt) : NaN;
   const since = Number.isFinite(sinceMs) ? panels.stamp.calibratedAt : null;
-  const escapes = resolved ? escapesOn(root, ref) : null;
-  const claims = resolved ? recordTimes(root, ref, 'claim') : null;
+  const escapes = resolved ? escapesOn(root, ref, scope) : null;
+  const claims = resolved ? recordTimes(root, ref, 'claim', scope) : null;
   const sprintOf = (id) => Number(String(id).match(/^S(\d+)-/)?.[1] ?? NaN);
   // escapeSprint(e): the sprint an escape fell in: the latest of the escaped story's sprint, the
   // sprint its fix commit names, and every sprint with a story merged or claimed by then.
