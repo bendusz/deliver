@@ -484,13 +484,13 @@ const sanitize = (s) => oneLine(s).slice(0, 80);
 const resolve = (root, rev) => chomp(git(root, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`]) || '');
 const contains = (root, ancestor, of) => git(root, ['merge-base', '--is-ancestor', ancestor, of]) !== null;
 
-function refFor(root, name) {
+export function refFor(root, name) {
   for (const ref of [`refs/heads/${name}`, `refs/remotes/origin/${name}`]) if (resolve(root, ref)) return ref;
   return null;
 }
 
 // The plan parsers live in lib.mjs, shared with scripts/retro-stats.mjs.
-export const { planEntry, validBranchName, planName } = lib;
+export const { planEntry, validBranchName, planName, readGitPath } = lib;
 
 // project(root, prefixes): the deliver project at the deepest of `prefixes` (each "" or a
 // "dir/" path below the top level) that a trusted branch marks; null when none does. Else the
@@ -524,7 +524,7 @@ export function projectAt(root, prefix) {
   for (const name of baseBranches(root)) add(name);
   for (const name of localBranches(root)) {
     if (name.startsWith('pm/') || cands.some((c) => c.name === name)) continue;
-    if (planName(git(root, ['show', `refs/heads/${name}:${prefix}docs/plan.md`])) === name) add(name);
+    if (planName(git(root, ['show', `refs/heads/${name}:${prefix}docs/plan.md`]), root) === name) add(name);
   }
   for (const c of cands) {
     c.approved = git(root, ['cat-file', '-e', `${c.ref}:${prefix}docs/approval.json`]) !== null;
@@ -643,14 +643,6 @@ function operandOf(root, op) {
 // as `git merge FETCH_HEAD` merges them all: { heads: [{ sha, name }], bad }, name the branch the
 // line's `branch '<name>' of <url>` part names, or null, and url that line's url; bad when a line
 // marked for merge does not parse. null when FETCH_HEAD cannot be read.
-// readGitPath(root, rel): the text of `git rev-parse --git-path <rel>`; null when it cannot be read
-// (missing included), or, with { missing: '' }, that value for a missing file.
-function readGitPath(root, rel, { missing = null } = {}) {
-  const where = chomp(git(root, ['rev-parse', '--git-path', rel]) || '');
-  if (!where) return null;
-  try { return fs.readFileSync(path.resolve(root, where), 'utf8'); } catch (e) { return e.code === 'ENOENT' ? missing : null; }
-}
-
 export function fetchHeads(root) {
   const text = readGitPath(root, 'FETCH_HEAD');
   if (text === null) return null;
@@ -948,18 +940,18 @@ export function discover(root) {
   };
   const bases = baseBranches(root);
   for (const ref of baseRefs(root)) {
-    for (const prefix of dirs(listing(root, ['ls-tree', '-r', '-z', '--name-only', ref]))) note(prefix, planName(git(root, ['show', `${ref}:${prefix}docs/plan.md`])));
+    for (const prefix of dirs(listing(root, ['ls-tree', '-r', '-z', '--name-only', ref]))) note(prefix, planName(git(root, ['show', `${ref}:${prefix}docs/plan.md`]), root));
   }
   for (const name of localBranches(root)) {
     if (name.startsWith('pm/') || bases.includes(name)) continue;
     for (const prefix of dirs(listing(root, ['ls-tree', '-r', '-z', '--name-only', `refs/heads/${name}`]))) {
-      if (planName(git(root, ['show', `refs/heads/${name}:${prefix}docs/plan.md`])) === name) note(prefix, name);
+      if (planName(git(root, ['show', `refs/heads/${name}:${prefix}docs/plan.md`]), root) === name) note(prefix, name);
     }
   }
   // The working tree is untrusted, so it only adds projects, and so blocks; it never removes one.
   for (const prefix of dirs(listing(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', `:(glob)**/${tail}`]))) {
     let plan = null;
-    try { plan = planName(fs.readFileSync(path.join(root, `${prefix}docs/plan.md`), 'utf8')); } catch { plan = null; }
+    try { plan = planName(fs.readFileSync(path.join(root, `${prefix}docs/plan.md`), 'utf8'), root); } catch { plan = null; }
     note(prefix, plan);
   }
   return { found: [...found].sort(), integrations, failed };
@@ -1178,8 +1170,21 @@ function judgeCommand(calls, sessionDir) {
     // An octopus merge of a story into the integration branch is refused once every story in it
     // passes, so a missing verdict is the reason given first; the git-level gate agrees.
     let octopus = null;
+    let tipsOnce;
+    let baseOnceErr;
     for (const op of ops) {
-      const found = integ.error ? { branches: [] } : storyBranches(root, op.text, integ, target);
+      // With the project's plan in error (an invalid integration branch, or plans that disagree),
+      // the story is still recognised by its SHA or any alias (storyLike, as outside a project), and
+      // refused with that error; a merge that brings in no story goes on.
+      if (integ.error) {
+        tipsOnce ??= pmTips(root);
+        if (storyLike(root, op, tipsOnce, () => (baseOnceErr ??= baseRefs(root)))) {
+          if (call.noVerify) block(op.text, NO_VERIFY);
+          block(op.text, integ.error);
+        }
+        continue;
+      }
+      const found = storyBranches(root, op.text, integ, target);
       // A no-op judged on refs an earlier command may move is no judgement; fall through to SEPARATE.
       if (found.noop && !prior) continue;
       const story = Boolean(found.reason || found.branches.length || namedStory(op));
@@ -1187,7 +1192,6 @@ function judgeCommand(calls, sessionDir) {
       if (call.noVerify) block(op.text, NO_VERIFY);
       if (prior) block(op.text, SEPARATE);
       if (target === UNKNOWN) block(op.text, UNKNOWN_TARGET);
-      if (integ.error) block(op.text, integ.error);
       if (found.reason) block(op.text, found.reason);
       // A ship into the project's integration branch is judged by judgeMerge, the git-level gate's
       // own verdict; a story merged into any other branch keeps the directory project's verdict.

@@ -353,9 +353,9 @@ export function escapesOn(root, ref, scope = projectScope(root, ref)) {
   return out;
 }
 
-// planBranch(root): the plan's integration branch, parsed whole by lib.mjs's planName (never cut to
-// a valid prefix), or null.
-export const planBranch = (root) => planName(readText(path.join(root, 'docs', 'plan.md')) || '');
+// planBranch(root): the plan's integration branch, parsed whole by lib.mjs's planName and checked by
+// git's own rule, as the gate checks it (never cut to a valid prefix), or null.
+export const planBranch = (root) => planName(readText(path.join(root, 'docs', 'plan.md')) || '', root);
 
 // planTargets(text): { targets, problem } from docs/plan.md's Delivery mode line, found by its
 // label `- Assurance targets:` whatever follows, such as `T0=0.10, T1=0.05, T2=0.02`. HTML

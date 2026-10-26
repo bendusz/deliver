@@ -16,10 +16,11 @@ import { fileURLToPath } from 'node:url';
 export const chomp = (s) => s.replace(/(\r?\n)+$/, '');
 
 // planEntry(text): the plan's `Integration branch:` value, whole: the line (read up to a newline
-// only, so U+2028 or U+2029 cannot cut it), an HTML comment dropped, its first word, unwrapped from
-// backticks or <>, or, bare, with trailing punctuation (`,` `;` `)` `.` or a closing quote) and
-// opening quotes taken as delimiters; null when there is no such line. Never cut to a prefix:
-// `release+fix` is `release+fix`, and `main, as agreed` is `main`.
+// only, so U+2028 or U+2029 cannot cut it), an HTML comment dropped, then its first word, from
+// backticks whole; else with trailing punctuation (`,` `;` `.`, a closing quote, and a `)` only when
+// the word holds no `(`) dropped first, then unwrapped from <>, then with a leading `(` or quote
+// dropped. null when there is no such line. Never cut to a prefix: `release+fix` is `release+fix`,
+// `main, as agreed` and `<main>,` and `(main)` are `main`, and `feature(x)` is `feature(x)`.
 export function planEntry(text) {
   const line = String(text ?? '').split('\n').map((l) => l.replace(/\r$/, '')).find((l) => /^[ \t]*-[ \t]*Integration branch:/.test(l));
   if (line === undefined) return null;
@@ -27,8 +28,14 @@ export function planEntry(text) {
   const tick = rest.match(/^`([^`]*)`/);
   if (tick) return tick[1].trim() || null;
   let word = rest.split(/[ \t]+/)[0] ?? '';
+  for (let prev = null; prev !== word;) {
+    prev = word;
+    word = word.replace(/[,;.'"’”]+$/, '');
+    if (word.endsWith(')') && !word.includes('(')) word = word.slice(0, -1);
+  }
   if (/^<.*>$/.test(word)) return word.slice(1, -1) || null;
-  word = word.replace(/^["'‘“]+/, '').replace(/[,;).'"’”]+$/, '');
+  word = word.replace(/^[("'‘“]+/, '');
+  if (word.endsWith(')') && !word.includes('(')) word = word.slice(0, -1);
   return word || null;
 }
 
@@ -41,28 +48,47 @@ export function validBranchName(name) {
   return name.split('/').every((c) => c && !c.startsWith('.') && !c.endsWith('.lock'));
 }
 
-// branchNameOk(cwd, name): `git check-ref-format --branch <name>` accepts the name and prints it back
-// unchanged (no `@{-N}` expansion); validBranchName when git cannot be run.
+// branchNameOk(cwd, name, { timeout }): `git check-ref-format --branch <name>` accepts the name and
+// prints it back unchanged (no `@{-N}` expansion), and it is not HEAD (git before about 2.44
+// accepts HEAD). When git cannot answer (not found, timed out, killed: no exit status), the JS
+// mirror validBranchName decides; a refusal by git is final.
 const branchNames = new Map();
-export function branchNameOk(cwd, name) {
+export function branchNameOk(cwd, name, { timeout = 5000 } = {}) {
   if (typeof name !== 'string' || !name) return false;
   if (!branchNames.has(name)) {
     let ok;
     try {
-      ok = execFileSync('git', ['-C', cwd, 'check-ref-format', '--branch', name], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout: 5000 }).replace(/\r?\n$/, '') === name;
+      ok = execFileSync('git', ['-C', cwd, 'check-ref-format', '--branch', name], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout }).replace(/\r?\n$/, '') === name;
     } catch (e) {
-      ok = e.code === 'ENOENT' || e.status === undefined ? validBranchName(name) : false;
+      ok = e.code === 'ENOENT' || e.code === 'ETIMEDOUT' || e.status === null ? validBranchName(name) : false;
     }
-    branchNames.set(name, ok && !name.includes('@{'));
+    branchNames.set(name, ok && name !== 'HEAD' && !name.includes('@{'));
   }
   return branchNames.get(name);
 }
 
-// planName(text): the plan's integration branch when it is a valid branch name, else null (an
-// invalid one is reported, and never cut down to a valid prefix).
-export function planName(text) {
+// planName(text, root): the plan's integration branch when it is a valid branch name, else null (an
+// invalid one is reported, and never cut down to a valid prefix): git's rule (branchNameOk) with a
+// repository root, so every caller agrees with the gate; the JS mirror without one.
+export function planName(text, root = null) {
   const name = planEntry(text);
-  return name && validBranchName(name) ? name : null;
+  if (!name) return null;
+  return (root ? branchNameOk(root, name) : validBranchName(name)) ? name : null;
+}
+
+// readGitPath(root, rel, { missing }): the text of the file `git rev-parse --git-path <rel>` names;
+// null when it cannot be read (missing included), or, with { missing: '' }, that value for a
+// missing file.
+export function readGitPath(root, rel, { missing = null } = {}) {
+  const where = gitPathOf(root, rel);
+  if (!where) return null;
+  try { return fs.readFileSync(where, 'utf8'); } catch (e) { return e.code === 'ENOENT' ? missing : null; }
+}
+
+// gitPathOf(root, rel): the absolute path `git rev-parse --git-path <rel>` names, or null.
+export function gitPathOf(root, rel) {
+  const where = chomp(git(root, ['rev-parse', '--git-path', rel]) || '');
+  return where ? path.resolve(root, where) : null;
 }
 
 // REFUSED: the exit status deliver's git-level gate script uses for a deliberate refusal, read only
