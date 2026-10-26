@@ -1405,7 +1405,7 @@ test('git gate: the plan line `main, as agreed` guards main; a plan naming a bra
   gitIn(p, ['commit', '-qam', 'plan: trunk'], { DELIVER_NO_ENFORCE: '1' });
   const t = installGitHook(p);
   assert.equal(t.ok, false);
-  assert.match(t.notes.join('\n'), /integration branch trunk does not exist; check the plan's Integration branch line/);
+  assert.match(t.notes.join('\n'), /integration branch trunk does not exist \(no refs\/heads\/trunk or refs\/remotes\/origin\/trunk\); check the plan's Integration branch line/);
   fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `HEAD`\n');
   gitRun(p, ['commit', '-qam', 'plan: HEAD'], { DELIVER_NO_ENFORCE: '1' });
   const h = installGitHook(p);
@@ -1457,6 +1457,7 @@ test('git gate: plan names keep their parentheses where they belong', () => {
   assert.equal(planName('- Integration branch: (main)'), 'main');
   assert.equal(planName('- Integration branch: feature(x)'), 'feature(x)');
   assert.equal(planName('- Integration branch: "main".'), 'main');
+  assert.equal(planName('- Integration branch: (feature(x))'), 'feature(x)');
 });
 
 test('git gate: the missing-branch check asks for the exact refs, and spares an unborn current branch', () => {
@@ -1495,6 +1496,60 @@ test('git gate: with an invalid plan, the Bash hook still finds a story merged b
   gitIn(p, ['checkout', '-q', 'main']);
   const plain = bash(p, 'git merge --no-ff feature -m m');
   assert.equal(plain.status, 0, plain.stderr);
+});
+
+test('git gate: a tag that shares the integration branch name does not hide the project', () => {
+  // The plan naming release lives on release alone, so release is found as a local branch whose
+  // committed plan names itself; main's plan names no integration branch.
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n');
+  gitIn(p, ['add', 'docs/plan.md']);
+  gitIn(p, ['commit', '-qm', 'plan: none']);
+  gitIn(p, ['checkout', '-qb', 'release', 'main']);
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `release`\n');
+  gitIn(p, ['commit', '-qam', 'plan: release']);
+  gitIn(p, ['checkout', '-q', 'main']);
+  gitIn(p, ['tag', 'release', 'main']);
+  const r = installGitHook(p);
+  assert.deepEqual(r.branches, ['release']);
+  gitIn(p, ['checkout', '-q', 'release']);
+  const before = head(p, 'refs/heads/release');
+  const m = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']);
+  assert.notEqual(m.status, 0, m.stderr);
+  assert.equal(head(p, 'refs/heads/release'), before);
+  const b = bash(p, `git merge --no-ff ${BRANCH} -m m`);
+  assert.equal(b.status, 2, b.stderr);
+});
+
+test('git gate: clustered short options consume their values: -qm, -qmmsg, -nm', () => {
+  const ok = verified();
+  for (const cmd of [`git merge --no-ff -qm "Ship story" ${BRANCH}`, `git merge --no-ff -qmShip ${BRANCH}`, `git merge --no-ff -nm msg ${BRANCH}`, `git merge --no-ff -S -qm msg ${BRANCH}`]) {
+    const r = bash(ok, cmd);
+    assert.equal(r.status, 0, `${cmd}: ${r.stderr}`);
+  }
+  const bad = project();
+  const r = bash(bad, `git merge --no-ff -qm "Ship story" ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /no verifier verdict/);
+  // commit -qnm: the n in the cluster skips hooks.
+  gitRun(bad, ['merge', '--no-commit', '--no-ff', BRANCH]);
+  assert.equal(bash(bad, 'git commit -qnm msg').status, 2);
+  gitIn(bad, ['merge', '--abort']);
+});
+
+test('git gate: under an invalid plan, a merge into a story branch goes on, and an earlier ref write is SEPARATE', () => {
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `main~1`\n');
+  gitIn(p, ['add', 'docs/plan.md']);
+  gitIn(p, ['commit', '-qm', 'plan: invalid'], { DELIVER_NO_ENFORCE: '1' });
+  gitIn(p, ['checkout', '-qb', 'develop', BRANCH]);
+  gitIn(p, ['checkout', '-q', BRANCH]);
+  const r = bash(p, 'git merge develop');
+  assert.equal(r.status, 0, r.stderr);
+  gitIn(p, ['checkout', '-q', 'main']);
+  const s = bash(p, `git fetch . ${BRANCH}:refs/heads/tmp && git merge tmp`);
+  assert.equal(s.status, 2, s.stderr);
+  assert.match(s.stderr, /run the merge as its own command/);
 });
 
 // --- what must keep working ---
@@ -1935,6 +1990,32 @@ test('git gate: an upstream set to a pm/* branch does not get the overlapping-re
   gitIn(p, ['update-ref', `refs/remotes/origin/${BRANCH}`, BRANCH]);
   const check = spawnSync(process.execPath, [INSTALL, '--check', p], { encoding: 'utf8', env: env() });
   assert.doesNotMatch(check.stdout, /also reads as a story branch/);
+});
+
+test('git gate: a missing integration branch names the refs checked and the remedy; the upstream advice names <remote> when no remote is designated', () => {
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `develop`\n');
+  gitIn(p, ['add', 'docs/plan.md']);
+  gitIn(p, ['commit', '-qm', 'plan: develop']);
+  gitIn(p, ['remote', 'add', 'upstream', 'https://example.invalid/u.git']);
+  gitIn(p, ['update-ref', 'refs/remotes/upstream/develop', 'main']);
+  assert.match(installGitHook(p).notes.join('\n'), /integration branch develop does not exist \(no refs\/heads\/develop or refs\/remotes\/origin\/develop\); create it locally with git branch "develop" "upstream\/develop"/);
+  // Two remotes, neither origin: no designated remote, so the advice says <remote>.
+  const q = project();
+  gitIn(q, ['remote', 'add', 'a', 'https://example.invalid/a.git']);
+  gitIn(q, ['remote', 'add', 'b', 'https://example.invalid/b.git']);
+  const check = spawnSync(process.execPath, [INSTALL, '--check', q], { encoding: 'utf8', env: env() });
+  assert.match(check.stdout, /set one with git branch --set-upstream-to <remote>\/"main" "main"/);
+});
+
+test('git gate: a set line that only mentions -e later in the line is no errexit', { skip: NO_SH }, () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  const f = path.join(p, '.git', 'hooks', RT_HOOK);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  const c = `"${path.join(p, '.git', 'deliver', RT_HOOK).replace(/\\/g, '/')}"`;
+  const r7 = `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then cat > "$deliver_in"; sh ${c} "$@" < "$deliver_in"; if [ $? = 1 ]; then rm -f "$deliver_in"; exit 1; fi; exec < "$deliver_in"; rm -f "$deliver_in"; fi`;
+  fs.writeFileSync(f, `#!/bin/sh\nset -u; foo -e\n${r7}\n`, { mode: 0o755 });
+  assert.equal(installGitHook(p).hooks[RT_HOOK], 'chained');
 });
 
 test('git gate: a symlinked hooks directory outside the git directory is not written', { skip: WIN && 'symlinks' }, () => {
