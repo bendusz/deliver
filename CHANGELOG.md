@@ -2,6 +2,53 @@
 
 All notable changes to this project are documented here.
 
+## 0.29.1 - 2026-10-26
+
+The ship gate moves into git itself, so a merge of an unverified story is refused whatever command
+makes it, and deliver is checked to run unchanged without T3 Code.
+
+- **A git-level ship gate behind the Bash hook.** Session start installs a git hook in deliver
+  projects: `git-hook-install.mjs` writes a `reference-transaction` shim marked
+  `# deliver-merge-gate v2` (git 2.28 or newer; below that, `pre-merge-commit` and `pre-commit`,
+  which miss fast-forwards), never over a hook it did not write. For an existing hook it prints
+  lines to chain in, or an sh wrapper for a non-sh or symlinked hook, and every generated shim is
+  checked with `sh -n` before it is installed. Git runs `git-merge-gate.mjs` on every update of an
+  integration branch, which judges the stories the update brings in with the Bash hook's own
+  verdict and requires any merge on top of a story to be git's automatic merge apart from the
+  story file. Merges, fast-forwards, pulls, rebases, resets, `update-ref`, amended merges,
+  `git push .`, and hand-finished conflicted merges are all judged. Cherry-picks and squash merges
+  of a story are found by patch id and refused: merge the story branch itself with `--no-ff`.
+  Rewriting shipped story history must keep the code exactly; use `git pull --no-rebase` or
+  `--rebase=merges`, since a plain `--rebase` that flattens a story merge is refused. A fetched
+  integration head is trusted only for the pull now running, from the designated remote. A
+  refusal exits 86 inside the shim and 1 to git; any other failure of the gate warns and lets the
+  update through, so a broken node never blocks a repository. The merged-tree comparison needs git
+  2.38; on 2.28 to 2.37 it alone is skipped and reported.
+- **Uninstalling.** `node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes the
+  shims and sets `git config deliver.mergeGate off`, which session start honours until an explicit
+  install. `/deliver:doctor` checks and repairs the install, and reports a chained hook that is not
+  executable, has CRLF line endings, or holds stale lines.
+- **The Bash hook reads more of the shell.** Clustered short options (`-qm "msg"`) consume their
+  values, per subcommand, and every value-taking option was checked against `git <cmd> -h`. Only a
+  `status`, `log`, `diff`, `show`, or `rev-parse`, or a plain checkout or switch, may precede a
+  story merge in the same command; run any other merge as its own command.
+- **Several projects in one repository.** A story several projects claim must be verified in
+  each. `Escaped-From:` accepts `<project-path>/<story-id>`, and holdout checks live on
+  `refs/deliver/holdout/<project-key>/<story-id>`. The plan's integration branch is parsed whole
+  and validated with `git check-ref-format`; an invalid or missing branch is reported.
+- **T3 Code stays optional.** When the host probe fails, deliver runs unchanged under plain Claude
+  Code. The new `host-neutral` test fails if a T3-only step leaves `host-t3.md` or loses its
+  condition, or if the hooks depend on T3.
+- **Documentation consistency.** `/deliver:analyze` ran over the changed references (0.29
+  acceptance item 6). Its four P2 findings are fixed: a measured panel runs only when its bound
+  meets the plan's target, fix rounds re-review with the risk lenses too, a Codex review that fell
+  back to another model counts as the calibrated lens missing, and the claim step pulls with
+  `--no-rebase` or `--rebase=merges`. The P3 findings are listed in the plan's backlog.
+- **Known limits.** Out of scope remain deleting the hook, overriding `core.hooksPath`,
+  `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, and pushing straight to the
+  remote. The gate catches a PM's honest mistakes; it is not a boundary against an agent that
+  evades it on purpose.
+
 ## 0.29.0 - 2026-10-25
 
 Autonomous trust: review strength is measured per risk tier instead of assumed, the builder can no
@@ -34,7 +81,7 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   panel each tier ran, the stories reviewed below panel, the calibrated bound or "unmeasured,
   maximum panel", first-pass stories (no fix rounds, no retries), fix rounds, integrity blocks,
   holdout failures, and observed escapes. A tier with any story below panel has its bound
-  withheld. A fix for a defect an earlier story shipped carries an `Escaped-From: <story-id>` trailer, or `Escaped-From: <project-path>/<story-id>`, with the project's path from the git top level, to name one of several projects in a repository; a bare trailer counts only for the project whose files the fix changes. A tier is OVER TARGET when at least one escape
+  withheld. A fix for a defect an earlier story shipped carries an `Escaped-From: <story-id>` trailer. A tier is OVER TARGET when at least one escape
   was observed since the calibration in force and the escape bound over those stories exceeds the
   target; the PM reads the report at sprint start and runs that tier at the maximum panel until
   `/deliver:calibrate` re-runs.
@@ -42,8 +89,7 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   red acceptance tests before the build, and the Execution block lists them under `protected`. Any
   change to a protected path fails the scope check, and the Codex runner refuses it. At `T2`, `test-engineer` also writes extra
   acceptance checks, which the PM stores with `scripts/holdout.mjs` on the private ref
-  `refs/deliver/holdout/<project-key>/<story-id>`, namespaced so sibling projects in one
-  repository keep their own checks; `RUN` must be one line. The ref is never checked out or pushed, and no builder brief
+  `refs/deliver/holdout/<story-id>`. The ref is never checked out or pushed, and no builder brief
   names it. The PM runs the checks beside the verifier, and a failure is a `FAIL`.
 - **New `scripts/test-integrity.mjs`.** At `T1` and `T2`, the PM runs it after every writer run.
   It fails on a deleted or renamed test file, added skip or focus markers, a net drop in
@@ -58,27 +104,9 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   automatically. It reads `tier`, `deliver`, and `protected` from the
   integration branch's copy, never the story branch's. It fails open on unreadable hook input,
   with the kill switch set, or outside a deliver project; the hook header lists the remaining
-  known limits. Behind it, an authoritative git-level gate. **Session start installs a git hook
-  in deliver projects**: `git-hook-install.mjs` writes a `reference-transaction` shim marked
-  `# deliver-merge-gate v2` (git 2.28 or newer; below that, `pre-merge-commit` and `pre-commit`,
-  which miss fast-forwards), never over a hook it did not write, a symlink, or a hooks directory in
-  the working tree or from global `core.hooksPath`, each of which it reports. Git runs
-  `git-merge-gate.mjs` on every update of an integration branch, which judges the stories the
-  update brings in with the Bash hook's own verdict (`judgeMerge`) and requires any merge on top of
-  a story to be git's automatic merge apart from the story file, so merge commits, fast-forwards,
-  pulls, rebases, resets, `update-ref`, amended merges, `git push .`, and hand-finished conflicted
-  merges are all judged, whatever the shell form. Cherry-picks and squash merges of a story are
-  found by `git patch-id --stable` and refused, verified or not: merge the story branch itself with
-  `--no-ff`, compared on code alone so a record conflict in a squash does not hide it; a hotfix
-  that a story only cherry-picked is not a copy. Amending or rebasing over shipped story work must
-  keep the code. An octopus merge of a story is refused: merge one story at a time. The merged-tree
-  comparison needs git 2.38 (`git merge-tree --write-tree`); on 2.28 to 2.37 it alone is skipped
-  and reported, and the verdicts still apply. Out of scope remain deleting the hook, overriding `core.hooksPath`, `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, the merged-result comparison on git older than 2.38 (the verdicts still apply), and pushing straight to the remote.
-  `/deliver:doctor` checks and repairs the install, and
-  `node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes it and sets
-  `git config deliver.mergeGate off`, which session start honours until an explicit install. It catches a PM's honest mistakes, such as
+  known limits. It catches a PM's honest mistakes, such as
   a forgotten verification or a stale verdict. It is not a boundary against an agent that evades
-  it on purpose. The merge's own directory, after `cd` or `git -C`, identifies the project (a story several projects claim must be verified in each); from a
+  it on purpose. The merge's own directory, after `cd` or `git -C`, identifies the project; from a
   directory that is in no deliver project (for example a monorepo root), a story-like merge blocks
   with "run the merge from the project directory, or with git -C <project>", unless the checked-out target is a non-base branch that no project integrates on. The hook does not see
   a remote PR merge. Before `gh pr merge` or a UI merge, the PM applies the same rule by hand: the
@@ -103,9 +131,7 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   stories remain: its tree is committed to its branch as `wip(<story-id>): blocked` and the PM
   moves on from the integration branch. A heartbeat runs `/deliver:resume --heartbeat` every 30
   minutes, remote PR mode watches the PR and re-gates locally on a CI wake, and `/deliver:doctor`
-  checks the T3 setup. T3 stays optional: when the probe fails, deliver runs unchanged under plain
-  Claude Code, and the new `host-neutral` test fails if a T3-only step leaves `host-t3.md` or loses its
-  condition.
+  checks the T3 setup.
 - **Superpowers precedence is stated.** While deliver is active, its phases replace Superpowers'
   brainstorming, writing-plans, and subagent-driven-development. TDD, debugging, and
   verification-before-completion still apply.
@@ -132,10 +158,7 @@ longer move its own oracle, and deliver runs a project on its own inside T3 Code
   no story, when the checked-out target is a base branch, an integration branch, or unknown. After a
   command that can write refs it always blocks. After a fetch, or after any other git command except
   a plain checkout or switch once a `pm/*` branch exists, it blocks unless the merge names a base
-  branch. Only a `status`, `log`, `diff`, `show`, or `rev-parse`, or a plain checkout or switch,
-  may precede a story merge in the same command, and a checkout that might not run (in an `if` or
-  loop, after `||`, or behind another command in its `&&` chain) makes the target unknown for any
-  merge outside that `&&` chain, so a story merge there blocks even when verified. Run such a merge as its own command.
+  branch. Run such a merge as its own command.
   The corpus README says batch 1's 65 certify cases prove 4.5042%. That
   is true of batch 1 alone; the calibrated set is 66 certify cases including batch 0, at 4.4%. The README
   is in the corpus manifest, so editing it would invalidate the calibration; the next corpus batch

@@ -23,8 +23,9 @@ Resolve a `pm-meta` builder of `auto` now, by `decomposition.md`'s rules for the
 Codex it falls back to `expert-builder`. An explicit `codex-builder` is a readiness blocker and
 never switches workers silently.
 
-**Claim.** Pull or rebase the integration branch. Confirm no `pm/<story-id>-*` branch exists locally
-or on the remote and that the story has no Execution block owned by someone else. Append the
+**Claim.** Pull the integration branch (`git pull --no-rebase` or `--rebase=merges`, never a plain
+`--rebase`, which the ship gate refuses over local story merges). Confirm no `pm/<story-id>-*`
+branch exists locally or on the remote and that the story has no Execution block owned by someone else. Append the
 `## Execution` section per `state.md`, with your `owner`, the resolved `builder`, the branch name,
 `status: claimed`, the story's `tier`, every counter at `0`, and the `deliver` version, and commit
 it on the integration branch as `chore(<story-id>): claim`. Push it only under a standing push
@@ -159,7 +160,8 @@ criterion needs the running app or the story needs a durable report.
 
 ### 6. Ship
 Everything the story changed is already on its branch; `git status --porcelain` must be empty.
-Pull or rebase the integration branch, and re-gate on the merged result if its tip moved after your
+Pull the integration branch (`git pull --no-rebase` or `--rebase=merges`, never a plain
+`--rebase`, which the ship gate refuses over local story merges), and re-gate on the merged result if its tip moved after your
 gates ran. Then check it out and `--no-ff` merge the story branch. **Never** push without an
 explicit request. `environment.md` owns the opt-in remote PR path.
 
