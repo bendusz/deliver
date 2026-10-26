@@ -271,6 +271,36 @@ const GIT_REPO_OPTS = new Set(['--git-dir', '--work-tree']);
 const MERGE_OPTS_WITH_VALUE = new Set(['-m', '--message', '-F', '--file', '-s', '-X', '--strategy', '--strategy-option', '--into-name']);
 const PULL_OPTS_WITH_VALUE = new Set(['-s', '-X', '--strategy', '--strategy-option', '--depth', '--deepen', '--shallow-since', '--shallow-exclude', '-j', '--jobs', '--upload-pack', '-o', '--server-option', '--negotiation-tip']);
 const MERGE_CONTROL = new Set(['--abort', '--continue', '--quit', '--skip']);
+// SHORT: the short options of each subcommand the hook parses that take a value, from `git <cmd>
+// -h`: required (the rest of the cluster, else the next word) and optional (attached only, as
+// `-S<keyid>` or `-j4`; never the next word).
+const SHORT = {
+  merge: { required: 'mFsX', optional: 'S' },
+  pull: { required: 'sXo', optional: 'Srj' },
+  commit: { required: 'FmcCtU', optional: 'Su' },
+  checkout: { required: 'bBU', optional: 't' },
+  switch: { required: 'cCU', optional: 't' },
+};
+
+// shortCluster(sub, word): a cluster of short options (`-qm`, `-qmmsg`, `-nm`) read letter by
+// letter, as { flags, letter, value, next }: the flag letters before the first that takes a value,
+// that letter and its attached value, and next when the value is the next word. null when word
+// is no short-option cluster.
+function shortCluster(sub, word) {
+  if (!/^-[A-Za-z]/.test(word) || word.startsWith('--')) return null;
+  const spec = SHORT[sub] ?? { required: '', optional: '' };
+  const flags = [];
+  for (let i = 1; i < word.length; i++) {
+    const ch = word[i];
+    if (spec.required.includes(ch)) {
+      const rest = word.slice(i + 1);
+      return { flags, letter: ch, value: rest || null, next: !rest };
+    }
+    if (spec.optional.includes(ch)) return { flags, letter: ch, value: word.slice(i + 1) || null, next: false };
+    flags.push(ch);
+  }
+  return { flags, letter: null, value: null, next: false };
+}
 const COMMIT_OPTS_WITH_VALUE = new Set(['-m', '-F', '-C', '-c', '-t', '--message', '--file', '--author', '--date', '--template', '--reuse-message', '--reedit-message', '--fixup', '--squash', '--cleanup']);
 
 const isGit = (w) => /^git(\.exe)?$/i.test(w.split(/[\\/]/).at(-1));
@@ -406,13 +436,13 @@ function skipsHooks(sub, args) {
     if (w === '--') break;
     if (w === '--no-verify') skip = true;
     else if (w === '--verify') skip = false;
-    else if (withValue.has(w)) k++;
-    else if (sub === 'commit' && /^-[A-Za-z]+$/.test(w)) {
+    else if (withValue.has(w) && w.startsWith('--')) k++;
+    else {
       // In a cluster, a letter that takes a value swallows the rest: -nm msg skips, -mn is a message.
-      for (const ch of w.slice(1)) {
-        if (ch === 'n') { skip = true; break; }
-        if (withValue.has(`-${ch}`)) break;
-      }
+      const cl = shortCluster(sub, w);
+      if (!cl) continue;
+      if (sub === 'commit' && cl.flags.includes('n')) skip = true;
+      if (cl.next) k++;
     }
   }
   return skip;
@@ -428,7 +458,8 @@ function operands(sub, args) {
     const w = args[i];
     if (options && w.text === '--') options = false;
     else if (options && MERGE_CONTROL.has(w.text)) return { ops: [], bare: false };
-    else if (options && withValue.has(w.text)) i++;
+    else if (options && w.text.startsWith('--') && withValue.has(w.text)) i++;
+    else if (options && shortCluster(sub, w.text)) { if (shortCluster(sub, w.text).next) i++; }
     // `-` and `@{-N}` name the previously checked-out branch, which the shell state decides.
     else if (w.text === '-' || /@\{-\d+\}/.test(w.text)) positional.push({ ...w, dynamic: true });
     else if (!options || !w.text.startsWith('-')) positional.push(w);
@@ -442,8 +473,9 @@ function operands(sub, args) {
 // { text, local }: a local branch name when the upstream's remote is `.`, else the
 // remote-tracking name; null when none is configured.
 function upstreamOf(root, branch) {
-  const name = chomp(git(root, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${branch}@{upstream}`]) || '');
-  if (!name || name === '@{upstream}') return null;
+  // The full refname, never an abbreviation (which turns ambiguous when a tag shares the name).
+  const name = chomp(git(root, ['rev-parse', '--symbolic-full-name', `${branch}@{upstream}`]) || '');
+  if (!name.startsWith('refs/')) return null;
   const remote = chomp(git(root, ['config', '--get', `branch.${branch}.remote`]) || '');
   return { text: name, dynamic: false, upstream: true, local: remote === '.' };
 }
@@ -464,12 +496,12 @@ function checkoutOf(sub, args) {
     if (w === '--' && sub === 'switch') { options = false; continue; }
     // `git checkout main --` with nothing after the -- still switches branches.
     if (w === '--') { out.paths = i + 1 < args.length; break; }
-    if (['-b', '-c', '-B', '-C', '--orphan'].includes(w)) {
-      out.create = args[i + 1]?.text ?? null;
-      createDynamic = Boolean(args[i + 1]?.dynamic);
-      if (w !== '-b' && w !== '-c') out.force = true;
-      i++;
-    } else if (w === '--detach' || (sub === 'switch' && w === '-d')) out.detach = true;
+    const cl = w.startsWith('--') ? null : shortCluster(sub, w);
+    const creates = w === '--orphan' || (cl && ['b', 'c', 'B', 'C'].includes(cl.letter) && (sub === 'switch' ? 'cC' : 'bB').includes(cl.letter));
+    if (creates) {
+      if (cl?.value) { out.create = cl.value; createDynamic = Boolean(args[i].dynamic); } else { out.create = args[i + 1]?.text ?? null; createDynamic = Boolean(args[i + 1]?.dynamic); i++; }
+      if (w === '--orphan' || cl.letter === 'B' || cl.letter === 'C') out.force = true;
+    } else if (cl?.next) i++; else if (w === '--detach' || (sub === 'switch' && w === '-d')) out.detach = true;
     else if (w === '-') out.prev = true;
     else if (!w.startsWith('-') && out.name === null) { out.name = w; nameDynamic = args[i].dynamic; }
   }
@@ -512,7 +544,9 @@ export function baseBranches(root) {
     .filter((n) => n && !n.startsWith('pm/'));
 }
 
-const localBranches = (root) => (git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']) || '').split(/\r?\n/).filter(Boolean);
+// Full refnames with refs/heads/ stripped: %(refname:short) would give heads/<b> when a tag shares
+// the name.
+const localBranches = (root) => (git(root, ['for-each-ref', '--format=%(refname)', 'refs/heads/']) || '').split(/\r?\n/).filter((r) => r.startsWith('refs/heads/')).map((r) => r.slice('refs/heads/'.length));
 
 export function projectAt(root, prefix) {
   const cands = [];
@@ -543,7 +577,8 @@ export function projectAt(root, prefix) {
 }
 
 function currentBranch(root) {
-  return chomp(git(root, ['symbolic-ref', '--quiet', '--short', 'HEAD']) || '') || null;
+  const ref = chomp(git(root, ['symbolic-ref', '--quiet', 'HEAD']) || '');
+  return ref.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : null;
 }
 
 // remotes(root): the configured remote names, longest first (a name may hold a slash); read once per
@@ -975,6 +1010,21 @@ function storyLike(root, op, tips, base) {
   return !base().some((r) => contains(root, o.commit, r));
 }
 
+// storyLikeOp(root, ops, { prior, priorWrite, tips }): for a merge the gate judges without a usable
+// project (outside every project, or with the plan in error): refuses with SEPARATE when an earlier
+// call in the command can have moved the refs it reads (a base branch by name is exempt only when
+// no earlier call can have written refs), then returns the first operand that could be a story
+// (storyLike), or null.
+function storyLikeOp(root, ops, { prior, priorWrite, tips }) {
+  let base;
+  const baseOnce = () => (base ??= baseRefs(root));
+  if (prior) {
+    const other = ops.find((o) => priorWrite || !baseByName(root, o.text, baseOnce));
+    if (other) block(other.text || '(computed)', SEPARATE);
+  }
+  return ops.find((o) => storyLike(root, o, tips, baseOnce)) ?? null;
+}
+
 // baseByName(root, text, refs): the operand names a trusted base branch: main or its kin, locally,
 // as origin/<name>, or as one of the trusted base refs.
 function baseByName(root, text, refs) {
@@ -1143,19 +1193,24 @@ function judgeCommand(calls, sessionDir) {
       if (!disc.failed && !disc.found.length) continue;
       // A known target that is no base branch and that no project integrates on is not a ship.
       if (!disc.failed && typeof target === 'string' && !baseBranches(root).includes(target) && !disc.integrations.has(target)) continue;
-      let base;
-      const baseOnce = () => (base ??= baseRefs(root));
-      const op = ops.find((o) => storyLike(root, o, tips, baseOnce));
       if (disc.failed) {
+        const op = ops.find((o) => storyLike(root, o, tips, () => baseRefs(root)));
         if (op) block(op.text || '(computed)', 'the gate cannot list the repository to look for deliver projects; run the merge from the project directory, or with git -C <project>');
         continue;
       }
-      // A base branch by name is exempt only when no earlier call can have written refs.
-      if (prior) {
-        const other = ops.find((o) => priorWrite || !baseByName(root, o.text, baseOnce));
-        if (other) block(other.text || '(computed)', SEPARATE);
-      }
+      const op = storyLikeOp(root, ops, { prior, priorWrite, tips });
       if (op) block(op.text || '(computed)', `${dir} is in no deliver project; run the merge from the project directory, or with git -C <project> (found deliver projects: ${disc.found.join(', ')})`);
+      continue;
+    }
+    // With the project's plan in error (an invalid integration branch, or plans that disagree), a
+    // story is still recognised by its SHA or any alias, as outside a project (storyLikeOp, with
+    // the same SEPARATE rule), and refused with that error; a merge that brings in no story goes on.
+    if (integ.error) {
+      const op = storyLikeOp(root, ops, { prior, priorWrite, tips: pmTips(root) });
+      if (op) {
+        if (call.noVerify) block(op.text, NO_VERIFY);
+        block(op.text || '(computed)', integ.error);
+      }
       continue;
     }
     if (dyn) block(dyn.text || '(computed)', DYNAMIC);
@@ -1170,20 +1225,7 @@ function judgeCommand(calls, sessionDir) {
     // An octopus merge of a story into the integration branch is refused once every story in it
     // passes, so a missing verdict is the reason given first; the git-level gate agrees.
     let octopus = null;
-    let tipsOnce;
-    let baseOnceErr;
     for (const op of ops) {
-      // With the project's plan in error (an invalid integration branch, or plans that disagree),
-      // the story is still recognised by its SHA or any alias (storyLike, as outside a project), and
-      // refused with that error; a merge that brings in no story goes on.
-      if (integ.error) {
-        tipsOnce ??= pmTips(root);
-        if (storyLike(root, op, tipsOnce, () => (baseOnceErr ??= baseRefs(root)))) {
-          if (call.noVerify) block(op.text, NO_VERIFY);
-          block(op.text, integ.error);
-        }
-        continue;
-      }
       const found = storyBranches(root, op.text, integ, target);
       // A no-op judged on refs an earlier command may move is no judgement; fall through to SEPARATE.
       if (found.noop && !prior) continue;

@@ -20,7 +20,8 @@ export const chomp = (s) => s.replace(/(\r?\n)+$/, '');
 // backticks whole; else with trailing punctuation (`,` `;` `.`, a closing quote, and a `)` only when
 // the word holds no `(`) dropped first, then unwrapped from <>, then with a leading `(` or quote
 // dropped. null when there is no such line. Never cut to a prefix: `release+fix` is `release+fix`,
-// `main, as agreed` and `<main>,` and `(main)` are `main`, and `feature(x)` is `feature(x)`.
+// `main, as agreed` and `<main>,` and `(main)` are `main`, and `feature(x)` and `(feature(x))` are
+// `feature(x)`.
 export function planEntry(text) {
   const line = String(text ?? '').split('\n').map((l) => l.replace(/\r$/, '')).find((l) => /^[ \t]*-[ \t]*Integration branch:/.test(l));
   if (line === undefined) return null;
@@ -34,8 +35,11 @@ export function planEntry(text) {
     if (word.endsWith(')') && !word.includes('(')) word = word.slice(0, -1);
   }
   if (/^<.*>$/.test(word)) return word.slice(1, -1) || null;
+  const opened = /^\(/.test(word);
   word = word.replace(/^[("'‘“]+/, '');
-  if (word.endsWith(')') && !word.includes('(')) word = word.slice(0, -1);
+  // Drop one trailing `)` the dropped `(` opened: when the word's own parentheses do not balance.
+  const count = (c) => [...word].filter((x) => x === c).length;
+  if (word.endsWith(')') && (!word.includes('(') || (opened && count(')') > count('(')))) word = word.slice(0, -1);
   return word || null;
 }
 
@@ -57,12 +61,14 @@ export function branchNameOk(cwd, name, { timeout = 5000 } = {}) {
   if (typeof name !== 'string' || !name) return false;
   if (!branchNames.has(name)) {
     let ok;
+    // Only git's own answers are cached; a fallback (git missing or timed out) is asked again.
     try {
-      ok = execFileSync('git', ['-C', cwd, 'check-ref-format', '--branch', name], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout }).replace(/\r?\n$/, '') === name;
+      const ok = execFileSync('git', ['-C', cwd, 'check-ref-format', '--branch', name], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout }).replace(/\r?\n$/, '') === name;
+      branchNames.set(name, ok && name !== 'HEAD' && !name.includes('@{'));
     } catch (e) {
-      ok = e.code === 'ENOENT' || e.code === 'ETIMEDOUT' || e.status === null ? validBranchName(name) : false;
+      if (e.code === 'ENOENT' || e.code === 'ETIMEDOUT' || e.status === null) return validBranchName(name) && !name.includes('@{');
+      branchNames.set(name, false);
     }
-    branchNames.set(name, ok && name !== 'HEAD' && !name.includes('@{'));
   }
   return branchNames.get(name);
 }

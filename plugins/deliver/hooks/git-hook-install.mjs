@@ -139,8 +139,8 @@ export function integrationBranches(root, top) {
   } catch { names.add('main'); }
   // Partitioned once: a name git check-ref-format --branch refuses is invalidNamed (never watched,
   // nor cut to a valid prefix); a pm/* name is storyNamed (a story branch, never an integration
-  // branch); a valid name that resolves nowhere (no refs/heads/<b>, no refs/remotes/*/<b>) is also
-  // in missing, for installGitHook to report.
+  // branch); a valid name the gate's own resolver does not find (branchExists) is also in missing,
+  // for installGitHook to report.
   const out = { branches: [], storyNamed: [], invalidNamed: [], missing: [] };
   for (const n of [...names].sort()) {
     if (!branchNameOk(top, n)) out.invalidNamed.push(n);
@@ -157,8 +157,17 @@ export function integrationBranches(root, top) {
 // else refs/remotes/origin/<name>) finds it, so installer and gate cannot disagree; or name is the
 // unborn current branch of a repository with no commits yet.
 function branchExists(top, name) {
-  if (refFor(top, name)) return true;
-  return chomp(git(top, ['symbolic-ref', '-q', 'HEAD']) || '') === `refs/heads/${name}` && git(top, ['rev-parse', '--verify', '-q', 'HEAD']) === null;
+  const resolvedByGate = Boolean(refFor(top, name));
+  const unbornCurrent = chomp(git(top, ['symbolic-ref', '-q', 'HEAD']) || '') === `refs/heads/${name}` && git(top, ['rev-parse', '--verify', '-q', 'HEAD']) === null;
+  return resolvedByGate || unbornCurrent;
+}
+
+// missingRemedy(top, name): what to do about an integration branch the gate's resolver does not
+// find: create it locally from the remote that has it, else check the plan.
+function missingRemedy(top, name) {
+  const remotes = (git(top, ['remote']) || '').split(/\r?\n/).filter(Boolean);
+  const r = remotes.find((x) => git(top, ['rev-parse', '--verify', '-q', `refs/remotes/${x}/${name}`]) !== null);
+  return r ? `create it locally with git branch ${shQuote(name)} ${shQuote(`${r}/${name}`)}` : "check the plan's Integration branch line";
 }
 
 // shSyntaxOk(text): `sh -n` accepts the script; true when no sh can be run to check it.
@@ -543,7 +552,7 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
     res.brief.push(msg);
   }
   for (const n of missing) {
-    const msg = `merge gate: integration branch ${n} does not exist; check the plan's Integration branch line`;
+    const msg = `merge gate: integration branch ${n} does not exist (no refs/heads/${n} or refs/remotes/origin/${n}); ${missingRemedy(top, n)}`;
     res.notes.push(msg);
     res.brief.push(msg);
   }
