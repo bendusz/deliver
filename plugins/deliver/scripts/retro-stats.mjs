@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parseExec, listDir, readText, isMain, versionAtLeast, planName } from '../hooks/lib.mjs';
+import { parseExec, listDir, readText, isMain, versionAtLeast } from '../hooks/lib.mjs';
 import { upperBound, staleness, boundStaleness, parseUtc, parseTargets, DEFAULT_TARGETS, CORPUS_ROOT } from './assurance.mjs';
 
 const count = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
@@ -353,9 +353,10 @@ export function escapesOn(root, ref, scope = projectScope(root, ref)) {
   return out;
 }
 
-// planBranch(root): the plan's integration branch, parsed whole by lib.mjs's planName and checked by
-// git's own rule, as the gate checks it (never cut to a valid prefix), or null.
-export const planBranch = (root) => planName(readText(path.join(root, 'docs', 'plan.md')) || '', root);
+const planBranch = (root) => {
+  const m = (readText(path.join(root, 'docs', 'plan.md')) || '').match(/^\s*-\s*Integration branch:\s*`?([A-Za-z0-9._/][A-Za-z0-9._/-]*)`?/m);
+  return m ? m[1] : null;
+};
 
 // planTargets(text): { targets, problem } from docs/plan.md's Delivery mode line, found by its
 // label `- Assurance targets:` whatever follows, such as `T0=0.10, T1=0.05, T2=0.02`. HTML

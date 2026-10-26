@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here.
 
+## 0.29.2 - 2026-10-26
+
+Trimmed back. 0.29.1's git-level merge gate is removed: it grew to about 3,000 lines of hook code to
+cover rare merge routes, which is more machinery than a workflow skill should carry.
+
+- **The git-level merge gate is gone.** `git-hook-install.mjs`, `git-merge-gate.mjs`, and their tests
+  are deleted. The ship gate is again Claude's Bash `PreToolUse` hook (`require-verified.mjs`), as of
+  0.29.0 plus its shell-parsing fixes: it blocks Claude from merging an unverified story. A merge
+  made outside Claude (a terminal, an IDE, a remote PR) is not checked by a hook; the PM checks a
+  remote PR by hand before merging, as `environment.md` describes.
+- **Upgrading from 0.29.1.** Session start deletes the hook shims and copies 0.29.1 installed (only
+  files carrying deliver's marker) and unsets `deliver.mergeGate`, and says so once.
+- **Kept from 0.29.1:** the `host-neutral` test (deliver runs unchanged without T3 Code) and the
+  `/deliver:analyze` fixes to `review-gates.md` and `fix-loop.md`.
+- **v0.30 is dropped.** No unattended runner, sandbox profile, or telemetry pipeline is planned.
+
 ## 0.29.1 - 2026-10-26
 
 The ship gate moves into git itself, so a merge of an unverified story is refused whatever command

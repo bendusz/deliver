@@ -255,8 +255,6 @@ suite "test-integrity tests failed (node --test plugins/deliver/scripts/tests/te
   node --test plugins/deliver/scripts/tests/test-integrity.test.mjs
 suite "ship gate tests failed (node --test plugins/deliver/scripts/tests/require-verified.test.mjs)" \
   node --test plugins/deliver/scripts/tests/require-verified.test.mjs
-suite "git merge gate tests failed (node --test plugins/deliver/scripts/tests/git-merge-gate.test.mjs)" \
-  node --test plugins/deliver/scripts/tests/git-merge-gate.test.mjs
 suite "holdout tests failed (node --test plugins/deliver/scripts/tests/holdout.test.mjs)" \
   node --test plugins/deliver/scripts/tests/holdout.test.mjs
 suite "T3 host reference tests failed (node --test plugins/deliver/scripts/tests/host-t3.test.mjs)" \
