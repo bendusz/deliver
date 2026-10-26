@@ -1552,6 +1552,70 @@ test('git gate: under an invalid plan, a merge into a story branch goes on, and 
   assert.match(s.stderr, /run the merge as its own command/);
 });
 
+test('git gate: under an invalid plan, a pull refspec source is read as the remote\'s ref, not a local branch', () => {
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `main~1`\n');
+  gitIn(p, ['add', 'docs/plan.md']);
+  gitIn(p, ['commit', '-qm', 'plan: invalid']);
+  gitIn(p, ['remote', 'add', 'origin', 'https://example.invalid/repo.git']);
+  // A local feature inside the story tip; origin's feature is a plain branch.
+  gitIn(p, ['branch', 'feature', `${BRANCH}~1`]);
+  gitIn(p, ['update-ref', 'refs/remotes/origin/feature', 'main~1']);
+  const r = bash(p, 'git pull origin feature');
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: under an invalid plan, SEPARATE applies only to a story-like operand', () => {
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `main~1`\n');
+  gitIn(p, ['add', 'docs/plan.md']);
+  gitIn(p, ['commit', '-qm', 'plan: invalid']);
+  gitIn(p, ['branch', 'develop', 'main']);
+  commitFile(p, 'src/dev.js', 'd\n', 'feat: dev');
+  gitIn(p, ['reset', '-q', '--hard', 'HEAD~1']);
+  const plain = bash(p, 'git commit --allow-empty -m x && git merge develop');
+  assert.equal(plain.status, 0, plain.stderr);
+  const story = bash(p, `git commit --allow-empty -m x && git merge ${head(p, BRANCH)}`);
+  assert.equal(story.status, 2, story.stderr);
+});
+
+test('git gate: optional-value options do not swallow the next word; required ones do', () => {
+  const p = project();
+  gitIn(p, ['remote', 'add', 'origin', p]);
+  for (const cmd of [`git pull --jobs origin ${BRANCH}`, `git pull -r origin ${BRANCH}`, `git pull -j4 origin ${BRANCH}`]) {
+    const r = bash(p, cmd);
+    assert.equal(r.status, 2, `${cmd}: ${r.stderr}`);
+    assert.match(r.stderr, /pm\/S1-1-fix/, cmd);
+  }
+  const ok = verified();
+  const c = bash(ok, `git merge --no-ff --cleanup strip ${BRANCH} -m m`);
+  assert.equal(c.status, 0, c.stderr);
+  // fetch -j takes a required value: the refspec after the remote still counts as a ref write.
+  for (const f of ['-j4', '-j 4']) {
+    const s = bash(ok, `git fetch ${f} origin ${BRANCH}:refs/heads/tmp && git merge --no-ff ${BRANCH} -m m`);
+    assert.equal(s.status, 2, `fetch ${f}: ${s.stderr}`);
+    assert.match(s.stderr, /run the merge as its own command/);
+  }
+});
+
+test('git gate: commit -nu skips hooks, -un does not; checkout -qb, switch -cnew and --create, and -qd keep the target known', () => {
+  const p = project();
+  gitRun(p, ['merge', '--no-commit', '--no-ff', BRANCH]);
+  assert.equal(bash(p, 'git commit -nu -m m').status, 2, '-nu: n is a flag');
+  assert.equal(bash(p, 'git commit -un -m m').status, 0, '-un: n is the value of -u');
+  gitIn(p, ['merge', '--abort']);
+  // switch --create pm/next makes a new story branch the target, exempt as with switch -c.
+  for (const co of ['git switch --create pm/next', 'git switch -c pm/next2']) {
+    const r = bash(p, `${co} && git merge ${BRANCH}`);
+    assert.equal(r.status, 0, `${co}: ${r.stderr}`);
+  }
+  // A merge into a new or detached branch is not a merge into main.
+  for (const co of ['git checkout -qb newb main', 'git switch -cnewc main', 'git switch --create newd main', 'git checkout -qd main']) {
+    const r = bash(p, `${co} && git merge --no-ff ${BRANCH} -m m`);
+    assert.doesNotMatch(r.stderr, /the branch this merge goes into is unknown/, co);
+  }
+});
+
 // --- what must keep working ---
 
 test('git gate: a pull that fast-forwards main to shipped history is allowed, with no extra merge commit', () => {
