@@ -489,34 +489,8 @@ function refFor(root, name) {
   return null;
 }
 
-// planEntry(text): the plan's `Integration branch:` value, whole: the rest of the line, an HTML
-// comment dropped, its first word, unwrapped from backticks or <>; null when there is no such line.
-// Never a partial match: `release+fix` is `release+fix`.
-export function planEntry(text) {
-  const m = String(text ?? '').match(/^\s*-\s*Integration branch:[ \t]*(.*)$/m);
-  if (!m) return null;
-  const rest = m[1].replace(/<!--.*?(-->|$)/g, '').trim();
-  const tick = rest.match(/^`([^`]*)`/);
-  let word = tick ? tick[1].trim() : rest.split(/\s+/)[0] ?? '';
-  if (/^<.*>$/.test(word)) word = word.slice(1, -1);
-  return word || null;
-}
-
-// validBranchName(name): git check-ref-format --branch accepts it (its rules, checked here so the
-// pure parsers need no git).
-export function validBranchName(name) {
-  if (typeof name !== 'string' || !name || name === '@' || name.startsWith('-')) return false;
-  if (/[\x00-\x20\x7f~^:?*[\\]/.test(name) || name.includes('..') || name.includes('@{') || name.includes('//')) return false;
-  if (name.startsWith('/') || name.endsWith('/') || name.endsWith('.')) return false;
-  return name.split('/').every((c) => c && !c.startsWith('.') && !c.endsWith('.lock'));
-}
-
-// planName(text): the plan's integration branch when it is a valid branch name, else null (an
-// invalid one is reported by the installer, and never cut down to a valid prefix).
-export const planName = (text) => {
-  const name = planEntry(text);
-  return name && validBranchName(name) ? name : null;
-};
+// The plan parsers live in lib.mjs, shared with scripts/retro-stats.mjs.
+export const { planEntry, validBranchName, planName } = lib;
 
 // project(root, prefixes): the deliver project at the deepest of `prefixes` (each "" or a
 // "dir/" path below the top level) that a trusted branch marks; null when none does. Else the
@@ -555,13 +529,13 @@ export function projectAt(root, prefix) {
   for (const c of cands) {
     c.approved = git(root, ['cat-file', '-e', `${c.ref}:${prefix}docs/approval.json`]) !== null;
     const entry = c.approved ? planEntry(git(root, ['show', `${c.ref}:${prefix}docs/plan.md`])) : null;
-    c.plan = entry && validBranchName(entry) ? entry : null;
+    c.plan = entry && lib.branchNameOk(root, entry) ? entry : null;
     c.invalid = entry && !c.plan ? entry : null;
   }
   const approved = cands.filter((c) => c.approved);
   if (!approved.length) return null;
   const invalid = approved.find((c) => c.invalid);
-  if (invalid) return { names: [invalid.invalid], invalid: invalid.invalid, error: `integration branch ${sanitize(invalid.invalid)} in ${prefix}docs/plan.md is not a valid branch name; the gate is not enforced; fix the plan` };
+  if (invalid) return { names: [invalid.invalid], invalid: invalid.invalid, error: `integration branch ${sanitize(invalid.invalid)} in ${prefix}docs/plan.md is not a valid branch name; story merges are refused until the plan names a valid branch` };
   const names = [...new Set(approved.map((c) => c.plan).filter(Boolean))];
   if (names.length > 1) return { names, error: `the committed plans on ${approved.filter((c) => c.plan).map((c) => c.name).join(', ')} disagree on the integration branch (${names.join(', ')}); make ${prefix}docs/plan.md agree` };
   const name = names[0] ?? approved[0].name;
@@ -635,14 +609,14 @@ function integrationRefs(root, integ) {
   return [...new Set(refs.filter((r) => r && resolve(root, r) && (r.startsWith('refs/heads/') || !storyName(r, names))))];
 }
 
-// storyReadableUpstream(root, branch): the configured upstream of `branch`, when integrationRefs
-// leaves it untrusted because it also reads as a story branch; else null. For --check to report.
 // noTracking(root, branch): the integration branch has no upstream (branch.<branch>.merge) while
-// remotes exist, so a pull's trust rests on GIT_REFLOG_ACTION, which a tool may preset.
+// remotes exist, so a pull's trust rests on binding it to the pull's own operation.
 export function noTracking(root, branch) {
   return remotes(root).length > 0 && !chomp(git(root, ['config', '--get', `branch.${branch}.merge`]) || '');
 }
 
+// storyReadableUpstream(root, branch): the configured upstream of `branch`, when integrationRefs
+// leaves it untrusted because it also reads as a story branch; else null. For --check to report.
 export function storyReadableUpstream(root, branch) {
   if (chomp(git(root, ['config', '--get', `branch.${branch}.merge`]) || '') !== `refs/heads/${branch}`) return null;
   const upstream = chomp(git(root, ['for-each-ref', '--format=%(upstream)', `refs/heads/${branch}`]) || '');
@@ -667,13 +641,19 @@ function operandOf(root, op) {
 
 // fetchHeads(root): the heads FETCH_HEAD lists for merging, every line not marked not-for-merge,
 // as `git merge FETCH_HEAD` merges them all: { heads: [{ sha, name }], bad }, name the branch the
-// line's `branch '<name>' of <url>` part names, or null, and url that line's url; bad when a line marked for merge does not
-// parse. null when FETCH_HEAD cannot be read.
-export function fetchHeads(root) {
-  const where = chomp(git(root, ['rev-parse', '--git-path', 'FETCH_HEAD']) || '');
+// line's `branch '<name>' of <url>` part names, or null, and url that line's url; bad when a line
+// marked for merge does not parse. null when FETCH_HEAD cannot be read.
+// readGitPath(root, rel): the text of `git rev-parse --git-path <rel>`; null when it cannot be read
+// (missing included), or, with { missing: '' }, that value for a missing file.
+function readGitPath(root, rel, { missing = null } = {}) {
+  const where = chomp(git(root, ['rev-parse', '--git-path', rel]) || '');
   if (!where) return null;
-  let text;
-  try { text = fs.readFileSync(path.resolve(root, where), 'utf8'); } catch { return null; }
+  try { return fs.readFileSync(path.resolve(root, where), 'utf8'); } catch (e) { return e.code === 'ENOENT' ? missing : null; }
+}
+
+export function fetchHeads(root) {
+  const text = readGitPath(root, 'FETCH_HEAD');
+  if (text === null) return null;
   const heads = [];
   let bad = false;
   for (const line of text.split(/\r?\n/)) {
@@ -690,10 +670,8 @@ export function fetchHeads(root) {
 // mergeHeads(root): the commits MERGE_HEAD lists, the ones an in-progress merge brings in; [] when
 // no merge is in progress, null when it cannot be read.
 export function mergeHeads(root) {
-  const where = chomp(git(root, ['rev-parse', '--git-path', 'MERGE_HEAD']) || '');
-  if (!where) return null;
-  let text;
-  try { text = fs.readFileSync(path.resolve(root, where), 'utf8'); } catch (e) { return e.code === 'ENOENT' ? [] : null; }
+  const text = readGitPath(root, 'MERGE_HEAD', { missing: '' });
+  if (text === null) return null;
   return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
 
@@ -1621,9 +1599,8 @@ const recordFile = (f, info) => (info?.projects?.length ? info.projects : [{ pre
 // else checkout.defaultRemote, else origin, else the only remote), never a fork, its line naming
 // `branch '<branch>' of <url>` for that remote's url (fetchUrl); equal to that remote's
 // refs/remotes/<remote>/<branch> when that ref exists and the remote's refspec maps it; and only
-// while the update is the pull's own:
-// next holds the fetched head, and the update is the pull's own (pullOwn). A FETCH_HEAD left by an
-// earlier fetch never trusts a later, unrelated update.
+// while next holds the fetched head and the update is the pull's own (pullOwn). A FETCH_HEAD left
+// by an earlier fetch never trusts a later, unrelated update.
 function fetchedIntegration(root, branch, next) {
   const heads = (fetchHeads(root)?.heads ?? []).filter((h) => h.name === branch && h.url);
   if (!heads.length) return [];
@@ -1651,10 +1628,7 @@ function pullOwn(root, sha, branch, next) {
     const parents = chomp(git(root, ['rev-list', '--parents', '-n', '1', next]) || '').split(' ').slice(1);
     if (parents.includes(sha)) return true;
   }
-  const read = (rel) => {
-    const where = chomp(git(root, ['rev-parse', '--git-path', rel]) || '');
-    try { return where ? chomp(fs.readFileSync(path.resolve(root, where), 'utf8')) : ''; } catch { return ''; }
-  };
+  const read = (rel) => chomp(readGitPath(root, rel) ?? '');
   for (const dir of ['rebase-merge', 'rebase-apply']) {
     if (read(`${dir}/onto`) === sha && read(`${dir}/head-name`) === `refs/heads/${branch}`) return true;
   }
@@ -1662,10 +1636,20 @@ function pullOwn(root, sha, branch, next) {
 }
 
 // mapsBranch(root, remote, branch): one of remote.<remote>.fetch maps refs/heads/<branch> to
-// refs/remotes/<remote>/<branch> (exactly, or through the usual `refs/heads/*` glob).
+// refs/remotes/<remote>/<branch> (exactly, or through the usual `refs/heads/*` glob), and no
+// negative refspec excludes it.
 function mapsBranch(root, remote, branch) {
   const specs = (git(root, ['config', '--get-all', `remote.${remote}.fetch`]) || '').split(/\r?\n/).filter(Boolean);
-  return specs.some((spec) => {
+  // A negative refspec (`^refs/heads/<branch>`, or a glob covering it) unmaps the branch.
+  const negated = specs.filter((sp) => sp.startsWith('^')).some((sp) => {
+    const src = sp.slice(1);
+    if (!src.includes('*')) return src === `refs/heads/${branch}`;
+    const [pre, post] = src.split('*');
+    const ref = `refs/heads/${branch}`;
+    return ref.startsWith(pre) && ref.endsWith(post) && ref.length >= pre.length + post.length;
+  });
+  if (negated) return false;
+  return specs.filter((sp) => !sp.startsWith('^')).some((spec) => {
     const [src, dst] = spec.replace(/^\+/, '').split(':');
     if (!src || !dst) return false;
     if (src === `refs/heads/${branch}`) return dst === `refs/remotes/${remote}/${branch}`;
@@ -1676,7 +1660,7 @@ function mapsBranch(root, remote, branch) {
 // designatedRemote(root, branch): the one remote the integration branch is pulled from:
 // branch.<branch>.remote when set (and not `.`), else checkout.defaultRemote, else origin, else the
 // only configured remote; null otherwise.
-function designatedRemote(root, branch) {
+export function designatedRemote(root, branch) {
   const names = remotes(root);
   const configured = chomp(git(root, ['config', '--get', `branch.${branch}.remote`]) || '');
   if (configured) return configured !== '.' && names.includes(configured) ? configured : null;

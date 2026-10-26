@@ -15,6 +15,56 @@ import { fileURLToPath } from 'node:url';
 // (which strips trailing \n but leaves other whitespace, unlike String#trim()).
 export const chomp = (s) => s.replace(/(\r?\n)+$/, '');
 
+// planEntry(text): the plan's `Integration branch:` value, whole: the line (read up to a newline
+// only, so U+2028 or U+2029 cannot cut it), an HTML comment dropped, its first word, unwrapped from
+// backticks or <>, or, bare, with trailing punctuation (`,` `;` `)` `.` or a closing quote) and
+// opening quotes taken as delimiters; null when there is no such line. Never cut to a prefix:
+// `release+fix` is `release+fix`, and `main, as agreed` is `main`.
+export function planEntry(text) {
+  const line = String(text ?? '').split('\n').map((l) => l.replace(/\r$/, '')).find((l) => /^[ \t]*-[ \t]*Integration branch:/.test(l));
+  if (line === undefined) return null;
+  const rest = line.replace(/^[ \t]*-[ \t]*Integration branch:[ \t]*/, '').replace(/<!--.*?(-->|$)/g, '').trim();
+  const tick = rest.match(/^`([^`]*)`/);
+  if (tick) return tick[1].trim() || null;
+  let word = rest.split(/[ \t]+/)[0] ?? '';
+  if (/^<.*>$/.test(word)) return word.slice(1, -1) || null;
+  word = word.replace(/^["'‘“]+/, '').replace(/[,;).'"’”]+$/, '');
+  return word || null;
+}
+
+// validBranchName(name): the JS mirror of `git check-ref-format --branch`, for the pure parsers;
+// where git can run, branchNameOk asks git itself. Like git, it refuses HEAD and accepts `@`.
+export function validBranchName(name) {
+  if (typeof name !== 'string' || !name || name === 'HEAD' || name.startsWith('-')) return false;
+  if (/[\x00-\x20\x7f~^:?*[\\]/.test(name) || name.includes('..') || name.includes('@{') || name.includes('//')) return false;
+  if (name.startsWith('/') || name.endsWith('/') || name.endsWith('.')) return false;
+  return name.split('/').every((c) => c && !c.startsWith('.') && !c.endsWith('.lock'));
+}
+
+// branchNameOk(cwd, name): `git check-ref-format --branch <name>` accepts the name and prints it back
+// unchanged (no `@{-N}` expansion); validBranchName when git cannot be run.
+const branchNames = new Map();
+export function branchNameOk(cwd, name) {
+  if (typeof name !== 'string' || !name) return false;
+  if (!branchNames.has(name)) {
+    let ok;
+    try {
+      ok = execFileSync('git', ['-C', cwd, 'check-ref-format', '--branch', name], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout: 5000 }).replace(/\r?\n$/, '') === name;
+    } catch (e) {
+      ok = e.code === 'ENOENT' || e.status === undefined ? validBranchName(name) : false;
+    }
+    branchNames.set(name, ok && !name.includes('@{'));
+  }
+  return branchNames.get(name);
+}
+
+// planName(text): the plan's integration branch when it is a valid branch name, else null (an
+// invalid one is reported, and never cut down to a valid prefix).
+export function planName(text) {
+  const name = planEntry(text);
+  return name && validBranchName(name) ? name : null;
+}
+
 // REFUSED: the exit status deliver's git-level gate script uses for a deliberate refusal, read only
 // by the shim git-hook-install.mjs writes: it turns REFUSED into exit 1, the refusal status chained
 // hooks check for, and any other failure to run into a warning and exit 0, so a broken node or

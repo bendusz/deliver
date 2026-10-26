@@ -42,8 +42,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { git, chomp, isMain, oneLine, REFUSED } from './lib.mjs';
-import { discover, projectAt, project, planEntry, validBranchName, mergeTreeWorks, storyReadableUpstream, noTracking } from './require-verified.mjs';
+import { git, chomp, isMain, oneLine, REFUSED, branchNameOk } from './lib.mjs';
+import { discover, projectAt, project, planEntry, mergeTreeWorks, storyReadableUpstream, noTracking, designatedRemote } from './require-verified.mjs';
 
 export const MARKER = '# deliver-merge-gate v2';
 const OURS = /^# deliver-merge-gate v\d+$/;
@@ -137,13 +137,21 @@ export function integrationBranches(root, top) {
     for (const n of own?.names ?? (own?.name ? [own.name] : [])) names.add(n);
     if (!names.size) names.add(planEntry(git(top, ['show', `HEAD:${prefix}docs/plan.md`])) || 'main');
   } catch { names.add('main'); }
-  // A pm/* name is a story branch, never an integration branch: returned apart, as storyNamed, for
-  // installGitHook to report.
-  // An invalid name (one git check-ref-format --branch would refuse) is returned apart too: it is
-  // never watched, nor cut down to a valid prefix.
-  const sorted = [...names].sort();
-  const valid = sorted.filter((n) => validBranchName(n));
-  return { branches: valid.filter((n) => !n.startsWith('pm/')), storyNamed: valid.filter((n) => n.startsWith('pm/')), invalidNamed: sorted.filter((n) => !validBranchName(n)) };
+  // Partitioned once: a name git check-ref-format --branch refuses is invalidNamed (never watched,
+  // nor cut to a valid prefix); a pm/* name is storyNamed (a story branch, never an integration
+  // branch); a valid name that resolves nowhere (no refs/heads/<b>, no refs/remotes/*/<b>) is also
+  // in missing, for installGitHook to report.
+  const out = { branches: [], storyNamed: [], invalidNamed: [], missing: [] };
+  for (const n of [...names].sort()) {
+    if (!branchNameOk(top, n)) out.invalidNamed.push(n);
+    else if (n.startsWith('pm/')) out.storyNamed.push(n);
+    else {
+      out.branches.push(n);
+      const found = (git(top, ['for-each-ref', '--format=%(refname)', `refs/heads/${n}`, 'refs/remotes/']) || '').split(/\r?\n/).some((r) => r === `refs/heads/${n}` || r.endsWith(`/${n}`));
+      if (!found) out.missing.push(n);
+    }
+  }
+  return out;
 }
 
 // shSyntaxOk(text): `sh -n` accepts the script; true when no sh can be run to check it.
@@ -279,7 +287,8 @@ function legacyLines(name, copy, text = '') {
   // -e on the #! line, or `set -e` (or set -eu, ...) in the body. A hook manager that runs the hook
   // as `sh -e "$hook"` cannot be seen from here; the current lines are -e safe either way.
   const t = String(text);
-  if (name === RT_HOOK && (/^#!.*\s-[a-z]*e/.test(t.split('\n')[0]) || /^\s*set\s+-[a-z]*e/m.test(t))) return [];
+  const errexit = /\s-[A-Za-z]*e[A-Za-z]*\b|-o\s+errexit/;
+  if (name === RT_HOOK && ((t.startsWith('#!') && errexit.test(t.split('\n')[0])) || /^\s*set\b[^\n#]*(\s-[A-Za-z]*e|-o\s+errexit)/m.test(t))) return [];
   const c = shQuote(slash(copy));
   return Object.values(LEGACY).flatMap((form) => {
     const lines = form(name, c);
@@ -503,7 +512,7 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   const v = version ?? gitVersion(top);
   res.git = v ? v.join('.') : 'unknown';
   res.mode = atLeast(v, MIN_GIT) ? RT_HOOK : 'fallback';
-  const { branches, storyNamed, invalidNamed } = integrationBranches(abs, top);
+  const { branches, storyNamed, invalidNamed, missing } = integrationBranches(abs, top);
   res.branches = branches;
   // git 2.28 or newer with no integration branch to watch: no hook at all (the fallback hooks are
   // for older git only), reported as mode `none`.
@@ -526,8 +535,13 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
     res.notes.push(msg);
     res.brief.push(msg);
   }
+  for (const n of missing) {
+    const msg = `merge gate: integration branch ${n} does not exist; check the plan's Integration branch line`;
+    res.notes.push(msg);
+    res.brief.push(msg);
+  }
   for (const n of invalidNamed) {
-    const msg = `merge gate: integration branch ${oneLine(n).slice(0, 80)} is not a valid branch name; the gate is not enforced for it; fix the plan's Integration branch line`;
+    const msg = `merge gate: integration branch ${oneLine(n).slice(0, 80)} is not a valid branch name; the git-level gate cannot watch it, and story merges through Claude are refused until the plan names a valid branch`;
     res.notes.push(msg);
     res.brief.push(msg);
   }
@@ -551,12 +565,15 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   for (const b of res.branches) {
     const up = storyReadableUpstream(top, b);
     if (up) add(`merge gate: ${b}'s upstream ${up} also reads as a story branch, so it is not trusted as shipped history; give the remote a name that does not overlap another's`);
-    if (check && git(top, ['rev-parse', '--verify', '--quiet', `refs/heads/${b}`]) !== null && noTracking(top, b)) add(`merge gate: ${b} has no upstream; a fast-forward git pull run by a tool that presets GIT_REFLOG_ACTION is refused as an unrelated update; set one with git branch --set-upstream-to <remote>/${b} ${b}`);
+    if (check && git(top, ['rev-parse', '--verify', '--quiet', `refs/heads/${b}`]) !== null && noTracking(top, b)) {
+      const r = designatedRemote(top, b) ?? 'origin';
+      add(`merge gate: ${b} has no upstream; a fast-forward git pull run by a tool that presets GIT_REFLOG_ACTION is refused as an unrelated update; set one with git branch --set-upstream-to ${shQuote(`${r}/${b}`)} ${shQuote(b)}`);
+    }
   }
   if (res.mode === 'fallback') add(`merge gate: git < 2.28 (this is ${res.git}): fast-forward updates, squash merges, and cherry-picks are not gated (they make no merge commit), and a merge commit's result is compared with the automatic merge only where git needs no content merge, else only the verdicts are checked; upgrade git`);
   else if (res.mode === RT_HOOK && !(treeCheck ?? mergeTreeWorks(top))) add(TREE_NOTE);
   const good = new Set(['installed', 'refreshed', 'current', 'chained']);
-  res.ok = !res.disabled && res.mode !== 'none' && !invalidNamed.length && Object.keys(wanted).every((n) => good.has(res.hooks[n]));
+  res.ok = !res.disabled && res.mode !== 'none' && !invalidNamed.length && !missing.length && Object.keys(wanted).every((n) => good.has(res.hooks[n]));
   return res;
 }
 
