@@ -549,17 +549,26 @@ function remotes(root) {
   return remoteNames.get(root);
 }
 
-// branchOf(ref, names): the branch a ref names: refs/heads/<b>, or refs/remotes/<remote>/<b>, the
-// remote being the longest configured name in `names` that fits (a name may hold a slash), else
-// the first path segment (a remote-tracking ref with no remote configured); null otherwise.
-function branchOf(ref, names) {
-  if (ref.startsWith('refs/heads/')) return ref.slice('refs/heads/'.length);
-  if (!ref.startsWith('refs/remotes/')) return null;
-  const remote = names.find((r) => ref.startsWith(`refs/remotes/${r}/`));
-  if (remote) return ref.slice(`refs/remotes/${remote}/`.length);
+// branchesOf(ref, names): every branch name a ref can be read as: refs/heads/<b>, or, for
+// refs/remotes/<remote>/<b>, one reading per configured remote name in `names` that fits (a name
+// may hold a slash, and names may overlap, `a` and `a/pm`), plus the first path segment as the
+// remote. A ref no configured remote fits (a leftover of a removed remote, whose name may have held
+// a slash) is read at every slash. [] for any other ref.
+function branchesOf(ref, names) {
+  if (ref.startsWith('refs/heads/')) return [ref.slice('refs/heads/'.length)];
+  if (!ref.startsWith('refs/remotes/')) return [];
   const rest = ref.slice('refs/remotes/'.length);
-  return rest.includes('/') ? rest.slice(rest.indexOf('/') + 1) : null;
+  const out = names.filter((r) => rest.startsWith(`${r}/`)).map((r) => rest.slice(r.length + 1));
+  if (out.length) {
+    if (rest.includes('/')) out.push(rest.slice(rest.indexOf('/') + 1));
+  } else {
+    for (let i = rest.indexOf('/'); i !== -1; i = rest.indexOf('/', i + 1)) out.push(rest.slice(i + 1));
+  }
+  return [...new Set(out.filter(Boolean))];
 }
+// storyName(ref, names): the pm/* branch a ref is a story as, under any reading (failing closed:
+// one pm/ reading is enough), or null.
+const storyName = (ref, names) => branchesOf(ref, names).find((b) => b.startsWith('pm/')) ?? null;
 
 function pmTips(root) {
   const refs = git(root, ['for-each-ref', '--format=%(objectname) %(refname)', 'refs/heads/pm/', 'refs/remotes/']) || '';
@@ -567,8 +576,7 @@ function pmTips(root) {
   const out = [];
   for (const line of refs.split(/\r?\n/)) {
     const [oid, ref] = line.split(' ');
-    const name = ref ? branchOf(ref, names) : null;
-    if (name?.startsWith('pm/')) out.push({ name, tip: oid });
+    for (const name of ref ? branchesOf(ref, names) : []) if (name.startsWith('pm/')) out.push({ name, tip: oid });
   }
   return out;
 }
@@ -1375,7 +1383,7 @@ function introducedStories(root, { tips, next, reached, held = () => false }) {
 function heldOutsideStories(root, commit, local) {
   const refs = (git(root, ['for-each-ref', '--format=%(refname)', '--contains', commit, 'refs/heads/', 'refs/remotes/', 'refs/tags/']) || '').split(/\r?\n/).filter(Boolean);
   const names = remotes(root);
-  return refs.some((r) => r !== local && !branchOf(r, names)?.startsWith('pm/') && !r.endsWith('/HEAD'));
+  return refs.some((r) => r !== local && !storyName(r, names) && !r.endsWith('/HEAD'));
 }
 
 // patchIds(root, args): the `git patch-id --stable` of each patch `git <args>` prints, as a Map
@@ -1384,7 +1392,7 @@ function heldOutsideStories(root, commit, local) {
 // bytes)
 // from patch-id to the commits that carry it (the zero id for a plain diff); null when either
 // command fails.
-const PATCH = ['--no-color', '--no-ext-diff', '--no-textconv'];
+const PATCH = ['--no-color', '--no-ext-diff', '--no-textconv', '--ignore-submodules=none'];
 function patchIds(root, args) {
   const out = spawnGit(root, args);
   if (out.error || out.status !== 0) return null;
@@ -1423,22 +1431,26 @@ const commitTime = (root, c) => Number(chomp(git(root, ['show', '-s', '--format=
 // copy is a squash (squashCopy: the update carries the story's whole code diff) or a cherry-pick
 // (pickCopy: one of the story's commits), not counting the story's own commits, nor a hotfix the
 // story copied (hotfixExempt). A tip old holds is, in a rewrite, a copy only as a replay
-// (replayCopy). Cost is bounded: nothing when the update brings no code commit, a tip whose
-// changed paths miss the update's is skipped after two calls, and patches are read once per tip.
-// Fails open (no copy) when the patches cannot be read.
+// (droppedMerges, read once per update, and mergeOfStory). Cost is bounded: nothing when the
+// update brings no code commit; the dropped merges and next's first-parent line once per update;
+// per tip, a tip whose changed paths miss the update's is skipped after two calls, and patches
+// are read once. Fails open (no copy) when the patches cannot be read.
 function copiedStories(root, { rest, next, exclude, base = exclude[0], introduced, info, local, old = null }) {
   if (!rest.length) return [];
   const { code } = recordSpecs(info);
   const update = updatePatches(root, { next, exclude, introduced, code });
   if (!update) return [];
   const rewrite = Boolean(old) && !contains(root, old, next);
+  // Read once per update, not per tip: the merges old's replaced range held that next dropped, what
+  // each brought in, and next's first-parent line.
+  const flattened = rewrite ? droppedMerges(root, { old, next, exclude, code, update }) : [];
   const seen = new Map();
   const out = [];
   for (const t of rest) {
     if (!seen.has(t.tip)) {
       // In a rewrite, a linear rebase flattening this story's merge (even after the branch moved on
       // past the merged commit) is a replay; a tip old holds is a copy only that way.
-      const replay = rewrite && replayCopy(root, t.tip, { old, next, exclude, code, update });
+      const replay = flattened.some((m) => mergeOfStory(root, m, t.tip, local));
       let hit = replay;
       if (!hit && !(rewrite && contains(root, t.tip, old))) {
         // The story's own work: past the update's base, and, in a rewrite, neither held by old nor
@@ -1499,16 +1511,31 @@ function hotfixExempt(root, c, theirs, local, all = false) {
   return all ? theirs.every((sc) => t <= commitTime(root, sc)) : theirs.some((sc) => t <= commitTime(root, sc));
 }
 
-// replayCopy(root, tip, { old, next, exclude, code, update }): a linear rebase flattened a story
-// merge old held: old's replaced range holds a merge m, gone from next, of this story (replayedMerge),
-// and a commit m brought in reappears, by patch-id, on next's first-parent line. A rewrite that
-// keeps the merge (`git pull --rebase=merges`) recreates those commits off that line, and is no copy.
-function replayCopy(root, tip, { old, next, exclude, code, update }) {
+// droppedMerges(root, { old, next, exclude, code, update }): the merges in old's replaced range that
+// next no longer holds and whose brought-in commits (m^2 --not m^1) reappear, by patch-id, on
+// next's first-parent line: merges a linear rebase flattened. Each as { m, second, brought }, the
+// brought commits listed.
+function droppedMerges(root, { old, next, exclude, code, update }) {
+  const merges = (git(root, ['rev-list', '--merges', '--parents', old, '--not', ...exclude]) || '').split(/\r?\n/).filter(Boolean).map((l) => l.split(' '));
+  const gone = merges.filter(([m]) => !contains(root, m, next));
+  if (!gone.length) return [];
   const line = new Set((git(root, ['rev-list', '--first-parent', next, '--not', ...exclude]) || '').split(/\s+/).filter(Boolean));
-  return replayedMerge(root, tip, { old, next, exclude }).some((m) => {
-    const brought = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', `${m}^2`, '--not', `${m}^1`, ...code]) ?? new Map();
-    return [...brought.keys()].some((id) => (update.ids.get(id) ?? []).some((c) => line.has(c)));
-  });
+  const out = [];
+  for (const [m, , second] of gone) {
+    const ids = patchIds(root, ['log', '--no-merges', '-p', ...PATCH, '--format=commit %H', second, '--not', `${m}^1`, ...code]) ?? new Map();
+    if ([...ids.keys()].some((id) => (update.ids.get(id) ?? []).some((c) => line.has(c)))) out.push({ m, second, brought: [...ids.values()].flat() });
+  }
+  return out;
+}
+
+// mergeOfStory(root, { m, second, brought }, tip, local): the dropped merge merged this story: its
+// second parent is the tip, an ancestor of it (the story moved on past its merged commit, the merge
+// itself not in its history), or a descendant of it, and at least one commit it brought in is the
+// story's own work (the tip holds it) and no non-story ref holds it, so a non-story branch merged
+// before the story forked from it is not taken for the story.
+function mergeOfStory(root, { m, second, brought }, tip, local) {
+  const related = second === tip || (contains(root, second, tip) && !contains(root, m, tip)) || contains(root, tip, second);
+  return related && brought.some((c) => contains(root, c, tip) && !heldOutsideStories(root, c, local));
 }
 
 // rewriteCheck(root, { old, next, base, info, trusted }): for an update that rewrites history (old
@@ -1526,7 +1553,7 @@ function replayCopy(root, tip, { old, next, exclude, code, update }) {
 // from line numbers (codeDiff). A reword, a record edit, or a clean rebase passes; a change of a
 // single space, or a change moved to another place, does not.
 const REWRITE = 'rewriting shipped story history changes code; ship the change as a story';
-const CONFLICTED = 'the rebase changed code while resolving a conflict; ship that change as a story';
+const CONFLICTED = 'the rebase changed code while resolving a conflict, which cannot be compared with the verified code; use git pull --no-rebase (a merge keeps both sides comparable), or ship the resolution as a story';
 // recordFile(f, info): f is a PM state path, a story file or handoff note of a judged project.
 const recordFile = (f, info) => (info?.projects?.length ? info.projects : [{ prefix: '' }]).some(({ prefix = '' }) => {
   const dir = `${prefix}docs/stories/`;
@@ -1537,11 +1564,18 @@ const recordFile = (f, info) => (info?.projects?.length ? info.projects : [{ pre
 // a configured remote's url: what `git pull <remote> <branch>` just fetched, a trusted copy of the
 // integration branch even without tracking config.
 function fetchedIntegration(root, branch) {
-  const urls = new Set((git(root, ['config', '--get-regexp', '^remote\\..*\\.url$']) || '').split(/\r?\n/).map((l) => l.slice(l.indexOf(' ') + 1)).filter(Boolean));
-  return (fetchHeads(root)?.heads ?? []).filter((h) => h.name === branch && h.url && urls.has(h.url)).map((h) => h.sha);
+  const urls = new Set(remotes(root).map((r) => fetchUrl(chomp(git(root, ['ls-remote', '--get-url', r]) || ''))).filter(Boolean));
+  return (fetchHeads(root)?.heads ?? []).filter((h) => h.name === branch && h.url && urls.has(fetchUrl(h.url))).map((h) => resolve(root, h.sha)).filter(Boolean);
+}
+
+// fetchUrl(url): a remote url as git fetch writes it into FETCH_HEAD: any `user:pass@` credentials
+// dropped, then a trailing `/`, then a trailing `.git`. The configured side comes from
+// `git ls-remote --get-url`, which applies insteadOf.
+export function fetchUrl(url) {
+  return String(url ?? '').trim().replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, '$1').replace(/\/+$/, '').replace(/\.git$/, '');
 }
 // Diffs this gate compares are made the same way whatever the user's config says.
-const DIFF_CONFIG = ['-c', 'diff.noprefix=false', '-c', 'diff.mnemonicPrefix=false', '-c', 'diff.relative=false', '-c', 'diff.suppressBlankEmpty=false', '-c', 'diff.renames=false', '-c', 'diff.algorithm=myers', '-c', 'diff.indentHeuristic=false'];
+const DIFF_CONFIG = ['-c', 'diff.ignoreSubmodules=none', '-c', 'diff.noprefix=false', '-c', 'diff.mnemonicPrefix=false', '-c', 'diff.relative=false', '-c', 'diff.suppressBlankEmpty=false', '-c', 'diff.renames=false', '-c', 'diff.algorithm=myers', '-c', 'diff.indentHeuristic=false'];
 const DIFF_OPTS = ['--no-renames', '--diff-algorithm=myers', '--no-indent-heuristic', ...PATCH];
 // codeDiff(root, a, b, spec): the exact diff from a to b over `spec`, with no context lines (-U0)
 // so changes next to a hunk do not count, and with the parts a rebase's line shifts and new blob
@@ -1576,9 +1610,8 @@ function rewriteCheck(root, { old, next, base, info, trusted, branch }) {
   const mt = spawnGit(root, ['merge-tree', '--write-tree', '--name-only', '--no-messages', '-z', '--merge-base', base, from, old]);
   const [tree, ...conflicted] = mt.status === 0 || mt.status === 1 ? mt.stdout.split('\0').filter(Boolean) : [];
   if (/^[0-9a-f]{40,64}$/.test(tree ?? '')) {
-    const recordsOnly = conflicted.every((f) => recordFile(f, info));
-    if (!conflicted.length || recordsOnly) return verdict(sameCode(root, tree, next, code));
     const same = sameCode(root, tree, next, code);
+    if (conflicted.every((f) => recordFile(f, info))) return verdict(same);
     return same === true ? { found: true } : { found: true, bad: CONFLICTED };
   }
   const before = codeDiff(root, base, old, code);
@@ -1587,19 +1620,7 @@ function rewriteCheck(root, { old, next, base, info, trusted, branch }) {
   return verdict(before === after);
 }
 
-// replayedMerge(root, tip, { old, next, exclude }): the merges in old's replaced range that merged
-// this story and that next no longer holds: the second parent is the tip, or an ancestor of it (the
-// story moved on past its merged commit, the merge itself not in its history), or a descendant of
-// it.
 export const REPLAY = 'a rebase is replaying a shipped story merge; use git pull --rebase=merges (or git pull --no-rebase)';
-function replayedMerge(root, tip, { old, next, exclude }) {
-  if (!old) return [];
-  const merges = (git(root, ['rev-list', '--merges', '--parents', old, '--not', ...exclude]) || '').split(/\r?\n/).filter(Boolean);
-  return merges.map((line) => line.split(' ')).filter(([m, , second]) => {
-    const ofStory = second === tip || (contains(root, second, tip) && !contains(root, m, tip)) || contains(root, tip, second);
-    return ofStory && !contains(root, m, next);
-  }).map(([m]) => m);
-}
 
 // copyVerdict(root, branch, copies, info): the refusal of a story copied into `branch`. A replay (a
 // linear rebase flattening a story merge old held) is told to keep the merge. Otherwise an

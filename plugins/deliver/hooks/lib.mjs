@@ -15,9 +15,10 @@ import { fileURLToPath } from 'node:url';
 // (which strips trailing \n but leaves other whitespace, unlike String#trim()).
 export const chomp = (s) => s.replace(/(\r?\n)+$/, '');
 
-// REFUSED: the exit status deliver's git-level gate uses for a deliberate refusal, and the only
-// one its shims and chaining lines pass on as a refusal; any other failure to run is a warning and
-// exit 0, so a broken node or gate never blocks updates. Unusual on purpose.
+// REFUSED: the exit status deliver's git-level gate script uses for a deliberate refusal, read only
+// by the shim git-hook-install.mjs writes: it turns REFUSED into exit 1, the refusal status chained
+// hooks check for, and any other failure to run into a warning and exit 0, so a broken node or
+// gate never blocks updates. Unusual on purpose.
 export const REFUSED = 86;
 
 // oneLine(s): s with every run of control characters (newlines included) made one space, so

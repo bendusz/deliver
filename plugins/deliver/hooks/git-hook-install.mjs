@@ -13,9 +13,11 @@
 // can call. The hooks directory is written only when its real path (symlinked directories
 // resolved) sits inside the git directory and core.hooksPath, if set, comes from the repository's
 // own config; a hooks directory in the working tree, from global or system config, or elsewhere is
-// reported with the lines to add to the existing hook (addLine: they stop with status 1 only on a
-// refusal, do nothing once the private copy is gone or mktemp fails, and for reference-transaction
-// hand the same stdin records to the rest of the hook). A foreign hook that already calls the
+// reported with the lines to add to the existing hook (addLine: they exit 1 only on a refusal, end
+// with status 0 otherwise, do nothing once the private copy is gone or mktemp fails, and for
+// reference-transaction hand the same stdin records to the rest of the hook). The gate exits
+// REFUSED (86) to the shim only; the shim, and so the private copy a chained hook runs, exits 1 on a
+// refusal and 0 on anything else, a gate that fails to run included (with a warning). A foreign hook that already calls the
 // private copy is `chained`, in place; --uninstall then says to remove those lines. Notes come in
 // full, and brief for session start, where each chaining command is replaced by the command
 // that prints it, so no note is ever cut.
@@ -59,8 +61,10 @@ const shQuote = (s) => `"${String(s).replace(/["\\$`]/g, '\\$&')}"`;
 
 // shim({ name, gate, node, branches }): the hook script `name`. Forward slashes, so git for
 // Windows' sh runs the same script. A missing gate script or node fails open with a warning, and so
-// does a gate that fails to run (node exists but cannot start): only the gate's REFUSED status is
-// passed on, as itself. deliver's hooks never wedge the repository.
+// does a gate that fails to run (node exists but cannot start). The gate's REFUSED status (86) is
+// used between the gate and the shim only: the shim turns it into exit 1, the one refusal status
+// every chained hook and wrapper checks for, and anything else into a warning and exit 0. deliver's
+// hooks never wedge the repository.
 export function shim({ name = RT_HOOK, gate = GATE, node = process.execPath, branches = ['main'] } = {}) {
   const head = [
     '#!/bin/sh',
@@ -77,10 +81,11 @@ export function shim({ name = RT_HOOK, gate = GATE, node = process.execPath, bra
     '[ -x "$node" ] || node=node',
     'command -v "$node" >/dev/null 2>&1 || { echo "deliver: node is not runnable, so the merge gate did not run; run /deliver:doctor" >&2; exit 0; }',
   ];
-  // The gate's status: 0 allows, REFUSED refuses, anything else is a failure to run, not enforced.
+  // The gate's status: 0 allows, REFUSED refuses (exit 1), anything else failed to run: not enforced.
   const verdictOf = [
     'rc=$?',
-    `[ "$rc" = 0 ] || [ "$rc" = ${REFUSED} ] && exit "$rc"`,
+    '[ "$rc" = 0 ] && exit 0',
+    `[ "$rc" = ${REFUSED} ] && exit 1`,
     'echo "deliver: merge gate failed to run ($rc); not enforced" >&2',
     'exit 0',
   ];
@@ -146,7 +151,7 @@ function readHook(file) {
     // whether it already runs deliver's lines). An unreadable target leaves text unset.
     let target;
     try { target = fs.readFileSync(file, 'utf8'); } catch { target = undefined; }
-    return { state: 'foreign', why: 'is a symlink', text: target };
+    return { state: 'foreign', why: 'is a symlink', symlink: true, text: target };
   }
   if (!st.isFile()) return { state: 'foreign', why: 'is not a regular file' };
   let text;
@@ -211,22 +216,34 @@ function layout(top) {
 }
 
 // gateLines(name, copy): the sh statements that run deliver's gate from another hook, one template
-// for addLine and wrapper. They stop with the gate's REFUSED status only when it refuses, and fail
-// open on anything else: with
-// the private copy gone (after --uninstall, or a git upgrade that drops a fallback hook), or
-// without mktemp, they do nothing. The reference-transaction form saves stdin once, feeds it to
-// the gate, and then gives the same records to whatever runs next.
+// for addLine and wrapper. The private copy exits 1 only when the gate refuses; these lines then
+// exit 1, and otherwise end with status 0 (an `if` whose test fails), so a hook made of these lines
+// alone allows, and a hook with more lines goes on. They fail open: with the private copy gone
+// (after --uninstall, or a git upgrade that drops a fallback hook), or without mktemp, they do
+// nothing. The reference-transaction form saves stdin once, feeds it to the gate, and then gives
+// the same records to whatever runs next.
 function gateLines(name, copy) {
   const c = shQuote(slash(copy));
   return name === RT_HOOK
     ? [
       `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
       '  cat > "$deliver_in";',
-      `  sh ${c} "$@" < "$deliver_in"; [ $? = ${REFUSED} ] && { rm -f "$deliver_in"; exit ${REFUSED}; };`,
+      `  sh ${c} "$@" < "$deliver_in"; if [ $? = 1 ]; then rm -f "$deliver_in"; exit 1; fi;`,
       '  exec < "$deliver_in"; rm -f "$deliver_in";',
       'fi',
     ]
-    : [`if [ -f ${c} ]; then sh ${c} "$@"; [ $? = ${REFUSED} ] && exit ${REFUSED}; fi`];
+    : [`if [ -f ${c} ]; then sh ${c} "$@"; if [ $? = 1 ]; then exit 1; fi; fi`];
+}
+
+// legacyLines(name, copy): earlier forms of the lines that still work as chained, so they count
+// as current: the reference-transaction line printed before the explicit-success form. The
+// earlier fallback-hook line is not one: as a hook's last line it exits 1 when the gate allows.
+function legacyLines(name, copy) {
+  const c = shQuote(slash(copy));
+  return name === RT_HOOK
+    ? [`if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then cat > "$deliver_in"; sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; }; exec < "$deliver_in"; rm -f "$deliver_in"; fi`,
+      `  sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; };`]
+    : [];
 }
 
 // addLine(name, copy): gateLines as one line, to put right after the #! line of an existing
@@ -276,13 +293,12 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
   const res = { hooks: {}, notes: [], brief: [], sawV1: false, layout: layout(top) };
   const { dir, privateDir, writable, why } = res.layout;
   const note = (full, brief = full) => { res.notes.push(full); res.brief.push(brief); };
-  // A foreign hook whose interpreter is not sh, or cannot be read (a dangling or unreadable
-  // symlink target), gets the wrapper, which is always safe; a missing hook gets the lines.
-  // The wrapper, always safe, replaces inline lines for a symlinked hook (its target may be shared,
-  // and is never to be edited), a hook that cannot be read, and one whose interpreter is not sh.
+  // A missing hook gets the lines. The wrapper, always safe, replaces them for a symlinked hook
+  // (its target may be shared, and is never to be edited), a hook that cannot be read, and one
+  // whose interpreter is not sh.
   const chain = (name, copy, cur) => {
     if (cur.state !== 'foreign') return `add these as the lines right after its #! line: ${addLine(name, copy)}`;
-    const why = cur.why === 'is a symlink' ? 'it is a symlink, whose target may be shared and is never to be edited'
+    const why = cur.symlink ? 'it is a symlink, whose target may be shared and is never to be edited'
       : cur.text === undefined ? `it ${cur.why}`
         : !shCompatible(cur.text) ? 'its interpreter is not sh' : null;
     if (!why) return `add these as the lines right after its #! line: ${addLine(name, copy)}`;
@@ -296,9 +312,10 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
     const cur = readHook(file);
     if (cur.v1) res.sawV1 = true;
     const whose = cur.v1 ? "an earlier deliver install's" : "deliver's";
-    const chained = cur.state === 'foreign' && typeof cur.text === 'string' && cur.text.includes(slash(copy)) && shCompatible(cur.text);
+    const text = typeof cur.text === 'string' ? cur.text.replace(/\r\n/g, '\n') : undefined;
+    const chained = cur.state === 'foreign' && text !== undefined && text.includes(slash(copy)) && shCompatible(text);
     // The lines it runs are this version's (the inline form, or the wrapper's block); else stale.
-    const current = chained && (cur.text.includes(addLine(name, copy)) || cur.text.includes(gateLines(name, copy).join('\n')));
+    const current = chained && [addLine(name, copy), gateLines(name, copy).join('\n'), ...legacyLines(name, copy)].some((l) => text.includes(l));
     try {
       if (want === null) {
         // Not wanted in this mode (or uninstalling): remove only what is ours.
@@ -326,7 +343,7 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
         const executable = process.platform === 'win32' || Boolean(fs.statSync(file).mode & 0o111);
         res.hooks[name] = !executable ? 'chained-inactive' : !current ? 'chained-stale' : check ? copyState(copy, want) : 'chained';
         if (res.hooks[name] === 'chained-inactive') note(`merge gate: ${slash(file)} runs deliver's lines but is not executable, so git skips it; run chmod +x ${shQuote(slash(file))}`);
-        else if (res.hooks[name] === 'chained-stale') note(`merge gate: ${slash(file)} runs an earlier version of deliver's lines; replace them: ${chain(name, copy, { ...cur, why: "is not deliver's" })}`, `merge gate: ${slash(file)} runs an earlier version of deliver's lines; ${pointer}`);
+        else if (res.hooks[name] === 'chained-stale') note(`merge gate: ${slash(file)} runs an earlier version of deliver's lines; replace them: ${chain(name, copy, cur)}`, `merge gate: ${slash(file)} runs an earlier version of deliver's lines; ${pointer}`);
         else if (res.hooks[name] !== 'chained') note(`merge gate: ${slash(file)} runs deliver's lines, but its copy ${slash(copy)} is ${res.hooks[name]}; run the installer without --check to refresh it`);
         continue;
       }

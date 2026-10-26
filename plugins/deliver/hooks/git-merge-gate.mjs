@@ -81,9 +81,14 @@ try {
 }
 
 if (verdict && !verdict.allow) {
-  const what = verdict.ref ? `the update of ${verdict.ref}` : 'this merge commit';
-  fs.writeSync(2, `deliver blocked ${what}: ${lib.oneLine(verdict.reason)}.\n${recovery({ inMerge, top, next: verdict.next })}\n`);
-  process.exit(lib.REFUSED);
+  // A refusal always exits REFUSED, whatever throws while its message is built or printed: the shim
+  // reads any other status as a gate that failed to run, and lets the update through.
+  try {
+    const what = verdict.ref ? `the update of ${verdict.ref}` : 'this merge commit';
+    fs.writeSync(2, `deliver blocked ${what}: ${lib.oneLine(verdict.reason)}.\n${recovery({ inMerge, top, next: verdict.next })}\n`);
+  } catch { /* the refusal stands without its message */ } finally {
+    process.exit(lib?.REFUSED ?? 86);
+  }
 }
 process.exit(0);
 
