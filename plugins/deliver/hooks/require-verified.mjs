@@ -607,6 +607,7 @@ function integrationRefs(root, integ) {
 // storyReadableUpstream(root, branch): the configured upstream of `branch`, when integrationRefs
 // leaves it untrusted because it also reads as a story branch; else null. For --check to report.
 export function storyReadableUpstream(root, branch) {
+  if (chomp(git(root, ['config', '--get', `branch.${branch}.merge`]) || '') !== `refs/heads/${branch}`) return null;
   const upstream = chomp(git(root, ['for-each-ref', '--format=%(upstream)', `refs/heads/${branch}`]) || '');
   return upstream.startsWith('refs/remotes/') && storyName(upstream, remotes(root)) ? upstream : null;
 }
@@ -806,7 +807,7 @@ function afterVerdict(root, sha, tip, integrationRef, file, prefix) {
       if (!mergeMatches(root, commit, parents, file)) return false;
       continue;
     }
-    const changed = listing(root, ['diff-tree', '-z', '--root', '--name-only', '--no-commit-id', '-r', commit]);
+    const changed = listing(root, ['diff-tree', NO_SUBMODULE_IGNORE, '-z', '--root', '--name-only', '--no-commit-id', '-r', commit]);
     if (changed === null || !onlyRecords(changed, file, prefix)) return false;
   }
   return true;
@@ -1333,7 +1334,7 @@ function resultCheck(root, next, exclude, introduced, judged) {
       if (same === false) return `${c.slice(0, 12)}: ${MERGE_DIFFERS}`;
       continue;
     }
-    const changed = listing(root, ['diff-tree', '-z', '--root', '--name-only', '--no-commit-id', '-r', c]);
+    const changed = listing(root, ['diff-tree', NO_SUBMODULE_IGNORE, '-z', '--root', '--name-only', '--no-commit-id', '-r', c]);
     if (changed === null || !changed.every((p) => below.some((st) => onlyRecords([p], st.files, st.prefixes)))) {
       return `${c.slice(0, 12)} changes more than the story file and handoff notes on top of a story merge; ${MERGE_DIFFERS}`;
     }
@@ -1405,7 +1406,9 @@ function heldOutsideStories(root, commit, local) {
 // Every porcelain diff and log call in the gate passes NO_SUBMODULE_IGNORE, so a changed gitlink is
 // code whatever diff.ignoreSubmodules says.
 export const NO_SUBMODULE_IGNORE = '--ignore-submodules=none';
-const PATCH = ['--no-color', '--no-ext-diff', '--no-textconv', NO_SUBMODULE_IGNORE];
+// --submodule=short keeps a gitlink change a patch (diff.submodule=log would summarise it, and
+// patch-id would see nothing).
+const PATCH = ['--no-color', '--no-ext-diff', '--no-textconv', NO_SUBMODULE_IGNORE, '--submodule=short'];
 function patchIds(root, args) {
   const out = spawnGit(root, args);
   if (out.error || out.status !== 0) return null;
@@ -1559,7 +1562,7 @@ function mergeOfStory(root, { m, second, brought }, tip, local) {
 // as { found }, and, when it did, { bad }, the refusal when the rewrite changes code (records,
 // recordSpecs, left out). `from` is the commit next builds on: the newest of its first-parent
 // history that old, a trusted remote copy, or FETCH_HEAD's head of the integration branch from a
-// configured remote (fetchedIntegration) holds. With the same base (an amend), next's code
+// pull's own FETCH_HEAD head (fetchedIntegration) holds. With the same base (an amend), next's code
 // tree must equal old's exactly. On a new base (a rebase), next's code tree must equal the rebased
 // result, `git merge-tree --write-tree --merge-base <base> <from> <old>` (git 2.40 or newer); where
 // conflicts are confined to records, the code is compared all the same; a code conflict resolved
@@ -1575,12 +1578,37 @@ const recordFile = (f, info) => (info?.projects?.length ? info.projects : [{ pre
   return isHandoff(f, prefix) || (f.startsWith(dir) && /^[^/]+\.md$/.test(f.slice(dir.length)));
 });
 
-// fetchedIntegration(root, branch): the heads FETCH_HEAD names as `branch '<branch>' of <url>` for
-// a configured remote's url: what `git pull <remote> <branch>` just fetched, a trusted copy of the
-// integration branch even without tracking config.
-function fetchedIntegration(root, branch) {
-  const urls = new Set(remotes(root).map((r) => fetchUrl(chomp(git(root, ['ls-remote', '--get-url', r]) || ''))).filter(Boolean));
-  return (fetchHeads(root)?.heads ?? []).filter((h) => h.name === branch && h.url && urls.has(fetchUrl(h.url))).map((h) => resolve(root, h.sha)).filter(Boolean);
+// fetchedIntegration(root, branch, next): FETCH_HEAD's head of the integration branch, trusted as a
+// copy of it only for the pull now running (`git pull <remote> <branch>` with no tracking config),
+// as [sha] or []. Trusted only: from the one designated remote (branch.<branch>.remote when set,
+// else checkout.defaultRemote, else origin, else the only remote), never a fork, its line naming
+// `branch '<branch>' of <url>` for that remote's url (fetchUrl); equal to that remote's
+// refs/remotes/<remote>/<branch> when that ref exists; and only while the update is the pull's own:
+// GIT_REFLOG_ACTION starts with `pull`, and next holds the fetched head. A FETCH_HEAD left by an
+// earlier fetch never trusts a later, unrelated update.
+function fetchedIntegration(root, branch, next) {
+  if (!/^pull\b/.test(process.env.GIT_REFLOG_ACTION ?? '')) return [];
+  const remote = designatedRemote(root, branch);
+  if (!remote) return [];
+  const url = fetchUrl(chomp(git(root, ['ls-remote', '--get-url', remote]) || ''));
+  const tracking = resolve(root, `refs/remotes/${remote}/${branch}`);
+  return (fetchHeads(root)?.heads ?? [])
+    .filter((h) => h.name === branch && h.url && url && fetchUrl(h.url) === url)
+    .map((h) => resolve(root, h.sha))
+    .filter((sha) => sha && (!tracking || sha === tracking) && contains(root, sha, next));
+}
+
+// designatedRemote(root, branch): the one remote the integration branch is pulled from:
+// branch.<branch>.remote when set (and not `.`), else checkout.defaultRemote, else origin, else the
+// only configured remote; null otherwise.
+function designatedRemote(root, branch) {
+  const names = remotes(root);
+  const configured = chomp(git(root, ['config', '--get', `branch.${branch}.remote`]) || '');
+  if (configured) return configured !== '.' && names.includes(configured) ? configured : null;
+  const preferred = chomp(git(root, ['config', '--get', 'checkout.defaultRemote']) || '');
+  if (preferred && names.includes(preferred)) return preferred;
+  if (names.includes('origin')) return 'origin';
+  return names.length === 1 ? names[0] : null;
 }
 
 // fetchUrl(url): a remote url as git fetch writes it into FETCH_HEAD: the user part dropped (for a
@@ -1591,7 +1619,8 @@ function fetchedIntegration(root, branch) {
 export function fetchUrl(url) {
   let u = String(url ?? '').trim();
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) u = u.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, '$1');
-  else if (u.includes('@') && u.indexOf(':', u.indexOf('@')) !== -1) u = u.slice(u.indexOf('@') + 1);
+  // A `/` before the first `:` makes it a local path, not scp-style (git's url_is_local_not_ssh).
+  else if (u.includes('@') && u.includes(':') && !u.slice(0, u.indexOf(':')).includes('/') && u.indexOf(':', u.indexOf('@')) !== -1) u = u.slice(u.indexOf('@') + 1);
   return u.replace(/\/+$/, '').replace(/\.git$/, '');
 }
 // Diffs this gate compares are made the same way whatever the user's config says.
@@ -1615,12 +1644,13 @@ function sameCode(root, a, b, spec) {
 function rewriteCheck(root, { old, next, base, info, trusted }) {
   if (contains(root, next, old)) return { found: false };
   const { code, stories } = recordSpecs(info);
-  // Merge commits count too, against their first parent: a PASS may be recorded while committing a
-  // merge of the integration branch into the story.
-  const touched = (git(root, ['log', NO_SUBMODULE_IGNORE, '--diff-merges=first-parent', '--format=%H', old, '--not', base, ...stories]) || '').split(/\s+/).filter(Boolean);
+  // Merge commits count too (no --no-merges), compared with their first parent: a PASS may be
+  // recorded while committing a merge of the integration branch into the story. Only options git
+  // 2.28 has are used here (the reference-transaction gate's minimum).
+  const touched = (git(root, ['log', NO_SUBMODULE_IGNORE, '--format=%H', old, '--not', base, ...stories]) || '').split(/\s+/).filter(Boolean);
   const changedStories = (c) => {
     const first = resolve(root, `${c}^1`);
-    return listing(root, first ? ['diff', NO_SUBMODULE_IGNORE, '-z', '--name-only', first, c, ...stories] : ['diff-tree', '-z', '-r', '--root', '--no-commit-id', '--name-only', c, ...stories]) ?? [];
+    return listing(root, first ? ['diff', NO_SUBMODULE_IGNORE, '-z', '--name-only', first, c, ...stories] : ['diff-tree', NO_SUBMODULE_IGNORE, '-z', '-r', '--root', '--no-commit-id', '--name-only', c, ...stories]) ?? [];
   };
   const found = touched.some((c) => changedStories(c).some((f) => {
     const exec = parseExec(git(root, ['show', `${c}:${f}`]) ?? '');
@@ -1751,10 +1781,10 @@ export function judgeRefUpdate(root, { target, old, new: next }) {
     // The update builds on its base (excludeFor); what a trusted remote copy holds has shipped
     // there and is not judged again (upstream story merges and squashes under a rebase or a pull).
     const base = excludeFor(root, oldSha, next, local);
-    // FETCH_HEAD's head of the integration branch from a configured remote (`git pull origin main`
-    // with no tracking config) is trusted the same way.
-    const fetched = fetchedIntegration(root, branch);
-    const ctx = { branch, local, oldSha, next, info, trusted: [...new Set([...trusted, ...fetched])], base: base[0], exclude: [...new Set([...base, ...trusted, ...fetched])] };
+    // FETCH_HEAD's head of the integration branch, for the pull now running from the designated
+    // remote (`git pull origin main` with no tracking config), is trusted the same way.
+    const trustedAll = [...new Set([...trusted, ...fetchedIntegration(root, branch, next)])];
+    const ctx = { branch, local, oldSha, next, info, trusted: trustedAll, base: base[0], exclude: [...new Set([...base, ...trustedAll])] };
     const mark = () => { certain = true; };
     // Every verdict from here passes one place: what the update brings in, then, for a rewrite (an
     // amend, a rebase, a reset elsewhere), the shipped story work it replaces.
