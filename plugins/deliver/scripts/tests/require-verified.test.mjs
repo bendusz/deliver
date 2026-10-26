@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { newProj, runHook, gitIn, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
@@ -964,7 +965,7 @@ test('verified: a story branch two projects claim blocks from the root, and from
 });
 
 test('directory rule: a story two projects claim is judged in each, by both gates; one owner only when one claims it', async () => {
-  const { judgeMerge, judgeRefUpdate } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+  const { judgeMerge, judgeRefUpdate } = await import(pathToFileURL(path.join(HOOKS_DIR, 'require-verified.mjs')).href);
   const s = siblings({ barStory: STORY, fooClaims: true });
   recordAt(s.bar, STORY, { verifier: `PASS ${s.code}` });
   const tip = gitIn(s.top, ['rev-parse', 'HEAD']).trim();
@@ -1000,7 +1001,7 @@ test('directory rule: a story two projects claim is judged in each, by both gate
 });
 
 test('directory rule: a shared story whose two story files conflicted and were resolved merges; a handoff note in one claimant keeps the other verified', async () => {
-  const { judgeRefUpdate } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+  const { judgeRefUpdate } = await import(pathToFileURL(path.join(HOOKS_DIR, 'require-verified.mjs')).href);
   const both = siblings({ barStory: STORY, fooClaims: true });
   for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${both.code}` }));
   gitIn(both.top, ['add', '-A']);
@@ -1598,7 +1599,7 @@ test('verified: audit of shell constructs around a merge, unverified blocked and
     ['git -C', (p) => `git -C '${p}' merge --no-ff ${B}`],
     ['git -c key=val', () => `git -c core.editor=true merge --no-ff ${B}`],
     ['--git-dir/--work-tree', (p) => `git --git-dir='${p}/.git' --work-tree='${p}' merge --no-ff ${B}`],
-    ['--git-dir=', (p) => `git --git-dir=${p}/.git merge --no-ff ${B}`],
+    ['--git-dir=', (p) => `git --git-dir=${p.replace(/\\/g, '/')}/.git merge --no-ff ${B}`],
     ['checkout main --', () => `git checkout main -- && git merge --no-ff ${B}`, { from: 'branch' }],
     ['switch -- main', () => `git switch -- main && git merge --no-ff ${B}`, { from: 'branch' }],
     ['merge --', () => `git merge --no-ff -- ${B}`],

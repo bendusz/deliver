@@ -5,11 +5,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { newProj, runHook, gitIn, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
-const { installGitHook, shim, writeAtomic, shCompatible, shSyntaxOk, wrapper, MARKER, GATE, RT_HOOK, TREE_NOTE } = await import(path.join(HOOKS_DIR, 'git-hook-install.mjs'));
-const { judgeMerge, judgeRefUpdate, ONE_AT_A_TIME, fetchUrl, planName, planEntry } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+const { installGitHook, shim, writeAtomic, shCompatible, shSyntaxOk, wrapper, MARKER, GATE, RT_HOOK, TREE_NOTE } = await import(pathToFileURL(path.join(HOOKS_DIR, 'git-hook-install.mjs')).href);
+const { judgeMerge, judgeRefUpdate, ONE_AT_A_TIME, fetchUrl, planName, planEntry } = await import(pathToFileURL(path.join(HOOKS_DIR, 'require-verified.mjs')).href);
 
 const BRANCH = 'pm/S1-1-fix';
 const STORY = 'docs/stories/S1-1-fix.md';
@@ -1431,7 +1432,7 @@ test('git gate: mapsBranch honours a negative refspec: the excluded branch is no
 });
 
 test('git gate: branchNameOk falls back to the JS rule when git times out, and refuses HEAD even if git accepts it', { skip: WIN && 'POSIX git stub' }, async () => {
-  const lib = await import(path.join(HOOKS_DIR, 'lib.mjs'));
+  const lib = await import(pathToFileURL(path.join(HOOKS_DIR, 'lib.mjs')).href);
   const bin = tmpDir('pmslowgit-');
   fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nsleep 3\necho "$4"\n', { mode: 0o755 });
   const saved = process.env.PATH;
