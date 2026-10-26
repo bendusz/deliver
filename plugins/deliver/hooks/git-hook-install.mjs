@@ -43,7 +43,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { git, chomp, isMain, oneLine, REFUSED } from './lib.mjs';
-import { discover, projectAt, project, planName, mergeTreeWorks, storyReadableUpstream } from './require-verified.mjs';
+import { discover, projectAt, project, planEntry, validBranchName, mergeTreeWorks, storyReadableUpstream, noTracking } from './require-verified.mjs';
 
 export const MARKER = '# deliver-merge-gate v2';
 const OURS = /^# deliver-merge-gate v\d+$/;
@@ -125,7 +125,7 @@ const atLeast = (v, min) => Boolean(v) && (v[0] > min[0] || (v[0] === min[0] && 
 
 // integrationBranches(root, top): every integration branch a deliver project in the repository
 // names, so one shim serves them all; else the plan on HEAD's; else main.
-export function integrationBranches(root, top, { all = false } = {}) {
+export function integrationBranches(root, top) {
   const names = new Set();
   try {
     for (const dir of discover(top).found) {
@@ -135,11 +135,15 @@ export function integrationBranches(root, top, { all = false } = {}) {
     const prefix = chomp(git(root, ['rev-parse', '--show-prefix']) || '').replace(/\\/g, '/');
     const own = project(top, [prefix]);
     for (const n of own?.names ?? (own?.name ? [own.name] : [])) names.add(n);
-    if (!names.size) names.add(planName(git(top, ['show', `HEAD:${prefix}docs/plan.md`])) || 'main');
+    if (!names.size) names.add(planEntry(git(top, ['show', `HEAD:${prefix}docs/plan.md`])) || 'main');
   } catch { names.add('main'); }
-  // A pm/* name is a story branch, never an integration branch: left out (installGitHook reports
-  // it), unless `all` asks for every name.
-  return [...names].filter((n) => all || !n.startsWith('pm/')).sort();
+  // A pm/* name is a story branch, never an integration branch: returned apart, as storyNamed, for
+  // installGitHook to report.
+  // An invalid name (one git check-ref-format --branch would refuse) is returned apart too: it is
+  // never watched, nor cut down to a valid prefix.
+  const sorted = [...names].sort();
+  const valid = sorted.filter((n) => validBranchName(n));
+  return { branches: valid.filter((n) => !n.startsWith('pm/')), storyNamed: valid.filter((n) => n.startsWith('pm/')), invalidNamed: sorted.filter((n) => !validBranchName(n)) };
 }
 
 // shSyntaxOk(text): `sh -n` accepts the script; true when no sh can be run to check it.
@@ -272,8 +276,10 @@ const LEGACY = {
 // each as its inline line and as its whole wrapper block; none for a reference-transaction hook
 // whose #! runs the shell with -e.
 function legacyLines(name, copy, text = '') {
-  const first = String(text).split('\n')[0];
-  if (name === RT_HOOK && /^#!.*\s-[a-z]*e/.test(first)) return [];
+  // -e on the #! line, or `set -e` (or set -eu, ...) in the body. A hook manager that runs the hook
+  // as `sh -e "$hook"` cannot be seen from here; the current lines are -e safe either way.
+  const t = String(text);
+  if (name === RT_HOOK && (/^#!.*\s-[a-z]*e/.test(t.split('\n')[0]) || /^\s*set\s+-[a-z]*e/m.test(t))) return [];
   const c = shQuote(slash(copy));
   return Object.values(LEGACY).flatMap((form) => {
     const lines = form(name, c);
@@ -337,7 +343,7 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
       : cur.text === undefined ? `it ${cur.why}`
         : !shCompatible(cur.text) ? 'its interpreter is not sh' : null;
     if (!why) return `add these as the lines right after its #! line: ${addLine(name, copy)}`;
-    if (!shSyntaxOk(wrapper(name, copy))) return `${why}, and the wrapper deliver generated does not parse (sh -n); run /deliver:doctor`;
+    if (!shSyntaxOk(wrapper(name, copy))) return `${why}, and the wrapper deliver generated does not parse (sh -n); this is a deliver bug: report it with the hook path ${slash(path.join(dir, name))}`;
     return `${why}, so deliver's lines cannot go inside it; rename it to ${name}.local in the same directory, and write this sh wrapper as ${name}, executable:\n${wrapper(name, copy)}`;
   };
   const pointer = `for what to add to it, run ${doctor}`;
@@ -355,8 +361,8 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
     try {
       // Never install a hook script that does not parse: it would fail every update.
       if (want !== null && !shSyntaxOk(want)) {
-        res.hooks[name] = 'invalid';
-        note(`merge gate: the ${name} hook deliver generated does not parse (sh -n), so it was not installed; run /deliver:doctor`);
+        res.hooks[name] = 'invalid-generated';
+        note(`merge gate: the ${name} hook deliver generated does not parse (sh -n), so it was not installed; this is a deliver bug: report it with the hook path ${slash(path.join(dir, name))}`);
         continue;
       }
       if (want === null) {
@@ -497,9 +503,11 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   const v = version ?? gitVersion(top);
   res.git = v ? v.join('.') : 'unknown';
   res.mode = atLeast(v, MIN_GIT) ? RT_HOOK : 'fallback';
-  const named = integrationBranches(abs, top, { all: true });
-  res.branches = named.filter((n) => !n.startsWith('pm/'));
-  const storyNamed = named.filter((n) => n.startsWith('pm/'));
+  const { branches, storyNamed, invalidNamed } = integrationBranches(abs, top);
+  res.branches = branches;
+  // git 2.28 or newer with no integration branch to watch: no hook at all (the fallback hooks are
+  // for older git only), reported as mode `none`.
+  if (res.mode === RT_HOOK && !branches.length) res.mode = 'none';
   if (!uninstall && !check && explicit && optedOut(top)) git(top, ['config', '--local', '--unset', OPT_OUT]);
   if (!uninstall && optedOut(top)) {
     res.disabled = true;
@@ -510,11 +518,16 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   const wanted = {};
   // With no integration branch to watch, no reference-transaction shim is written (its `case`
   // would have no pattern and could not parse); that is reported, and the gate is not in place.
-  if (res.mode === RT_HOOK && res.branches.length) wanted[RT_HOOK] = shim({ name: RT_HOOK, gate, node, branches: res.branches });
-  else for (const name of FALLBACK_HOOKS) wanted[name] = shim({ name, gate, node, branches: res.branches });
+  if (res.mode === RT_HOOK) wanted[RT_HOOK] = shim({ name: RT_HOOK, gate, node, branches: res.branches });
+  else if (res.mode === 'fallback') for (const name of FALLBACK_HOOKS) wanted[name] = shim({ name, gate, node, branches: res.branches });
   const doctor = `/deliver:doctor, or node ${shQuote(slash(INSTALLER))} --check ${shQuote(slash(abs))}`;
   for (const n of storyNamed) {
     const msg = `merge gate: integration branch ${n} is a story branch name; the gate is not enforced for it; fix the plan's Integration branch line`;
+    res.notes.push(msg);
+    res.brief.push(msg);
+  }
+  for (const n of invalidNamed) {
+    const msg = `merge gate: integration branch ${oneLine(n).slice(0, 80)} is not a valid branch name; the gate is not enforced for it; fix the plan's Integration branch line`;
     res.notes.push(msg);
     res.brief.push(msg);
   }
@@ -538,11 +551,12 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   for (const b of res.branches) {
     const up = storyReadableUpstream(top, b);
     if (up) add(`merge gate: ${b}'s upstream ${up} also reads as a story branch, so it is not trusted as shipped history; give the remote a name that does not overlap another's`);
+    if (check && git(top, ['rev-parse', '--verify', '--quiet', `refs/heads/${b}`]) !== null && noTracking(top, b)) add(`merge gate: ${b} has no upstream; a fast-forward git pull run by a tool that presets GIT_REFLOG_ACTION is refused as an unrelated update; set one with git branch --set-upstream-to <remote>/${b} ${b}`);
   }
   if (res.mode === 'fallback') add(`merge gate: git < 2.28 (this is ${res.git}): fast-forward updates, squash merges, and cherry-picks are not gated (they make no merge commit), and a merge commit's result is compared with the automatic merge only where git needs no content merge, else only the verdicts are checked; upgrade git`);
-  else if (!(treeCheck ?? mergeTreeWorks(top))) add(TREE_NOTE);
+  else if (res.mode === RT_HOOK && !(treeCheck ?? mergeTreeWorks(top))) add(TREE_NOTE);
   const good = new Set(['installed', 'refreshed', 'current', 'chained']);
-  res.ok = !res.disabled && (res.mode !== RT_HOOK || res.branches.length > 0) && Object.keys(wanted).every((n) => good.has(res.hooks[n]));
+  res.ok = !res.disabled && res.mode !== 'none' && !invalidNamed.length && Object.keys(wanted).every((n) => good.has(res.hooks[n]));
   return res;
 }
 
@@ -561,7 +575,7 @@ if (isMain(import.meta.url)) {
     process.exit(1);
   }
   const lines = [
-    `git ${r.git}: ${r.mode === RT_HOOK ? 'reference-transaction gate (2.28 or newer)' : 'older than 2.28, pre-merge-commit fallback'}`,
+    `git ${r.git}: ${r.mode === RT_HOOK ? 'reference-transaction gate (2.28 or newer)' : r.mode === 'none' ? 'no gate: no integration branch to watch' : 'older than 2.28, pre-merge-commit fallback'}`,
     `integration branches: ${r.branches.join(', ')}`,
     ...(r.disabled ? ['merge gate: disabled'] : []),
     ...Object.entries(r.hooks).map(([n, s]) => `hook ${n}: ${s}`),

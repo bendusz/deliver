@@ -489,7 +489,34 @@ function refFor(root, name) {
   return null;
 }
 
-export const planName = (text) => (String(text ?? '').match(/^\s*-\s*Integration branch:\s*`?<?([A-Za-z0-9._/-]+)>?`?/m) || [])[1] || null;
+// planEntry(text): the plan's `Integration branch:` value, whole: the rest of the line, an HTML
+// comment dropped, its first word, unwrapped from backticks or <>; null when there is no such line.
+// Never a partial match: `release+fix` is `release+fix`.
+export function planEntry(text) {
+  const m = String(text ?? '').match(/^\s*-\s*Integration branch:[ \t]*(.*)$/m);
+  if (!m) return null;
+  const rest = m[1].replace(/<!--.*?(-->|$)/g, '').trim();
+  const tick = rest.match(/^`([^`]*)`/);
+  let word = tick ? tick[1].trim() : rest.split(/\s+/)[0] ?? '';
+  if (/^<.*>$/.test(word)) word = word.slice(1, -1);
+  return word || null;
+}
+
+// validBranchName(name): git check-ref-format --branch accepts it (its rules, checked here so the
+// pure parsers need no git).
+export function validBranchName(name) {
+  if (typeof name !== 'string' || !name || name === '@' || name.startsWith('-')) return false;
+  if (/[\x00-\x20\x7f~^:?*[\\]/.test(name) || name.includes('..') || name.includes('@{') || name.includes('//')) return false;
+  if (name.startsWith('/') || name.endsWith('/') || name.endsWith('.')) return false;
+  return name.split('/').every((c) => c && !c.startsWith('.') && !c.endsWith('.lock'));
+}
+
+// planName(text): the plan's integration branch when it is a valid branch name, else null (an
+// invalid one is reported by the installer, and never cut down to a valid prefix).
+export const planName = (text) => {
+  const name = planEntry(text);
+  return name && validBranchName(name) ? name : null;
+};
 
 // project(root, prefixes): the deliver project at the deepest of `prefixes` (each "" or a
 // "dir/" path below the top level) that a trusted branch marks; null when none does. Else the
@@ -527,10 +554,14 @@ export function projectAt(root, prefix) {
   }
   for (const c of cands) {
     c.approved = git(root, ['cat-file', '-e', `${c.ref}:${prefix}docs/approval.json`]) !== null;
-    c.plan = c.approved ? planName(git(root, ['show', `${c.ref}:${prefix}docs/plan.md`])) : null;
+    const entry = c.approved ? planEntry(git(root, ['show', `${c.ref}:${prefix}docs/plan.md`])) : null;
+    c.plan = entry && validBranchName(entry) ? entry : null;
+    c.invalid = entry && !c.plan ? entry : null;
   }
   const approved = cands.filter((c) => c.approved);
   if (!approved.length) return null;
+  const invalid = approved.find((c) => c.invalid);
+  if (invalid) return { names: [invalid.invalid], invalid: invalid.invalid, error: `integration branch ${sanitize(invalid.invalid)} in ${prefix}docs/plan.md is not a valid branch name; the gate is not enforced; fix the plan` };
   const names = [...new Set(approved.map((c) => c.plan).filter(Boolean))];
   if (names.length > 1) return { names, error: `the committed plans on ${approved.filter((c) => c.plan).map((c) => c.name).join(', ')} disagree on the integration branch (${names.join(', ')}); make ${prefix}docs/plan.md agree` };
   const name = names[0] ?? approved[0].name;
@@ -606,6 +637,12 @@ function integrationRefs(root, integ) {
 
 // storyReadableUpstream(root, branch): the configured upstream of `branch`, when integrationRefs
 // leaves it untrusted because it also reads as a story branch; else null. For --check to report.
+// noTracking(root, branch): the integration branch has no upstream (branch.<branch>.merge) while
+// remotes exist, so a pull's trust rests on GIT_REFLOG_ACTION, which a tool may preset.
+export function noTracking(root, branch) {
+  return remotes(root).length > 0 && !chomp(git(root, ['config', '--get', `branch.${branch}.merge`]) || '');
+}
+
 export function storyReadableUpstream(root, branch) {
   if (chomp(git(root, ['config', '--get', `branch.${branch}.merge`]) || '') !== `refs/heads/${branch}`) return null;
   const upstream = chomp(git(root, ['for-each-ref', '--format=%(upstream)', `refs/heads/${branch}`]) || '');
@@ -1583,19 +1620,57 @@ const recordFile = (f, info) => (info?.projects?.length ? info.projects : [{ pre
 // as [sha] or []. Trusted only: from the one designated remote (branch.<branch>.remote when set,
 // else checkout.defaultRemote, else origin, else the only remote), never a fork, its line naming
 // `branch '<branch>' of <url>` for that remote's url (fetchUrl); equal to that remote's
-// refs/remotes/<remote>/<branch> when that ref exists; and only while the update is the pull's own:
-// GIT_REFLOG_ACTION starts with `pull`, and next holds the fetched head. A FETCH_HEAD left by an
+// refs/remotes/<remote>/<branch> when that ref exists and the remote's refspec maps it; and only
+// while the update is the pull's own:
+// next holds the fetched head, and the update is the pull's own (pullOwn). A FETCH_HEAD left by an
 // earlier fetch never trusts a later, unrelated update.
 function fetchedIntegration(root, branch, next) {
-  if (!/^pull\b/.test(process.env.GIT_REFLOG_ACTION ?? '')) return [];
+  const heads = (fetchHeads(root)?.heads ?? []).filter((h) => h.name === branch && h.url);
+  if (!heads.length) return [];
   const remote = designatedRemote(root, branch);
   if (!remote) return [];
   const url = fetchUrl(chomp(git(root, ['ls-remote', '--get-url', remote]) || ''));
-  const tracking = resolve(root, `refs/remotes/${remote}/${branch}`);
-  return (fetchHeads(root)?.heads ?? [])
-    .filter((h) => h.name === branch && h.url && url && fetchUrl(h.url) === url)
+  // The tracking ref limits staleness only when the remote's fetch refspec maps this branch to it;
+  // with a narrowed refspec it is not updated, and is not compared.
+  const tracking = mapsBranch(root, remote, branch) ? resolve(root, `refs/remotes/${remote}/${branch}`) : '';
+  return heads
+    .filter((h) => url && fetchUrl(h.url) === url)
     .map((h) => resolve(root, h.sha))
-    .filter((sha) => sha && (!tracking || sha === tracking) && contains(root, sha, next));
+    .filter((sha) => sha && (!tracking || sha === tracking) && contains(root, sha, next) && pullOwn(root, sha, branch, next));
+}
+
+// pullOwn(root, sha, branch, next): the update is the pull that fetched sha, bound to the operation:
+// GIT_REFLOG_ACTION starts with `pull` (git sets it for the pull's own merge or rebase); or a merge
+// the pull stopped on a conflict is being concluded (`git commit`), MERGE_HEAD being exactly sha and
+// next having it as a parent; or a rebase the pull stopped is being continued, the rebase state's
+// onto being sha and its head-name this branch. A FETCH_HEAD left by an earlier fetch matches none.
+function pullOwn(root, sha, branch, next) {
+  if (/^pull\b/.test(process.env.GIT_REFLOG_ACTION ?? '')) return true;
+  const heads = mergeHeads(root) ?? [];
+  if (heads.length === 1 && heads[0] === sha) {
+    const parents = chomp(git(root, ['rev-list', '--parents', '-n', '1', next]) || '').split(' ').slice(1);
+    if (parents.includes(sha)) return true;
+  }
+  const read = (rel) => {
+    const where = chomp(git(root, ['rev-parse', '--git-path', rel]) || '');
+    try { return where ? chomp(fs.readFileSync(path.resolve(root, where), 'utf8')) : ''; } catch { return ''; }
+  };
+  for (const dir of ['rebase-merge', 'rebase-apply']) {
+    if (read(`${dir}/onto`) === sha && read(`${dir}/head-name`) === `refs/heads/${branch}`) return true;
+  }
+  return false;
+}
+
+// mapsBranch(root, remote, branch): one of remote.<remote>.fetch maps refs/heads/<branch> to
+// refs/remotes/<remote>/<branch> (exactly, or through the usual `refs/heads/*` glob).
+function mapsBranch(root, remote, branch) {
+  const specs = (git(root, ['config', '--get-all', `remote.${remote}.fetch`]) || '').split(/\r?\n/).filter(Boolean);
+  return specs.some((spec) => {
+    const [src, dst] = spec.replace(/^\+/, '').split(':');
+    if (!src || !dst) return false;
+    if (src === `refs/heads/${branch}`) return dst === `refs/remotes/${remote}/${branch}`;
+    return src === 'refs/heads/*' && dst === `refs/remotes/${remote}/*`;
+  });
 }
 
 // designatedRemote(root, branch): the one remote the integration branch is pulled from:
@@ -1619,8 +1694,9 @@ function designatedRemote(root, branch) {
 export function fetchUrl(url) {
   let u = String(url ?? '').trim();
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) u = u.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, '$1');
-  // A `/` before the first `:` makes it a local path, not scp-style (git's url_is_local_not_ssh).
-  else if (u.includes('@') && u.includes(':') && !u.slice(0, u.indexOf(':')).includes('/') && u.indexOf(':', u.indexOf('@')) !== -1) u = u.slice(u.indexOf('@') + 1);
+  // A `/` before the first `:`, or a Windows drive (`C:\` or `C:/`), makes it a local path, not
+  // scp-style (git's url_is_local_not_ssh).
+  else if (u.includes('@') && u.includes(':') && !/^[A-Za-z]:[\\/]/.test(u) && !u.slice(0, u.indexOf(':')).includes('/') && u.indexOf(':', u.indexOf('@')) !== -1) u = u.slice(u.indexOf('@') + 1);
   return u.replace(/\/+$/, '').replace(/\.git$/, '');
 }
 // Diffs this gate compares are made the same way whatever the user's config says.
