@@ -268,8 +268,11 @@ const WRAPPERS = {
 };
 const GIT_OPTS_WITH_VALUE = new Set(['-c', '--namespace', '--exec-path', '--config-env', '--super-prefix', '--attr-source']);
 const GIT_REPO_OPTS = new Set(['--git-dir', '--work-tree']);
-const MERGE_OPTS_WITH_VALUE = new Set(['-m', '--message', '-F', '--file', '-s', '-X', '--strategy', '--strategy-option', '--into-name']);
-const PULL_OPTS_WITH_VALUE = new Set(['-s', '-X', '--strategy', '--strategy-option', '--depth', '--deepen', '--shallow-since', '--shallow-exclude', '-j', '--jobs', '--upload-pack', '-o', '--server-option', '--negotiation-tip']);
+// The long options that take a required value as the next word, from `git <cmd> -h` (an optional
+// `[=<value>]` one, such as pull's --jobs, --log, --rebase, --gpg-sign, takes it attached only, and
+// is not listed). Short letters are in SHORT.
+const MERGE_OPTS_WITH_VALUE = new Set(['--message', '--file', '--strategy', '--strategy-option', '--into-name', '--cleanup']);
+const PULL_OPTS_WITH_VALUE = new Set(['--strategy', '--strategy-option', '--cleanup', '--depth', '--deepen', '--shallow-since', '--shallow-exclude', '--upload-pack', '--server-option', '--negotiation-tip', '--refmap']);
 const MERGE_CONTROL = new Set(['--abort', '--continue', '--quit', '--skip']);
 // SHORT: the short options of each subcommand the hook parses that take a value, from `git <cmd>
 // -h`: required (the rest of the cluster, else the next word) and optional (attached only, as
@@ -278,8 +281,10 @@ const SHORT = {
   merge: { required: 'mFsX', optional: 'S' },
   pull: { required: 'sXo', optional: 'Srj' },
   commit: { required: 'FmcCtU', optional: 'Su' },
-  checkout: { required: 'bBU', optional: 't' },
-  switch: { required: 'cCU', optional: 't' },
+  checkout: { required: 'bBU', optional: 't', create: 'bB' },
+  switch: { required: 'cCU', optional: 't', create: 'cC' },
+  // fetch's --jobs (and -j) takes a required value, unlike pull's.
+  fetch: { required: 'jo', optional: '' },
 };
 
 // shortCluster(sub, word): a cluster of short options (`-qm`, `-qmmsg`, `-nm`) read letter by
@@ -301,7 +306,7 @@ function shortCluster(sub, word) {
   }
   return { flags, letter: null, value: null, next: false };
 }
-const COMMIT_OPTS_WITH_VALUE = new Set(['-m', '-F', '-C', '-c', '-t', '--message', '--file', '--author', '--date', '--template', '--reuse-message', '--reedit-message', '--fixup', '--squash', '--cleanup']);
+const COMMIT_OPTS_WITH_VALUE = new Set(['--message', '--file', '--author', '--date', '--template', '--reuse-message', '--reedit-message', '--fixup', '--squash', '--cleanup', '--trailer', '--pathspec-from-file', '--unified', '--inter-hunk-context']);
 
 const isGit = (w) => /^git(\.exe)?$/i.test(w.split(/[\\/]/).at(-1));
 const expandHome = (t) => (t === '~' || t.startsWith('~/') ? path.join(os.homedir(), t.slice(1)) : t);
@@ -454,12 +459,13 @@ function operands(sub, args) {
   const withValue = sub === 'merge' ? MERGE_OPTS_WITH_VALUE : PULL_OPTS_WITH_VALUE;
   const positional = [];
   let options = true;
+  let cluster;
   for (let i = 0; i < args.length; i++) {
     const w = args[i];
     if (options && w.text === '--') options = false;
     else if (options && MERGE_CONTROL.has(w.text)) return { ops: [], bare: false };
     else if (options && w.text.startsWith('--') && withValue.has(w.text)) i++;
-    else if (options && shortCluster(sub, w.text)) { if (shortCluster(sub, w.text).next) i++; }
+    else if (options && (cluster = shortCluster(sub, w.text))) { if (cluster.next) i++; }
     // `-` and `@{-N}` name the previously checked-out branch, which the shell state decides.
     else if (w.text === '-' || /@\{-\d+\}/.test(w.text)) positional.push({ ...w, dynamic: true });
     else if (!options || !w.text.startsWith('-')) positional.push(w);
@@ -467,6 +473,20 @@ function operands(sub, args) {
   // A pull's first operand is the remote; each further one is a refspec whose source merges.
   const ops = sub === 'pull' ? positional.slice(1).map((w) => ({ ...w, text: w.text.replace(/^\+/, '').split(':')[0] })) : positional;
   return { ops, bare: !ops.length };
+}
+
+// pullRemote(call): the remote a pull names (its first operand), or null for a bare pull.
+function pullRemote(call) {
+  const positional = [];
+  let cluster;
+  for (let i = 0; i < call.args.length; i++) {
+    const w = call.args[i].text;
+    if (w === '--') { positional.push(...call.args.slice(i + 1).map((a) => a.text)); break; }
+    if (w.startsWith('--') && PULL_OPTS_WITH_VALUE.has(w)) i++;
+    else if (!w.startsWith('--') && (cluster = shortCluster('pull', w))) { if (cluster.next) i++; }
+    else if (!w.startsWith('-')) positional.push(w);
+  }
+  return positional[0] && positional[0] !== '.' ? positional[0] : null;
 }
 
 // upstreamOf(root, branch): the configured upstream a bare merge or pull on branch merges, as
@@ -497,11 +517,21 @@ function checkoutOf(sub, args) {
     // `git checkout main --` with nothing after the -- still switches branches.
     if (w === '--') { out.paths = i + 1 < args.length; break; }
     const cl = w.startsWith('--') ? null : shortCluster(sub, w);
-    const creates = w === '--orphan' || (cl && ['b', 'c', 'B', 'C'].includes(cl.letter) && (sub === 'switch' ? 'cC' : 'bB').includes(cl.letter));
+    const longCreate = { '--orphan': true, '--create': sub === 'switch', '--force-create': sub === 'switch' }[w] ?? false;
+    const creates = longCreate || Boolean(cl?.letter && SHORT[sub].create.includes(cl.letter));
+    // -d (alone, or in a cluster such as -qd) and --detach detach HEAD, for checkout and switch.
+    if (cl?.flags.includes('d') || w === '--detach') out.detach = true;
     if (creates) {
-      if (cl?.value) { out.create = cl.value; createDynamic = Boolean(args[i].dynamic); } else { out.create = args[i + 1]?.text ?? null; createDynamic = Boolean(args[i + 1]?.dynamic); i++; }
-      if (w === '--orphan' || cl.letter === 'B' || cl.letter === 'C') out.force = true;
-    } else if (cl?.next) i++; else if (w === '--detach' || (sub === 'switch' && w === '-d')) out.detach = true;
+      if (cl?.value) {
+        out.create = cl.value;
+        createDynamic = Boolean(args[i].dynamic);
+      } else {
+        out.create = args[i + 1]?.text ?? null;
+        createDynamic = Boolean(args[i + 1]?.dynamic);
+        i++;
+      }
+      if (w === '--orphan' || w === '--force-create' || cl?.letter === 'B' || cl?.letter === 'C') out.force = true;
+    } else if (cl?.next) i++;
     else if (w === '-') out.prev = true;
     else if (!w.startsWith('-') && out.name === null) { out.name = w; nameDynamic = args[i].dynamic; }
   }
@@ -1010,19 +1040,26 @@ function storyLike(root, op, tips, base) {
   return !base().some((r) => contains(root, o.commit, r));
 }
 
-// storyLikeOp(root, ops, { prior, priorWrite, tips }): for a merge the gate judges without a usable
-// project (outside every project, or with the plan in error): refuses with SEPARATE when an earlier
-// call in the command can have moved the refs it reads (a base branch by name is exempt only when
-// no earlier call can have written refs), then returns the first operand that could be a story
-// (storyLike), or null.
-function storyLikeOp(root, ops, { prior, priorWrite, tips }) {
+// storyLikeOp(root, ops, { prior, priorWrite, tips, separateOnlyForStories, remote }): for a merge
+// the gate judges without a usable project (outside every project, or with the plan in error):
+// returns the first operand that could be a story (storyLike), or null. When an earlier call in the
+// command can have moved the refs it reads, it refuses with SEPARATE: outside a project for any
+// operand but a base branch by name (exempt only when no earlier call can have written refs);
+// with the plan in error (separateOnlyForStories) only for an operand that could be a story or
+// does not resolve yet (an earlier call may create it), as with a valid plan. A pull's operands
+// (remote) are read as that remote's refs, refs/remotes/<remote>/<src>.
+function storyLikeOp(root, ops, { prior, priorWrite, tips, separateOnlyForStories = false, remote = null }) {
   let base;
   const baseOnce = () => (base ??= baseRefs(root));
+  const read = remote ? ops.map((o) => ({ ...o, text: o.text.startsWith('refs/') ? o.text : `refs/remotes/${remote}/${o.text}` })) : ops;
+  const story = read.find((o) => storyLike(root, o, tips, baseOnce)) ?? null;
   if (prior) {
-    const other = ops.find((o) => priorWrite || !baseByName(root, o.text, baseOnce));
+    const other = separateOnlyForStories
+      ? story ?? read.find((o) => !o.dynamic && !resolve(root, o.text))
+      : read.find((o) => priorWrite || !baseByName(root, o.text, baseOnce));
     if (other) block(other.text || '(computed)', SEPARATE);
   }
-  return ops.find((o) => storyLike(root, o, tips, baseOnce)) ?? null;
+  return story;
 }
 
 // baseByName(root, text, refs): the operand names a trusted base branch: main or its kin, locally,
@@ -1036,16 +1073,18 @@ function baseByName(root, text, refs) {
 // or a fetch with no destination refspec (`<src>:<dst>`), which updates only remote-tracking refs.
 // A plain checkout or switch is judged by checkoutOf.
 const READ_ONLY = new Set(['status', 'log', 'diff', 'show', 'rev-parse']);
-const FETCH_OPTS_WITH_VALUE = new Set([...PULL_OPTS_WITH_VALUE, '--refmap', '--recurse-submodules-default']);
+const FETCH_OPTS_WITH_VALUE = new Set([...PULL_OPTS_WITH_VALUE, '--jobs', '--filter', '--recurse-submodules-default']);
 function readsOnly(sub, args) {
   if (READ_ONLY.has(sub)) return true;
   if (sub !== 'fetch') return false;
   const positional = [];
+  let cluster;
   for (let i = 0; i < args.length; i++) {
     const w = args[i];
     if (w.dynamic) return false;
     if (w.text === '--') { positional.push(...args.slice(i + 1)); break; }
-    if (FETCH_OPTS_WITH_VALUE.has(w.text)) i++;
+    if (w.text.startsWith('--') && FETCH_OPTS_WITH_VALUE.has(w.text)) i++;
+    else if (!w.text.startsWith('--') && (cluster = shortCluster('fetch', w.text))) { if (cluster.next) i++; }
     else if (!w.text.startsWith('-')) positional.push(w);
   }
   // The first operand is the remote, which may be a URL; each further one is a refspec.
@@ -1206,7 +1245,8 @@ function judgeCommand(calls, sessionDir) {
     // story is still recognised by its SHA or any alias, as outside a project (storyLikeOp, with
     // the same SEPARATE rule), and refused with that error; a merge that brings in no story goes on.
     if (integ.error) {
-      const op = storyLikeOp(root, ops, { prior, priorWrite, tips: pmTips(root) });
+      const remote = sub === 'pull' ? pullRemote(call) : null;
+      const op = storyLikeOp(root, ops, { prior, priorWrite, tips: pmTips(root), separateOnlyForStories: true, remote });
       if (op) {
         if (call.noVerify) block(op.text, NO_VERIFY);
         block(op.text || '(computed)', integ.error);

@@ -60,7 +60,6 @@ const branchNames = new Map();
 export function branchNameOk(cwd, name, { timeout = 5000 } = {}) {
   if (typeof name !== 'string' || !name) return false;
   if (!branchNames.has(name)) {
-    let ok;
     // Only git's own answers are cached; a fallback (git missing or timed out) is asked again.
     try {
       const ok = execFileSync('git', ['-C', cwd, 'check-ref-format', '--branch', name], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout }).replace(/\r?\n$/, '') === name;
