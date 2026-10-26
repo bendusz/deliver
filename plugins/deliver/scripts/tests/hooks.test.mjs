@@ -332,6 +332,28 @@ test('session: a FIFO where a story or handoff should be is skipped, never read'
   assert.match(r.stdout, /^unreadable stories: S1-2 \(counted as unmerged\)$/m);
 });
 
+test('session: removes the git merge-gate files 0.29.1 left, and only those', () => {
+  const s = newProj(true);
+  const hooks = path.join(s, '.git', 'hooks');
+  const copies = path.join(s, '.git', 'deliver');
+  fs.mkdirSync(hooks, { recursive: true });
+  fs.mkdirSync(copies, { recursive: true });
+  const shim = '#!/bin/sh\n# deliver-merge-gate v2\nexit 0\n';
+  fs.writeFileSync(path.join(hooks, 'reference-transaction'), shim);
+  fs.writeFileSync(path.join(copies, 'reference-transaction'), shim);
+  fs.writeFileSync(path.join(hooks, 'pre-commit'), '#!/bin/sh\n# someone else\nexit 0\n');
+  spawnSync('git', ['config', 'deliver.mergeGate', 'off'], { cwd: s });
+  const r = runHook('session-context.mjs', { cwd: s }, {});
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /removed 2 git merge-gate files left by 0\.29\.1/);
+  assert.equal(fs.existsSync(path.join(hooks, 'reference-transaction')), false);
+  assert.equal(fs.existsSync(copies), false);
+  assert.equal(fs.existsSync(path.join(hooks, 'pre-commit')), true);
+  assert.notEqual(spawnSync('git', ['config', 'deliver.mergeGate'], { cwd: s }).status, 0);
+  // Nothing left: the next session says nothing about it.
+  assert.doesNotMatch(runHook('session-context.mjs', { cwd: s }, {}).stdout, /merge-gate/);
+});
+
 test('require-signoff: a missing lib.mjs still fails open (exit 0)', () => {
   const p = newProj(false);
   const dir = tmpDir('nolib-');

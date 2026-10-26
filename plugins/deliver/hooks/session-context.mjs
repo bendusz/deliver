@@ -5,15 +5,12 @@
 // new session. Renders lib.mjs's inspectState(): the approval status, the derived phase
 // and the reference to load, the checked-out story and its Execution block, other claimed
 // stories, deliver's and host-owned worktrees, the uncommitted path count, handoff
-// freshness, and the wiki line. In a deliver project (docs/approval.json) it also installs, or
-// refreshes, deliver's git-level merge gate through git-hook-install.mjs, unless
-// `git config deliver.mergeGate off` (set by --uninstall) disables it, and reports only what it
-// could not install or check: a foreign hook, a hooks directory it may not write, a deliver shim it
-// could not remove, the gate disabled, git older than 2.28, or git older than 2.38 (no merged-tree
-// check).
+// freshness, and the wiki line.
 // SILENT (exit 0, no output) outside a managed project. Fail-open throughout: any git or
 // file failure drops that one line, never the session.
 import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 // DELIVER_NO_ENFORCE is the documented kill switch.
 if (process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
@@ -21,7 +18,7 @@ if (process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
 // A damaged or missing lib.mjs must not block the session: fail open (silent).
 let lib;
 try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
-const { readHookInput, pmRoot, inspectState, APPROVAL_REL, oneLine } = lib;
+const { readHookInput, pmRoot, inspectState, APPROVAL_REL } = lib;
 
 const input = readHookInput();
 const cwd = pmRoot(typeof input?.cwd === 'string' && input.cwd ? input.cwd : process.cwd());
@@ -29,24 +26,16 @@ const out = [];
 const say = (line) => out.push(line);
 // Story and marker fields are repository content another actor wrote: strip control
 // characters (including newlines) and cap length before this text becomes session context.
-const sanitize = (s) => oneLine(s).slice(0, 200);
+const sanitize = (s) => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ').slice(0, 200);
 const v = (x, d) => (x === undefined || x === null || x === '' ? d : sanitize(x));
 const RESUME = 'To continue: run /deliver:resume.';
+
+try { removeGitGate(cwd); } catch { /* cleanup is best effort */ }
 
 let st = null;
 try { st = inspectState(cwd); } catch { st = null; }
 if (!st) finish();
 try { render(st); } catch { /* a malformed field must never take the session down */ }
-if (!st.legacy) {
-  // The git-level ship gate. Any failure drops it silently, like every line here.
-  try {
-    const { installGitHook } = await import('./git-hook-install.mjs');
-    // The brief notes point to the installer for any chaining command instead of carrying it, and
-    // are never cut, so no command they name is shown broken.
-    const r = installGitHook(cwd);
-    for (const note of r.brief ?? r.notes) out.splice(Math.max(0, out.length - 1), 0, oneLine(note));
-  } catch { /* fail open */ }
-}
 finish();
 
 function render(st) {
@@ -91,6 +80,31 @@ if (st.wiki_entries !== null) say(`wiki: docs/wiki/index.md (${st.wiki_entries} 
 if (st.sprints_without_retro.length) say(`retro: sprint ${st.sprints_without_retro.join(', ')} complete with no docs/retros record; run /deliver:retro before the next claim.`);
 if (st.unreadable.length) say(`unreadable stories: ${st.unreadable.join(', ')} (counted as unmerged)`);
 say(RESUME);
+}
+
+// removeGitGate(dir): 0.29.1 installed a git-level merge gate (hook shims marked
+// "# deliver-merge-gate" plus copies under the git directory's deliver/). 0.29.2 removed it, and
+// a left-over shim would call a gate file that no longer exists. Delete only files deliver wrote
+// (the marker on line 2), never anyone else's hook, and say so once.
+function removeGitGate(dir) {
+  const gp = (rel) => {
+    const r = spawnSync('git', ['rev-parse', '--git-path', rel], { cwd: dir, encoding: 'utf8', windowsHide: true, timeout: 5000 });
+    return r.status === 0 && r.stdout.trim() ? path.resolve(dir, r.stdout.trim()) : null;
+  };
+  const hooks = gp('hooks');
+  const copies = gp('deliver');
+  let removed = 0;
+  for (const name of ['reference-transaction', 'pre-merge-commit', 'pre-commit']) {
+    for (const f of [hooks && path.join(hooks, name), copies && path.join(copies, name)]) {
+      if (!f) continue;
+      let text;
+      try { if (!fs.lstatSync(f).isFile()) continue; text = fs.readFileSync(f, 'utf8'); } catch { continue; }
+      if (/^# deliver-merge-gate v\d+$/m.test(text.split('\n').slice(0, 3).join('\n'))) { fs.rmSync(f); removed++; }
+    }
+  }
+  if (copies) try { fs.rmdirSync(copies); } catch { /* not empty or absent: leave it */ }
+  spawnSync('git', ['config', '--unset', 'deliver.mergeGate'], { cwd: dir, windowsHide: true, timeout: 5000 });
+  if (removed) say(`deliver: removed ${removed} git merge-gate ${removed === 1 ? 'file' : 'files'} left by 0.29.1; the ship gate runs in Claude's Bash hook only.`);
 }
 
 function finish() {

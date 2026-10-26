@@ -3,7 +3,7 @@ description: Check environment readiness before implementation, covering tooling
 ---
 
 Use the `project-manager` skill to run a pre-implementation environment readiness check. Inspect and
-probe only; the readiness report is the only file you may write, apart from the merge gate install below.
+probe only; the readiness report is the only file you may write.
 
 Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo)
 
@@ -44,37 +44,10 @@ Inspect (whichever apply):
     `git rev-parse --path-format=absolute --git-dir --git-common-dir` (git 2.31 or newer) are
     equal from anywhere in the root checkout and differ in a linked worktree. Without
     `--path-format`, the plain output differs in a subdirectory too.
-- **Git-level merge gate.** In a deliver project, run
-  `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --check <project-root>`. It exits 0
-  (`OK`) only when the `reference-transaction` shim in `git rev-parse --git-path hooks` (on git
-  older than 2.28, `pre-merge-commit` and `pre-commit`) carries `# deliver-merge-gate v2` on line
-  2, is executable, points to a `git-merge-gate.mjs` that exists, runs a node that starts, and
-  names the current integration branches. It prints the git version against 2.28, and below git
-  2.38 the line "merged-tree check needs git 2.38; merges are not compared with the verified
-  automatic merge" (the verdicts are still checked; below 2.28 the fallback also misses
-  fast-forwards, squash merges, and cherry-picks, and compares a merge's staged result only where
-  git needs no content merge). A foreign hook that already runs deliver's lines shows as
-  `chained`, which is in place, in any hooks directory; `chained-inactive` (not executable; run
-  the printed `chmod +x`), `chained-crlf` (CRLF line endings; convert the hook to LF),
-  `chained-stale` (lines from an earlier version; replace them as printed), and `copy-missing`
-  or `copy-stale` (run the installer without `--check`) are not. For a hook whose interpreter is
-  not sh, it prints an sh wrapper to install instead. It reports mode `none` on git 2.28 or newer
-  when the plan's integration branch is a `pm/*` name (no hook is written; fix the plan); an
-  invalid branch name, or a branch that does not exist, is reported, and `--check` exits 1. It
-  also reports an integration branch with no upstream ("set one with git branch
-  --set-upstream-to"). It
-  reports `merge gate: disabled` and exits 1 when `git config deliver.mergeGate` is `off`, which
-  `--uninstall` sets; ask before re-enabling, since the user turned it off. It also reports a
-  deliver shim it cannot remove, such as a v1 shim in an in-tree `core.hooksPath`. On any other
-  failure, run the same command without `--check`, which installs or repairs it (and clears
-  `deliver.mergeGate off`), and report what it could not fix: a hook it will not overwrite, or a
-  hooks directory in the working tree, behind a symlink outside the git directory, or from global
-  `core.hooksPath`, each with the lines to add right after that hook's `#!` line. `--uninstall`
-  removes it and keeps it off; `--check` and `--uninstall` together are refused.
 - **State health.** When `docs/approval.json` or a legacy `pm/` exists, run the checks in
   `references/state-health.md` and report `OK` or `DRIFT` for each.
 
-Do **not** install or upgrade anything, except deliver's own git-level merge gate as above. Delegate heavy reading to a read-only subagent if that
+Do **not** install or upgrade anything. Delegate heavy reading to a read-only subagent if that
 helps.
 
 Write the findings to `tmp/environment-check.md` (runtime-only): each check as `OK`, `MISSING`, or
