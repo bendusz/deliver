@@ -1300,7 +1300,8 @@ test('git gate: with a narrowed fetch refspec, a pull of the integration branch 
 });
 
 test('git gate: a pull with no tracking config that stops on a record conflict, concluded by commit or rebase --continue, is allowed', () => {
-  for (const [mode, backend] of [['--no-rebase'], ['--rebase', 'merge'], ['--rebase', 'apply']]) {
+  // [mode, rebase backend, the side the story record is resolved to]
+  for (const [mode, backend, side] of [['--no-rebase', null, '--theirs'], ['--no-rebase', null, '--ours'], ['--rebase', 'merge', '--theirs'], ['--rebase', 'merge', '--ours'], ['--rebase', 'apply', '--theirs']]) {
     const o = verified();
     const c = clonedProject(o);
     gitIn(c, ['config', '--unset', 'branch.main.remote']);
@@ -1313,11 +1314,12 @@ test('git gate: a pull with no tracking config that stops on a record conflict, 
     const r = gitRun(c, ['pull', mode, '--no-edit', 'origin', 'main']);
     assert.notEqual(r.status, 0, `${mode}: the record conflict stops the pull: ${r.stdout}${r.stderr}`);
     assert.doesNotMatch(r.stderr, /deliver blocked/);
-    // Keep the local record: in a rebase that is the side being replayed (--theirs), in a merge too.
-    gitIn(c, ['checkout', '--theirs', STORY]);
+    // In a merge, --theirs is upstream's record and --ours the local one; in a rebase, --theirs is
+    // the local commit being replayed and --ours upstream's. Either resolution changes no code.
+    gitIn(c, ['checkout', side, STORY]);
     gitIn(c, ['add', STORY]);
     const done = mode === '--rebase' ? gitRun(c, ['rebase', '--continue']) : gitRun(c, ['commit', '--no-edit']);
-    assert.doesNotMatch(done.stderr, /deliver blocked/, `${mode} ${backend ?? ''}`);
+    assert.doesNotMatch(done.stderr, /deliver blocked/, `${mode} ${backend ?? ''} ${side}`);
     assert.equal(done.status, 0, `${mode}: ${done.stdout}${done.stderr}`);
   }
 });
@@ -1426,6 +1428,73 @@ test('git gate: mapsBranch honours a negative refspec: the excluded branch is no
   commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
   const r = gitRun(c, ['pull', '--rebase=merges', 'origin', 'main']);
   assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: branchNameOk falls back to the JS rule when git times out, and refuses HEAD even if git accepts it', { skip: WIN && 'POSIX git stub' }, async () => {
+  const lib = await import(path.join(HOOKS_DIR, 'lib.mjs'));
+  const bin = tmpDir('pmslowgit-');
+  fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nsleep 3\necho "$4"\n', { mode: 0o755 });
+  const saved = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${saved}`;
+  try {
+    assert.equal(lib.branchNameOk(tmpDir('pmrepo-'), 'slow-but-valid', { timeout: 200 }), true, 'a timeout falls back to validBranchName');
+    assert.equal(lib.branchNameOk(tmpDir('pmrepo-'), 'slow~invalid', { timeout: 200 }), false);
+  } finally {
+    process.env.PATH = saved;
+  }
+  // An older git that accepts HEAD: a stub that prints the name back.
+  fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\necho "$5"\n', { mode: 0o755 });
+  process.env.PATH = `${bin}${path.delimiter}${saved}`;
+  try {
+    assert.equal(lib.branchNameOk(tmpDir('pmrepo-'), 'HEAD'), false);
+  } finally {
+    process.env.PATH = saved;
+  }
+});
+
+test('git gate: plan names keep their parentheses where they belong', () => {
+  assert.equal(planName('- Integration branch: <main>,'), 'main');
+  assert.equal(planName('- Integration branch: (main)'), 'main');
+  assert.equal(planName('- Integration branch: feature(x)'), 'feature(x)');
+  assert.equal(planName('- Integration branch: "main".'), 'main');
+});
+
+test('git gate: the missing-branch check asks for the exact refs, and spares an unborn current branch', () => {
+  // A remote branch whose name only ends in /main is not main.
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `trunk`\n');
+  gitIn(p, ['add', 'docs/plan.md']);
+  gitIn(p, ['commit', '-qm', 'plan: trunk']);
+  gitIn(p, ['remote', 'add', 'origin', 'https://example.invalid/repo.git']);
+  gitIn(p, ['update-ref', 'refs/remotes/origin/team/trunk', 'main']);
+  gitIn(p, ['update-ref', 'refs/remotes/origin/archive/trunk', 'main']);
+  assert.match(installGitHook(p).notes.join('\n'), /integration branch trunk does not exist/);
+  gitIn(p, ['update-ref', 'refs/remotes/origin/trunk', 'main']);
+  assert.doesNotMatch(installGitHook(p).notes.join('\n'), /does not exist/);
+  // An empty repository on its unborn integration branch.
+  const e = tmpDir('pmempty-');
+  gitIn(e, ['init', '-q', '-b', 'main']);
+  fs.mkdirSync(path.join(e, 'docs'), { recursive: true });
+  fs.writeFileSync(path.join(e, 'docs', 'approval.json'), '{"status":"approved"}\n');
+  assert.doesNotMatch(installGitHook(e).notes.join('\n'), /does not exist/);
+});
+
+test('git gate: with an invalid plan, the Bash hook still finds a story merged by SHA, and lets a non-story merge through', () => {
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `main~1`\n');
+  gitIn(p, ['add', 'docs/plan.md']);
+  gitIn(p, ['commit', '-qm', 'plan: invalid'], { DELIVER_NO_ENFORCE: '1' });
+  const tip = head(p, BRANCH);
+  const byName = bash(p, `git merge --no-ff ${BRANCH} -m m`);
+  assert.equal(byName.status, 2, byName.stderr);
+  const bySha = bash(p, `git merge --no-ff ${tip} -m m`);
+  assert.equal(bySha.status, 2, bySha.stderr);
+  assert.match(bySha.stderr, /is not a valid branch name; story merges are refused until the plan names a valid branch/);
+  gitIn(p, ['checkout', '-qb', 'feature', 'main']);
+  commitFile(p, 'src/feature.js', 'f\n', 'feature');
+  gitIn(p, ['checkout', '-q', 'main']);
+  const plain = bash(p, 'git merge --no-ff feature -m m');
+  assert.equal(plain.status, 0, plain.stderr);
 });
 
 // --- what must keep working ---

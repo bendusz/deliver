@@ -115,10 +115,7 @@ function worktreeTop() {
 // raw text, or GIT_REFLOG_ACTION or MERGE_MSG names FETCH_HEAD. Only then does an unreadable
 // FETCH_HEAD line refuse the merge, since that line could be the story.
 function fetchedMerge(top, merged) {
-  const read = (name) => {
-    const where = lib.chomp(lib.git(top, ['rev-parse', '--git-path', name]) || '');
-    try { return where ? fs.readFileSync(path.resolve(top, where), 'utf8') : ''; } catch { return ''; }
-  };
+  const read = (name) => lib.readGitPath(top, name) ?? '';
   const raw = read('FETCH_HEAD');
   if ([...merged].some((sha) => raw.includes(sha))) return true;
   return /FETCH_HEAD/.test(process.env.GIT_REFLOG_ACTION ?? '') || /FETCH_HEAD/.test(read('MERGE_MSG'));
@@ -134,8 +131,8 @@ function recovery({ inMerge: merging, top: root, next }) {
   if (merging) return 'Run git merge --abort, fix the cause, and merge again.';
   if (!root) return 'Fix the cause and retry.';
   const exists = (name) => {
-    const where = lib.chomp(lib.git(root, ['rev-parse', '--git-path', name]) || '');
-    return Boolean(where) && fs.existsSync(path.resolve(root, where));
+    const where = lib.gitPathOf(root, name);
+    return Boolean(where) && fs.existsSync(where);
   };
   if (exists('rebase-merge') || exists('rebase-apply')) return 'Run git rebase --abort, fix the cause, and rebase again.';
   if (exists('CHERRY_PICK_HEAD')) return 'Run git cherry-pick --abort, fix the cause, and retry.';

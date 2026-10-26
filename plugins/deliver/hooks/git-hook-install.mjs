@@ -43,7 +43,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { git, chomp, isMain, oneLine, REFUSED, branchNameOk } from './lib.mjs';
-import { discover, projectAt, project, planEntry, mergeTreeWorks, storyReadableUpstream, noTracking, designatedRemote } from './require-verified.mjs';
+import { discover, projectAt, project, planEntry, mergeTreeWorks, storyReadableUpstream, noTracking, designatedRemote, refFor } from './require-verified.mjs';
 
 export const MARKER = '# deliver-merge-gate v2';
 const OURS = /^# deliver-merge-gate v\d+$/;
@@ -147,11 +147,18 @@ export function integrationBranches(root, top) {
     else if (n.startsWith('pm/')) out.storyNamed.push(n);
     else {
       out.branches.push(n);
-      const found = (git(top, ['for-each-ref', '--format=%(refname)', `refs/heads/${n}`, 'refs/remotes/']) || '').split(/\r?\n/).some((r) => r === `refs/heads/${n}` || r.endsWith(`/${n}`));
-      if (!found) out.missing.push(n);
+      if (!branchExists(top, n)) out.missing.push(n);
     }
   }
   return out;
+}
+
+// branchExists(top, name): the gate's own resolver (require-verified.mjs refFor: refs/heads/<name>,
+// else refs/remotes/origin/<name>) finds it, so installer and gate cannot disagree; or name is the
+// unborn current branch of a repository with no commits yet.
+function branchExists(top, name) {
+  if (refFor(top, name)) return true;
+  return chomp(git(top, ['symbolic-ref', '-q', 'HEAD']) || '') === `refs/heads/${name}` && git(top, ['rev-parse', '--verify', '-q', 'HEAD']) === null;
 }
 
 // shSyntaxOk(text): `sh -n` accepts the script; true when no sh can be run to check it.
@@ -288,7 +295,7 @@ function legacyLines(name, copy, text = '') {
   // as `sh -e "$hook"` cannot be seen from here; the current lines are -e safe either way.
   const t = String(text);
   const errexit = /\s-[A-Za-z]*e[A-Za-z]*\b|-o\s+errexit/;
-  if (name === RT_HOOK && ((t.startsWith('#!') && errexit.test(t.split('\n')[0])) || /^\s*set\b[^\n#]*(\s-[A-Za-z]*e|-o\s+errexit)/m.test(t))) return [];
+  if (name === RT_HOOK && ((t.startsWith('#!') && errexit.test(t.split('\n')[0])) || /^\s*set\b[^\n#;&|]*(\s-[A-Za-z]*e|-o\s+errexit)/m.test(t))) return [];
   const c = shQuote(slash(copy));
   return Object.values(LEGACY).flatMap((form) => {
     const lines = form(name, c);
@@ -566,8 +573,9 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
     const up = storyReadableUpstream(top, b);
     if (up) add(`merge gate: ${b}'s upstream ${up} also reads as a story branch, so it is not trusted as shipped history; give the remote a name that does not overlap another's`);
     if (check && git(top, ['rev-parse', '--verify', '--quiet', `refs/heads/${b}`]) !== null && noTracking(top, b)) {
-      const r = designatedRemote(top, b) ?? 'origin';
-      add(`merge gate: ${b} has no upstream; a fast-forward git pull run by a tool that presets GIT_REFLOG_ACTION is refused as an unrelated update; set one with git branch --set-upstream-to ${shQuote(`${r}/${b}`)} ${shQuote(b)}`);
+      const r = designatedRemote(top, b);
+      const target = r ? shQuote(`${r}/${b}`) : `<remote>/${shQuote(b)}`;
+      add(`merge gate: ${b} has no upstream; a fast-forward git pull run by a tool that presets GIT_REFLOG_ACTION is refused as an unrelated update; set one with git branch --set-upstream-to ${target} ${shQuote(b)}`);
     }
   }
   if (res.mode === 'fallback') add(`merge gate: git < 2.28 (this is ${res.git}): fast-forward updates, squash merges, and cherry-picks are not gated (they make no merge commit), and a merge commit's result is compared with the automatic merge only where git needs no content merge, else only the verdicts are checked; upgrade git`);
