@@ -23,8 +23,9 @@ Resolve a `pm-meta` builder of `auto` now, by `decomposition.md`'s rules for the
 Codex it falls back to `expert-builder`. An explicit `codex-builder` is a readiness blocker and
 never switches workers silently.
 
-**Claim.** Pull or rebase the integration branch. Confirm no `pm/<story-id>-*` branch exists locally
-or on the remote and that the story has no Execution block owned by someone else. Append the
+**Claim.** Pull the integration branch (`git pull --no-rebase` or `--rebase=merges`, never a plain
+`--rebase`, which the ship gate refuses over local story merges). Confirm no `pm/<story-id>-*`
+branch exists locally or on the remote and that the story has no Execution block owned by someone else. Append the
 `## Execution` section per `state.md`, with your `owner`, the resolved `builder`, the branch name,
 `status: claimed`, the story's `tier`, every counter at `0`, and the `deliver` version, and commit
 it on the integration branch as `chore(<story-id>): claim`. Push it only under a standing push
@@ -45,8 +46,11 @@ protected paths and says that any change to them, or to any story file, stops th
 **Holdout checks, at `T2`.** In the same dispatch, give `test-engineer` a new empty directory
 under the OS temp directory, outside every checkout, for holdout checks and their `RUN` file. Store
 them with `node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" store <story-id> <dir>`, which
-commits them to the private ref `refs/deliver/holdout/<story-id>` without checking anything out,
-then delete the directory. Never push that ref. Never name it, the checks, or their directory in a
+commits them to the private ref `refs/deliver/holdout/<project-key>/<story-id>` without checking
+anything out, then delete the directory. `<project-key>` is `_` for a project at the git top level,
+else a slug and short hash of its path below it, so sibling projects never share checks; run
+`holdout.mjs` from the project directory or pass `--root` to it. A project at the top level still
+reads a legacy `refs/deliver/holdout/<story-id>` ref. Never push that ref. Never name it, the checks, or their directory in a
 builder brief, fix brief, or continuation.
 
 Dispatch the persisted `builder` with the inputs its agent file lists, plus the absolute repository
@@ -98,8 +102,10 @@ subagent's word.
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/test-integrity.mjs" <integration> HEAD --protected <paths>
 --protected-base <protected_base>`, adding `--allow <kind>` for each `pm-meta.integrity_allow`
 entry, and `--root <worktree>` in parallel mode. Take `protected`, `protected_base`, and
-`integrity_allow` from the integration branch's copy of the story
-(`git show <integration>:docs/stories/<file>`), never from the story branch. Record its verdict and
+`integrity_allow` from the integration branch's copy of the story, never from the story branch:
+`git show <integration>:./docs/stories/<file>` run from the project directory (the `./` makes the
+path relative to it), or `git show <integration>:<project-prefix>/docs/stories/<file>` from
+anywhere in the repository. Record its verdict and
 the commit it judged as `integrity: "<pass|fail> <sha>"`, the full `git rev-parse HEAD`, or
 `git -C <worktree> rev-parse HEAD` in parallel mode, and commit it. Exit 1 is `fail`: increment
 `integrity_fails` in the same commit. Exit 64 means the command could not judge the diff: fix the
@@ -137,10 +143,13 @@ lenses that ran. At `T2`, set `status: blocked` and escalate.
 With the gates green and no `block` or `major` open, dispatch the read-only `pm-verifier` with the
 inputs its agent file lists and its `Specs`. At `T2`, run the holdout checks yourself on the same
 commit:
-`node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" run <story-id> --target <story checkout root>`
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/holdout.mjs" run <story-id> --target <project directory in the story checkout>`
 materialises them under the OS temp directory, runs them, and deletes the copy. A `fail` makes the
 verdict `FAIL` and increments `holdout_fails`, committed with the verdict. Exit 66 means the ref is
-missing, as in a fresh clone: dispatch `test-engineer` to regenerate the checks into a new temporary
+missing, as in a fresh clone. Exit 64 whose message names `RUN` (blank, or more than one line)
+means the stored checks are unusable, so treat it as 66. Any other exit 64, such as a `--target`
+outside the project, is a mistake in your command: fix the command and re-run, and never
+regenerate for it. For 66, or 64 naming `RUN`, dispatch `test-engineer` to regenerate the checks into a new temporary
 directory, with a brief that says holdout directory only, never touch the repository; store them,
 then verify. Record the verdict and the commit it judged as
 `verifier: "<verdict> <sha>"`, the full `git rev-parse HEAD`, and commit it on the story branch.
@@ -151,7 +160,8 @@ criterion needs the running app or the story needs a durable report.
 
 ### 6. Ship
 Everything the story changed is already on its branch; `git status --porcelain` must be empty.
-Pull or rebase the integration branch, and re-gate on the merged result if its tip moved after your
+Pull the integration branch (`git pull --no-rebase` or `--rebase=merges`, never a plain
+`--rebase`, which the ship gate refuses over local story merges), and re-gate on the merged result if its tip moved after your
 gates ran. Then check it out and `--no-ff` merge the story branch. **Never** push without an
 explicit request. `environment.md` owns the opt-in remote PR path.
 
@@ -162,8 +172,11 @@ after either `<sha>` may only record state in the story file and `docs/handoff/*
 integration tip exactly as git would automatically, which the re-gate covers. Any other change, a
 conflict resolution in code included, needs a fresh verdict. Run the merge as its own Bash command,
 from the project directory or with `git -C <project>`, after at most a plain `git checkout` or
-`git switch` of the integration branch, and name the story branch literally. The merge's own
-directory identifies the project; from a directory that is in no deliver project (for example a
+`git switch` of the integration branch in the same `&&` chain, or a `git status`, `log`, `diff`,
+`show`, or `rev-parse`, and name the story branch literally. A checkout that might not run (inside
+`if` or a loop, after `||`, or behind another command in its chain) leaves the target unknown for
+any merge outside that `&&` chain, and the hook blocks the story merge there. The merge's own
+directory identifies the project (a story several projects claim must be verified in each); from a directory that is in no deliver project (for example a
 monorepo root), a story-like merge blocks, unless the checked-out target is a non-base branch that no project integrates on.
 
 ```
@@ -175,8 +188,15 @@ EOF
 ```
 
 The hook refuses a shell variable or substitution, `-` or `@{-1}`, a `git pull` of a story branch, a
-commit short of the branch tip, and a tag that shadows the branch; the quoted heredoc message is
-fine. The hook catches honest mistakes such as a
+commit short of the branch tip, a tag that shadows the branch, and `--no-verify`; the quoted heredoc
+message is fine. Behind it, a git `reference-transaction` hook that session start installs judges
+every update of the integration branch by the same rules, whatever the shell form: a merge
+commit, a fast-forward, a reset, a rebase, a cherry-pick, or a squash merge, and the merged result
+must be git's automatic merge apart from the story file (git 2.38 or newer). A cherry-pick or squash
+of a story is refused even when verified, and so is an octopus merge: merge each story branch itself
+with `--no-ff`, one at a time. When git refuses a merge, it stays in progress: run
+`git merge --abort`, fix the cause, and merge again; for anything else, run what git's refusal
+message names (`git rebase --abort`, `git cherry-pick --abort`, or `git reset --merge`). The hook catches honest mistakes such as a
 missed or stale verdict, a careless chain, or a wrong tier; it is not a boundary against an agent
 set on evading it, which is the 0.30 sandbox's job. A block means a state was skipped: go back to
 it, and never set `DELIVER_NO_ENFORCE` to get past it.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { newProj, runHook, gitIn, tmpDir } from './helpers.mjs';
+import { newProj, runHook, gitIn, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
 const BRANCH = 'pm/S1-1-fix';
 const STORY = path.join('docs', 'stories', 'S1-1-fix.md');
@@ -642,19 +642,21 @@ test('verified: a backslash-newline continuation joins the lines, so the chained
   assert.equal(g.status, 0, g.stderr);
 });
 
-test('verified: a checkout to a computed branch leaves the target unknown, so a pm merge after it is a ship', () => {
+test('verified: a checkout to a computed branch leaves the target unknown, so a pm merge after it blocks', () => {
   const bad = project();
   record(bad.p, {});
   // HEAD is the story branch; the checkout's target cannot be read.
   for (const co of ['git checkout "$INTEGRATION"', 'git switch $INTEGRATION', 'git checkout no-such-branch']) {
     const r = merge(bad.p, `${co} && git merge --no-ff ${BRANCH}`);
     assert.equal(r.status, 2, co);
-    assert.match(r.stderr, /no verifier verdict/, co);
+    assert.match(r.stderr, /unknown/, co);
   }
+  // Even a verified story blocks: the gate cannot tell whether this merge ships.
   const ok = project();
   record(ok.p, { verifier: `PASS ${ok.code}` });
   const g = merge(ok.p, `git checkout "$INTEGRATION" && git merge --no-ff ${BRANCH}`);
-  assert.equal(g.status, 0, g.stderr);
+  assert.equal(g.status, 2, g.stderr);
+  assert.match(g.stderr, /unknown/);
 });
 
 test('verified: handoff notes committed after the verdict, alone or with the story file, keep it', () => {
@@ -939,7 +941,7 @@ test('verified: a story tip SHA is judged in the merge directory\'s project; fro
   assert.match(hook(un.top, `git -C packages/bar merge --no-ff ${unTip}`).stderr, /no verifier verdict/);
 });
 
-test('verified: a story branch two projects claim blocks from the root, and is judged by -C', () => {
+test('verified: a story branch two projects claim blocks from the root, and from -C unless every claimant verified it', () => {
   const s = siblings({ barStory: STORY, fooClaims: true });
   recordAt(s.bar, STORY, { verifier: `PASS ${s.code}` });
   gitIn(s.top, ['checkout', '-q', 'main']);
@@ -947,12 +949,88 @@ test('verified: a story branch two projects claim blocks from the root, and is j
   assert.equal(r.status, 2, r.stderr);
   assert.match(r.stderr, /run the merge from the project directory, or with git -C <project>/);
   const c = hook(s.top, `git -C packages/bar merge --no-ff ${BRANCH}`);
-  assert.equal(c.status, 0, c.stderr);
+  assert.equal(c.status, 2, c.stderr);
+  assert.match(c.stderr, /packages\/foo.*no verifier verdict.*two projects claim this story; verify it in each or rename the branch/);
+  // Verified in both, in one record commit.
+  const both = siblings({ barStory: STORY, fooClaims: true });
+  for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${both.code}` }));
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'chore(S1-1): record']);
+  gitIn(both.top, ['checkout', '-q', 'main']);
+  for (const dir of ['packages/bar', 'packages/foo']) {
+    const ok = hook(both.top, `git -C ${dir} merge --no-ff ${BRANCH}`);
+    assert.equal(ok.status, 0, `${dir}: ${ok.stderr}`);
+  }
+});
+
+test('directory rule: a story two projects claim is judged in each, by both gates; one owner only when one claims it', async () => {
+  const { judgeMerge, judgeRefUpdate } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+  const s = siblings({ barStory: STORY, fooClaims: true });
+  recordAt(s.bar, STORY, { verifier: `PASS ${s.code}` });
+  const tip = gitIn(s.top, ['rev-parse', 'HEAD']).trim();
+  gitIn(s.top, ['checkout', '-q', 'main']);
+  const main = gitIn(s.top, ['rev-parse', 'main']).trim();
+  const shared = /packages\/foo\/docs\/stories\/S1-1-fix\.md records no verifier verdict.*two projects claim this story; verify it in each or rename the branch/;
+  for (const dir of ['packages/foo', 'packages/bar']) {
+    const r = hook(s.top, `git -C ${dir} merge --no-ff ${BRANCH}`);
+    assert.equal(r.status, 2, `${dir}: ${r.stderr}`);
+    assert.match(r.stderr, shared, dir);
+    const j = judgeMerge(s.top, { target: 'main', commits: [tip], prefixes: [`${dir}/`, 'packages/', ''] });
+    assert.equal(j.allow, false, dir);
+    assert.match(j.reason, shared);
+  }
+  const v = judgeRefUpdate(s.top, { target: 'main', old: main, new: tip });
+  assert.equal(v.allow, false, v.reason);
+  assert.match(v.reason, shared);
+  // Verified in each: both gates allow, and judge both claims.
+  const both = siblings({ barStory: STORY, fooClaims: true });
+  for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${both.code}` }));
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'chore(S1-1): record']);
+  const bothTip = gitIn(both.top, ['rev-parse', 'HEAD']).trim();
+  gitIn(both.top, ['checkout', '-q', 'main']);
+  const ok = judgeRefUpdate(both.top, { target: 'main', old: gitIn(both.top, ['rev-parse', 'main']).trim(), new: bothTip });
+  assert.equal(ok.allow, true, ok.reason);
+  assert.deepEqual(ok.judged.map((j) => j.prefix).sort(), ['packages/bar/', 'packages/foo/']);
+  // One claimant: its project judges it alone.
+  const one = siblings({ barStory: STORY });
+  recordAt(one.bar, STORY, { verifier: `PASS ${one.code}` });
+  gitIn(one.top, ['checkout', '-q', 'main']);
+  assert.equal(hook(one.top, `git -C packages/bar merge --no-ff ${BRANCH}`).status, 0);
+});
+
+test('directory rule: a shared story whose two story files conflicted and were resolved merges; a handoff note in one claimant keeps the other verified', async () => {
+  const { judgeRefUpdate } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+  const both = siblings({ barStory: STORY, fooClaims: true });
+  for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${both.code}` }));
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'chore(S1-1): record']);
+  // A handoff note in packages/bar after the verdict.
+  fs.mkdirSync(path.join(both.bar, 'docs', 'handoff'), { recursive: true });
+  fs.writeFileSync(path.join(both.bar, 'docs', 'handoff', 'casey.md'), 'notes\n');
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'docs: handoff']);
+  gitIn(both.top, ['checkout', '-q', 'main']);
+  for (const dir of ['packages/foo', 'packages/bar']) {
+    const r = hook(both.top, `git -C ${dir} merge --no-ff ${BRANCH}`);
+    assert.equal(r.status, 0, `${dir}: ${r.stderr}`);
+  }
+  // main records something else in both story files, so the merge conflicts in both.
+  for (const dir of [both.bar, both.foo]) fs.writeFileSync(path.join(dir, STORY), storyText({ ...CLAIM, updated: '2026-10-25 08:00' }));
+  gitIn(both.top, ['commit', '-qam', 'chore(S1-1): note']);
+  const main = gitIn(both.top, ['rev-parse', 'main']).trim();
+  gitIn(both.top, ['checkout', '-qb', 'stage', 'main']);
+  assert.notEqual(spawnSync('git', ['-C', both.top, 'merge', BRANCH, '-m', 'm'], { encoding: 'utf8' }).status, 0);
+  for (const dir of ['packages/bar', 'packages/foo']) gitIn(both.top, ['checkout', '--theirs', `${dir}/${STORY}`]);
+  gitIn(both.top, ['add', '-A']);
+  gitIn(both.top, ['commit', '-qm', 'm']);
+  const v = judgeRefUpdate(both.top, { target: 'main', old: main, new: gitIn(both.top, ['rev-parse', 'stage']).trim() });
+  assert.equal(v.allow, true, v.reason);
 });
 
 // --- fix round 3 ---
 
-test('verified: a deliver project at the top level owns a root merge, even when a nested project claims the same branch', () => {
+test('verified: a root merge of a branch the top level and a nested project both claim needs the verdict in each', () => {
   const { p, code } = project();
   const foo = path.join(p, 'packages', 'foo');
   onMain(p, () => {
@@ -966,7 +1044,16 @@ test('verified: a deliver project at the top level owns a root merge, even when 
   record(p, { verifier: `PASS ${code}` });
   toMain(p);
   const r = merge(p);
-  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /packages\/foo\/docs\/stories\/S1-1-fix\.md records no verifier verdict.*two projects claim this story; verify it in each or rename the branch/);
+  // Recording the same verdict in the nested claim too, in a later record commit, ships it.
+  gitIn(p, ['checkout', '-q', BRANCH]);
+  fs.writeFileSync(path.join(foo, STORY), storyText({ ...CLAIM, status: 'in-review', verifier: `PASS ${code}` }));
+  gitIn(p, ['add', path.join('packages', 'foo', STORY)]);
+  gitIn(p, ['commit', '-qm', 'chore(S1-1): record in packages/foo']);
+  toMain(p);
+  const ok = merge(p);
+  assert.equal(ok.status, 0, ok.stderr);
 });
 
 test('verified: a story merge from the repository root of nested projects blocks and names them', () => {
@@ -1305,4 +1392,416 @@ test('directory rule: with no pm/* tips known, a merge after a fetch still reach
     assert.equal(hook(s.top, cmd, g.env).status, 0, cmd);
     assert.equal(/ls-tree -r|ls-files/.test(g.calls()), false, `${cmd}: no discovery`);
   }
+});
+
+// --- shell comments (WP-H fix round 1) ---
+
+test('verified: an unquoted shell comment is skipped, so a commented-out switch cannot hide the merge', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  const r = merge(p, `# Resume later (git switch ${BRANCH})\ngit merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  const trailing = merge(p, `git status # then (git switch ${BRANCH})\ngit merge --no-ff ${BRANCH}`);
+  assert.equal(trailing.status, 2, trailing.stderr);
+});
+
+test('verified: a # inside quotes or inside a word is not a comment', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  assert.equal(merge(p, `git merge -m "fix #1" --no-ff ${BRANCH}`).status, 2);
+  assert.equal(merge(p, `git merge -m 'fix #1' --no-ff ${BRANCH}`).status, 2);
+  assert.equal(merge(p, `echo a#b; git merge --no-ff ${BRANCH}`).status, 2, 'a#b is one word, so the merge still runs');
+});
+
+// --- WP-H fix round 2 ---
+
+test('verified: for git switch, -- ends the options and the next word is still the branch', () => {
+  const { p } = project();
+  record(p, {});
+  // From the story checkout: switch reaches main, so the merge ships the story.
+  const r = merge(p, `git switch -- main && git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+});
+
+test('verified: a merge or pull with no operand judges the target branch\'s configured upstream', () => {
+  const { p, code } = project();
+  record(p, {});
+  toMain(p);
+  gitIn(p, ['branch', '--set-upstream-to', BRANCH, 'main']);
+  for (const command of ['git merge --no-ff', 'git pull --no-rebase', 'git pull']) {
+    const r = merge(p, command);
+    assert.equal(r.status, 2, `${command}: ${r.stderr}`);
+    assert.match(r.stderr, /pm\/S1-1-fix/);
+  }
+  assert.equal(merge(p, 'git merge --abort').status, 0, 'merge-control forms stay exempt');
+  toBranch(p);
+  record(p, { verifier: `PASS ${code}` });
+  toMain(p);
+  for (const command of ['git merge --no-ff', 'git pull --no-rebase']) assert.equal(merge(p, command).status, 0, `${command} once verified`);
+});
+
+test('verified: a bare merge on the integration branch with no upstream asks for the branch by name', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  const r = merge(p, 'git merge --no-ff');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /name the branch to merge explicitly/);
+  assert.equal(merge(p, 'git merge --continue').status, 0);
+});
+
+test('verified: a comment inside a command substitution cannot swallow the merge after it', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  // The ( sits in a comment, so the substitution closes on the next line and the merge runs.
+  const r = merge(p, `echo $(true # (\n); git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  const quoted = merge(p, `echo "$(true # (\n)"; git merge --no-ff ${BRANCH}`);
+  assert.equal(quoted.status, 2, quoted.stderr);
+});
+
+// --- WP-H fix round 3 ---
+
+test('verified: checkout <branch> -- with nothing after the -- is a branch switch', () => {
+  const { p } = project();
+  record(p, {});
+  // HEAD is the story branch; the checkout reaches main, so the merge ships the story.
+  const r = merge(p, `git checkout main -- && git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  // With a path after --, it stays a path checkout and the target stays the story branch.
+  assert.equal(merge(p, `git checkout main -- src/fix.js && git merge --no-ff main`).status, 0);
+});
+
+test('verified: redirections are not operands, so a bare merge into a log still judges the upstream', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  gitIn(p, ['branch', '--set-upstream-to', BRANCH, 'main']);
+  for (const command of ['git merge > /tmp/merge.log', 'git merge --no-ff 2>&1 >/tmp/merge.log', '2>/dev/null git merge']) {
+    const r = merge(p, command);
+    assert.equal(r.status, 2, `${command}: ${r.stderr}`);
+    assert.match(r.stderr, /pm\/S1-1-fix/);
+  }
+  gitIn(p, ['branch', '--unset-upstream', 'main']);
+  const piped = merge(p, `git merge --no-ff ${BRANCH} 2>&1 | tee log`);
+  assert.equal(piped.status, 2, piped.stderr);
+  assert.match(piped.stderr, /no verifier verdict/);
+});
+
+// fetchHead(p, lines): write FETCH_HEAD as git fetch would, one { sha, merge, desc } a line.
+const fetchHead = (p, lines) => {
+  const file = path.resolve(p, gitIn(p, ['rev-parse', '--git-path', 'FETCH_HEAD']).trim());
+  fs.writeFileSync(file, lines.map(({ sha, merge: m = true, desc }) => `${sha}\t${m ? '' : 'not-for-merge'}\t${desc}\n`).join(''));
+};
+
+test('verified: a merge of FETCH_HEAD judges every head marked for merge', () => {
+  const { p, code } = project();
+  record(p, {});
+  toMain(p);
+  const main = gitIn(p, ['rev-parse', 'main']).trim();
+  const tip = gitIn(p, ['rev-parse', BRANCH]).trim();
+  // As left by `git fetch origin main pm/S1-1-fix`: main first, so rev-parse FETCH_HEAD is main.
+  fetchHead(p, [{ sha: main, desc: "branch 'main' of ../origin" }, { sha: tip, desc: `branch '${BRANCH}' of ../origin` }]);
+  const r = merge(p, 'git merge --no-ff FETCH_HEAD');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /pm\/S1-1-fix/);
+  // A head marked not-for-merge is not merged, so it is not judged.
+  fetchHead(p, [{ sha: main, desc: "branch 'main' of ../origin" }, { sha: tip, merge: false, desc: `branch '${BRANCH}' of ../origin` }]);
+  assert.equal(merge(p, 'git merge --no-ff FETCH_HEAD').status, 0);
+  // Once verified, the story head passes.
+  toBranch(p);
+  record(p, { verifier: `PASS ${code}` });
+  toMain(p);
+  fetchHead(p, [{ sha: main, desc: "branch 'main' of ../origin" }, { sha: gitIn(p, ['rev-parse', BRANCH]).trim(), desc: `branch '${BRANCH}' of ../origin` }]);
+  assert.equal(merge(p, 'git merge --no-ff FETCH_HEAD').status, 0, merge(p, 'git merge --no-ff FETCH_HEAD').stderr);
+  // In one command with the fetch, the separate-command rule still applies.
+  assert.match(merge(p, `git fetch origin main ${BRANCH} && git merge --no-ff FETCH_HEAD`).stderr, /separate command|own command/);
+});
+
+test('verified: an unreadable FETCH_HEAD blocks while a story could be in it', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  const file = path.resolve(p, gitIn(p, ['rev-parse', '--git-path', 'FETCH_HEAD']).trim());
+  fs.mkdirSync(file, { recursive: true });
+  const r = merge(p, 'git merge --no-ff FETCH_HEAD');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /FETCH_HEAD/);
+});
+
+test('verified: a # right after ) or after an escaped space is part of the word, not a comment', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  assert.equal(merge(p, `echo "$(echo $(date)#)"; git merge --no-ff ${BRANCH}`).status, 2);
+  assert.equal(merge(p, `echo $(echo $(date)#\n); git merge --no-ff ${BRANCH}`).status, 2);
+  assert.equal(merge(p, `echo a\\ #b; git merge --no-ff ${BRANCH}`).status, 2);
+});
+
+test('verified: a bare pull whose upstream is a remote story branch gets the fetch-then-merge block', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  const tip = gitIn(p, ['rev-parse', BRANCH]).trim();
+  gitIn(p, ['update-ref', `refs/remotes/origin/${BRANCH}`, tip]);
+  gitIn(p, ['config', 'branch.main.remote', 'origin']);
+  gitIn(p, ['config', 'branch.main.merge', `refs/heads/${BRANCH}`]);
+  gitIn(p, ['config', 'remote.origin.url', p]);
+  gitIn(p, ['config', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*']);
+  const r = merge(p, 'git pull');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /fetch.*separate command/);
+});
+
+test('verified: a bare merge or pull on the integration branch tracking origin/main is allowed', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  gitIn(p, ['update-ref', 'refs/remotes/origin/main', 'main']);
+  gitIn(p, ['config', 'branch.main.remote', 'origin']);
+  gitIn(p, ['config', 'branch.main.merge', 'refs/heads/main']);
+  gitIn(p, ['config', 'remote.origin.url', p]);
+  gitIn(p, ['config', 'remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*']);
+  for (const command of ['git merge --no-ff', 'git merge', 'git pull', 'git pull --no-rebase']) assert.equal(merge(p, command).status, 0, command);
+});
+
+// The audit: each shell construct an honest PM writes around a merge, judged for an unverified
+// story (blocked) and a verified one (allowed), unless `both` pins one decision for either.
+test('verified: audit of shell constructs around a merge, unverified blocked and verified allowed', () => {
+  const B = BRANCH;
+  const rows = [
+    ['&&', () => `echo go && git merge --no-ff ${B}`],
+    [';', () => `echo go; git merge --no-ff ${B}`],
+    ['||', () => `false || git merge --no-ff ${B}`],
+    ['|', () => `git merge --no-ff ${B} | cat`],
+    ['newline', () => `echo go\ngit merge --no-ff ${B}`],
+    ['backslash-newline', () => `git merge \\\n  --no-ff ${B}`],
+    ['git status && merge', () => `git status && git merge --no-ff ${B}`],
+    ['VAR=x prefix', () => `GIT_EDITOR=true git merge --no-ff ${B}`],
+    ['env prefix', () => `env GIT_EDITOR=true git merge --no-ff ${B}`],
+    ['nice prefix', () => `nice -n 5 git merge --no-ff ${B}`],
+    ['command prefix', () => `command git merge --no-ff ${B}`],
+    ['exec prefix', () => `exec git merge --no-ff ${B}`],
+    ['( ... )', () => `(git merge --no-ff ${B})`],
+    ['{ ...; }', () => `{ git merge --no-ff ${B}; }`],
+    ['double quotes', () => `git merge --no-ff "${B}"`],
+    ['single quotes', () => `git merge --no-ff '${B}'`],
+    ['backslash escape', () => `git merge --no-ff pm\\/S1-1-fix`],
+    ['trailing comment', () => `git merge --no-ff ${B} # ship it`],
+    ['comment line', () => `# ship it (git switch ${B})\ngit merge --no-ff ${B}`],
+    ['heredoc -F -', () => `git merge --no-ff ${B} -F - <<'EOF'\nfeat(S1-1): fix\nEOF`],
+    ['heredoc in -m', () => `git merge --no-ff ${B} -m "$(cat <<'EOF'\nfeat(S1-1): fix (#1)\nEOF\n)"`],
+    ['here-string', () => `git merge --no-ff ${B} -F - <<< "feat(S1-1): fix"`],
+    ['git -C', (p) => `git -C '${p}' merge --no-ff ${B}`],
+    ['git -c key=val', () => `git -c core.editor=true merge --no-ff ${B}`],
+    ['--git-dir/--work-tree', (p) => `git --git-dir='${p}/.git' --work-tree='${p}' merge --no-ff ${B}`],
+    ['--git-dir=', (p) => `git --git-dir=${p}/.git merge --no-ff ${B}`],
+    ['checkout main --', () => `git checkout main -- && git merge --no-ff ${B}`, { from: 'branch' }],
+    ['switch -- main', () => `git switch -- main && git merge --no-ff ${B}`, { from: 'branch' }],
+    ['merge --', () => `git merge --no-ff -- ${B}`],
+    ['> file', () => `git merge --no-ff ${B} > /tmp/merge.log`],
+    ['>> and 2>>', () => `git merge --no-ff ${B} >> /tmp/out.log 2>> /tmp/err.log`],
+    ['2>&1 | tee', () => `git merge --no-ff ${B} 2>&1 | tee merge.log`],
+    ['&> file', () => `git merge --no-ff ${B} &> /tmp/merge.log`],
+    ['>| file', () => `git merge --no-ff ${B} >| /tmp/merge.log`],
+    ['< /dev/null', () => `git merge --no-ff ${B} < /dev/null`],
+    ['redirect mid-args', () => `git merge > /tmp/merge.log --no-ff ${B}`],
+    ['redirect first', () => `2>/dev/null git merge --no-ff ${B}`],
+    ['N>file no space', () => `git merge --no-ff ${B} 2>/tmp/err.log`],
+    ['N<&M', () => `git merge --no-ff ${B} 0<&-`],
+    ['operand then options', () => `git merge ${B} --no-ff`],
+    ['-m', () => `git merge -m "feat(S1-1): fix" --no-ff ${B}`],
+    ['-F file', () => `git merge -F msg.txt --no-ff ${B}`],
+    ['--no-edit', () => `git merge --no-edit --no-ff ${B}`],
+    ['--ff-only', () => `git merge --ff-only ${B}`],
+    ['-s/-X', () => `git merge -s ort -X theirs --no-ff ${B}`],
+    ['pull with operand', () => `git pull --no-rebase origin ${B}`, { both: 2 }],
+  ];
+  const u = project();
+  record(u.p, {});
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  const wrong = [];
+  for (const [label, cmd, opts = {}] of rows) {
+    for (const [p, want] of [[u.p, opts.both ?? 2], [v.p, opts.both ?? 0]]) {
+      if (opts.from === 'branch') toBranch(p); else toMain(p);
+      const r = merge(p, cmd(p));
+      if (r.status !== want) wrong.push(`${label} (${p === u.p ? 'unverified' : 'verified'}): ${r.status} not ${want}${r.stderr ? `: ${r.stderr.trim()}` : ''}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+// --- WP-I: conditional checkouts, FETCH_HEAD names, process substitution, repository options ---
+
+test('verified: a checkout that might not run leaves the target unknown, so a story merge after it blocks', () => {
+  const u = project();
+  record(u.p, {});
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  const B = BRANCH;
+  const forms = [
+    `if false; then git switch ${B}; fi; git merge ${B}`,
+    `if false; then git checkout ${B}; else echo no; fi\ngit merge --no-ff ${B}`,
+    `case x in y) git switch ${B};; esac; git merge ${B}`,
+    `while false; do git switch ${B}; done; git merge ${B}`,
+    `for b in x; do git switch ${B}; done; git merge ${B}`,
+    `true || git switch ${B}; git merge ${B}`,
+    `false && git switch ${B}; git merge ${B}`,
+    `test -d src && git checkout ${B}; git merge ${B}`,
+    `false && git checkout main && git checkout ${B}; git merge ${B}`,
+  ];
+  const wrong = [];
+  for (const { p } of [u, v]) {
+    toMain(p);
+    for (const cmd of forms) {
+      const r = merge(p, cmd);
+      if (r.status !== 2 || !/unknown/.test(r.stderr)) wrong.push(`${p === u.p ? 'unverified' : 'verified'}: ${JSON.stringify(cmd)}: ${r.status} ${r.stderr.trim()}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('verified: a checkout in the same && chain as the merge still names the target', () => {
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  // HEAD is the story branch; the checkout of main runs whenever the merge does.
+  for (const cmd of [
+    `cd '${v.p}' && git checkout main && git merge --no-ff ${BRANCH}`,
+    `if true; then git checkout main && git merge --no-ff ${BRANCH}; fi`,
+    `git checkout main && git merge --no-ff ${BRANCH}`,
+  ]) {
+    toBranch(v.p);
+    const r = merge(v.p, cmd);
+    assert.equal(r.status, 0, `${cmd}: ${r.stderr}`);
+  }
+  // A || in the chain lets the merge run with the checkout skipped.
+  toBranch(v.p);
+  const r = merge(v.p, `true || git checkout main && git merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+});
+
+// singleBranchClone(p): a clone of p's main alone, as `git clone --single-branch` leaves it.
+function singleBranchClone(p) {
+  const c = tmpDir('pmclone-');
+  gitIn(c, ['clone', '-q', '--single-branch', '--branch', 'main', p, '.']);
+  gitIn(c, ['config', 'user.email', 'casey@example.com']);
+  gitIn(c, ['config', 'user.name', 'Casey Example']);
+  return c;
+}
+
+test('verified: FETCH_HEAD branch names judge a pm/* head with no local or remote ref', () => {
+  const u = project();
+  record(u.p, {});
+  const uc = singleBranchClone(u.p);
+  gitIn(uc, ['fetch', '-q', 'origin', BRANCH]);
+  assert.equal(gitIn(uc, ['for-each-ref', 'refs/heads/pm/', 'refs/remotes/origin/pm/']).trim(), '');
+  const r = merge(uc, 'git merge --no-ff FETCH_HEAD');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /pm\/S1-1-fix: .*no verifier verdict/);
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  const vc = singleBranchClone(v.p);
+  gitIn(vc, ['fetch', '-q', 'origin', BRANCH]);
+  const g = merge(vc, 'git merge --no-ff FETCH_HEAD');
+  assert.equal(g.status, 0, g.stderr);
+});
+
+test('verified: a FETCH_HEAD story head that cannot be judged blocks', () => {
+  const { p } = project();
+  record(p, {});
+  toMain(p);
+  fetchHead(p, [{ sha: 'b'.repeat(40), desc: `branch '${BRANCH}' of ../origin` }]);
+  const r = merge(p, 'git merge --no-ff FETCH_HEAD');
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /FETCH_HEAD/);
+});
+
+test('verified: a process substitution is one word, so the merge after it is judged', () => {
+  const u = project();
+  record(u.p, {});
+  toMain(u.p);
+  assert.equal(merge(u.p, `git merge --no-ff -F <(printf 'feat') ${BRANCH}`).status, 2);
+  assert.equal(merge(u.p, `diff <(git log main) >(cat); git merge --no-ff ${BRANCH}`).status, 2);
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  toMain(v.p);
+  const g = merge(v.p, `git merge --no-ff -F <(printf 'feat') ${BRANCH}`);
+  assert.equal(g.status, 0, g.stderr);
+});
+
+test('verified: --work-tree alone keeps the current directory for repository discovery', () => {
+  const elsewhere = tmpDir('pmwt-');
+  const u = project();
+  record(u.p, {});
+  toMain(u.p);
+  assert.match(merge(u.p, `git --work-tree='${elsewhere}' merge --no-ff ${BRANCH}`).stderr, /no verifier verdict/);
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  toMain(v.p);
+  const g = merge(v.p, `git --work-tree='${elsewhere}' merge --no-ff ${BRANCH}`);
+  assert.equal(g.status, 0, g.stderr);
+});
+
+test('verified: a relative --git-dir resolves under a later -C', () => {
+  const outside = tmpDir('pmout-');
+  const u = project();
+  record(u.p, {});
+  toMain(u.p);
+  const r = hook(outside, `git --git-dir=.git -C '${u.p}' merge --no-ff ${BRANCH}`, { CLAUDE_PROJECT_DIR: outside });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /no verifier verdict/);
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  toMain(v.p);
+  const g = hook(outside, `git --git-dir=.git -C '${v.p}' merge --no-ff ${BRANCH}`, { CLAUDE_PROJECT_DIR: outside });
+  assert.equal(g.status, 0, g.stderr);
+});
+
+test('verified: a --git-dir that is not the checkout\'s own blocks a story merge', () => {
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  toMain(v.p);
+  const other = newProj(true);
+  const r = merge(v.p, `git --git-dir='${other}/.git' --work-tree='${v.p}' merge --no-ff ${BRANCH}`);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /cannot be determined/);
+});
+
+test('verified: an escaped space inside $(...) does not start a comment that hides the operand', () => {
+  const u = project();
+  record(u.p, {});
+  toMain(u.p);
+  assert.equal(merge(u.p, `git merge --no-ff -m $(echo a\\ #b) ${BRANCH}`).status, 2);
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  toMain(v.p);
+  const g = merge(v.p, `git merge --no-ff -m $(echo a\\ #b) ${BRANCH}`);
+  assert.equal(g.status, 0, g.stderr);
+});
+
+test('verified: --no-verify on a story merge or pull is blocked, since it skips the git-level gate', () => {
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  toMain(v.p);
+  for (const cmd of [`git merge --no-verify --no-ff ${BRANCH}`, `git merge --no-ff ${BRANCH} --no-verify`, `git -c core.hooksPath=/dev/null merge --no-ff ${BRANCH}`, `git pull --no-verify . ${BRANCH}`]) {
+    const r = merge(v.p, cmd);
+    assert.equal(r.status, 2, cmd);
+    assert.match(r.stderr, /--no-verify skips deliver's merge gate|hooksPath/, cmd);
+  }
+  // A non-story merge may skip hooks.
+  gitIn(v.p, ['branch', 'feature', 'main']);
+  assert.equal(merge(v.p, 'git merge --no-verify --no-ff feature').status, 0);
+});
+
+test('verified: merge -n is --no-stat, not --no-verify, so a verified story merges with it; commit -n skips hooks', () => {
+  const v = project();
+  record(v.p, { verifier: `PASS ${v.code}` });
+  toMain(v.p);
+  const r = merge(v.p, `git merge -n ${BRANCH}`);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(merge(v.p, `git merge -n --no-ff ${BRANCH} -m m`).status, 0);
 });

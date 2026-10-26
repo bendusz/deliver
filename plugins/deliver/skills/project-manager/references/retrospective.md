@@ -48,9 +48,18 @@ working tree. Paste the report into the record unedited.
 trailer `Escaped-From: <story-id>` in its message body, naming the story that shipped the defect,
 one line per story. The fix's own story, review, or fix round adds it when the cause is known; a
 defect whose origin is unclear gets no trailer. The report maps each trailer to that story's tier.
+In a repository holding several deliver projects, a bare trailer counts for a project only when its
+commit changes a file under that project's directory, and a project at the top level owns the files
+outside every nested one. To name the project outright, as for a fix in shared code, qualify the id
+with the project's path from the top level, `Escaped-From: packages/api/S1-1` (`./S1-1` for the top
+level); it then counts for that project alone. Merge and claim times come from that project's own
+`chore(...)` commits in the same way. A commit that changes no path, as `--allow-empty` makes,
+belongs to the project at the top level, or to every project when none sits there. When git cannot
+read the paths a commit changes, its escapes count for every project, so none is dropped, while
+merge times fall back to the Execution block's `updated`; claim times are not used.
 
 **Over target.** A tier flagged `OVER TARGET` runs the maximum panel from the next sprint on, as an
-unmeasured tier does (`review-gates.md`), until `/deliver:calibrate` re-runs and the report no
+unmeasured tier does, keeping every measured member at its trial count (`review-gates.md`), until `/deliver:calibrate` re-runs and the report no
 longer flags it. The flag counts only stories merged at or after the calibration's `calibratedAt`
 time, so a recalibration starts a fresh window. A story's merge time is the committer time of the
 first `chore(<story-id>): merged` commit on the integration branch, compared in UTC; without one

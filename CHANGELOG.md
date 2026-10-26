@@ -2,6 +2,53 @@
 
 All notable changes to this project are documented here.
 
+## 0.29.1 - 2026-10-26
+
+The ship gate moves into git itself, so a merge of an unverified story is refused whatever command
+makes it, and deliver is checked to run unchanged without T3 Code.
+
+- **A git-level ship gate behind the Bash hook.** Session start installs a git hook in deliver
+  projects: `git-hook-install.mjs` writes a `reference-transaction` shim marked
+  `# deliver-merge-gate v2` (git 2.28 or newer; below that, `pre-merge-commit` and `pre-commit`,
+  which miss fast-forwards), never over a hook it did not write. For an existing hook it prints
+  lines to chain in, or an sh wrapper for a non-sh or symlinked hook, and every generated shim is
+  checked with `sh -n` before it is installed. Git runs `git-merge-gate.mjs` on every update of an
+  integration branch, which judges the stories the update brings in with the Bash hook's own
+  verdict and requires any merge on top of a story to be git's automatic merge apart from the
+  story file. Merges, fast-forwards, pulls, rebases, resets, `update-ref`, amended merges,
+  `git push .`, and hand-finished conflicted merges are all judged. Cherry-picks and squash merges
+  of a story are found by patch id and refused: merge the story branch itself with `--no-ff`.
+  Rewriting shipped story history must keep the code exactly; use `git pull --no-rebase` or
+  `--rebase=merges`, since a plain `--rebase` that flattens a story merge is refused. A fetched
+  integration head is trusted only for the pull now running, from the designated remote. A
+  refusal exits 86 inside the shim and 1 to git; any other failure of the gate warns and lets the
+  update through, so a broken node never blocks a repository. The merged-tree comparison needs git
+  2.38; on 2.28 to 2.37 it alone is skipped and reported.
+- **Uninstalling.** `node <plugin>/hooks/git-hook-install.mjs --uninstall <project>` removes the
+  shims and sets `git config deliver.mergeGate off`, which session start honours until an explicit
+  install. `/deliver:doctor` checks and repairs the install, and reports a chained hook that is not
+  executable, has CRLF line endings, or holds stale lines.
+- **The Bash hook reads more of the shell.** Clustered short options (`-qm "msg"`) consume their
+  values, per subcommand, and every value-taking option was checked against `git <cmd> -h`. Only a
+  `status`, `log`, `diff`, `show`, or `rev-parse`, or a plain checkout or switch, may precede a
+  story merge in the same command; run any other merge as its own command.
+- **Several projects in one repository.** A story several projects claim must be verified in
+  each. `Escaped-From:` accepts `<project-path>/<story-id>`, and holdout checks live on
+  `refs/deliver/holdout/<project-key>/<story-id>`. The plan's integration branch is parsed whole
+  and validated with `git check-ref-format`; an invalid or missing branch is reported.
+- **T3 Code stays optional.** When the host probe fails, deliver runs unchanged under plain Claude
+  Code. The new `host-neutral` test fails if a T3-only step leaves `host-t3.md` or loses its
+  condition, or if the hooks depend on T3.
+- **Documentation consistency.** `/deliver:analyze` ran over the changed references (0.29
+  acceptance item 6). Its four P2 findings are fixed: a measured panel runs only when its bound
+  meets the plan's target, fix rounds re-review with the risk lenses too, a Codex review that fell
+  back to another model counts as the calibrated lens missing, and the claim step pulls with
+  `--no-rebase` or `--rebase=merges`. The P3 findings are listed in the plan's backlog.
+- **Known limits.** Out of scope remain deleting the hook, overriding `core.hooksPath`,
+  `DELIVER_NO_ENFORCE=1`, a fast-forward on git older than 2.28, and pushing straight to the
+  remote. The gate catches a PM's honest mistakes; it is not a boundary against an agent that
+  evades it on purpose.
+
 ## 0.29.0 - 2026-10-25
 
 Autonomous trust: review strength is measured per risk tier instead of assumed, the builder can no

@@ -5,7 +5,12 @@
 // new session. Renders lib.mjs's inspectState(): the approval status, the derived phase
 // and the reference to load, the checked-out story and its Execution block, other claimed
 // stories, deliver's and host-owned worktrees, the uncommitted path count, handoff
-// freshness, and the wiki line.
+// freshness, and the wiki line. In a deliver project (docs/approval.json) it also installs, or
+// refreshes, deliver's git-level merge gate through git-hook-install.mjs, unless
+// `git config deliver.mergeGate off` (set by --uninstall) disables it, and reports only what it
+// could not install or check: a foreign hook, a hooks directory it may not write, a deliver shim it
+// could not remove, the gate disabled, git older than 2.28, or git older than 2.38 (no merged-tree
+// check).
 // SILENT (exit 0, no output) outside a managed project. Fail-open throughout: any git or
 // file failure drops that one line, never the session.
 import fs from 'node:fs';
@@ -16,7 +21,7 @@ if (process.env.DELIVER_NO_ENFORCE === '1') process.exit(0);
 // A damaged or missing lib.mjs must not block the session: fail open (silent).
 let lib;
 try { lib = await import('./lib.mjs'); } catch { process.exit(0); }
-const { readHookInput, pmRoot, inspectState, APPROVAL_REL } = lib;
+const { readHookInput, pmRoot, inspectState, APPROVAL_REL, oneLine } = lib;
 
 const input = readHookInput();
 const cwd = pmRoot(typeof input?.cwd === 'string' && input.cwd ? input.cwd : process.cwd());
@@ -24,7 +29,7 @@ const out = [];
 const say = (line) => out.push(line);
 // Story and marker fields are repository content another actor wrote: strip control
 // characters (including newlines) and cap length before this text becomes session context.
-const sanitize = (s) => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ').slice(0, 200);
+const sanitize = (s) => oneLine(s).slice(0, 200);
 const v = (x, d) => (x === undefined || x === null || x === '' ? d : sanitize(x));
 const RESUME = 'To continue: run /deliver:resume.';
 
@@ -32,6 +37,16 @@ let st = null;
 try { st = inspectState(cwd); } catch { st = null; }
 if (!st) finish();
 try { render(st); } catch { /* a malformed field must never take the session down */ }
+if (!st.legacy) {
+  // The git-level ship gate. Any failure drops it silently, like every line here.
+  try {
+    const { installGitHook } = await import('./git-hook-install.mjs');
+    // The brief notes point to the installer for any chaining command instead of carrying it, and
+    // are never cut, so no command they name is shown broken.
+    const r = installGitHook(cwd);
+    for (const note of r.brief ?? r.notes) out.splice(Math.max(0, out.length - 1), 0, oneLine(note));
+  } catch { /* fail open */ }
+}
 finish();
 
 function render(st) {

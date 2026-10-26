@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { tmpDir, gitIn, PLUGIN_ROOT } from './helpers.mjs';
-import { collect, render, auditLessons, renderAudit, trust, renderTrust, firingSprint } from '../retro-stats.mjs';
+import { collect, render, auditLessons, renderAudit, trust, renderTrust, firingSprint, projectScope, ownCommits } from '../retro-stats.mjs';
 import { upperBound, CORPUS_ROOT, REVIEW_DEFAULTS } from '../assurance.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'retro-stats.mjs');
@@ -655,4 +655,172 @@ test('retro-stats: firingSprint falls back to the latest known sprint at or befo
   const esc = (story, at, sprint) => ({ commit: `c${at}`, story, at, sprint });
   const escapes = [esc('S1-1', 1, 1), esc('S1-2', 2, 3), esc('S1-3', 3, null), esc('S1-4', 4, null)];
   assert.equal(firingSprint(window, escapes, 0.1, (e) => e.sprint), 3);
+});
+
+// multiProject(): one repository whose top level is a deliver project, holding sibling projects
+// a/ and b/, each with its own S1-1 at T1. Every commit touches real files, as the PM's do.
+const multiProject = () => {
+  const top = proj();
+  const projects = { '': top, a: path.join(top, 'a'), b: path.join(top, 'b') };
+  for (const p of Object.values(projects)) {
+    fs.mkdirSync(path.join(p, 'docs', 'stories'), { recursive: true });
+    fs.mkdirSync(path.join(p, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(p, 'src', 'x.txt'), '0\n');
+    fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n');
+    trustStory(p, 'S1-1', ex('T1'));
+  }
+  fs.writeFileSync(path.join(top, 'p.json'), JSON.stringify({ ...PANELS, stamp: { ...PANELS.stamp, calibratedAt: '2026-10-10T00:00:00.000Z' } }));
+  gitProj(top);
+  return projects;
+};
+// touchAt(top, rel, message, iso): a commit changing the file rel, at committer time iso.
+const touchAt = (top, rel, message, iso) => {
+  const f = path.join(top, rel);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.appendFileSync(f, `${message.length}\n`);
+  gitIn(top, ['add', '--', rel]);
+  execFileSync('git', ['-C', top, 'commit', '-q', '-m', message], { env: { ...process.env, GIT_COMMITTER_DATE: iso, GIT_AUTHOR_DATE: iso }, stdio: 'ignore' });
+};
+
+test('retro-stats --trust: an escape is attributed to the project whose files the fix touches', () => {
+  const pr = multiProject();
+  const top = pr[''];
+  touchAt(top, 'b/src/x.txt', 'fix: in b\n\nEscaped-From: S1-1', '2026-10-11T00:00:00Z');
+  const opts = { panelsFile: path.join(top, 'p.json') };
+  assert.equal(trust(pr.a, opts).tiers.T1.observedToDate.escapedStories, 0, "B's fix does not count for A's S1-1");
+  assert.equal(trust(pr.b, opts).tiers.T1.observedToDate.escapedStories, 1);
+  assert.equal(trust(top, opts).tiers.T1.observedToDate.escapedStories, 0, 'nor for the top-level project');
+  // A bare trailer on a commit touching files outside every nested project counts for the top level.
+  touchAt(top, 'src/x.txt', 'fix: at the top\n\nEscaped-From: S1-1', '2026-10-12T00:00:00Z');
+  assert.equal(trust(top, opts).tiers.T1.observedToDate.escapedStories, 1);
+  assert.equal(trust(pr.a, opts).tiers.T1.observedToDate.escapedStories, 0);
+});
+
+test('retro-stats --trust: a project-qualified Escaped-From trailer counts for the project it names only', () => {
+  const pr = multiProject();
+  const top = pr[''];
+  touchAt(top, 'README.md', 'fix: shared\n\nEscaped-From: a/S1-1', '2026-10-11T00:00:00Z');
+  const opts = { panelsFile: path.join(top, 'p.json') };
+  assert.equal(trust(pr.a, opts).tiers.T1.observedToDate.escapedStories, 1);
+  assert.equal(trust(pr.b, opts).tiers.T1.observedToDate.escapedStories, 0);
+  assert.equal(trust(top, opts).tiers.T1.observedToDate.escapedStories, 0, 'a trailer naming a/ is not the top level\'s, though the commit touches top-level files');
+});
+
+test('retro-stats --trust: merge and claim times come from the project\'s own record commits', () => {
+  const pr = multiProject();
+  const top = pr[''];
+  // B merged its S1-1 before the calibration; A merged its own after it.
+  touchAt(top, 'b/docs/stories/S1-1-thing.md', 'chore(S1-1): merged', '2026-10-05T00:00:00Z');
+  touchAt(top, 'a/docs/stories/S1-1-thing.md', 'chore(S1-1): merged', '2026-10-12T00:00:00Z');
+  const opts = { panelsFile: path.join(top, 'p.json') };
+  assert.equal(trust(pr.a, opts).tiers.T1.observed.shipped, 1, "A's S1-1 merged after the calibration, by its own merged commit");
+  assert.equal(trust(pr.b, opts).tiers.T1.observed.shipped, 0);
+});
+
+test('retro-stats --trust: a story filename git would quote is still read, with core.quotePath at its default', () => {
+  const p = proj();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n');
+  trustStory(p, 'S1-1', ex('T1'));
+  fs.renameSync(path.join(p, 'docs', 'stories', 'S1-1-thing.md'), path.join(p, 'docs', 'stories', 'S1-1-café.md'));
+  gitProj(p);
+  // Git's default, set here so a user's global core.quotePath=false cannot void the precondition.
+  gitIn(p, ['config', 'core.quotePath', 'true']);
+  assert.match(gitIn(p, ['ls-tree', '--name-only', 'main', 'docs/stories/']), /"/, 'git quotes the name by default');
+  const r = trust(p, { panelsFile: path.join(p, 'none.json') });
+  assert.equal(r.tiers.T1.shipped, 1);
+});
+
+// --- WP-H fix round 1 ---
+
+test('retro-stats --trust: a forced maximum panel keeps every calibrated member at its trial count', () => {
+  const twice = { ...PANELS, tiers: { ...PANELS.tiers, T0: { ...PANELS.tiers.T0, panel: [{ lens: 'code-integrity-reviewer', trials: 2 }] } } };
+  const plusOne = [...MAX, 'code-integrity-reviewer'];
+  const p = soloProject([['S1-1', ex('T0', 0, 0, { panel: ['code-integrity-reviewer', 'code-integrity-reviewer', 'codex-reviewer'] })], ['S2-1', ex('T0', 0, 0, { panel: MAX })], ['S2-2', ex('T0', 0, 0, { panel: plusOne })]]);
+  commitAt(p, 'chore(S1-1): merged', '2026-10-05T10:00:00Z');
+  commitAt(p, 'fix: x\n\nEscaped-From: S1-1', '2026-10-06T10:00:00Z');
+  commitAt(p, 'chore(S2-1): merged', '2026-10-09T10:00:00Z');
+  commitAt(p, 'chore(S2-2): merged', '2026-10-09T11:00:00Z');
+  fs.writeFileSync(path.join(p, 'twice.json'), JSON.stringify(twice));
+  const r = trust(p, { panelsFile: path.join(p, 'twice.json'), sprint: 2 });
+  assert.equal(r.tiers.T0.maximumForced, true);
+  assert.equal(r.tiers.T0.belowPanel, 1, 'S2-1 ran the maximum panel but code-integrity-reviewer once, not the calibrated twice');
+});
+
+test('retro-stats --trust: an empty escape commit counts for the root project beside a nested one', () => {
+  const p = soloProject([['S1-1', ex('T1')]]);
+  fs.mkdirSync(path.join(p, 'examples', 'x', 'docs', 'stories'), { recursive: true });
+  trustStory(path.join(p, 'examples', 'x'), 'S1-1', ex('T1'));
+  fs.renameSync(path.join(p, 'examples', 'x', 'docs', 'stories', 'S1-1-thing.md'), path.join(p, 'examples', 'x', 'docs', 'stories', 'S1-1-a.md'));
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'example project']);
+  gitIn(p, ['commit', '-q', '--allow-empty', '-m', 'fix: x\n\nEscaped-From: S1-1']);
+  const none = path.join(p, 'none.json');
+  assert.equal(trust(p, { panelsFile: none }).tiers.T1.observedToDate.escapedStories, 1, 'a commit with no paths is the root project\'s');
+  assert.equal(trust(path.join(p, 'examples', 'x'), { panelsFile: none }).tiers.T1.observedToDate.escapedStories, 0);
+});
+
+test('retro-stats: when the paths a commit touches cannot be read, it counts for every project', () => {
+  const p = soloProject([['S1-1', ex('T1')]]);
+  fs.mkdirSync(path.join(p, 'b', 'docs', 'stories'), { recursive: true });
+  trustStory(path.join(p, 'b'), 'S1-1', ex('T1'));
+  gitIn(p, ['add', '-A']);
+  gitIn(p, ['commit', '-qm', 'b']);
+  const sha = gitIn(p, ['rev-parse', 'HEAD']).trim();
+  const commits = [{ sha, parent: gitIn(p, ['rev-parse', 'HEAD^']).trim() }];
+  const failing = () => null;
+  for (const root of [p, path.join(p, 'b')]) {
+    const scope = projectScope(root, 'main');
+    assert.equal(scope.solo, false);
+    assert.deepEqual([...ownCommits(root, scope, commits, { touchedBy: failing })], [sha], root);
+  }
+  assert.deepEqual([...ownCommits(p, projectScope(p, 'main'), commits)], [], 'read normally, a commit changing only b/ is not the root\'s');
+});
+
+// --- WP-H fix round 2 ---
+
+test('retro-stats --trust: with no project at the top level, a commit with no paths counts for every project', () => {
+  const top = tmpDir('retro-notop-');
+  const a = path.join(top, 'a');
+  const b = path.join(top, 'b');
+  for (const p of [a, b]) {
+    fs.mkdirSync(path.join(p, 'docs', 'stories'), { recursive: true });
+    fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n\n## Delivery mode\n- Integration branch: main\n');
+    trustStory(p, 'S1-1', ex('T1'));
+  }
+  gitProj(top);
+  gitIn(top, ['commit', '-q', '--allow-empty', '-m', 'fix: x\n\nEscaped-From: S1-1']);
+  const none = path.join(top, 'none.json');
+  assert.equal(trust(a, { panelsFile: none }).tiers.T1.observedToDate.escapedStories, 1);
+  assert.equal(trust(b, { panelsFile: none }).tiers.T1.observedToDate.escapedStories, 1);
+});
+
+test('retro-stats --trust: when diff-tree fails, merge times fall back to updated while escapes still count', { skip: process.platform === 'win32' && 'POSIX stub' }, () => {
+  const pr = multiProject();
+  const top = pr[''];
+  // A's own story says it merged inside the window; B's merged commit predates the calibration.
+  trustStory(pr.a, 'S1-1', ex('T1', 0, 0, { updated: '2026-10-15 10:00' }));
+  gitIn(top, ['add', '-A']);
+  gitIn(top, ['commit', '-qm', 'a updated']);
+  touchAt(top, 'b/docs/stories/S1-1-thing.md', 'chore(S1-1): merged', '2026-10-01T00:00:00Z');
+  touchAt(top, 'a/docs/stories/S1-1-thing.md', 'chore(S1-1): merged', '2026-10-12T00:00:00Z');
+  touchAt(top, 'b/src/x.txt', 'fix: in b\n\nEscaped-From: S1-1', '2026-10-13T00:00:00Z');
+  const bin = tmpDir('retro-stub-');
+  const real = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
+  fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\ncase "$*" in *diff-tree*) exit 1;; esac\nexec "${real}" "$@"\n`, { mode: 0o755 });
+  const report = (env = {}) => JSON.parse(spawnSync(process.execPath, [SCRIPT, pr.a, '--trust', '--json', '--panels', path.join(top, 'p.json')], { encoding: 'utf8', env: { ...process.env, ...env } }).stdout);
+  const normal = report();
+  assert.equal(normal.tiers.T1.observed.shipped, 1, 'read normally, A merged on 2026-10-12');
+  assert.equal(normal.tiers.T1.observed.escapedStories, 0, "B's fix is not A's");
+  const failing = report({ PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+  assert.equal(failing.tiers.T1.observed.shipped, 1, "the merge time falls back to updated, not to B's earlier merged commit");
+  assert.equal(failing.tiers.T1.observed.escapedStories, 1, 'an escape is never dropped: it counts for every project');
+});
+
+test('retro-stats: the plan\'s integration branch is parsed whole (release+fix), never cut to a prefix', async () => {
+  const { planBranch } = await import('../retro-stats.mjs');
+  const p = proj();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `release+fix`\n');
+  assert.equal(planBranch(p), 'release+fix');
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: rel~ease\n');
+  assert.equal(planBranch(p), null);
 });

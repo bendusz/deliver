@@ -150,6 +150,36 @@ const sha256File = (file) => {
 };
 // corpusSha256: the identity of the frozen corpus, the hash of its recorded manifest.
 export const corpusSha256 = (root = CORPUS_ROOT) => sha256File(path.join(root, MANIFEST));
+// The lens run through the Codex runner: its model and effort are the runner's review defaults, and
+// its agent file's frontmatter pins only the Claude wrapper that drives it.
+const CODEX_LENS = 'codex-reviewer';
+
+// agentPins(lens, agentsDir): { model, effort } from the lens's agent-file frontmatter, or null
+// without a file. A field the frontmatter lacks is null.
+export function agentPins(lens, agentsDir = AGENTS_DIR) {
+  if (!/^[a-z0-9-]+$/.test(String(lens))) return null;
+  let text;
+  try { text = fs.readFileSync(path.join(agentsDir, `${lens}.md`), 'utf8'); } catch { return null; }
+  const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const field = (k) => {
+    const m = fm && fm[1].match(new RegExp(`^${k}:[ \\t]*['"]?([^'"\\r\\n#]*?)['"]?[ \\t]*(?:#.*)?$`, 'm'));
+    return m && m[1] ? m[1] : null;
+  };
+  return { model: field('model'), effort: field('effort') };
+}
+
+// pinMismatch(lens, model, effort, agentsDir): why a Claude lens's recorded model and effort are not
+// the ones its agent file pins, or []. A Codex lens is judged by the runner's defaults instead.
+export function pinMismatch(lens, model, effort, agentsDir = AGENTS_DIR) {
+  if (lens === CODEX_LENS) return [];
+  const pins = agentPins(lens, agentsDir);
+  if (!pins) return [];
+  const out = [];
+  if (model !== pins.model) out.push(`${lens} was recorded on model ${model}, but its agent frontmatter pins ${pins.model}`);
+  if (effort !== pins.effort) out.push(`${lens} was recorded at effort ${effort}, but its agent frontmatter pins ${pins.effort}`);
+  return out;
+}
+
 // promptSha256: the hash of a lens's agent file, or null when there is no such lens.
 export const promptSha256 = (lens, agentsDir = AGENTS_DIR) => (/^[a-z0-9-]+$/.test(String(lens)) ? sha256File(path.join(agentsDir, `${lens}.md`)) : null);
 
@@ -656,6 +686,15 @@ export function promptDrift(records, agentsDir = AGENTS_DIR) {
   return [...out].sort();
 }
 
+// pinDrift(records, agentsDir): why Claude-lens trials were recorded under a model or effort other
+// than their agent frontmatter pins. calc refuses these: the prompt hash would match, so the stamp
+// would otherwise describe a configuration the lens does not run.
+export function pinDrift(records, agentsDir = AGENTS_DIR) {
+  const out = new Set();
+  for (const r of records) for (const why of pinMismatch(r.lens, r.model, r.effort, agentsDir)) out.add(why);
+  return [...out].sort();
+}
+
 // panelsDoc: the panels.json body, a pure function of the trials. Each lens is stamped with the
 // model, effort, and prompt hash its trials were recorded under; the corpus with the manifest hash
 // the trials were recorded against; the time with the latest trial's; and the Codex runner's
@@ -684,8 +723,9 @@ export function panelsDoc(result) {
 // staleness(doc): why panels.json no longer describes the shipped lenses and corpus, or [] when
 // it does. Stale means: the corpus manifest changed; a lens on a measured panel has no stamp, a
 // null hash, or a hash that differs from its agent file today; measured tiers with no lens stamps
-// at all; or, with codex-reviewer on a measured panel, a stamped model or effort that differs from
-// the Codex runner's review default, or a changed scripts/codex/lib/args.mjs. A stale document is
+// at all; a Claude lens whose stamped model or effort differs from its agent frontmatter; or, with
+// codex-reviewer on a measured panel, a stamped model or effort that differs from the Codex
+// runner's review default, or a changed scripts/codex/lib/args.mjs. A stale document is
 // no calibration: every tier runs the maximum panel.
 export function staleness(doc, { agentsDir = AGENTS_DIR, corpusRoot = CORPUS_ROOT } = {}) {
   if (!doc || !doc.stamp || !doc.tiers) return ['panels.json has no stamp'];
@@ -709,7 +749,8 @@ function lensStaleness(doc, lens, agentsDir) {
   if (!s || typeof s.promptSha256 !== 'string') reasons.push(`${lens} has no prompt stamp`);
   else if (now === null) reasons.push(`${lens} has no agent file`);
   else if (s.promptSha256 !== now) reasons.push(`${lens} prompt changed since calibration`);
-  if (lens === 'codex-reviewer' && s) {
+  if (lens !== CODEX_LENS && s) reasons.push(...pinMismatch(lens, s.model, s.effort, agentsDir).map((r) => r.replace(' was recorded ', ' was calibrated ')));
+  if (lens === CODEX_LENS && s) {
     if (s.model !== REVIEW_DEFAULTS.model) reasons.push(`codex-reviewer was calibrated on model ${s.model}, but the runner's review default is ${REVIEW_DEFAULTS.model}`);
     if (s.effort !== REVIEW_DEFAULTS.effort) reasons.push(`codex-reviewer was calibrated at effort ${s.effort}, but the runner's review default is ${REVIEW_DEFAULTS.effort}`);
     if (doc.stamp.codexArgsSha256 !== sha256File(CODEX_ARGS)) reasons.push('scripts/codex/lib/args.mjs changed since calibration');
@@ -822,6 +863,8 @@ if (isMain(import.meta.url)) {
     if (!SPLITS.includes(phase)) usage();
     const hash = promptSha256(flags['--lens'], agentsDir);
     if (hash === null) die(`assurance: no agent file for lens ${flags['--lens']} in ${agentsDir}`, 64);
+    const pinned = pinMismatch(flags['--lens'], flags['--model'], flags['--effort'], agentsDir);
+    if (pinned.length) die(`assurance: ${pinned.join('; ')}. Run the lens as its agent file pins it and record that.`, 64);
     const c = cases().find((x) => x.id === flags['--case']);
     if (!c) die(`assurance: no case ${flags['--case']} in cases.json`, 64);
     if (c.split !== phase) die(`assurance: ${c.id} is a ${c.split}-split case; record it with --phase ${c.split}`, 64);
@@ -853,6 +896,8 @@ if (isMain(import.meta.url)) {
     try { result = calc(records, cases(), targets, { corpusSha256: corpusSha256(root) }); } catch (err) { die(`assurance: ${err.message}`, 1); }
     const drift = promptDrift(records, agentsDir);
     if (drift.length) die(`assurance: trials for ${drift.join(', ')} were recorded under a prompt that differs from the agent file today. Re-run /deliver:calibrate for them.`, 1);
+    const pins = pinDrift(records, agentsDir);
+    if (pins.length) die(`assurance: ${pins.join('; ')}. Re-run /deliver:calibrate for them.`, 1);
     if (flags['--write']) fs.writeFileSync(path.join(root, 'panels.json'), JSON.stringify(panelsDoc(result), null, 2) + '\n');
     print(flags['--json'] ? { lenses: result.lenses, tiers: result.tiers } : renderCalc(result));
   } else usage();

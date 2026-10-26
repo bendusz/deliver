@@ -17,8 +17,23 @@ none of this file applies.
   its model, effort, and tools.
 - Codex build, fix, and review runs stay on the bundled runner.
 - Use `delegate_task` with the Codex provider only for an advisory or research second opinion.
-  Record `git status --porcelain` before it and confirm the output is unchanged after. A changed
-  tree is a failed run: stop and report it.
+  The child can write, and an overwrite of an already modified or untracked file, or a commit,
+  leaves `git status --porcelain` unchanged, so compare content instead. From the checkout root,
+  run these before the call and keep their output:
+
+  <!-- advisory-snapshot -->
+  ```
+  git rev-parse HEAD
+  git stash create
+  git -c core.quotePath=false ls-files -o --exclude-standard
+  git -c core.quotePath=false ls-files -o --exclude-standard | git hash-object --stdin-paths
+  ```
+
+  They give the commit, a commit whose tree holds the tracked changes (it prints nothing when there
+  are none, and touches neither the working tree, the index, nor the stash list), and the untracked
+  files with their content hashes. Run them again after the call and compare, reading each `stash
+  create` commit as its tree (`git rev-parse <sha>^{tree}`), since the commit itself carries a
+  timestamp. Any difference is a failed run: stop, investigate what changed, and report it.
 
 ## Worktrees
 - You own a worktree under `tmp/worktrees/` or on a `pm/*` branch. Any other worktree belongs to

@@ -7,7 +7,9 @@ import { pathToFileURL } from 'node:url';
 import { tmpDir, gitIn, PLUGIN_ROOT } from './helpers.mjs';
 
 const SCRIPT = path.join(PLUGIN_ROOT, 'scripts', 'holdout.mjs');
-const REF = 'refs/deliver/holdout/S1-2';
+// A project at the git top level keys its refs `_`.
+const REF = 'refs/deliver/holdout/_/S1-2';
+const LEGACY = 'refs/deliver/holdout/S1-2';
 
 function repo() {
   const d = tmpDir('pmholdout-');
@@ -151,4 +153,121 @@ test('holdout: after RUN exits only POSIX kills the process group; Windows kills
   // The pid of a process that has exited may already belong to another one, and taskkill /T
   // would kill that process and its children.
   assert.equal(killsAfterExit('win32'), false);
+});
+
+// handRef(d, ref, files): a holdout ref written by hand, bypassing store's checks.
+function handRef(d, ref, files) {
+  const lines = Object.entries(files).map(([name, text]) => {
+    const blob = spawnSync('git', ['-C', d, 'hash-object', '-w', '--stdin'], { input: text, encoding: 'utf8' }).stdout.trim();
+    return `100644 blob ${blob}\t${name}\n`;
+  });
+  const tree = spawnSync('git', ['-C', d, 'mktree'], { input: lines.join(''), encoding: 'utf8' }).stdout.trim();
+  gitIn(d, ['update-ref', ref, gitIn(d, ['commit-tree', tree, '-m', 'by hand']).trim()]);
+}
+
+test('holdout: a multiline RUN is refused by store, check, and run, and nothing runs', () => {
+  const d = repo();
+  const multi = checks('node -e "process.exit(0)"\nnode -e "process.exit(1)"');
+  const stored = cli(['store', 'S1-2', multi, '--root', d]);
+  assert.equal(stored.status, 64, 'store refuses a second line');
+  assert.match(stored.stderr, /one line/);
+  assert.equal(spawnSync('git', ['-C', d, 'rev-parse', '--verify', '--quiet', REF]).status, 1, 'no ref written');
+  handRef(d, REF, { RUN: 'node -e "require(\'fs\').writeFileSync(\'ran.txt\', \'x\')"\nnode -e "process.exit(1)"\n' });
+  assert.equal(cli(['check', 'S1-2', '--root', d]).status, 64, 'check refuses a multiline RUN');
+  const r = cli(['run', 'S1-2', '--target', d, '--root', d]);
+  assert.equal(r.status, 64, 'run refuses it rather than running the first line');
+  assert.match(r.stderr, /one line/);
+  assert.ok(!fs.existsSync(path.join(d, 'ran.txt')), 'no line of it ran');
+  handRef(d, REF, { RUN: '  \n' });
+  assert.equal(cli(['check', 'S1-2', '--root', d]).status, 64, 'check refuses a blank RUN');
+  assert.equal(cli(['store', 'S1-2', checks('\n\n'), '--root', d]).status, 64, 'store refuses a blank RUN');
+});
+
+// twoProjects(): one repository holding deliver projects a/ and nested/b/, plus the root.
+function twoProjects() {
+  const d = repo();
+  for (const p of ['a', path.join('nested', 'b')]) {
+    fs.mkdirSync(path.join(d, p, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(d, p, 'src', 'x.txt'), 'ok\n');
+  }
+  gitIn(d, ['add', '-A']);
+  gitIn(d, ['commit', '-qm', 'projects']);
+  return { d, a: path.join(d, 'a'), b: path.join(d, 'nested', 'b') };
+}
+
+test('holdout: refs are namespaced by project, so two projects keep their own S1-1', () => {
+  const { d, a, b } = twoProjects();
+  const sa = cli(['store', 'S1-1', checks('node -e "process.exit(1)"'), '--root', a]);
+  const sb = cli(['store', 'S1-1', checks('node -e "process.exit(0)"'), '--root', b]);
+  assert.equal(sa.status, 0, sa.stderr);
+  assert.equal(sb.status, 0, sb.stderr);
+  assert.match(sa.out.ref, /^refs\/deliver\/holdout\/a_[0-9a-f]{8}\/S1-1$/);
+  assert.match(sb.out.ref, /^refs\/deliver\/holdout\/nested-b_[0-9a-f]{8}\/S1-1$/);
+  assert.notEqual(sa.out.ref, sb.out.ref);
+  const ra = cli(['run', 'S1-1', '--target', a, '--root', a]);
+  assert.equal(ra.status, 1, 'project A runs its own failing checks');
+  assert.equal(ra.out.verdict, 'fail');
+  const rb = cli(['run', 'S1-1', '--target', b, '--root', b]);
+  assert.equal(rb.status, 0, rb.stderr);
+  assert.equal(cli(['check', 'S1-1', '--root', d]).status, 66, 'the root project has no S1-1');
+});
+
+test('holdout: --target must lie inside the owning project', () => {
+  const { a, b } = twoProjects();
+  const stored = cli(['store', 'S1-1', checks('node -e "process.exit(0)"'), '--root', a]);
+  assert.equal(stored.status, 0, stored.stderr);
+  assert.equal(cli(['run', 'S1-1', '--target', b, '--root', a]).status, 64, 'another project');
+  assert.equal(cli(['run', 'S1-1', '--target', tmpDir('pmelse-'), '--root', a]).status, 64, 'outside the repository');
+  assert.equal(cli(['run', 'S1-1', '--target', path.join(a, 'src'), '--root', a]).status, 0, 'inside the project');
+});
+
+test('holdout: run from a project below the git top level materialises RUN and passes', () => {
+  const { b } = twoProjects();
+  const dir = checks();
+  assert.equal(cli(['store', 'S1-2', dir, '--root', b]).status, 0);
+  const r = cli(['run', 'S1-2', '--target', b, '--root', b]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.out.verdict, 'pass');
+  // And from a linked worktree of the whole repository, judging that worktree's copy of the project.
+  const wt = path.join(tmpDir('pmwt-'), 'story');
+  gitIn(path.dirname(path.dirname(b)), ['worktree', 'add', '-q', '-b', 'pm/S1-2-x', wt]);
+  const inWt = path.join(wt, 'nested', 'b');
+  const w = cli(['run', 'S1-2', '--target', inWt, '--root', inWt]);
+  assert.equal(w.status, 0, w.stderr);
+});
+
+test('holdout: a root project still reads the legacy unnamespaced ref, with a note; a nested one does not', () => {
+  const { d, b } = twoProjects();
+  handRef(d, LEGACY, { RUN: 'node -e "process.exit(0)"\n' });
+  const c = cli(['check', 'S1-2', '--root', d]);
+  assert.equal(c.status, 0, c.stderr);
+  assert.equal(c.out.ref, LEGACY);
+  assert.match(c.stderr, /legacy/);
+  assert.equal(cli(['run', 'S1-2', '--target', d, '--root', d]).status, 0);
+  assert.equal(cli(['check', 'S1-2', '--root', b]).status, 66);
+});
+
+test('holdout: a project directory whose name starts with .. is still inside the repository', () => {
+  const d = repo();
+  const odd = path.join(d, '..odd');
+  fs.mkdirSync(path.join(odd, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(odd, 'src', 'x.txt'), 'ok\n');
+  const r = cli(['store', 'S1-2', checks(), '--root', odd]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.out.ref, /^refs\/deliver\/holdout\/odd_[0-9a-f]{8}\/S1-2$/);
+  const run = cli(['run', 'S1-2', '--target', odd, '--root', odd]);
+  assert.equal(run.status, 0, run.stderr);
+});
+
+test('holdout: only a bad stored RUN names RUN in its exit-64 message, so the PM regenerates for that alone', () => {
+  const { a, b } = twoProjects();
+  const stored = cli(['store', 'S1-1', checks('node -e "process.exit(0)"'), '--root', a]);
+  assert.equal(stored.status, 0, stored.stderr);
+  const bad = cli(['run', 'S1-1', '--target', b, '--root', a]);
+  assert.equal(bad.status, 64);
+  assert.doesNotMatch(bad.stderr, /\bRUN\b/, 'a wrong --target is the command\'s mistake');
+  handRef(path.dirname(a), `refs/deliver/holdout/_/S1-1`, { RUN: 'a\nb\n' });
+  const multi = cli(['run', 'S1-1', '--target', path.dirname(a), '--root', path.dirname(a)]);
+  assert.equal(multi.status, 64);
+  assert.match(multi.stderr, /\bRUN\b/);
 });

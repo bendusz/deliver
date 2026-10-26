@@ -14,8 +14,9 @@ identical.
 | What each story must do | `docs/stories/*.md` |
 | Who holds a story, its builder, branch, status, tier, protected paths, gate verdicts, and loop counters | the story's `## Execution` block |
 | What a story changed, why, and how it was verified | the `--no-ff` merge commit body |
-| A `T2` story's holdout checks | the private ref `refs/deliver/holdout/<story-id>`, never checked out or pushed (`implementation-loop.md` state 1) |
+| A `T2` story's holdout checks | the private ref `refs/deliver/holdout/<project-key>/<story-id>`, never checked out or pushed (`implementation-loop.md` state 1) |
 | The project history | `git log --first-parent <integration branch>` |
+| The story that shipped a defect a later fix repairs | an `Escaped-From: <story-id>` trailer on the fix commit, or `Escaped-From: <project-path>/<story-id>`, with the project's path from the git top level, when the repository holds several projects (`retrospective.md`) |
 | Progress, decisions, blockers, and next steps as they happen | `tmp/log.md`, gitignored, local to this checkout |
 | A session's next step | `docs/handoff/<actor-id>.md`, optional |
 | Scratch, prompts, raw output, diffs, worktrees, the log | `tmp/`, gitignored, never load-bearing |
@@ -78,8 +79,8 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
   commit SHA it judged, recorded after every writer run at `T1` and `T2`. It is `n/a` at `T0`.
 - `verifier` is `"<PASS|FAIL|UNKNOWN> <sha>"`: the latest `pm-verifier` verdict and the full
   commit SHA it judged, recorded at state 5 and absent before the first verification. The
-  `require-verified.mjs` hook blocks a merge of the story branch unless this reads `PASS` and,
-  at `T1` and `T2`, `integrity` reads `pass`. Each SHA must be the branch head, or a commit after
+  `require-verified.mjs` hook, and the git-level merge gate behind it, block a merge of the story
+  branch unless this reads `PASS` and, at `T1` and `T2`, `integrity` reads `pass`. Each SHA must be the branch head, or a commit after
   which the branch gained only commits to the story file or `docs/handoff/*.md` and merges whose
   tree equals the automatic merge of their parents outside the story file.
 - **Claim fields.** `tier`, `deliver`, `branch`, `protected`, `protected_base`, and pm-meta
