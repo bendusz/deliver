@@ -60,6 +60,7 @@ spends neither a round nor a retry.
 
 ## The round cap
 Each round re-runs the gates and regenerates the cumulative diff for re-review by the story's tier
-panel, per `review-gates.md`, **up to 3 rounds**.
+panel plus the lenses its risk triggers add, exactly as `implementation-loop.md` state 3 runs
+them, per `review-gates.md`, **up to 3 rounds**.
 Increment `rounds` in the story's Execution block and commit it before the round's dispatch; that
 **cap** counts earlier sessions' rounds. Still failing, **escalate** to the user.

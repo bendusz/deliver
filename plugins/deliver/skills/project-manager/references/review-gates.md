@@ -17,8 +17,8 @@ The story's `tier` (`decomposition.md`) picks its panel. Read
 it holds a `status` of `measured` or `unmeasured`, the `panel` as lenses with a `trials` count of 1
 or 2, the calibrated escape `bound`, and the `target`.
 
-- A `measured` tier whose stamp matches the shipped lenses runs its `panel`, each lens for its
-  `trials`. The panel in force always adds the builder's opposite-family lens on top
+- A `measured` tier whose stamp matches the shipped lenses, and whose `bound` meets the plan's
+  target for that tier, runs its `panel`, each lens for its `trials`. The panel in force always adds the builder's opposite-family lens on top
   (`expert-builder` gets `codex-reviewer`, `codex-builder` gets `code-integrity-reviewer`) when
   the measured panel lacks it.
 - A tier that is `unmeasured`, absent, or stamped for other models or prompts runs the **maximum
@@ -46,7 +46,9 @@ fix round written by the other family gets the opposite-family lens for that rou
 lens, or a calibrated `codex-reviewer`), because Codex is absent or refuses, `T0` and `T1`
 continue with the lenses that can run and record it, and `T2` escalates. The Execution block's
 `panel` then lacks that lens, so the trust report counts the story as below panel and withholds
-that tier's bound.
+that tier's bound. A `codex-reviewer` run the runner moved to a fallback model (its envelope's
+model or effort differs from the calibrated `panels.json` stamp) counts as that lens missing: record
+it under its real model, never as the calibrated lens, and escalate at `T2`.
 
 ## Risk triggers: lenses added on top
 These lenses are additive. Under a measured panel, a story gets each one its risk calls for, even
