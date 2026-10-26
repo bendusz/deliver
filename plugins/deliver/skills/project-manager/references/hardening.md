@@ -67,7 +67,9 @@ fails to run warns and lets it through. A `git pull` of the integration branch w
 config is trusted only from the designated remote and only for the pull's own update (its
 `GIT_REFLOG_ACTION`, MERGE_HEAD, or rebase state); a tool that presets `GIT_REFLOG_ACTION` and
 fast-forwards needs tracking config (`environment.md`). With a `pm/*` name as the
-plan's integration branch, no hook is written (mode `none`) and that is reported. A hook that runs deliver's lines, in any hooks directory,
+plan's integration branch, on git 2.28 or newer, no hook is written (mode `none`) and that is
+reported, as are an invalid branch name (`git check-ref-format --branch`) and a branch that does
+not exist. A hook that runs deliver's lines, in any hooks directory,
 is `chained` once it is executable and its lines work as chained; otherwise the installer, at
 session start and with `--check` alike, reports `chained-inactive` (not executable),
 `chained-crlf` (CRLF line endings sh cannot run), or `chained-stale` (an earlier form of the lines

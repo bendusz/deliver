@@ -815,3 +815,12 @@ test('retro-stats --trust: when diff-tree fails, merge times fall back to update
   assert.equal(failing.tiers.T1.observed.shipped, 1, "the merge time falls back to updated, not to B's earlier merged commit");
   assert.equal(failing.tiers.T1.observed.escapedStories, 1, 'an escape is never dropped: it counts for every project');
 });
+
+test('retro-stats: the plan\'s integration branch is parsed whole (release+fix), never cut to a prefix', async () => {
+  const { planBranch } = await import('../retro-stats.mjs');
+  const p = proj();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `release+fix`\n');
+  assert.equal(planBranch(p), 'release+fix');
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: rel~ease\n');
+  assert.equal(planBranch(p), null);
+});
