@@ -54,9 +54,13 @@ Inspect (whichever apply):
   automatic merge" (the verdicts are still checked; below 2.28 the fallback also misses
   fast-forwards, squash merges, and cherry-picks, and compares a merge's staged result only where
   git needs no content merge). A foreign hook that already runs deliver's lines shows as
-  `chained`, which is in place, in any hooks directory; `chained-inactive` (not executable; run the
-  printed `chmod +x`), `chained-crlf` (CRLF line endings; convert the hook to LF), `chained-stale` (lines from an earlier version; replace them as printed),
-  and `copy-missing` or `copy-stale` (run the installer without `--check`) are not. For a hook whose interpreter is not sh, it prints an sh wrapper to install instead. It
+  `chained`, which is in place, in any hooks directory; `chained-inactive` (not executable; run
+  the printed `chmod +x`), `chained-crlf` (CRLF line endings; convert the hook to LF),
+  `chained-stale` (lines from an earlier version; replace them as printed), and `copy-missing`
+  or `copy-stale` (run the installer without `--check`) are not. For a hook whose interpreter is
+  not sh, it prints an sh wrapper to install instead. It reports mode `none` when the plan's
+  integration branch is a `pm/*` name (no hook is written; fix the plan), and an integration
+  branch with no upstream ("set one with git branch --set-upstream-to"). It
   reports `merge gate: disabled` and exits 1 when `git config deliver.mergeGate` is `off`, which
   `--uninstall` sets; ask before re-enabling, since the user turned it off. It also reports a
   deliver shim it cannot remove, such as a v1 shim in an in-tree `core.hooksPath`. On any other

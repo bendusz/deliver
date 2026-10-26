@@ -63,11 +63,17 @@ read) gets an sh wrapper to install instead: rename the hook to `<hook>.local` a
 printed wrapper as `<hook>`; it skips a missing `<hook>.local` rather than block updates. A
 symlinked hook always gets the wrapper, so its shared target is never edited. Only the gate's own
 refusal blocks an update (the gate exits 86, which the shim turns into exit 1); a gate or node that
-fails to run warns and lets it through. A hook that runs deliver's lines, in any hooks directory,
+fails to run warns and lets it through. A `git pull` of the integration branch with no tracking
+config is trusted only from the designated remote and only for the pull's own update (its
+`GIT_REFLOG_ACTION`, MERGE_HEAD, or rebase state); a tool that presets `GIT_REFLOG_ACTION` and
+fast-forwards needs tracking config (`environment.md`). With a `pm/*` name as the
+plan's integration branch, no hook is written (mode `none`) and that is reported. A hook that runs deliver's lines, in any hooks directory,
 is `chained` once it is executable and its lines work as chained; otherwise the installer, at
 session start and with `--check` alike, reports `chained-inactive` (not executable),
 `chained-crlf` (CRLF line endings sh cannot run), or `chained-stale` (an earlier form of the lines
-that no longer works), and `--check` also `copy-missing` or `copy-stale` (the private copy it
+that no longer works, or a legacy form in a hook run with `-e` on its `#!` line or `set -e` in
+its body; a hook manager that runs `sh -e "$hook"` cannot be seen, and the current lines are -e
+safe anyway), and `--check` also `copy-missing` or `copy-stale` (the private copy it
 calls). `/deliver:doctor` checks and repairs the install.
 `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --uninstall <project>` removes it and sets
 `git config deliver.mergeGate off` in the repository's local config, so session start does not

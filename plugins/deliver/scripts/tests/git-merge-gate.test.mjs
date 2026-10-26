@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { newProj, runHook, gitIn, tmpDir, HOOKS_DIR } from './helpers.mjs';
 
 const { installGitHook, shim, writeAtomic, shCompatible, shSyntaxOk, wrapper, MARKER, GATE, RT_HOOK, TREE_NOTE } = await import(path.join(HOOKS_DIR, 'git-hook-install.mjs'));
-const { judgeMerge, judgeRefUpdate, ONE_AT_A_TIME, fetchUrl } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
+const { judgeMerge, judgeRefUpdate, ONE_AT_A_TIME, fetchUrl, planName, planEntry } = await import(path.join(HOOKS_DIR, 'require-verified.mjs'));
 
 const BRANCH = 'pm/S1-1-fix';
 const STORY = 'docs/stories/S1-1-fix.md';
@@ -992,6 +992,9 @@ test('git gate: FETCH_HEAD urls match configured remotes the way git writes them
   assert.equal(fetchUrl('/srv/git/origin.git'), '/srv/git/origin');
   // A / before the first : is a local path, not scp-style: nothing is dropped.
   assert.equal(fetchUrl('/srv/a@b:c/repo.git'), '/srv/a@b:c/repo');
+  // A Windows drive path is local too.
+  assert.equal(fetchUrl('C:/git/a@b:c/repo.git'), 'C:/git/a@b:c/repo');
+  assert.equal(fetchUrl('C:\\git\\a@b:c.git'), 'C:\\git\\a@b:c');
 });
 
 test('git gate: a plain pull --rebase flattening a non-story merge that a story forked from is not taken for that story', () => {
@@ -1242,6 +1245,110 @@ test('git gate: a gitlink commit on top of a story merge is refused under submod
   gitIn(p, ['checkout', '-q', '-f', 'main']);
   const before = head(p);
   refused(p, before, gitRun(p, ['merge', '--ff-only', 'stage']), 'gitlink on top of a story merge');
+});
+
+test('git gate: a preset GIT_REFLOG_ACTION does not make an unrelated update a pull; a tool-run pull is trusted only bound to its operation', () => {
+  // A tool that presets GIT_REFLOG_ACTION runs git pull with no tracking config. A rebasing or
+  // merging pull is still bound to its operation (the rebase state's onto, or MERGE_HEAD), and
+  // passes; a fast-forward pull leaves no such state, so FETCH_HEAD is not trusted and the upstream
+  // code above the shipped story is refused. --check says to set an upstream, which makes it pass.
+  for (const mode of ['--rebase=merges', '--no-rebase', '--ff-only']) {
+    const o = verified();
+    const c = clonedProject(o);
+    gitIn(c, ['config', '--unset', 'branch.main.remote']);
+    gitIn(c, ['config', '--unset', 'branch.main.merge']);
+    if (mode !== '--ff-only') commitFile(c, 'src/local.js', 'local\n', 'feat: local');
+    assert.equal(gitRun(o, ['merge', '--no-ff', BRANCH, '-m', 'feat: ship']).status, 0);
+    commitFile(o, 'src/after.js', 'after\n', 'feat: after');
+    const r = gitRun(c, ['pull', mode, '--no-edit', 'origin', 'main'], { GIT_REFLOG_ACTION: 'ide' });
+    if (mode !== '--ff-only') {
+      assert.equal(r.status, 0, `${mode}: ${r.stderr}`);
+      continue;
+    }
+    assert.notEqual(r.status, 0, r.stderr);
+    assert.match(r.stderr, /deliver blocked/);
+    gitIn(c, ['reset', '-q', '--merge']);
+    const check = spawnSync(process.execPath, [INSTALL, '--check', c], { encoding: 'utf8', env: env() });
+    assert.match(check.stdout, /main has no upstream; .*set one with git branch --set-upstream-to <remote>\/main main/);
+    gitIn(c, ['branch', '--set-upstream-to', 'origin/main', 'main']);
+    const t = gitRun(c, ['pull', mode, '--no-edit', 'origin', 'main'], { GIT_REFLOG_ACTION: 'ide' });
+    assert.equal(t.status, 0, t.stderr);
+  }
+  // GIT_REFLOG_ACTION=pull on a direct story merge after a fetch: still refused.
+  const o = project();
+  const c = clonedProject(o);
+  gitIn(c, ['config', '--unset', 'branch.main.remote']);
+  gitIn(c, ['config', '--unset', 'branch.main.merge']);
+  gitRun(o, ['merge', '--no-ff', BRANCH, '-m', 'unverified story'], { DELIVER_NO_ENFORCE: '1' });
+  gitIn(c, ['fetch', '-q', 'origin', 'main']);
+  const before = head(c);
+  refused(c, before, gitRun(c, ['merge', '--no-ff', `origin/${BRANCH}`, '-m', 'm'], { GIT_REFLOG_ACTION: 'pull' }), 'merge dressed as a pull');
+});
+
+test('git gate: with a narrowed fetch refspec, a pull of the integration branch skips the stale tracking-ref comparison', () => {
+  const o = verified();
+  const c = clonedProject(o);
+  gitIn(c, ['config', '--unset', 'branch.main.remote']);
+  gitIn(c, ['config', '--unset', 'branch.main.merge']);
+  gitIn(c, ['config', 'remote.origin.fetch', '+refs/heads/pm/*:refs/remotes/origin/pm/*']);
+  localStory(c, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'z.js'), 'z\n'));
+  assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+  gitIn(c, ['branch', '-D', 'pm/S1-3-z']);
+  commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+  const r = gitRun(c, ['pull', '--rebase=merges', 'origin', 'main']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: a pull with no tracking config that stops on a record conflict, concluded by commit or rebase --continue, is allowed', () => {
+  for (const mode of ['--no-rebase', '--rebase']) {
+    const o = verified();
+    const c = clonedProject(o);
+    gitIn(c, ['config', '--unset', 'branch.main.remote']);
+    gitIn(c, ['config', '--unset', 'branch.main.merge']);
+    // Local main records something else in the story file; upstream ships the story, then code.
+    commitFile(c, STORY, storyText({ ...claimFor('S1-1-fix'), updated: '2026-10-26 07:00' }), 'chore(S1-1-fix): note');
+    assert.equal(gitRun(o, ['merge', '--no-ff', BRANCH, '-m', 'feat: ship']).status, 0);
+    commitFile(o, 'src/after.js', 'after\n', 'feat: after');
+    const r = gitRun(c, ['pull', mode, '--no-edit', 'origin', 'main']);
+    assert.notEqual(r.status, 0, `${mode}: the record conflict stops the pull: ${r.stdout}${r.stderr}`);
+    assert.doesNotMatch(r.stderr, /deliver blocked/);
+    gitIn(c, ['checkout', mode === '--rebase' ? '--ours' : '--theirs', STORY]);
+    gitIn(c, ['add', STORY]);
+    const done = mode === '--rebase' ? gitRun(c, ['rebase', '--continue']) : gitRun(c, ['commit', '--no-edit']);
+    assert.equal(done.status, 0, `${mode}: ${done.stdout}${done.stderr}`);
+  }
+});
+
+test('git gate: an integration branch name is parsed whole: release+fix is guarded exactly; an invalid name is reported, not cut', () => {
+  const p = project();
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `release+fix`  <!-- note -->\n');
+  gitIn(p, ['add', 'docs/plan.md']);
+  gitIn(p, ['commit', '-qm', 'plan: release+fix']);
+  gitIn(p, ['branch', 'release+fix', 'main']);
+  const r = installGitHook(p);
+  assert.deepEqual(r.branches, ['release+fix']);
+  assert.match(fs.readFileSync(path.join(p, '.git', 'hooks', RT_HOOK), 'utf8'), /"refs\/heads\/release\+fix"\)/);
+  gitIn(p, ['checkout', '-q', 'release+fix']);
+  const before = head(p, 'release+fix');
+  const m = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm']);
+  assert.notEqual(m.status, 0, m.stderr);
+  assert.equal(head(p, 'release+fix'), before);
+  gitIn(p, ['checkout', '-q', '-f', 'main']);
+  // An invalid name.
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# Plan\n- Integration branch: `rel~ease`\n');
+  gitIn(p, ['commit', '-qam', 'plan: invalid']);
+  const bad = installGitHook(p);
+  assert.equal(bad.ok, false);
+  assert.match(bad.notes.join('\n'), /integration branch rel~ease is not a valid branch name; the gate is not enforced/);
+  assert.ok(!bad.branches.includes('rel'), 'never cut down to a valid prefix');
+});
+
+test('git gate: planName reads the whole delimited value and refuses invalid names', () => {
+  assert.equal(planName('- Integration branch: <main>  <!-- the branch every story is cut from -->'), 'main');
+  assert.equal(planName('- Integration branch: `release+fix` (since S3)'), 'release+fix');
+  assert.equal(planName('- Integration branch: develop'), 'develop');
+  assert.equal(planEntry('- Integration branch: `rel~ease`'), 'rel~ease');
+  for (const bad of ['rel~ease', 'a..b', '-x', 'x.lock', 'a//b', 'x.', '@', 'a@{b']) assert.equal(planName(`- Integration branch: \`${bad}\``), null, bad);
 });
 
 // --- what must keep working ---
@@ -1632,7 +1739,8 @@ test('git gate: a plan naming a pm/* integration branch writes no broken shim, s
   const r = installGitHook(p);
   assert.equal(r.ok, false);
   assert.match(r.notes.join('\n'), /integration branch pm\/main is a story branch name; the gate is not enforced/);
-  assert.equal(fs.existsSync(path.join(p, '.git', 'hooks', RT_HOOK)), false, 'no shim written');
+  assert.equal(r.mode, 'none');
+  for (const name of [RT_HOOK, 'pre-commit', 'pre-merge-commit']) assert.equal(fs.existsSync(path.join(p, '.git', 'hooks', name)), false, `no ${name} written`);
   const c = gitRun(p, ['commit', '--allow-empty', '-m', 'chore: empty']);
   assert.equal(c.status, 0, c.stderr);
 });
@@ -1663,6 +1771,9 @@ test('git gate: notes are one per state: a CRLF hook gets only the CRLF note; -e
   fs.writeFileSync(f, `#!/bin/sh\n${r7}\n`);
   assert.equal(installGitHook(p).hooks[RT_HOOK], 'chained');
   fs.writeFileSync(f, `#!/bin/sh -e\n${r7}\n`);
+  assert.equal(installGitHook(p).hooks[RT_HOOK], 'chained-stale');
+  // set -e, or set -eu, in the body is the same.
+  fs.writeFileSync(f, `#!/bin/sh\nset -eu\n${r7}\n`);
   assert.equal(installGitHook(p).hooks[RT_HOOK], 'chained-stale');
 });
 
