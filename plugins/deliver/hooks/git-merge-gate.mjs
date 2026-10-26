@@ -87,7 +87,8 @@ if (verdict && !verdict.allow) {
     const what = verdict.ref ? `the update of ${verdict.ref}` : 'this merge commit';
     fs.writeSync(2, `deliver blocked ${what}: ${lib.oneLine(verdict.reason)}.\n${recovery({ inMerge, top, next: verdict.next })}\n`);
   } catch { /* the refusal stands without its message */ } finally {
-    process.exit(lib?.REFUSED ?? 86);
+    // lib.mjs is loaded: a verdict exists only after it loaded.
+    process.exit(lib.REFUSED);
   }
 }
 process.exit(0);
@@ -138,8 +139,8 @@ function recovery({ inMerge: merging, top: root, next }) {
   };
   if (exists('rebase-merge') || exists('rebase-apply')) return 'Run git rebase --abort, fix the cause, and rebase again.';
   if (exists('CHERRY_PICK_HEAD')) return 'Run git cherry-pick --abort, fix the cause, and retry.';
-  const staged = lib.git(root, ['diff', '--cached', '--quiet', 'HEAD', '--']) === null;
-  const isRefused = typeof next === 'string' && /^[0-9a-f]{40,64}$/.test(next) && lib.git(root, ['diff', '--cached', '--quiet', next, '--']) !== null;
+  const staged = lib.git(root, ['diff', '--cached', '--quiet', rv.NO_SUBMODULE_IGNORE, 'HEAD', '--']) === null;
+  const isRefused = typeof next === 'string' && /^[0-9a-f]{40,64}$/.test(next) && lib.git(root, ['diff', '--cached', '--quiet', rv.NO_SUBMODULE_IGNORE, next, '--']) !== null;
   if (staged && isRefused) return 'The refused changes are staged: run git reset --merge to return the index and working tree to HEAD, then fix the cause and retry.';
   return 'Fix the cause and retry.';
 }
@@ -163,7 +164,7 @@ function stagedDiffers(root, mergeHead, files) {
     const clean = chomp(run(['write-tree']).stdout || '');
     const staged = chomp(git(root, ['write-tree']) || '');
     if (!clean || !staged) return false;
-    const r = rv.spawnGit(root, ['diff', '-z', '--name-only', clean, staged, '--']);
+    const r = rv.spawnGit(root, ['diff', rv.NO_SUBMODULE_IGNORE, '-z', '--name-only', clean, staged, '--']);
     if (r.status !== 0) return false;
     return r.stdout.split('\0').filter(Boolean).some((p) => !record(p));
   } finally {

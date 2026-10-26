@@ -43,7 +43,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { git, chomp, isMain, oneLine, REFUSED } from './lib.mjs';
-import { discover, projectAt, project, planName, mergeTreeWorks } from './require-verified.mjs';
+import { discover, projectAt, project, planName, mergeTreeWorks, storyReadableUpstream } from './require-verified.mjs';
 
 export const MARKER = '# deliver-merge-gate v2';
 const OURS = /^# deliver-merge-gate v\d+$/;
@@ -222,28 +222,50 @@ function layout(top) {
 // (after --uninstall, or a git upgrade that drops a fallback hook), or without mktemp, they do
 // nothing. The reference-transaction form saves stdin once, feeds it to the gate, and then gives
 // the same records to whatever runs next.
-function gateLines(name, copy) {
+function gateLines(name, copy, form = 'current') {
   const c = shQuote(slash(copy));
-  return name === RT_HOOK
-    ? [
+  // Earlier forms, kept only so legacyLines can recognise them.
+  if (form === 'r5') {
+    return name === RT_HOOK ? [
+      `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
+      '  cat > "$deliver_in";',
+      `  sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; };`,
+      '  exec < "$deliver_in"; rm -f "$deliver_in";',
+      'fi',
+    ] : [];
+  }
+  if (form === 'r7') {
+    return name === RT_HOOK ? [
       `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
       '  cat > "$deliver_in";',
       `  sh ${c} "$@" < "$deliver_in"; if [ $? = 1 ]; then rm -f "$deliver_in"; exit 1; fi;`,
       '  exec < "$deliver_in"; rm -f "$deliver_in";',
       'fi',
+    ] : [`if [ -f ${c} ]; then sh ${c} "$@"; if [ $? = 1 ]; then exit 1; fi; fi`];
+  }
+  // The gate's status is caught with ||, so under `sh -e` (husky) a refusal still removes the
+  // temp file before exiting 1. The temp file goes in $TMPDIR, else /tmp.
+  return name === RT_HOOK
+    ? [
+      `if [ -f ${c} ] && deliver_in=$(mktemp "\${TMPDIR:-/tmp}/deliver-gate.XXXXXX" 2>/dev/null); then`,
+      '  cat > "$deliver_in";',
+      `  deliver_rc=0; sh ${c} "$@" < "$deliver_in" || deliver_rc=$?;`,
+      '  if [ "$deliver_rc" = 1 ]; then rm -f "$deliver_in"; exit 1; fi;',
+      '  exec < "$deliver_in"; rm -f "$deliver_in";',
+      'fi',
     ]
-    : [`if [ -f ${c} ]; then sh ${c} "$@"; if [ $? = 1 ]; then exit 1; fi; fi`];
+    : [`if [ -f ${c} ]; then deliver_rc=0; sh ${c} "$@" || deliver_rc=$?; if [ "$deliver_rc" = 1 ]; then exit 1; fi; fi`];
 }
 
-// legacyLines(name, copy): earlier forms of the lines that still work as chained, so they count
-// as current: the reference-transaction line printed before the explicit-success form. The
-// earlier fallback-hook line is not one: as a hook's last line it exits 1 when the gate allows.
+// legacyLines(name, copy): earlier forms of the lines that still work as chained, so they count as
+// current, each as its inline line and as its whole wrapper block: the round-5 and round-7
+// reference-transaction forms, and the round-7 fallback-hook form. The round-5 fallback-hook line
+// is not one: as a hook's last line it exits 1 when the gate allows.
 function legacyLines(name, copy) {
-  const c = shQuote(slash(copy));
-  return name === RT_HOOK
-    ? [`if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then cat > "$deliver_in"; sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; }; exec < "$deliver_in"; rm -f "$deliver_in"; fi`,
-      `  sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; };`]
-    : [];
+  return ['r5', 'r7'].flatMap((form) => {
+    const lines = gateLines(name, copy, form);
+    return lines.length ? [lines.map((l) => l.trim()).join(' '), lines.join('\n')] : [];
+  });
 }
 
 // addLine(name, copy): gateLines as one line, to put right after the #! line of an existing
@@ -341,7 +363,10 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
       // needs the private copy it calls to be current.
       if (chained) {
         const executable = process.platform === 'win32' || Boolean(fs.statSync(file).mode & 0o111);
-        res.hooks[name] = !executable ? 'chained-inactive' : !current ? 'chained-stale' : check ? copyState(copy, want) : 'chained';
+        // sh reads a CRLF hook as broken lines: report it rather than call it in place.
+        const crlf = cur.text.includes('\r\n');
+        res.hooks[name] = !executable ? 'chained-inactive' : crlf ? 'chained-crlf' : !current ? 'chained-stale' : check ? copyState(copy, want) : 'chained';
+        if (res.hooks[name] === 'chained-crlf') note(`merge gate: ${slash(file)} runs deliver's lines but has CRLF line endings, which sh cannot run; convert it to LF line endings`);
         if (res.hooks[name] === 'chained-inactive') note(`merge gate: ${slash(file)} runs deliver's lines but is not executable, so git skips it; run chmod +x ${shQuote(slash(file))}`);
         else if (res.hooks[name] === 'chained-stale') note(`merge gate: ${slash(file)} runs an earlier version of deliver's lines; replace them: ${chain(name, copy, cur)}`, `merge gate: ${slash(file)} runs an earlier version of deliver's lines; ${pointer}`);
         else if (res.hooks[name] !== 'chained') note(`merge gate: ${slash(file)} runs deliver's lines, but its copy ${slash(copy)} is ${res.hooks[name]}; run the installer without --check to refresh it`);
@@ -474,6 +499,10 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
       add(`merge gate: cannot set git config ${OPT_OUT} off, so session start will install the gate again`);
     }
     return res;
+  }
+  for (const b of res.branches) {
+    const up = storyReadableUpstream(top, b);
+    if (up) add(`merge gate: ${b}'s upstream ${up} also reads as a story branch, so it is not trusted as shipped history; give the remote a name that does not overlap another's`);
   }
   if (res.mode === 'fallback') add(`merge gate: git < 2.28 (this is ${res.git}): fast-forward updates, squash merges, and cherry-picks are not gated (they make no merge commit), and a merge commit's result is compared with the automatic merge only where git needs no content merge, else only the verdicts are checked; upgrade git`);
   else if (!(treeCheck ?? mergeTreeWorks(top))) add(TREE_NOTE);

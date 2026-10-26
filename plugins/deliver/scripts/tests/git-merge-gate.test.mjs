@@ -986,7 +986,9 @@ test('git gate: a leftover story ref of a removed slash-named remote is still a 
 test('git gate: FETCH_HEAD urls match configured remotes the way git writes them', () => {
   assert.equal(fetchUrl('https://user:secret@example.com/team/repo.git/'), 'https://example.com/team/repo');
   assert.equal(fetchUrl('ssh://git@example.com/team/repo.git'), 'ssh://example.com/team/repo');
-  assert.equal(fetchUrl('git@example.com:team/repo.git'), 'git@example.com:team/repo');
+  // An scp-style url: git drops everything up to the first @ when a : follows it.
+  assert.equal(fetchUrl('git@example.com:team/repo.git'), 'example.com:team/repo');
+  assert.equal(fetchUrl('example.com:team/repo.git'), 'example.com:team/repo');
   assert.equal(fetchUrl('/srv/git/origin.git'), '/srv/git/origin');
 });
 
@@ -1015,6 +1017,114 @@ test('git gate: a refusal still exits with the refusal status when its message c
   } finally {
     fs.closeSync(fd);
   }
+});
+
+test('git gate: pull --rebase=merges origin main through an insteadOf-rewritten scp or ssh url, with no tracking config', () => {
+  for (const url of ['git@example.com:org/repo.git', 'ssh://casey@example.com/org/repo.git/']) {
+    const o = verified();
+    const bare = `${tmpDir('pmbare-')}/origin.git`;
+    gitIn(o, ['clone', '-q', '--bare', o, bare]);
+    const c = tmpDir('pmclone-');
+    gitIn(c, ['init', '-q', '-b', 'main']);
+    gitIn(c, ['config', 'user.email', 'casey@example.com']);
+    gitIn(c, ['config', 'user.name', 'Casey Example']);
+    gitIn(c, ['config', `url.${bare}.insteadOf`, url]);
+    gitIn(c, ['remote', 'add', 'origin', url]);
+    gitIn(c, ['pull', '-q', 'origin', 'main']);
+    // What git actually writes: the rewritten url, with .git stripped.
+    assert.match(fs.readFileSync(path.join(c, '.git', 'FETCH_HEAD'), 'utf8'), new RegExp(`branch 'main' of ${bare.replace(/\.git$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\n`));
+    assert.equal(installGitHook(c).ok, true);
+    localStory(c, 'S1-3-z', (q) => fs.writeFileSync(path.join(q, 'src', 'z.js'), 'z\n'));
+    assert.equal(gitRun(c, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']).status, 0);
+    gitIn(c, ['branch', '-D', 'pm/S1-3-z']);
+    const u = tmpDir('pmup-');
+    gitIn(u, ['clone', '-q', bare, '.']);
+    gitIn(u, ['config', 'user.email', 'casey@example.com']);
+    gitIn(u, ['config', 'user.name', 'Casey Example']);
+    commitFile(u, 'src/other.js', 'upstream\n', 'feat: upstream');
+    gitIn(u, ['push', '-q', 'origin', 'main']);
+    const r = gitRun(c, ['pull', '--rebase=merges', 'origin', 'main']);
+    assert.equal(r.status, 0, `${url}: ${r.stderr}`);
+  }
+});
+
+test('git gate: a gitlink staged into a --no-commit story merge is refused under diff.ignoreSubmodules=all, on both paths', () => {
+  for (const version of [undefined, [2, 27, 0]]) {
+    const p = verified({ install: false });
+    installGitHook(p, version ? { version } : {});
+    gitIn(p, ['config', 'diff.ignoreSubmodules', 'all']);
+    const before = head(p);
+    assert.equal(gitRun(p, ['merge', '--no-commit', '--no-ff', BRANCH]).status, 0);
+    gitIn(p, ['update-index', '--add', '--cacheinfo', `160000,${head(p, 'HEAD')},vendor/lib`]);
+    const r = gitRun(p, ['commit', '-m', 'm']);
+    refused(p, before, r, version ? 'fallback gitlink' : 'reference-transaction gitlink');
+  }
+});
+
+test('git gate: replay detection fails open when a non-story ref holds the story commit; the unchanged code then passes rewriteCheck', () => {
+  const o = verified();
+  const c = clonedProject(o);
+  assert.equal(gitRun(c, ['merge', '--no-ff', `origin/${BRANCH}`, '-m', 'feat: ship']).status, 0);
+  gitIn(c, ['branch', 'backup', `origin/${BRANCH}`]);
+  commitFile(o, 'src/other.js', 'upstream\n', 'feat: upstream');
+  const r = gitRun(c, ['pull', '--rebase']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: pull --no-rebase origin main with no tracking config takes in shipped upstream story history', () => {
+  const o = verified();
+  const c = clonedProject(o);
+  gitIn(c, ['config', '--unset', 'branch.main.remote']);
+  gitIn(c, ['config', '--unset', 'branch.main.merge']);
+  commitFile(c, 'src/local.js', 'local\n', 'feat: local');
+  // Upstream ships the verified story, then a normal code commit on top.
+  assert.equal(gitRun(o, ['merge', '--no-ff', BRANCH, '-m', 'feat: ship']).status, 0);
+  commitFile(o, 'src/after.js', 'after\n', 'feat: after');
+  const r = gitRun(c, ['pull', '--no-rebase', '--no-edit', 'origin', 'main']);
+  assert.equal(r.status, 0, r.stderr);
+});
+
+test('git gate: an upstream ref that also reads as a story branch is not trusted as shipped history', () => {
+  const p = project();
+  gitIn(p, ['checkout', '-qb', 'stage', 'main']);
+  gitIn(p, ['merge', '-q', '--no-ff', BRANCH, '-m', 'unverified story']);
+  gitIn(p, ['checkout', '-q', 'main']);
+  gitIn(p, ['remote', 'add', 'a', 'https://example.invalid/a.git']);
+  gitIn(p, ['config', 'remote.a/pm.url', 'https://example.invalid/apm.git']);
+  gitIn(p, ['config', 'remote.a/pm.fetch', '+refs/heads/*:refs/remotes/a/pm/*']);
+  gitIn(p, ['config', 'branch.main.remote', 'a/pm']);
+  gitIn(p, ['config', 'branch.main.merge', 'refs/heads/main']);
+  gitIn(p, ['update-ref', 'refs/remotes/a/pm/main', 'stage']);
+  const before = head(p);
+  refused(p, before, gitRun(p, ['merge', '--ff-only', 'refs/remotes/a/pm/main']), 'story-readable upstream');
+  const check = spawnSync(process.execPath, [INSTALL, '--check', p], { encoding: 'utf8', env: env() });
+  assert.match(check.stdout, /refs\/remotes\/a\/pm\/main also reads as a story branch, so it is not trusted as shipped history/);
+});
+
+test('git gate: amending a shipped merge whose story recorded its PASS in a merge commit is refused', () => {
+  const p = project([], { install: false });
+  assert.equal(installGitHook(p).ok, true);
+  const z = 'docs/stories/S1-3-z.md';
+  commitFile(p, z, storyText(claimFor('S1-3-z')), 'chore(S1-3-z): claim');
+  gitIn(p, ['checkout', '-qb', 'pm/S1-3-z', 'main']);
+  commitFile(p, 'src/z.js', 'z\n', 'build(S1-3-z): code');
+  const code = head(p, 'HEAD');
+  gitIn(p, ['checkout', '-q', 'main']);
+  commitFile(p, 'src/other.js', 'other\n', 'feat: other');
+  gitIn(p, ['checkout', '-q', 'pm/S1-3-z']);
+  // The PASS is recorded while committing an automatic merge of main into the story.
+  assert.equal(gitRun(p, ['merge', '--no-commit', '--no-ff', 'main']).status, 0);
+  fs.writeFileSync(path.join(p, z), storyText({ ...claimFor('S1-3-z'), status: 'in-review', verifier: `PASS ${code}` }));
+  gitIn(p, ['add', z]);
+  gitIn(p, ['commit', '-qm', 'merge main; record']);
+  gitIn(p, ['checkout', '-q', 'main']);
+  const m = gitRun(p, ['merge', '--no-ff', 'pm/S1-3-z', '-m', 'feat: z']);
+  assert.equal(m.status, 0, m.stderr);
+  gitIn(p, ['branch', '-D', 'pm/S1-3-z']);
+  const before = head(p);
+  fs.writeFileSync(path.join(p, 'src', 'z.js'), 'unverified\n');
+  const r = gitRun(p, ['commit', '-a', '--amend', '--no-edit']);
+  refused(p, before, r, 'amend after a PASS recorded in a merge');
 });
 
 // --- what must keep working ---
@@ -1322,16 +1432,21 @@ test('git gate: a pinned node that cannot start lets an unrelated commit through
   assert.doesNotMatch(m.stderr, /failed to run/);
 });
 
+// writePrintedLines(p, r): for each hook the install result r prints lines for, write an
+// executable hook in .githooks made of the #! line and those lines alone.
+function writePrintedLines(p, r, shebang = '#!/bin/sh') {
+  fs.mkdirSync(path.join(p, '.githooks'), { recursive: true });
+  for (const note of r.notes.filter((n) => n.includes('right after its #! line: '))) {
+    const name = note.match(/your hook manager's ([a-z-]+) hook/)[1];
+    fs.writeFileSync(path.join(p, '.githooks', name), `${shebang}\n${note.split('right after its #! line: ')[1]}\n`, { mode: 0o755 });
+  }
+}
+
 test('git gate: hooks made only of the printed lines exit 0 when the gate allows, fallback and reference-transaction alike', { skip: NO_SH }, () => {
   for (const version of [[2, 27, 0], undefined]) {
     const p = verified({ install: false });
     gitIn(p, ['config', 'core.hooksPath', '.githooks']);
-    const r = installGitHook(p, version ? { version } : {});
-    fs.mkdirSync(path.join(p, '.githooks'), { recursive: true });
-    for (const note of r.notes.filter((n) => n.includes('right after its #! line: '))) {
-      const name = note.match(/your hook manager's ([a-z-]+) hook/)[1];
-      fs.writeFileSync(path.join(p, '.githooks', name), `#!/bin/sh\n${note.split('right after its #! line: ')[1]}\n`, { mode: 0o755 });
-    }
+    writePrintedLines(p, installGitHook(p, version ? { version } : {}));
     const label = version ? 'fallback' : 'reference-transaction';
     const again = installGitHook(p, version ? { version } : {});
     assert.equal(again.ok, true, `${label}: ${JSON.stringify(again.hooks)}`);
@@ -1342,14 +1457,36 @@ test('git gate: hooks made only of the printed lines exit 0 when the gate allows
   }
   const q = project([{ id: 'S1-1-fix' }], { install: false });
   gitIn(q, ['config', 'core.hooksPath', '.githooks']);
-  const r = installGitHook(q, { version: [2, 27, 0] });
-  fs.mkdirSync(path.join(q, '.githooks'), { recursive: true });
-  for (const note of r.notes.filter((n) => n.includes('right after its #! line: '))) {
-    const name = note.match(/your hook manager's ([a-z-]+) hook/)[1];
-    fs.writeFileSync(path.join(q, '.githooks', name), `#!/bin/sh\n${note.split('right after its #! line: ')[1]}\n`, { mode: 0o755 });
-  }
+  writePrintedLines(q, installGitHook(q, { version: [2, 27, 0] }));
   const before = head(q);
   refused(q, before, gitRun(q, ['merge', '--no-ff', BRANCH, '-m', 'm']), 'fallback chained refusal');
+});
+
+test('git gate: under sh -e the printed lines refuse without leaking their temp file, and allow with exit 0', { skip: NO_SH }, () => {
+  for (const verifiedStory of [false, true]) {
+    const p = project([{ id: 'S1-1-fix', verified: verifiedStory }], { install: false });
+    gitIn(p, ['config', 'core.hooksPath', '.githooks']);
+    writePrintedLines(p, installGitHook(p), '#!/bin/sh -e');
+    assert.equal(installGitHook(p).ok, true);
+    const tmp = tmpDir('pmtmp-');
+    const before = head(p);
+    const m = gitRun(p, ['merge', '--no-ff', BRANCH, '-m', 'm'], { TMPDIR: tmp });
+    if (verifiedStory) assert.equal(m.status, 0, m.stderr);
+    else refused(p, before, m, 'sh -e refusal');
+    assert.deepEqual(fs.readdirSync(tmp), [], 'no temp file left behind');
+  }
+});
+
+test('git gate: a chained hook with CRLF line endings is chained-crlf, not in place', { skip: NO_SH }, () => {
+  const p = project([{ id: 'S1-1-fix' }], { install: false });
+  gitIn(p, ['config', 'core.hooksPath', '.githooks']);
+  writePrintedLines(p, installGitHook(p));
+  const f = path.join(p, '.githooks', RT_HOOK);
+  fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/\n/g, '\r\n'));
+  const r = installGitHook(p);
+  assert.equal(r.hooks[RT_HOOK], 'chained-crlf');
+  assert.equal(r.ok, false);
+  assert.match(r.notes.join('\n'), /convert it to LF line endings/);
 });
 
 test('git gate: lines chained in the earlier reference-transaction form keep refusing after an install', { skip: NO_SH }, () => {
@@ -1358,9 +1495,9 @@ test('git gate: lines chained in the earlier reference-transaction form keep ref
   fs.mkdirSync(path.dirname(f), { recursive: true });
   const c = `"${path.join(p, '.git', 'deliver', RT_HOOK).replace(/\\/g, '/')}"`;
   const earlier = `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then cat > "$deliver_in"; sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; }; exec < "$deliver_in"; rm -f "$deliver_in"; fi`;
-  // Recognised with CRLF line endings too (a checkout on Windows), though sh runs the LF form.
+  // With CRLF line endings (a checkout on Windows) it is recognised, but sh cannot run it.
   fs.writeFileSync(f, `#!/bin/sh\r\n${earlier}\r\nexit 0\r\n`, { mode: 0o755 });
-  assert.equal(installGitHook(p).hooks[RT_HOOK], 'chained');
+  assert.equal(installGitHook(p).hooks[RT_HOOK], 'chained-crlf');
   fs.writeFileSync(f, `#!/bin/sh\n${earlier}\nexit 0\n`, { mode: 0o755 });
   const r = installGitHook(p);
   assert.equal(r.hooks[RT_HOOK], 'chained', JSON.stringify(r.hooks));
