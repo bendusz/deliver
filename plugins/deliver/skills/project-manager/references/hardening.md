@@ -64,9 +64,11 @@ printed wrapper as `<hook>`; it skips a missing `<hook>.local` rather than block
 symlinked hook always gets the wrapper, so its shared target is never edited. Only the gate's own
 refusal blocks an update (the gate exits 86, which the shim turns into exit 1); a gate or node that
 fails to run warns and lets it through. A hook that runs deliver's lines, in any hooks directory,
-is `chained` once it is executable and its lines work as chained; otherwise `--check` reports
-`chained-inactive` (not executable), `chained-stale` (an earlier form of the lines that no longer
-works), or `copy-missing` or `copy-stale` (the private copy it calls). `/deliver:doctor` checks and repairs the install.
+is `chained` once it is executable and its lines work as chained; otherwise the installer, at
+session start and with `--check` alike, reports `chained-inactive` (not executable),
+`chained-crlf` (CRLF line endings sh cannot run), or `chained-stale` (an earlier form of the lines
+that no longer works), and `--check` also `copy-missing` or `copy-stale` (the private copy it
+calls). `/deliver:doctor` checks and repairs the install.
 `node "${CLAUDE_PLUGIN_ROOT}/hooks/git-hook-install.mjs" --uninstall <project>` removes it and sets
 `git config deliver.mergeGate off` in the repository's local config, so session start does not
 reinstall it and `--check` reports it disabled; running the same command without a flag installs
