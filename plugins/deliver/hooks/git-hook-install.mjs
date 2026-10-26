@@ -125,7 +125,7 @@ const atLeast = (v, min) => Boolean(v) && (v[0] > min[0] || (v[0] === min[0] && 
 
 // integrationBranches(root, top): every integration branch a deliver project in the repository
 // names, so one shim serves them all; else the plan on HEAD's; else main.
-export function integrationBranches(root, top) {
+export function integrationBranches(root, top, { all = false } = {}) {
   const names = new Set();
   try {
     for (const dir of discover(top).found) {
@@ -137,7 +137,15 @@ export function integrationBranches(root, top) {
     for (const n of own?.names ?? (own?.name ? [own.name] : [])) names.add(n);
     if (!names.size) names.add(planName(git(top, ['show', `HEAD:${prefix}docs/plan.md`])) || 'main');
   } catch { names.add('main'); }
-  return [...names].filter((n) => !n.startsWith('pm/')).sort();
+  // A pm/* name is a story branch, never an integration branch: left out (installGitHook reports
+  // it), unless `all` asks for every name.
+  return [...names].filter((n) => all || !n.startsWith('pm/')).sort();
+}
+
+// shSyntaxOk(text): `sh -n` accepts the script; true when no sh can be run to check it.
+export function shSyntaxOk(text) {
+  const r = spawnSync('sh', ['-n'], { input: text, windowsHide: true, timeout: 10000, stdio: ['pipe', 'ignore', 'ignore'] });
+  return r.error ? true : r.status === 0;
 }
 
 // readHook(file): an existing hook as { state: 'missing' | 'ours' | 'foreign', text, why }. A
@@ -222,27 +230,8 @@ function layout(top) {
 // (after --uninstall, or a git upgrade that drops a fallback hook), or without mktemp, they do
 // nothing. The reference-transaction form saves stdin once, feeds it to the gate, and then gives
 // the same records to whatever runs next.
-function gateLines(name, copy, form = 'current') {
+function gateLines(name, copy) {
   const c = shQuote(slash(copy));
-  // Earlier forms, kept only so legacyLines can recognise them.
-  if (form === 'r5') {
-    return name === RT_HOOK ? [
-      `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
-      '  cat > "$deliver_in";',
-      `  sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; };`,
-      '  exec < "$deliver_in"; rm -f "$deliver_in";',
-      'fi',
-    ] : [];
-  }
-  if (form === 'r7') {
-    return name === RT_HOOK ? [
-      `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
-      '  cat > "$deliver_in";',
-      `  sh ${c} "$@" < "$deliver_in"; if [ $? = 1 ]; then rm -f "$deliver_in"; exit 1; fi;`,
-      '  exec < "$deliver_in"; rm -f "$deliver_in";',
-      'fi',
-    ] : [`if [ -f ${c} ]; then sh ${c} "$@"; if [ $? = 1 ]; then exit 1; fi; fi`];
-  }
   // The gate's status is caught with ||, so under `sh -e` (husky) a refusal still removes the
   // temp file before exiting 1. The temp file goes in $TMPDIR, else /tmp.
   return name === RT_HOOK
@@ -257,13 +246,37 @@ function gateLines(name, copy, form = 'current') {
     : [`if [ -f ${c} ]; then deliver_rc=0; sh ${c} "$@" || deliver_rc=$?; if [ "$deliver_rc" = 1 ]; then exit 1; fi; fi`];
 }
 
-// legacyLines(name, copy): earlier forms of the lines that still work as chained, so they count as
-// current, each as its inline line and as its whole wrapper block: the round-5 and round-7
-// reference-transaction forms, and the round-7 fallback-hook form. The round-5 fallback-hook line
-// is not one: as a hook's last line it exits 1 when the gate allows.
-function legacyLines(name, copy) {
-  return ['r5', 'r7'].flatMap((form) => {
-    const lines = gateLines(name, copy, form);
+// LEGACY: earlier forms of the lines, by name, that still work as chained, so they count as
+// current: the round-5 and round-7 reference-transaction forms, and the round-7 fallback-hook
+// form. The round-5 fallback-hook line is not one: as a hook's last line it exits 1 when the gate
+// allows. None catches the gate's status with ||, so under `sh -e` a refusal leaks the
+// reference-transaction temp file: in a hook run with -e they are stale (legacyLines).
+const LEGACY = {
+  r5: (name, c) => (name === RT_HOOK ? [
+    `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
+    '  cat > "$deliver_in";',
+    `  sh ${c} "$@" < "$deliver_in"; [ $? = 1 ] && { rm -f "$deliver_in"; exit 1; };`,
+    '  exec < "$deliver_in"; rm -f "$deliver_in";',
+    'fi',
+  ] : []),
+  r7: (name, c) => (name === RT_HOOK ? [
+    `if [ -f ${c} ] && deliver_in=$(mktemp 2>/dev/null); then`,
+    '  cat > "$deliver_in";',
+    `  sh ${c} "$@" < "$deliver_in"; if [ $? = 1 ]; then rm -f "$deliver_in"; exit 1; fi;`,
+    '  exec < "$deliver_in"; rm -f "$deliver_in";',
+    'fi',
+  ] : [`if [ -f ${c} ]; then sh ${c} "$@"; if [ $? = 1 ]; then exit 1; fi; fi`]),
+};
+
+// legacyLines(name, copy, text): the LEGACY forms accepted as current for a hook with this text,
+// each as its inline line and as its whole wrapper block; none for a reference-transaction hook
+// whose #! runs the shell with -e.
+function legacyLines(name, copy, text = '') {
+  const first = String(text).split('\n')[0];
+  if (name === RT_HOOK && /^#!.*\s-[a-z]*e/.test(first)) return [];
+  const c = shQuote(slash(copy));
+  return Object.values(LEGACY).flatMap((form) => {
+    const lines = form(name, c);
     return lines.length ? [lines.map((l) => l.trim()).join(' '), lines.join('\n')] : [];
   });
 }
@@ -324,6 +337,7 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
       : cur.text === undefined ? `it ${cur.why}`
         : !shCompatible(cur.text) ? 'its interpreter is not sh' : null;
     if (!why) return `add these as the lines right after its #! line: ${addLine(name, copy)}`;
+    if (!shSyntaxOk(wrapper(name, copy))) return `${why}, and the wrapper deliver generated does not parse (sh -n); run /deliver:doctor`;
     return `${why}, so deliver's lines cannot go inside it; rename it to ${name}.local in the same directory, and write this sh wrapper as ${name}, executable:\n${wrapper(name, copy)}`;
   };
   const pointer = `for what to add to it, run ${doctor}`;
@@ -337,8 +351,14 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
     const text = typeof cur.text === 'string' ? cur.text.replace(/\r\n/g, '\n') : undefined;
     const chained = cur.state === 'foreign' && text !== undefined && text.includes(slash(copy)) && shCompatible(text);
     // The lines it runs are this version's (the inline form, or the wrapper's block); else stale.
-    const current = chained && [addLine(name, copy), gateLines(name, copy).join('\n'), ...legacyLines(name, copy)].some((l) => text.includes(l));
+    const current = chained && [addLine(name, copy), gateLines(name, copy).join('\n'), ...legacyLines(name, copy, text)].some((l) => text.includes(l));
     try {
+      // Never install a hook script that does not parse: it would fail every update.
+      if (want !== null && !shSyntaxOk(want)) {
+        res.hooks[name] = 'invalid';
+        note(`merge gate: the ${name} hook deliver generated does not parse (sh -n), so it was not installed; run /deliver:doctor`);
+        continue;
+      }
       if (want === null) {
         // Not wanted in this mode (or uninstalling): remove only what is ours.
         if (cur.state === 'ours') {
@@ -365,11 +385,17 @@ function hookFiles(top, { wanted, check = false, uninstall = false, doctor = '/d
         const executable = process.platform === 'win32' || Boolean(fs.statSync(file).mode & 0o111);
         // sh reads a CRLF hook as broken lines: report it rather than call it in place.
         const crlf = cur.text.includes('\r\n');
-        res.hooks[name] = !executable ? 'chained-inactive' : crlf ? 'chained-crlf' : !current ? 'chained-stale' : check ? copyState(copy, want) : 'chained';
-        if (res.hooks[name] === 'chained-crlf') note(`merge gate: ${slash(file)} runs deliver's lines but has CRLF line endings, which sh cannot run; convert it to LF line endings`);
-        if (res.hooks[name] === 'chained-inactive') note(`merge gate: ${slash(file)} runs deliver's lines but is not executable, so git skips it; run chmod +x ${shQuote(slash(file))}`);
-        else if (res.hooks[name] === 'chained-stale') note(`merge gate: ${slash(file)} runs an earlier version of deliver's lines; replace them: ${chain(name, copy, cur)}`, `merge gate: ${slash(file)} runs an earlier version of deliver's lines; ${pointer}`);
-        else if (res.hooks[name] !== 'chained') note(`merge gate: ${slash(file)} runs deliver's lines, but its copy ${slash(copy)} is ${res.hooks[name]}; run the installer without --check to refresh it`);
+        const state = !executable ? 'chained-inactive' : crlf ? 'chained-crlf' : !current ? 'chained-stale' : check ? copyState(copy, want) : 'chained';
+        res.hooks[name] = state;
+        // One note per state, from one table; `chained` needs none, every copy-* state the same one.
+        const at = `merge gate: ${slash(file)} runs deliver's lines`;
+        const notes = {
+          'chained-inactive': [`${at} but is not executable, so git skips it; run chmod +x ${shQuote(slash(file))}`],
+          'chained-crlf': [`${at} but has CRLF line endings, which sh cannot run; convert it to LF line endings`],
+          'chained-stale': [`merge gate: ${slash(file)} runs an earlier version of deliver's lines; replace them: ${chain(name, copy, cur)}`, `merge gate: ${slash(file)} runs an earlier version of deliver's lines; ${pointer}`],
+        };
+        if (notes[state]) note(...notes[state]);
+        else if (state !== 'chained') note(`${at}, but its copy ${slash(copy)} is ${state}; run the installer without --check to refresh it`);
         continue;
       }
       if (!writable) {
@@ -471,7 +497,9 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   const v = version ?? gitVersion(top);
   res.git = v ? v.join('.') : 'unknown';
   res.mode = atLeast(v, MIN_GIT) ? RT_HOOK : 'fallback';
-  res.branches = integrationBranches(abs, top);
+  const named = integrationBranches(abs, top, { all: true });
+  res.branches = named.filter((n) => !n.startsWith('pm/'));
+  const storyNamed = named.filter((n) => n.startsWith('pm/'));
   if (!uninstall && !check && explicit && optedOut(top)) git(top, ['config', '--local', '--unset', OPT_OUT]);
   if (!uninstall && optedOut(top)) {
     res.disabled = true;
@@ -480,9 +508,16 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
     if (!check) return res;
   }
   const wanted = {};
-  if (res.mode === RT_HOOK) wanted[RT_HOOK] = shim({ name: RT_HOOK, gate, node, branches: res.branches });
+  // With no integration branch to watch, no reference-transaction shim is written (its `case`
+  // would have no pattern and could not parse); that is reported, and the gate is not in place.
+  if (res.mode === RT_HOOK && res.branches.length) wanted[RT_HOOK] = shim({ name: RT_HOOK, gate, node, branches: res.branches });
   else for (const name of FALLBACK_HOOKS) wanted[name] = shim({ name, gate, node, branches: res.branches });
   const doctor = `/deliver:doctor, or node ${shQuote(slash(INSTALLER))} --check ${shQuote(slash(abs))}`;
+  for (const n of storyNamed) {
+    const msg = `merge gate: integration branch ${n} is a story branch name; the gate is not enforced for it; fix the plan's Integration branch line`;
+    res.notes.push(msg);
+    res.brief.push(msg);
+  }
   const files = hookFiles(top, { wanted, check, uninstall, doctor });
   res.hooks = files.hooks;
   res.notes.push(...files.notes);
@@ -507,7 +542,7 @@ export function installGitHook(root, { gate = GATE, node = process.execPath, che
   if (res.mode === 'fallback') add(`merge gate: git < 2.28 (this is ${res.git}): fast-forward updates, squash merges, and cherry-picks are not gated (they make no merge commit), and a merge commit's result is compared with the automatic merge only where git needs no content merge, else only the verdicts are checked; upgrade git`);
   else if (!(treeCheck ?? mergeTreeWorks(top))) add(TREE_NOTE);
   const good = new Set(['installed', 'refreshed', 'current', 'chained']);
-  res.ok = !res.disabled && Object.keys(wanted).every((n) => good.has(res.hooks[n]));
+  res.ok = !res.disabled && (res.mode !== RT_HOOK || res.branches.length > 0) && Object.keys(wanted).every((n) => good.has(res.hooks[n]));
   return res;
 }
 

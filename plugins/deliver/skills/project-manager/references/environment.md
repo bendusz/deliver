@@ -25,13 +25,13 @@ and handoff commits or by merges of the integration branch that git would make a
 This is the rule the hook applies to a local merge. Check it for each recorded `<sha>`:
 
 1. `git merge-base --is-ancestor <sha> <head>` succeeds.
-2. `git log --stat <sha>..<head> --not origin/<integration>` shows only the story file and
+2. `git log --stat --ignore-submodules=none <sha>..<head> --not origin/<integration>` shows only the story file and
    `docs/handoff/*.md` in its non-merge commits.
 3. For each merge commit that `git rev-list --merges <sha>..<head> --not origin/<integration>`
    lists, run `git merge-tree --write-tree --name-only <merge>^1 <merge>^2`. Its first line is the
    result tree; on a conflict it exits 1 and lists the conflicted paths after that line. The merge
    passes when every conflicted path it lists, and every path that
-   `git diff --name-only <result-tree> <merge>^{tree}` lists, is the story file. The story file is
+   `git diff --name-only --ignore-submodules=none <result-tree> <merge>^{tree}` lists, is the story file. The story file is
    the project-prefixed `docs/stories/…` path (`<project>/docs/stories/<story-id>.md` for a
    project below the git top level), or the file whose Execution block names the branch. A
    conflict-free merge whose only difference is the story file passes too. This is exactly the
