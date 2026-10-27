@@ -57,7 +57,8 @@ for an end customer, obtain explicit sign-off, then run the work to a verified, 
 - **Host.** At session start, run `ToolSearch select:mcp__t3-code__orchestrator_capabilities` and
   call it once; on success, load `references/host-t3.md`. If the tool is absent or the call fails, skip it: deliver runs unchanged under plain Claude Code. Under any host, dispatch every named
   `deliver:*` agent through the `Agent` tool, never a host delegation tool, so its frontmatter
-  model, effort, and `tools:` hold. Codex build, fix, and review stay on the bundled runner.
+  model, effort, and `tools:` hold. Under T3 Code, a Codex call skips its Sonnet
+  wrapper agent; `host-t3.md` says how.
 - **Superpowers.** While deliver is active, its phases replace Superpowers' brainstorming,
   writing-plans, and subagent-driven-development. TDD, systematic-debugging, and
   verification-before-completion remain compatible.

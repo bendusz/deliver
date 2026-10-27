@@ -27,9 +27,10 @@ risks enter triage like any other finding.
 ## Route the fix
 A localized fix with known paths and a reproducer goes to `codex-builder`, even where
 `expert-builder` built the story. Write the fix brief to `tmp/codex-builder/<story-id>-round-<n>.md`,
-then dispatch `Mode: fix` and that path. Architectural, cross-cutting, or ambiguous findings go to
-`expert-builder`, as does any fix Codex calls broader than its brief. Without Codex it takes the fix
-too; an unavailable run earns no extra retries and resets neither counter.
+then dispatch `Mode: fix` and that path. Under T3 Code, it goes through the host, as `host-t3.md`
+says. Architectural, cross-cutting, or ambiguous findings go to `expert-builder`, as does any fix
+Codex calls broader than its brief. Without Codex it takes the fix too; an unavailable run earns
+no extra retries and resets neither counter.
 
 **Escalate effort, not just rounds.** Round 1 dispatches `expert-builder` at its frontmatter
 effort. From round 2 on, pass `effort: high` on the dispatch: the cheaper attempt has already

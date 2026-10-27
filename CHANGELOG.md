@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## 0.29.4 - 2026-10-27
+
+Inside T3 Code, Codex runs through T3 itself. Without T3 nothing changes.
+
+- **Codex goes through T3.** When the T3 probe succeeds, every Codex call (build, fix, review,
+  advice, and research) goes to T3's Codex delegation instead of the Sonnet wrapper agents.
+  `host-t3.md` gives the steps: get the prompt, call T3 with the runner's model and an explicit
+  effort, snapshot read-only runs before and after, and run the usual scope check, integrity check,
+  and gates after a build. If T3 refuses or fails, the PM falls back to the wrapper and records it.
+- **`run.mjs --emit-prompt`.** It makes the same checks as a real run, prints the exact prompt
+  plus the mode's model, effort, working directory, and whether the run is read-only, and never
+  launches codex. Build and fix prompts carry the result schema inline, and read-only prompts
+  carry a report format and a no-write instruction.
+- **Honest calibration.** A Codex review through T3 is recorded as `codex-reviewer-t3`. It meets
+  the opposite-family rule but is not the calibrated lens, so its tier runs the maximum panel and
+  `retro-stats.mjs --trust` withholds that tier's bound. A new test proves it.
+
 ## 0.29.3 - 2026-10-27
 
 Documentation consistency: the references now match what the hooks and scripts do. No code changes.

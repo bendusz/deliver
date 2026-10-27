@@ -50,7 +50,8 @@ Run once from the repository root, or the current directory for `codebase`:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/codex/run.mjs" --mode review --scope "$SCOPE" --preflight
 ```
 
-Stop with the runner's reason on any non-zero exit.
+Stop with the runner's reason on any non-zero exit. Under T3 Code, skip the preflight: the local
+CLI is not used, and `host-t3.md`'s `--emit-prompt` step makes the run's checks.
 
 ## 4. Output directory
 
@@ -69,6 +70,9 @@ they run in parallel, each with `Scope`, `Out dir`, `Stamp`, `Objective` (a pres
 `Base` for the `branch` scope, and any `Model` or `Effort` override. `timeout=` is minutes and the agent's `Timeout seconds` is
 seconds, so `timeout=5` becomes `Timeout seconds: 300`; omit it when unset, and the runner's
 600-second default applies. Do not poll; agents return when the runner returns.
+
+Under T3 Code, run each objective through the host instead, as `host-t3.md` says, with the same
+`Scope`, `Out dir`, `Stamp`, `Objective`, and overrides. Each saved report ends in `-t3.md`.
 
 ## 6. Index
 

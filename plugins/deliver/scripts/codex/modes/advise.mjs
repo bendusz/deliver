@@ -7,6 +7,7 @@ import { requireCodex, EXEC_FLAGS } from '../lib/preflight.mjs';
 import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
+import { emitted, withContract, answerContract } from '../lib/emit.mjs';
 
 export async function runAdvise(o) {
   const cwd = realpath(process.cwd());
@@ -15,6 +16,8 @@ export async function runAdvise(o) {
     if (!path.isAbsolute(o.promptFile)) throw new RunnerError('rejected', '--prompt-file must be an absolute path');
     if (!fs.existsSync(o.promptFile) || !fs.statSync(o.promptFile).isFile()) throw new RunnerError('rejected', 'prompt file does not exist');
   }
+  // --emit-prompt never launches codex, not even to probe it.
+  if (o.emitPrompt) return emitted(o, cwd, true, withContract(fs.readFileSync(o.promptFile, 'utf8'), answerContract(cwd)));
   const { found, version, help } = requireCodex(EXEC_FLAGS);
   const searchAvailable = help.includes('--search');
   const useSearch = o.mode === 'research' && o.search === 'auto' && searchAvailable;

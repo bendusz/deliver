@@ -10,6 +10,7 @@ import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch, runtimeTmp, assertRuntimeRootReal } from '../lib/scratch.mjs';
 import { snapshotWorktree, changedPaths, gitMetadataFingerprint } from '../lib/snapshot.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
+import { emitted, withContract, builderContract } from '../lib/emit.mjs';
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SCHEMA = path.join(PLUGIN_ROOT, 'schemas', 'codex-builder-result.schema.json');
@@ -129,13 +130,20 @@ export async function runBuild(o) {
     if (digestNow && digestNow !== approval.plan_digest) throw blocked('docs/plan.md changed since approval (plan_digest mismatch); run /deliver:correct-course before codex-builder can write');
   }
 
-  const { found, version } = requireCodex(BUILD_FLAGS, { hint: ' or use expert-builder' });
+  // --emit-prompt never launches codex, not even to probe it: the host that runs the prompt brings its own.
+  const { found, version } = o.emitPrompt ? { found: null, version: '' } : requireCodex(BUILD_FLAGS, { hint: ' or use expert-builder' });
   if (!fs.existsSync(SCHEMA)) throw new RunnerError('failed', 'bundled result schema is missing', { codex_version: version });
   assertRuntimeRootReal(worktree);
   if (!checkIgnore(worktree, 'tmp/codex-runtime/probe')) throw blocked('tmp/ must be ignored before codex-builder can create an isolated runtime directory', { codex_version: version });
 
   if (o.preflight) {
     return { exit: 0, envelope: { runner_status: 'ready', preflight: true, codex_version: version, worktree, story: storyRel || null, story_builder: builder || null, story_scope_checked: storyRel !== '', allowed_paths: scopes, quota_consumed: false, policy: policy() } };
+  }
+  // Every refusal above has run. The caller owns the post-run checks the runner would make: the
+  // scope check, protected paths included, and the gates.
+  if (o.emitPrompt) {
+    const prompt = buildPrompt({ worktree, storyRel, scopes, protectedPaths, mode: o.mode, evidenceRel });
+    return emitted(o, worktree, false, withContract(prompt, builderContract(fs.readFileSync(SCHEMA, 'utf8'))));
   }
 
   const scratch = makeScratch(worktree, 'pm-codex-builder');

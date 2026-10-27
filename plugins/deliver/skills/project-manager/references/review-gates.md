@@ -53,6 +53,13 @@ that tier's bound. A `codex-reviewer` run the runner moved to a fallback model (
 model or effort differs from the calibrated `panels.json` stamp) counts as that lens missing: record
 it under its real model, never as the calibrated lens, and escalate at `T2`.
 
+**Under T3 Code** (`host-t3.md`), a Codex review runs through the host, not the calibrated wrapper,
+and is recorded in `panel` as `codex-reviewer-t3`. It meets the opposite-family rule, so it is no
+missing lens, but it is not `codex-reviewer`: a tier whose measured panel needs `codex-reviewer`
+runs the maximum panel instead, with `codex-reviewer-t3` in the Codex seat. The trust report counts
+such a story below panel and withholds that tier's bound. A review that fell back to the wrapper is
+`codex-reviewer` again.
+
 ## Risk triggers: lenses added on top
 These lenses are additive. Under a measured panel, a story gets each one its risk calls for, even
 when the panel omits it. The maximum panel already runs them all, so the skip conditions below

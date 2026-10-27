@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { parseArgs, UsageError } from '../codex/lib/args.mjs';
+import { parseArgs, UsageError, REVIEW_DEFAULTS } from '../codex/lib/args.mjs';
 import { lockedExecArgs } from '../codex/lib/argv.mjs';
 import { envelope, EXIT, RunnerError } from '../codex/lib/result.mjs';
 import { parseStory, parseProtected } from '../codex/lib/story.mjs';
@@ -1027,4 +1027,149 @@ test('story: a leading ./ in a protected path is normalised away; inner . or .. 
     const q = protectedBuildProject(bad);
     assert.throws(() => parseProtected(q, 'docs/stories/S1-1-fix.md'), (e) => e instanceof RunnerError && e.status === 'blocked' && /protected/.test(e.message), JSON.stringify(bad));
   }
+});
+
+// --emit-prompt: the prompt a real run would send, for a host that launches Codex itself. It runs
+// every check a real run makes before codex starts and never launches codex, not even to probe it.
+const EMIT_KEYS = ['cwd', 'effort', 'mode', 'model', 'prompt', 'readOnly'];
+const BUILDER_SCHEMA = JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'schemas', 'codex-builder-result.schema.json'), 'utf8'));
+const lastJsonBlock = (text) => JSON.parse([...text.matchAll(/```json\n([\s\S]*?)\n```/g)].at(-1)[1]);
+const real = (p) => fs.realpathSync.native(p);
+
+test('emit-prompt: build prints the runner prompt plus the schema contract, and never launches codex', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const e = runRunner(['--mode', 'build', '--emit-prompt'], { project: p, stub: s });
+  assert.equal(e.status, 0, e.stdout + e.stderr);
+  assert.equal(stubActions(s), '', 'codex was never launched, not even for --version');
+  assert.deepEqual(Object.keys(e.out).sort(), EMIT_KEYS);
+  assert.deepEqual([e.out.mode, e.out.model, e.out.effort, e.out.cwd, e.out.readOnly], ['build', 'gpt-6-astra', 'high', real(p), false]);
+  // Parity: a real run on the same project sends exactly the emitted prompt before its contract.
+  const r = runRunner(['--mode', 'build'], { project: p, stub: s, env: { STUB_WRITE_PATH: 'src/fix.txt' } });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const sent = fs.readFileSync(s.promptFile, 'utf8');
+  assert.ok(e.out.prompt.startsWith(`${sent}\n`), 'the emitted prompt starts with the prompt codex gets');
+  const contract = e.out.prompt.slice(sent.length);
+  assert.match(contract, /attaches no schema file/);
+  assert.deepEqual(lastJsonBlock(contract), BUILDER_SCHEMA, 'the contract carries the --output-schema the runner would pass');
+  // Explicit values pass through.
+  const o = runRunner(['--mode', 'build', '--emit-prompt', '--model', 'gpt-6-sol', '--effort', 'xhigh'], { project: p, stub: s });
+  assert.deepEqual([o.out.model, o.out.effort], ['gpt-6-sol', 'xhigh']);
+});
+
+test('emit-prompt: needs no codex CLI on PATH', () => {
+  const p = newBuildProject(true);
+  const e = runRunner(['--mode', 'build', '--emit-prompt'], { project: p, env: { PATH: minimalPath(), Path: minimalPath() } });
+  assert.equal(e.status, 0, e.stdout + e.stderr);
+  assert.equal(e.out.mode, 'build');
+});
+
+test('emit-prompt: fix mode names the evidence; build refusals carry over unchanged', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const f = runRunner(['--mode', 'fix', '--emit-prompt', '--evidence', 'tmp/codex-builder/S1-1-round-1.md'], { project: p, stub: s });
+  assert.equal(f.status, 0, f.stdout + f.stderr);
+  assert.equal(f.out.mode, 'fix');
+  assert.match(f.out.prompt, /Fix evidence: tmp\/codex-builder\/S1-1-round-1\.md/);
+  assert.match(f.out.prompt, /smallest change that resolves its accepted findings/);
+  assert.equal(runRunner(['--mode', 'fix', '--emit-prompt'], { project: p, stub: s }).status, 64);
+  assert.equal(runRunner(['--mode', 'build', '--emit-prompt', '--preflight'], { project: p, stub: s }).status, 64);
+  // Not approved.
+  const pending = runRunner(['--mode', 'build', '--emit-prompt'], { project: newBuildProject(false), stub: s });
+  assert.equal(pending.status, 66); assert.match(pending.out.reason, /not approved/);
+  // Untracked story.
+  fs.writeFileSync(path.join(p, 'docs', 'stories', 'S1-2-new.md'), fs.readFileSync(path.join(p, 'docs', 'stories', 'S1-1-fix.md')));
+  const untracked = runRunner(['--mode', 'build', '--emit-prompt', '--worktree', p, '--story', 'docs/stories/S1-2-new.md'], { stub: s });
+  assert.equal(untracked.status, 66); assert.match(untracked.out.reason, /tracked/);
+  // A story outside docs/stories/ and a worktree that is not the git root.
+  assert.equal(runRunner(['--mode', 'build', '--emit-prompt', '--worktree', p, '--story', 'docs/approval.json'], { stub: s }).status, 65);
+  assert.equal(runRunner(['--mode', 'build', '--emit-prompt', '--worktree', path.join(p, 'src'), '--story', 'docs/stories/S1-1-fix.md'], { stub: s }).status, 65);
+  // A plan that changed since approval.
+  fs.writeFileSync(path.join(p, 'docs', 'plan.md'), '# plan v1\n');
+  fs.writeFileSync(path.join(p, 'docs', 'approval.json'), JSON.stringify({ ...APPROVED, plan_digest: '0'.repeat(40) }) + '\n');
+  gitIn(p, ['add', 'docs/plan.md', 'docs/approval.json']); gitIn(p, ['commit', '-qm', 'plan']);
+  const drift = runRunner(['--mode', 'build', '--emit-prompt'], { project: p, stub: s });
+  assert.equal(drift.status, 66); assert.match(drift.out.reason, /plan_digest mismatch/);
+  assert.equal(stubActions(s), '');
+});
+
+test('emit-prompt: build keeps the protected-path line, and a malformed protected list or pm-exec refuses', () => {
+  const p = protectedBuildProject(); const s = makeStub();
+  const e = runRunner(['--mode', 'build', '--emit-prompt'], { project: p, stub: s });
+  assert.equal(e.status, 0, e.stdout + e.stderr);
+  assert.match(e.out.prompt, /- edit these protected acceptance paths, which the test engineer wrote before the build: src\/acceptance, src\/limits\.test\.mjs\./);
+  for (const bad of [['../outside'], ['/abs'], 'src/acceptance']) {
+    const r = runRunner(['--mode', 'build', '--emit-prompt'], { project: protectedBuildProject(bad), stub: s });
+    assert.equal(r.status, 66, JSON.stringify(bad));
+    assert.match(r.out.reason, /protected/);
+  }
+  const story = path.join(p, 'docs', 'stories', 'S1-1-fix.md');
+  fs.writeFileSync(story, fs.readFileSync(story, 'utf8').replace(/"deliver":"0\.29\.0"\}/, '"deliver":"0.29.0",}'));
+  gitIn(p, ['commit', '-qam', 'a trailing comma']);
+  const r = runRunner(['--mode', 'build', '--emit-prompt'], { project: p, stub: s });
+  assert.equal(r.status, 66); assert.match(r.out.reason, /pm-exec/);
+  assert.equal(stubActions(s), '');
+});
+
+test('emit-prompt: review is read-only at the review defaults, with the prompt a prompted review sends', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const e = runRunner(['--mode', 'review', '--scope', 'recent', '--out', out, '--emit-prompt'], { stub: s, cwd: p });
+  assert.equal(e.status, 0, e.stdout + e.stderr);
+  assert.deepEqual(Object.keys(e.out).sort(), EMIT_KEYS);
+  assert.deepEqual([e.out.mode, e.out.model, e.out.effort, e.out.cwd, e.out.readOnly], ['review', REVIEW_DEFAULTS.model, REVIEW_DEFAULTS.effort, real(p), true]);
+  assert.ok(e.out.prompt.startsWith('Review the changes introduced by the last commit (HEAD).\n\n'));
+  assert.ok(e.out.prompt.includes(`Work in ${real(p)} and run every command from there. This run is read-only: change no file`));
+  assert.match(e.out.prompt, /`\[block\|major\|minor\] path:line: what is wrong`/);
+  assert.equal(stubActions(s), '');
+  assert.ok(!fs.existsSync(out), 'nothing is written to the report directory');
+  // Parity with a real prompted review and a real codebase review, objective included.
+  for (const args of [['--scope', 'recent', '--objective', 'security'], ['--scope', 'codebase', '--objective', 'find dead code']]) {
+    const em = runRunner(['--mode', 'review', ...args, '--out', out, '--emit-prompt'], { stub: s, cwd: p });
+    const r = runRunner(['--mode', 'review', ...args, '--out', out], { stub: s, cwd: p });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const sent = fs.readFileSync(s.promptFile, 'utf8');
+    assert.ok(em.out.prompt.startsWith(sent), `${args.join(' ')}: ${JSON.stringify(em.out.prompt)}`);
+  }
+  // Branch scope names the base; an objective that reads like the flag stays an objective.
+  gitIn(p, ['checkout', '-qb', 'feature']);
+  fs.writeFileSync(path.join(p, 'src', 'b.txt'), 'b\n'); gitIn(p, ['add', 'src/b.txt']); gitIn(p, ['commit', '-qm', 'b']);
+  const main = gitIn(p, ['rev-parse', '--abbrev-ref', '@{-1}']).trim();
+  const b = runRunner(['--mode', 'review', '--scope', 'branch', '--base', main, '--out', out, '--emit-prompt', '--objective', '--emit-prompt'], { stub: s, cwd: p });
+  assert.equal(b.status, 0, b.stdout + b.stderr);
+  assert.ok(b.out.prompt.startsWith(`Review the changes on the current branch relative to ${main} (git diff ${main}...HEAD). Focus exclusively on this objective: --emit-prompt.`));
+});
+
+test('emit-prompt: review refusals and nothing-to-review carry over', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const out = path.join(p, 'untracked');
+  const clean = runRunner(['--mode', 'review', '--scope', 'worktree', '--out', out, '--emit-prompt'], { stub: s, cwd: p });
+  assert.equal(clean.status, 0);
+  assert.equal(clean.out.runner_status, 'nothing-to-review');
+  assert.equal(clean.out.prompt, undefined);
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'branch', '--out', out, '--emit-prompt'], { stub: s, cwd: p }).status, 64);
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'branch', '--base', 'nope', '--out', out, '--emit-prompt'], { stub: s, cwd: p }).status, 65);
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'recent', '--out', path.join(p, 'elsewhere'), '--emit-prompt'], { stub: s, cwd: p }).status, 65);
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'recent', '--emit-prompt'], { stub: s, cwd: p }).status, 64);
+  assert.equal(runRunner(['--mode', 'review', '--scope', 'recent', '--out', out, '--emit-prompt'], { stub: s, cwd: tmpDir('norepo-') }).status, 65);
+  assert.equal(stubActions(s), '');
+});
+
+test('emit-prompt: advise and research send the brief verbatim, read-only', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const brief = path.join(s.dir, 'brief.md');
+  fs.writeFileSync(brief, 'Should we use X or Y?\n');
+  for (const mode of ['advise', 'research']) {
+    const e = runRunner(['--mode', mode, '--prompt-file', brief, '--emit-prompt'], { stub: s, cwd: p });
+    assert.equal(e.status, 0, e.stdout + e.stderr);
+    assert.deepEqual(Object.keys(e.out).sort(), EMIT_KEYS);
+    assert.deepEqual([e.out.mode, e.out.model, e.out.effort, e.out.cwd, e.out.readOnly], [mode, 'gpt-6-astra', 'high', real(p), true]);
+    assert.ok(e.out.prompt.startsWith(`Should we use X or Y?\n\nWork in ${real(p)} and run every command from there. This run is read-only`));
+  }
+  const r = runRunner(['--mode', 'advise', '--prompt-file', brief], { stub: s, cwd: p, env: { STUB_ANSWER: '1' } });
+  assert.equal(r.status, 0);
+  assert.ok(runRunner(['--mode', 'advise', '--prompt-file', brief, '--emit-prompt'], { stub: s, cwd: p }).out.prompt.startsWith(fs.readFileSync(s.promptFile, 'utf8')));
+  fs.writeFileSync(s.actionsLog, '');
+  assert.equal(runRunner(['--mode', 'advise', '--prompt-file', path.join(s.dir, 'nope.md'), '--emit-prompt'], { stub: s, cwd: p }).status, 65);
+  assert.equal(runRunner(['--mode', 'research', '--prompt-file', 'relative.md', '--emit-prompt'], { stub: s, cwd: p }).status, 65);
+  assert.equal(runRunner(['--mode', 'research', '--emit-prompt'], { stub: s, cwd: p }).status, 64);
+  assert.equal(stubActions(s), '');
 });

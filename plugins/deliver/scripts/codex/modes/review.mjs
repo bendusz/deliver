@@ -7,6 +7,7 @@ import { requireCodex, EXEC_FLAGS, REVIEW_FLAGS } from '../lib/preflight.mjs';
 import { runCodexWithFallback } from '../lib/spawn.mjs';
 import { makeScratch } from '../lib/scratch.mjs';
 import { lockedExecArgs } from '../lib/argv.mjs';
+import { emitted, withContract, reviewContract } from '../lib/emit.mjs';
 
 const PRESETS = {
   security: 'authn/authz gaps, injection, secret handling, unsafe deserialization, dependency risk',
@@ -30,6 +31,14 @@ const slug = (s) => {
   return base;
 };
 
+// The prompt that names the scope for `codex exec review` when an objective is set. A review with
+// no objective passes a scope flag and codex supplies its own prompt, so --emit-prompt uses this.
+function scopeText(o) {
+  return o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).'
+    : o.scope === 'branch' ? `Review the changes on the current branch relative to ${o.base} (git diff ${o.base}...HEAD).`
+      : 'Review the uncommitted changes: staged, unstaged, and untracked.';
+}
+
 function objectiveClause(objective) {
   if (!objective) return '';
   const preset = PRESETS[objective.toLowerCase()];
@@ -45,7 +54,8 @@ export async function runReview(o) {
 
   // Recent, worktree, and branch scopes run `codex exec review`. Codebase scope uses plain
   // `codex exec`, so gating it on the review subcommand would refuse a usable CLI.
-  const { found, version } = requireCodex(EXEC_FLAGS, { reviewFlags: o.scope === 'codebase' ? null : REVIEW_FLAGS });
+  // --emit-prompt never launches codex, not even to probe it.
+  const { found, version } = o.emitPrompt ? { found: null, version: '' } : requireCodex(EXEC_FLAGS, { reviewFlags: o.scope === 'codebase' ? null : REVIEW_FLAGS });
 
   if (o.preflight) return { exit: 0, envelope: { runner_status: 'ready', preflight: true, mode: 'review', scope: o.scope, codex_version: version, quota_consumed: false } };
 
@@ -75,6 +85,12 @@ export async function runReview(o) {
     if (realpath(o.out) !== path.join(base, outName)) throw new RunnerError('rejected', 'output directory must resolve inside the repository root');
   }
 
+  if (o.emitPrompt) {
+    const clause = objectiveClause(o.objective);
+    const prompt = o.scope === 'codebase' ? `${CODEBASE_PROMPT}${clause}\n` : `${scopeText(o)}${clause}`;
+    return emitted(o, base, true, withContract(prompt, reviewContract(base)));
+  }
+
   const scratch = makeScratch(base, 'pm-codex-review');
   const report = path.join(scratch, 'report.md');
   const stderrPath = path.join(scratch, 'stderr.log');
@@ -88,10 +104,7 @@ export async function runReview(o) {
     if (o.objective) {
       // A prompt and a scope flag are mutually exclusive on `codex exec review`, so the prompt
       // names the scope, including the base branch for a branch review.
-      const scopeText = o.scope === 'recent' ? 'Review the changes introduced by the last commit (HEAD).'
-        : o.scope === 'branch' ? `Review the changes on the current branch relative to ${o.base} (git diff ${o.base}...HEAD).`
-          : 'Review the uncommitted changes: staged, unstaged, and untracked.';
-      return ['exec', 'review', ...tail, `${scopeText}${clause}`];
+      return ['exec', 'review', ...tail, `${scopeText(o)}${clause}`];
     }
     if (o.scope === 'branch') return ['exec', 'review', '--base', o.base, ...tail];
     return ['exec', 'review', ...(o.scope === 'recent' ? ['--commit', 'HEAD'] : ['--uncommitted']), ...tail];

@@ -27,6 +27,7 @@ before answering.`
 
 Dispatch `codex-advisor` with the brief and any `model=` or `effort=` overrides. Never run `codex`
 yourself. The agent returns Codex's attributed answer or the runner's failure reason.
+Under T3 Code, send the brief through the host instead, as `host-t3.md` says.
 
 ## 4. Relay
 

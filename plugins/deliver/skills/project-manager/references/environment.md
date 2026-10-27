@@ -49,10 +49,11 @@ explicit request.
 ## Agents you orchestrate
 Run reviewers as the tier panel `review-gates.md` sets, plus the lenses the story's risk adds.
 
-The PM never assembles a `codex` command line. Outside T3 Code's `delegate_task` advisory and
-research path, every Codex invocation goes through the bundled runner `scripts/codex/run.mjs`: the PM may call it
-directly, the `--preflight` probe for example, and every model run goes through a Sonnet wrapper
-agent. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
+The PM never assembles a `codex` command line. Every Codex invocation goes through the bundled
+runner `scripts/codex/run.mjs`: the PM may call it directly, the `--preflight` probe for example,
+and every model run goes through a Sonnet wrapper agent. Under T3 Code, see `host-t3.md`: the PM
+takes each prompt from the runner's `--emit-prompt` and hands it to the host, never a command line
+of its own. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
 prompt. When the OpenAI Codex CLI is installed, `codex-reviewer` is the opposite-family lens for
 work Claude wrote, and `codex-advisor` gives a second opinion on a consequential decision.
 `review-gates.md` owns when `codex-reviewer` runs and which lenses run beside it, and `SKILL.md`

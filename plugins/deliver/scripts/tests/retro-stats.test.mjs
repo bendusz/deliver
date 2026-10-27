@@ -452,6 +452,26 @@ test('retro-stats --trust: the panel in force always adds the builder\'s opposit
   assert.equal(o.tiers.T0.calibratedBound, 0.0488);
 });
 
+test('retro-stats --trust: a Codex review through T3 (codex-reviewer-t3) is not the calibrated lens, so the story runs below panel', () => {
+  // An expert-builder story's opposite family is codex-reviewer; the uncalibrated T3 route records
+  // codex-reviewer-t3, which exact name matching never counts as codex-reviewer.
+  const p = soloProject([['S1-1', ex('T0', 0, 0, { panel: ['code-integrity-reviewer', 'codex-reviewer-t3'] })]]);
+  fs.writeFileSync(path.join(p, 'panels.json'), JSON.stringify(PANELS));
+  const r = trust(p, { panelsFile: path.join(p, 'panels.json') });
+  assert.deepEqual(r.panels.stale, []);
+  assert.equal(r.tiers.T0.belowPanel, 1);
+  assert.equal(r.tiers.T0.calibratedBound, null, 'the tier bound is withheld');
+  assert.equal(r.tiers.T0.withheld, '1 story ran below panel');
+  // The maximum panel with codex-reviewer-t3 in place of codex-reviewer is below panel too.
+  const max = soloProject([['S1-1', ex('T1', 0, 0, { panel: MAX.map((l) => (l === 'codex-reviewer' ? 'codex-reviewer-t3' : l)) })]]);
+  assert.equal(trust(max, { panelsFile: path.join(max, 'none.json') }).tiers.T1.belowPanel, 1);
+  // The same story reviewed by the calibrated codex-reviewer is covered.
+  const ok = soloProject([['S1-1', ex('T0', 0, 0, { panel: ['code-integrity-reviewer', 'codex-reviewer'] })]]);
+  const o = trust(ok, { panelsFile: path.join(p, 'panels.json') });
+  assert.equal(o.tiers.T0.belowPanel, 0);
+  assert.equal(o.tiers.T0.calibratedBound, 0.0488);
+});
+
 test('retro-stats --trust: a member at two trials needs two occurrences in the recorded panel', () => {
   const twice = { ...PANELS, tiers: { ...PANELS.tiers, T0: { ...PANELS.tiers.T0, panel: [{ lens: 'code-integrity-reviewer', trials: 2 }] } } };
   const once = soloProject([['S1-1', ex('T0', 0, 0, { panel: ['code-integrity-reviewer', 'codex-reviewer'] })]]);
