@@ -55,8 +55,8 @@ When a story blocks:
 1. Escalate with the story and the decision you need. Use a push-notification tool if the host
    offers one, otherwise the escalation message.
 2. Set the blocked story aside. Commit its preserved tree to its own branch as
-   `wip(<story-id>): blocked`; that commit never ships without a fresh verdict. Then check out the
-   integration branch.
+   `wip(<story-id>): blocked`. That commit may hold paths outside the story's scope, so it never
+   ships without a fresh scope check and verdict. Then check out the integration branch.
 3. Take the next build-ready story in the current sprint, the lowest sprint with an unmerged
    story (`state.md`), that does not depend on the blocked one. Never start a later sprint's
    story to keep busy.
@@ -72,8 +72,8 @@ id in `tmp/log.md`. Delete it with `delete_scheduled_task` when the project comp
 ## Remote PR mode
 When `environment.md` opens a real PR, attach it with `link_pull_request`, then
 `watch_pull_request`. A CI wake is news, not a merge decision: re-run the gates locally, and merge
-only on a verifier `PASS` as usual. Before `gh pr merge` or a merge in the UI, confirm the recorded
-`verifier: PASS <sha>` and, at `T1` and `T2`, `integrity: pass <sha>` name the PR head, or an
+only on a verifier `PASS` as usual. Before `gh pr merge` or a merge in the UI, confirm the claim
+fields are unchanged at the PR head and the recorded `verifier: PASS <sha>` and, at `T1` and `T2`, `integrity: pass <sha>` name the PR head, or an
 ancestor of it followed only by story-file and handoff commits or automatic merges of the
 integration branch. Run the checks `environment.md` lists, and re-verify if any fails. The ship gate hook does not see this path, so
 that check is yours alone; treat it as a residual risk.

@@ -166,7 +166,9 @@ The `require-verified.mjs` hook blocks that merge unless the story branch's Exec
 claim fields `state.md` lists unchanged from the integration branch. Every commit on the branch
 after either `<sha>` may only record state in the story file and `docs/handoff/*.md`, or merge the
 integration tip exactly as git would automatically, which the re-gate covers. Any other change, a
-conflict resolution in code included, needs a fresh verdict. Run the merge as its own Bash command,
+conflict resolution in code included, needs a fresh verdict. A legacy pre-0.29 claim (`state.md`)
+passes the hook with no verdict check, so confirm its `verifier: PASS <sha>` yourself. Run the
+merge as its own Bash command,
 from the project directory or with `git -C <project>`, after at most a plain `git checkout` or
 `git switch` of the integration branch, and name the story branch literally. The merge's own
 directory identifies the project; from a directory that is in no deliver project (for example a

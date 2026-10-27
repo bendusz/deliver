@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## 0.29.3 - 2026-10-27
+
+Documentation consistency: the references now match what the hooks and scripts do. No code changes.
+
+- `environment.md` and `host-t3.md`: the remote-PR check confirms the claim fields and compares
+  against the remote the PR targets, not `origin`; `codex-reviewer`'s role defers to
+  `review-gates.md`.
+- `review-gates.md`: the real stamp inputs, `retro-stats.mjs --trust` as the stamp check, and the
+  maximum panel for a legacy claim with no `tier`.
+- `implementation-loop.md`: a legacy pre-0.29 claim passes the hook with no verdict check.
+- `state.md`: `integrity` is absent at `T0`.
+- `decomposition.md`: `integrity_allow` added in flight goes on the integration branch.
+- `host-t3.md`: a `wip(<id>): blocked` commit may hold out-of-scope paths.
+- 0.30 is postponed, not dropped; its open design points stay in the 0.29 plan's backlog.
+
 ## 0.29.2 - 2026-10-26
 
 Trimmed back. 0.29.1's git-level merge gate is removed: it grew to about 3,000 lines of hook code to

@@ -33,7 +33,9 @@ header. These fields carry rules:
   The object has `builder` and `touches`, and `integrity_allow` only when the story must do
   something `test-integrity.mjs` flags, such as deleting an obsolete test: a list of the kinds it
   may trip, with the reason in Context. The kinds are `test-deleted`, `skip-added`,
-  `assertions-dropped`, `config-weakened`, `pragma-added`, and `protected-changed`. `touches` names the files and directory roots this
+  `assertions-dropped`, `config-weakened`, `pragma-added`, and `protected-changed`. To add it to a
+  claimed story, commit it on the integration branch and merge that commit into the story branch,
+  as `state.md`'s claim fields say. `touches` names the files and directory roots this
   story will change, used for `[P]` safety and enforced by the Codex runner: unique repo-relative
   paths without globs, placeholders, `.`, or traversal. It is required, must be bounded, and must
   cover the implementation and test paths; a story whose scope you cannot name yet is not

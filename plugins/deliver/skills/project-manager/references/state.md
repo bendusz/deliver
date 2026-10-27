@@ -76,7 +76,7 @@ A claimed story ends with an `## Execution` section holding one JSON comment:
   none. `protected_base` is the full SHA of the commit that added them. The scope check rejects
   any change to them since that commit, and the integrity gate gets both.
 - `integrity` is `"<pass|fail> <sha>"`: the latest `test-integrity.mjs` verdict and the full
-  commit SHA it judged, recorded after every writer run at `T1` and `T2`. It is `n/a` at `T0`.
+  commit SHA it judged, recorded after every writer run at `T1` and `T2`. It is absent at `T0`.
 - `verifier` is `"<PASS|FAIL|UNKNOWN> <sha>"`: the latest `pm-verifier` verdict and the full
   commit SHA it judged, recorded at state 5 and absent before the first verification. The
   `require-verified.mjs` hook blocks a merge of the story branch unless this reads `PASS` and,

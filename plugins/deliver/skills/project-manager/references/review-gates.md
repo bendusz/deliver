@@ -11,9 +11,11 @@ escalation.
   otherwise `PASS`.
 
 ## The tier panel
-The story's `tier` (`decomposition.md`) picks its panel. Read
-`${CLAUDE_PLUGIN_ROOT}/benchmarks/assurance/panels.json`, which `/deliver:calibrate` writes. Its
-`stamp` names the models, efforts, prompts, and `deliver` version it was measured on. For each tier
+The story's `tier` (`decomposition.md`) picks its panel; a legacy in-flight claim with no `tier`
+runs the maximum panel. Read `${CLAUDE_PLUGIN_ROOT}/benchmarks/assurance/panels.json`, which
+`/deliver:calibrate` writes. Its `stamp` records the `deliver` version, the corpus manifest hash,
+each lens's model, effort, and prompt hash, and for `codex-reviewer` the hash of
+`scripts/codex/lib/args.mjs`. For each tier
 it holds a `status` of `measured` or `unmeasured`, the `panel` as lenses with a `trials` count of 1
 or 2, the calibrated escape `bound`, and the `target`.
 
@@ -23,7 +25,8 @@ or 2, the calibrated escape `bound`, and the `target`.
   the measured panel lacks it.
 - A tier that is `unmeasured`, absent, or stamped for other models or prompts runs the **maximum
   panel**. So does every tier when the file is missing or unreadable, or when you cannot confirm the
-  stamp matches. The maximum panel is every lens below, the opposite-family reviewer on the first
+  stamp matches. `retro-stats.mjs --trust` is the check: it reports a stale stamp and why. The
+  maximum panel is every lens below, the opposite-family reviewer on the first
   review and on every fix round, and at `T2` two trials of `code-integrity-reviewer`: two
   separate dispatches whose findings you merge.
 - **Never** reduce review below the maximum panel without a measured bound that meets the tier's
