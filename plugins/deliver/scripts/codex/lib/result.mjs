@@ -34,6 +34,8 @@ export function envelope(status, reason, extra = {}) {
     out.ignored_files_changed = Array.isArray(extra.ignored_files_changed) ? extra.ignored_files_changed : [];
   }
   if (typeof extra.stderr_path === 'string') out.stderr_path = extra.stderr_path;
+  // --snapshot-compare names what a host-run child changed, by kind (modes/snapshot.mjs).
+  if (extra.changes && typeof extra.changes === 'object') out.changes = extra.changes;
   return out;
 }
 

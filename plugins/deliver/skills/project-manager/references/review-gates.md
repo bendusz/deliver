@@ -11,9 +11,11 @@ escalation.
   otherwise `PASS`.
 
 ## The tier panel
-The story's `tier` (`decomposition.md`) picks its panel. Read
-`${CLAUDE_PLUGIN_ROOT}/benchmarks/assurance/panels.json`, which `/deliver:calibrate` writes. Its
-`stamp` names the models, efforts, prompts, and `deliver` version it was measured on. For each tier
+The story's `tier` (`decomposition.md`) picks its panel; a legacy in-flight claim with no `tier`
+runs the maximum panel. Read `${CLAUDE_PLUGIN_ROOT}/benchmarks/assurance/panels.json`, which
+`/deliver:calibrate` writes. Its `stamp` records the `deliver` version, the corpus manifest hash,
+each lens's model, effort, and prompt hash, and for `codex-reviewer` the hash of
+`scripts/codex/lib/args.mjs`. For each tier
 it holds a `status` of `measured` or `unmeasured`, the `panel` as lenses with a `trials` count of 1
 or 2, the calibrated escape `bound`, and the `target`.
 
@@ -23,7 +25,8 @@ or 2, the calibrated escape `bound`, and the `target`.
   the measured panel lacks it.
 - A tier that is `unmeasured`, absent, or stamped for other models or prompts runs the **maximum
   panel**. So does every tier when the file is missing or unreadable, or when you cannot confirm the
-  stamp matches. The maximum panel is every lens below, the opposite-family reviewer on the first
+  stamp matches. `retro-stats.mjs --trust` is the check: it reports a stale stamp and why. The
+  maximum panel is every lens below, the opposite-family reviewer on the first
   review and on every fix round, and at `T2` two trials of `code-integrity-reviewer`: two
   separate dispatches whose findings you merge.
 - **Never** reduce review below the maximum panel without a measured bound that meets the tier's
@@ -49,6 +52,13 @@ continue with the lenses that can run and record it, and `T2` escalates. The Exe
 that tier's bound. A `codex-reviewer` run the runner moved to a fallback model (its envelope's
 model or effort differs from the calibrated `panels.json` stamp) counts as that lens missing: record
 it under its real model, never as the calibrated lens, and escalate at `T2`.
+
+**Under T3 Code** (`host-t3.md`), a Codex review runs through the host, not the calibrated wrapper,
+and is recorded in `panel` as `codex-reviewer-t3`. It meets the opposite-family rule, so it is no
+missing lens, but it is not `codex-reviewer`: a tier whose measured panel needs `codex-reviewer`
+runs the maximum panel instead, with `codex-reviewer-t3` in the Codex seat. The trust report counts
+such a story below panel and withholds that tier's bound. A review that fell back to the wrapper is
+`codex-reviewer` again.
 
 ## Risk triggers: lenses added on top
 These lenses are additive. Under a measured panel, a story gets each one its risk calls for, even

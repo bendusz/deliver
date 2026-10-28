@@ -2,6 +2,44 @@
 
 All notable changes to this project are documented here.
 
+## 0.29.4 - 2026-10-27
+
+Inside T3 Code, Codex runs through T3 itself. Without T3 nothing changes.
+
+- **Codex goes through T3.** When the T3 probe succeeds, every Codex call (build, fix, review,
+  advice, and research) goes to T3's Codex delegation instead of the Sonnet wrapper agents.
+  `host-t3.md` gives the steps: get the prompt, snapshot the checkout, call T3 with the runner's
+  model and an explicit effort, compare, then run the usual scope check, integrity check, and gates
+  after a build. If T3 refuses or fails, or there is no repository, the PM falls back to the
+  wrapper and records it.
+- **`run.mjs --snapshot` and `--snapshot-compare`.** The runner's own before/after checks for a
+  child T3 runs, with no codex launch. They cover the whole checkout from its root: file bytes on
+  disk, ignored files, protected PM artifacts, and git metadata (hooks, refs, config, index flags,
+  worktrees, `info/exclude`). A read-only run fails on any change, and a build fails on what a real
+  build would. The hand-run git snapshot commands are gone: they missed `.git/` and ignored files.
+- **`run.mjs --emit-prompt`.** It makes the same checks as a real run, prints the exact prompt
+  plus the mode's model, effort, working directory, and whether the run is read-only, and never
+  launches codex. Build and fix prompts carry the result schema inline, and read-only prompts
+  carry a report format and a no-write instruction.
+- **Honest calibration.** A Codex review through T3 is recorded as `codex-reviewer-t3`. It meets
+  the opposite-family rule but is not the calibrated lens, so its tier runs the maximum panel and
+  `retro-stats.mjs --trust` withholds that tier's bound. A new test proves it.
+
+## 0.29.3 - 2026-10-27
+
+Documentation consistency: the references now match what the hooks and scripts do. No code changes.
+
+- `environment.md` and `host-t3.md`: the remote-PR check confirms the claim fields and compares
+  against the remote the PR targets, not `origin`; `codex-reviewer`'s role defers to
+  `review-gates.md`.
+- `review-gates.md`: the real stamp inputs, `retro-stats.mjs --trust` as the stamp check, and the
+  maximum panel for a legacy claim with no `tier`.
+- `implementation-loop.md`: a legacy pre-0.29 claim passes the hook with no verdict check.
+- `state.md`: `integrity` is absent at `T0`.
+- `decomposition.md`: `integrity_allow` added in flight goes on the integration branch.
+- `host-t3.md`: a `wip(<id>): blocked` commit may hold out-of-scope paths.
+- 0.30 is postponed, not dropped; its open design points stay in the 0.29 plan's backlog.
+
 ## 0.29.2 - 2026-10-26
 
 Trimmed back. 0.29.1's git-level merge gate is removed: it grew to about 3,000 lines of hook code to

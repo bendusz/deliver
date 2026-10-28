@@ -113,7 +113,8 @@ export function snapshotWorktree(root) {
     if (hasControl(rel)) throw new Error(`unsupported path name: ${rel}`);
     let st;
     try { st = fs.lstatSync(path.join(root, rel)); } catch { out.set(rel, 'missing'); continue; }
-    out.set(rel, `ignored:${st.size}:${st.mtimeMs}:${st.ino}`);
+    // ctime too: a writer can restore mtime with utimes(), but not ctime.
+    out.set(rel, `ignored:${st.size}:${st.mtimeMs}:${st.ctimeMs}:${st.ino}`);
   }
   return out;
 }

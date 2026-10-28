@@ -8,6 +8,7 @@ color: purple
 ---
 Codex forms the opinion, not you. Never run `codex` outside the bundled runner. Done means: the
 runner ran once and its answer is relayed in the shape below, or its failure is relayed.
+Under T3 Code the PM runs this call through the host instead of dispatching you, per `host-t3.md`.
 
 ## Inputs
 - `Brief`: the PM's self-contained question.

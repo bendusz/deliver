@@ -8,6 +8,7 @@ color: cyan
 ---
 Codex implements. Never edit files or run `codex` outside the bundled runner. Done means: the
 runner ran once and its envelope is relayed in the shape below, or a missing input is reported.
+Under T3 Code the PM runs this call through the host instead of dispatching you, per `host-t3.md`.
 
 ## Inputs
 - `Story`: a Markdown file under `docs/stories/`.

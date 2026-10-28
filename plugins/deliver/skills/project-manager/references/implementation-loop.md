@@ -54,8 +54,9 @@ builder brief, fix brief, or continuation.
 
 Dispatch the persisted `builder` with the inputs its agent file lists, plus the absolute repository
 or worktree root for every `codex-builder` and for `expert-builder` outside the main checkout. Run
-Codex's quota-free `--preflight` first when readiness is not established. Pass the story's `Specs`
-when it has any. Builders edit the working tree; you own every git command.
+Codex's quota-free `--preflight` first when readiness is not established. Under T3 Code, a
+`codex-builder` run goes through the host instead, as `host-t3.md` says, with no preflight. Pass
+the story's `Specs` when it has any. Builders edit the working tree; you own every git command.
 
 **Scope check, after every writer run.** Two checks, from the repository and never from the
 summary. First, the cumulative set: `git diff --name-only --diff-filter=ACDMRTUXB
@@ -127,7 +128,8 @@ the story file, that diff text, and the story's `Specs`. Aggregate the lenses' f
 `codex-reviewer` with `Scope: branch`, `Base:` the integration branch, at
 the runner's default model and effort, after the secret scan and preflight that
 `/deliver:codex-review` describes. Grade its findings yourself against `review-gates.md`'s
-severities and aggregate them with the panel's. When `review-gates.md` calls for `codex-reviewer`
+severities and aggregate them with the panel's. Under T3 Code, dispatch it as `host-t3.md` says
+and record it as `codex-reviewer-t3`. When `review-gates.md` calls for `codex-reviewer`
 this round and Codex is absent or refuses, note the gap in the story's Execution notes. At `T0` and
 `T1`, continue under `review-gates.md`'s missing-Codex-lens exception, so `panel` lists only the
 lenses that ran. At `T2`, set `status: blocked` and escalate.
@@ -166,7 +168,9 @@ The `require-verified.mjs` hook blocks that merge unless the story branch's Exec
 claim fields `state.md` lists unchanged from the integration branch. Every commit on the branch
 after either `<sha>` may only record state in the story file and `docs/handoff/*.md`, or merge the
 integration tip exactly as git would automatically, which the re-gate covers. Any other change, a
-conflict resolution in code included, needs a fresh verdict. Run the merge as its own Bash command,
+conflict resolution in code included, needs a fresh verdict. A legacy pre-0.29 claim (`state.md`)
+passes the hook with no verdict check, so confirm its `verifier: PASS <sha>` yourself. Run the
+merge as its own Bash command,
 from the project directory or with `git -C <project>`, after at most a plain `git checkout` or
 `git switch` of the integration branch, and name the story branch literally. The merge's own
 directory identifies the project; from a directory that is in no deliver project (for example a

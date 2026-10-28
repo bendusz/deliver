@@ -9,6 +9,7 @@ color: purple
 Codex does the research, never you. Never run `codex` outside the bundled runner. Done means: the
 runner ran once, the attributed report is written under `docs/research/`, and the digest below is
 returned, or the runner's failure is relayed.
+Under T3 Code the PM runs this call through the host instead of dispatching you, per `host-t3.md`.
 
 ## Inputs
 - The question, the decision it feeds, the file paths, options, and constraints.

@@ -22,12 +22,15 @@ open the PR with the message format in `implementation-loop.md`, and merge it. B
 `gh pr merge` or a merge in the UI, confirm the recorded `verifier: PASS <sha>` and, at `T1` and
 `T2`, `integrity: pass <sha>` name the PR head, or an ancestor of it followed only by story-file
 and handoff commits or by merges of the integration branch that git would make automatically.
-This is the rule the hook applies to a local merge. Check it for each recorded `<sha>`:
+This is the rule the hook applies to a local merge. `<remote>` is the remote the PR targets.
+First confirm the claim fields `state.md` lists are the same at `<head>` as on
+`<remote>/<integration>`, and that a `T1` or `T2` claim there has a non-empty `protected` and a
+`protected_base`. Then check each recorded `<sha>`:
 
 1. `git merge-base --is-ancestor <sha> <head>` succeeds.
-2. `git log --stat <sha>..<head> --not origin/<integration>` shows only the story file and
+2. `git log --stat <sha>..<head> --not <remote>/<integration>` shows only the story file and
    `docs/handoff/*.md` in its non-merge commits.
-3. For each merge commit that `git rev-list --merges <sha>..<head> --not origin/<integration>`
+3. For each merge commit that `git rev-list --merges <sha>..<head> --not <remote>/<integration>`
    lists, run `git merge-tree --write-tree --name-only <merge>^1 <merge>^2`. Its first line is the
    result tree; on a conflict it exits 1 and lists the conflicted paths after that line. The merge
    passes when every conflicted path it lists, and every path that
@@ -46,14 +49,15 @@ explicit request.
 ## Agents you orchestrate
 Run reviewers as the tier panel `review-gates.md` sets, plus the lenses the story's risk adds.
 
-The PM never assembles a `codex` command line. Outside T3 Code's `delegate_task` advisory and
-research path, every Codex invocation goes through the bundled runner `scripts/codex/run.mjs`: the PM may call it
-directly, the `--preflight` probe for example, and every model run goes through a Sonnet wrapper
-agent. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
+The PM never assembles a `codex` command line. Every Codex invocation goes through the bundled
+runner `scripts/codex/run.mjs`: the PM may call it directly, the `--preflight` probe for example,
+and every model run goes through a Sonnet wrapper agent. Under T3 Code, see `host-t3.md`: the PM
+takes each prompt from the runner's `--emit-prompt` and hands it to the host, never a command line
+of its own. `scripts/validate.sh` fails on any direct `codex exec` in an agent or command
 prompt. When the OpenAI Codex CLI is installed, `codex-reviewer` is the opposite-family lens for
-work Claude wrote, alongside the panel and never as a replacement for it, and
-`codex-advisor` gives a second opinion on a consequential decision. `review-gates.md` owns when
-`codex-reviewer` runs, and `SKILL.md` when `codex-advisor` does. `/deliver:codex-review` and `/deliver:codex-help` are
+work Claude wrote, and `codex-advisor` gives a second opinion on a consequential decision.
+`review-gates.md` owns when `codex-reviewer` runs and which lenses run beside it, and `SKILL.md`
+when `codex-advisor` does. `/deliver:codex-review` and `/deliver:codex-help` are
 the user-run forms. The
 `codex-researcher` agent plays the same independent-second-model role for research questions.
 `codex-builder` is different: it is write-capable inside one fixed worktree and may replace

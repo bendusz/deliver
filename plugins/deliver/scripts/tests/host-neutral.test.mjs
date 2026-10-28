@@ -15,7 +15,6 @@ const T3_TOOLS = /mcp__t3-code__|\bdelegate_task\b|\bschedule_task\b|\bt3_thread
 // here until it is made conditional and listed, so a T3-only step cannot slip into the default path.
 const ALLOWED = [
   { file: path.join('skills', 'project-manager', 'SKILL.md'), line: /ToolSearch select:mcp__t3-code__orchestrator_capabilities/ },
-  { file: path.join('skills', 'project-manager', 'references', 'environment.md'), line: /Outside T3 Code's `delegate_task` advisory/ },
 ];
 const T3_WORD = /\bT3\b/;
 const CONDITIONAL = /Under T3 Code|Outside T3 Code|Only when the probe|scheduled T3 heartbeat|T3's for example|a T3 thread|\(a T3 thread|host-t3\.md/;
