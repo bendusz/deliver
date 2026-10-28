@@ -8,9 +8,15 @@ Inside T3 Code, Codex runs through T3 itself. Without T3 nothing changes.
 
 - **Codex goes through T3.** When the T3 probe succeeds, every Codex call (build, fix, review,
   advice, and research) goes to T3's Codex delegation instead of the Sonnet wrapper agents.
-  `host-t3.md` gives the steps: get the prompt, call T3 with the runner's model and an explicit
-  effort, snapshot read-only runs before and after, and run the usual scope check, integrity check,
-  and gates after a build. If T3 refuses or fails, the PM falls back to the wrapper and records it.
+  `host-t3.md` gives the steps: get the prompt, snapshot the checkout, call T3 with the runner's
+  model and an explicit effort, compare, then run the usual scope check, integrity check, and gates
+  after a build. If T3 refuses or fails, or there is no repository, the PM falls back to the
+  wrapper and records it.
+- **`run.mjs --snapshot` and `--snapshot-compare`.** The runner's own before/after checks for a
+  child T3 runs, with no codex launch. They cover the whole checkout from its root: file bytes on
+  disk, ignored files, protected PM artifacts, and git metadata (hooks, refs, config, index flags,
+  worktrees, `info/exclude`). A read-only run fails on any change, and a build fails on what a real
+  build would. The hand-run git snapshot commands are gone: they missed `.git/` and ignored files.
 - **`run.mjs --emit-prompt`.** It makes the same checks as a real run, prints the exact prompt
   plus the mode's model, effort, working directory, and whether the run is read-only, and never
   launches codex. Build and fix prompts carry the result schema inline, and read-only prompts

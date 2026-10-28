@@ -30,8 +30,18 @@ none of this file applies.
    codex would get plus a contract for what the runner would enforce. Build and fix end with the
    builder result schema. Review, advise, and research name `cwd` and are told not to write.
    Skip the runner's `--preflight`: it probes the local Codex CLI, which a T3 child does not use.
-2. **Read-only modes** (`readOnly: true`: review, advise, research). Before the call, take the
-   advisory snapshot below in the emitted `cwd`, and in your own checkout when it differs.
+2. **Snapshot.** Run the runner again with the same arguments plus
+   `--snapshot --snapshot-out <file>`, a new file outside the checkout (under the system temp
+   directory, say), and keep the `snapshot_sha256` it prints in your own context. It fingerprints
+   the whole checkout from its root, whatever the cwd: tracked, untracked, and git-ignored files
+   by their bytes on disk, the protected PM artifacts even when ignored, and the git metadata
+   (HEAD, refs, the index and its flags, local config, worktrees, hooks, `info/exclude`). Exit 69
+   with `no git repository`, a codebase review or advice outside a repo, refuses the T3 path:
+   use the wrapper agent (step 8). Any other non-zero exit is the wrapper's refusal. For a
+   read-only mode whose `root` is not your own checkout, snapshot yours too, from its root, with
+   `--mode review --scope codebase --out <your root>/untracked`, since a `shared` child starts
+   there; a build covers its worktree only, as the runner does. Until the compare, change nothing
+   in a snapshotted checkout and run no other child there.
 3. **Call** `delegate_task` with:
    - `task`: the emitted `prompt`, verbatim.
    - `target`: `{providerInstanceId: "codex", model: <model>, options: {reasoningEffort: <effort>}}`.
@@ -41,24 +51,30 @@ none of this file applies.
    - `clientRequestId`: `<story-id>-<mode>-<round>` (or `<topic>-<mode>-<stamp>` outside a
      story), the same on every retry of this run, so a resumed call reuses its child.
 4. **Read** the result with `task_status`. Its `summary` is the child's final message.
-5. **Read-only check.** Run the snapshot again and compare. Any difference is a failed run: stop,
-   report what changed, and never grade or relay its output. Otherwise use the summary as the
-   wrapper's answer. Grade review findings per `review-gates.md`, and save the summary as
+5. **Compare** before you read the summary as a result: run the runner with the same arguments
+   plus `--snapshot-compare <file> --snapshot-sha256 <sha>`, for each snapshot you took. A
+   read-only mode refuses any change at all. A build or fix refuses what a real build refuses:
+   git metadata, a protected PM artifact even when ignored, a story `protected` path, or a
+   tracked or untracked path outside the `pm-meta.touches` recorded at the snapshot. Git-ignored
+   output elsewhere is reported in `ignored_files_changed`, not refused. A non-zero exit
+   (`safety-violation`, with `changes` naming each kind) stops the story with the tree preserved.
+   Report what changed, never grade or relay the run, and never fall back to a wrapper over it.
+6. **Read-only result.** Use the summary as the wrapper's answer. Grade review findings per
+   `review-gates.md`, and save the summary as
    `<out>/<stamp>-codex-review-<scope>[-<objective slug>]-t3.md`, `<stamp>` being the review
    run's shared `PM_CODEX_STAMP`. A research answer goes to
    `docs/research/YYYY-MM-DD-<slug>-codex.md` as `codex-researcher` would write it, attributed
    "Codex (<model>) via T3", with search left to T3's Codex settings.
-6. **Build and fix.** The child works in the story's worktree, which the prompt names. Parse the
-   last fenced JSON block of the summary as the result `codex-builder` would relay; a missing or
-   malformed one is a failed run. Nothing runner-side checks a T3 child, so run exactly what you
-   run after any writer: the scope check against `pm-meta.touches` and the story's `protected`
-   paths, `test-integrity.mjs` at `T1` and `T2`, and the gates. The block's `files_changed` must
-   match the diff you see.
-7. **Fallback.** When T3 refuses the call, the call fails, or the child ends in failure, dispatch
-   the wrapper agent for the same run and record `codex via wrapper: <reason>` in the story's
-   Execution notes, or in `tmp/log.md` outside a story. A read-only run that changed anything is
-   not a fallback case; step 5 stops it. A build or fix child that wrote before failing leaves a
-   writer's tree: scope-check it first, then fall back.
+7. **Build and fix result.** The child works in the story's worktree, which the prompt names.
+   Parse the last fenced JSON block of the summary as the result `codex-builder` would relay; a
+   missing or malformed one is a failed run. Its `files_changed` must equal the compare's
+   `actual_files_changed`. Then run exactly what you run after any writer: the scope check,
+   `test-integrity.mjs` at `T1` and `T2`, and the gates.
+8. **Fallback.** When the snapshot reports no repository, T3 refuses the call, the call fails,
+   or the child ends in failure, dispatch the wrapper agent for the same run and record
+   `codex via wrapper: <reason>` in the story's Execution notes, or in `tmp/log.md` outside a
+   story. Compare first whenever a child ran: a failed child's tree falls back only after a clean
+   compare.
 
 **Calibration.** A Codex review through T3 is not the calibrated `codex-reviewer` lens. Record it
 in the Execution block's `panel` as `codex-reviewer-t3`. It meets the opposite-family rule, but
@@ -66,25 +82,6 @@ in the Execution block's `panel` as `codex-reviewer-t3`. It meets the opposite-f
 whose measured panel needs `codex-reviewer` runs the maximum panel instead (`review-gates.md`). A
 review that fell back to the wrapper is the calibrated lens again and is recorded as
 `codex-reviewer`.
-
-## Advisory snapshot
-A `delegate_task` child can write, and an overwrite of an already modified or untracked file, or
-a commit, leaves `git status --porcelain` unchanged, so compare content instead. From the checkout
-root, run these before the call and keep their output:
-
-<!-- advisory-snapshot -->
-```
-git rev-parse HEAD
-git stash create
-git -c core.quotePath=false ls-files -o --exclude-standard
-git -c core.quotePath=false ls-files -o --exclude-standard | git hash-object --stdin-paths
-```
-
-They give the commit, a commit whose tree holds the tracked changes (it prints nothing when there
-are none, and touches neither the working tree, the index, nor the stash list), and the untracked
-files with their content hashes. Run them again after the call and compare, reading each `stash
-create` commit as its tree (`git rev-parse <sha>^{tree}`), since the commit itself carries a
-timestamp. Any difference is a failed run: stop, investigate what changed, and report it.
 
 ## Worktrees
 - You own a worktree under `tmp/worktrees/` or on a `pm/*` branch. Any other worktree belongs to

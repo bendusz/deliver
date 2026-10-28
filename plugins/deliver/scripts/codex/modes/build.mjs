@@ -18,8 +18,8 @@ const rejected = (r) => new RunnerError('rejected', r);
 const blocked = (r, extra) => new RunnerError('blocked', r, extra);
 const unavailable = (r, extra) => new RunnerError('unavailable', r, extra);
 const isRootSpec = (rel) => /\.sdd$/i.test(rel) && !rel.includes('/');
-const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stories/') || rel.startsWith('docs/wiki/') || rel.startsWith('docs/handoff/') || rel.startsWith('.specdd/') || isRootSpec(rel) || ['docs/approval.json', 'docs/spec.md', 'docs/plan.md', 'docs/constitution.md'].includes(rel);
-const allowed = (rel, scopes) => scopes.some((s) => rel === s || rel.startsWith(`${s}/`));
+export const isProtected = (rel) => rel.startsWith('pm/') || rel.startsWith('docs/stories/') || rel.startsWith('docs/wiki/') || rel.startsWith('docs/handoff/') || rel.startsWith('.specdd/') || isRootSpec(rel) || ['docs/approval.json', 'docs/spec.md', 'docs/plan.md', 'docs/constitution.md'].includes(rel);
+export const allowed = (rel, scopes) => scopes.some((s) => rel === s || rel.startsWith(`${s}/`));
 const tomlString = (s) => JSON.stringify(s);
 
 function buildPrompt({ worktree, storyRel, scopes, protectedPaths = [], mode, evidenceRel }) {
@@ -71,7 +71,8 @@ function policy() {
   return { sandbox: 'danger-full-access', network_access: true, web_search: 'config', mcp_servers: 'config', hooks: false, subagents: false, login_shell: false, environment: 'core-with-secret-filtering', host_tmp_writable: true };
 }
 
-export async function runBuild(o) {
+// resolveWorktree(o): the real path of --worktree, refused unless it is a git worktree root.
+export function resolveWorktree(o) {
   if (!path.isAbsolute(o.worktree)) throw rejected('worktree must be an absolute path');
   if (!fs.existsSync(o.worktree) || !fs.statSync(o.worktree).isDirectory()) throw rejected('worktree does not exist');
   const worktree = realpath(o.worktree);
@@ -82,7 +83,20 @@ export async function runBuild(o) {
   const gitRoot = realpath(top);
   if (!gitRoot) throw rejected('cannot resolve git root');
   if (gitRoot !== worktree) throw rejected('--worktree must name the git worktree root exactly');
+  return worktree;
+}
 
+const AMBIGUOUS_BASELINE = 'the worktree contains an unsupported path type or a tab/newline filename; refusing an ambiguous baseline';
+
+// baseline(worktree, extra): the pre-run snapshot, or the blocked refusal a real run gives.
+export function baseline(worktree, extra = {}) {
+  try { return snapshotWorktree(worktree); } catch { throw blocked(AMBIGUOUS_BASELINE, extra); }
+}
+
+// prepareBuild(o): every check a build makes before codex starts, short of the baseline snapshot.
+// --emit-prompt and --snapshot skip only the codex probe: neither launches codex.
+export function prepareBuild(o) {
+  const worktree = resolveWorktree(o);
   let storyRel = ''; let scopes = []; let builder = ''; let protectedPaths = [];
   if (o.story) {
     storyRel = pmRelpath(worktree, o.story);
@@ -131,17 +145,22 @@ export async function runBuild(o) {
   }
 
   // --emit-prompt never launches codex, not even to probe it: the host that runs the prompt brings its own.
-  const { found, version } = o.emitPrompt ? { found: null, version: '' } : requireCodex(BUILD_FLAGS, { hint: ' or use expert-builder' });
+  const { found, version } = o.emitPrompt || o.snapshot ? { found: null, version: '' } : requireCodex(BUILD_FLAGS, { hint: ' or use expert-builder' });
   if (!fs.existsSync(SCHEMA)) throw new RunnerError('failed', 'bundled result schema is missing', { codex_version: version });
   assertRuntimeRootReal(worktree);
   if (!checkIgnore(worktree, 'tmp/codex-runtime/probe')) throw blocked('tmp/ must be ignored before codex-builder can create an isolated runtime directory', { codex_version: version });
+  return { worktree, storyRel, scopes, builder, protectedPaths, evidenceRel, found, version };
+}
 
+export async function runBuild(o) {
+  const { worktree, storyRel, scopes, builder, protectedPaths, evidenceRel, found, version } = prepareBuild(o);
   if (o.preflight) {
     return { exit: 0, envelope: { runner_status: 'ready', preflight: true, codex_version: version, worktree, story: storyRel || null, story_builder: builder || null, story_scope_checked: storyRel !== '', allowed_paths: scopes, quota_consumed: false, policy: policy() } };
   }
   // Every refusal above has run. The caller owns the post-run checks the runner would make: the
   // scope check, protected paths included, and the gates.
   if (o.emitPrompt) {
+    baseline(worktree);
     const prompt = buildPrompt({ worktree, storyRel, scopes, protectedPaths, mode: o.mode, evidenceRel });
     return emitted(o, worktree, false, withContract(prompt, builderContract(fs.readFileSync(SCHEMA, 'utf8'))));
   }
@@ -167,7 +186,7 @@ export async function runBuild(o) {
   try { fs.writeFileSync(files.prompt, prompt); } catch { cleanupRuntime(); throw new RunnerError('failed', 'could not write the prompt', { scratch_dir: scratch, codex_version: version }); }
 
   let before;
-  try { before = snapshotWorktree(worktree); } catch { cleanupRuntime(); throw blocked('the worktree contains an unsupported path type or a tab/newline filename; refusing an ambiguous baseline', { scratch_dir: scratch, codex_version: version }); }
+  try { before = baseline(worktree, { scratch_dir: scratch, codex_version: version }); } catch (e) { cleanupRuntime(); throw e; }
   const beforeMeta = gitMetadataFingerprint(worktree);
 
   const argsFor = ({ model, effort }) => ['exec', ...lockedExecArgs({ ...o, model, effort }), '-C', worktree, '--color', 'never',

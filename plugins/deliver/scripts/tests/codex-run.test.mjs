@@ -1173,3 +1173,172 @@ test('emit-prompt: advise and research send the brief verbatim, read-only', () =
   assert.equal(runRunner(['--mode', 'research', '--emit-prompt'], { stub: s, cwd: p }).status, 64);
   assert.equal(stubActions(s), '');
 });
+
+// --snapshot / --snapshot-compare: the runner's before/after checks for a child a host launches.
+// Each run gets a fresh snapshot file outside the checkout, and the sha256 the PM keeps.
+const snapOf = (args, opts) => {
+  const file = path.join(tmpDir('pmsnap-'), 'snap.json');
+  const r = runRunner([...args, '--snapshot', '--snapshot-out', file], opts);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(r.out.runner_status, 'snapshot-taken');
+  return { file, sha: r.out.snapshot_sha256, root: r.out.root };
+};
+const compareOf = (args, snap, opts) => runRunner([...args, '--snapshot-compare', snap.file, '--snapshot-sha256', snap.sha], opts);
+const REVIEW = (p) => ['--mode', 'review', '--scope', 'recent', '--out', path.join(p, 'untracked')];
+
+test('snapshot: a read-only child writing a git hook, a ref, local config, or an ignored file is caught', () => {
+  const writes = {
+    'git hooks': (p) => fs.writeFileSync(path.join(p, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 0\n'),
+    refs: (p) => gitIn(p, ['update-ref', 'refs/heads/x', 'HEAD']),
+    'local git config': (p) => gitIn(p, ['config', '--local', 'core.hooksPath', '/tmp/evil']),
+  };
+  for (const [kind, write] of Object.entries(writes)) {
+    const p = newBuildProject(true); const s = makeStub();
+    const snap = snapOf(REVIEW(p), { stub: s, cwd: p });
+    assert.equal(snap.root, real(p));
+    assert.equal(compareOf(REVIEW(p), snap, { stub: s, cwd: p }).status, 0, 'nothing changed yet');
+    write(p);
+    const r = compareOf(REVIEW(p), snap, { stub: s, cwd: p });
+    assert.equal(r.status, 74, `${kind}: ${JSON.stringify(r.out)}`);
+    assert.equal(r.out.runner_status, 'safety-violation');
+    assert.ok(r.out.changes.git_metadata.includes(kind), `${kind}: ${JSON.stringify(r.out.changes)}`);
+    assert.match(r.out.reason, /never grade the run/);
+    assert.equal(stubActions(s), '', 'codex never launched');
+  }
+  const p = newBuildProject(true); const s = makeStub();
+  fs.appendFileSync(path.join(p, '.gitignore'), '.env\n');
+  gitIn(p, ['commit', '-qam', 'ignore .env']);
+  const snap = snapOf(REVIEW(p), { stub: s, cwd: p });
+  fs.writeFileSync(path.join(p, '.env'), 'TOKEN=planted\n');
+  const r = compareOf(REVIEW(p), snap, { stub: s, cwd: p });
+  assert.equal(r.status, 74, JSON.stringify(r.out));
+  assert.deepEqual(r.out.changes.ignored_files, ['.env']);
+  assert.match(r.out.reason, /git-ignored files \(\.env\)/);
+});
+
+test('snapshot: a read-only snapshot covers the whole checkout from a subdirectory, and the file is tamper-evident', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const brief = path.join(s.dir, 'brief.md'); fs.writeFileSync(brief, 'q\n');
+  const sub = path.join(p, 'src');
+  const args = ['--mode', 'advise', '--prompt-file', brief];
+  const snap = snapOf(args, { stub: s, cwd: sub });
+  assert.equal(snap.root, real(p), 'the snapshot is taken from the checkout root');
+  fs.mkdirSync(path.join(p, 'notes'));
+  fs.writeFileSync(path.join(p, 'notes', 'new.md'), 'outside the cwd subtree\n');
+  const r = compareOf(args, snap, { stub: s, cwd: sub });
+  assert.equal(r.status, 74, JSON.stringify(r.out));
+  assert.deepEqual(r.out.changes.content, ['notes/new.md']);
+  // A child that rewrites the snapshot to match is caught by the digest the PM kept.
+  const q = newBuildProject(true);
+  const snap2 = snapOf(args, { stub: s, cwd: q });
+  fs.appendFileSync(snap2.file, ' ');
+  const t = compareOf(args, snap2, { stub: s, cwd: q });
+  assert.equal(t.status, 74); assert.match(t.out.reason, /snapshot file changed/);
+  // The mode must match, and the snapshot file lives outside the checkout.
+  assert.equal(compareOf(REVIEW(q), snapOf(args, { stub: s, cwd: q }), { stub: s, cwd: q }).status, 65);
+  assert.equal(runRunner([...args, '--snapshot', '--snapshot-out', path.join(q, 'tmp', 'snap.json')], { stub: s, cwd: q }).status, 65);
+  // Usage: each flag needs its partner and the actions are exclusive.
+  assert.equal(runRunner([...args, '--snapshot'], { stub: s, cwd: q }).status, 64);
+  assert.equal(runRunner([...args, '--snapshot-compare', snap2.file], { stub: s, cwd: q }).status, 64);
+  assert.equal(runRunner([...args, '--emit-prompt', '--snapshot', '--snapshot-out', path.join(tmpDir('pmsnap-'), 's.json')], { stub: s, cwd: q }).status, 64);
+});
+
+test('snapshot: with no repository the T3 path is refused, so the PM falls back to the wrapper', () => {
+  const s = makeStub();
+  const noRepo = tmpDir('norepo-');
+  const brief = path.join(s.dir, 'brief.md'); fs.writeFileSync(brief, 'q\n');
+  for (const args of [['--mode', 'advise', '--prompt-file', brief], ['--mode', 'review', '--scope', 'codebase', '--out', path.join(noRepo, 'untracked')]]) {
+    const r = runRunner([...args, '--snapshot', '--snapshot-out', path.join(tmpDir('pmsnap-'), 's.json')], { stub: s, cwd: noRepo });
+    assert.equal(r.status, 69, JSON.stringify(r.out));
+    assert.match(r.out.reason, /no git repository.*use the wrapper agent/);
+  }
+});
+
+test('snapshot: a build child editing a git hook or a git-ignored protected artifact is caught', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const snap = snapOf(['--mode', 'build'], { project: p, stub: s });
+  fs.writeFileSync(path.join(p, '.git', 'hooks', 'post-commit'), '#!/bin/sh\nexit 0\n');
+  fs.writeFileSync(path.join(p, 'src', 'fix.txt'), 'in scope\n');
+  const r = compareOf(['--mode', 'build'], snap, { project: p, stub: s });
+  assert.equal(r.status, 74, JSON.stringify(r.out));
+  assert.deepEqual(r.out.changes.git_metadata, ['git hooks']);
+  const q = newBuildProject(true);
+  fs.appendFileSync(path.join(q, '.gitignore'), 'docs/handoff/\n');
+  gitIn(q, ['commit', '-qam', 'ignore handoffs']);
+  const snap2 = snapOf(['--mode', 'build'], { project: q, stub: s });
+  fs.mkdirSync(path.join(q, 'docs', 'handoff'));
+  fs.writeFileSync(path.join(q, 'docs', 'handoff', 'casey.md'), 'rewritten\n');
+  const t = compareOf(['--mode', 'build'], snap2, { project: q, stub: s });
+  assert.equal(t.status, 74, JSON.stringify(t.out));
+  assert.deepEqual(t.out.changes.protected_artifacts, ['docs/handoff/casey.md']);
+  assert.equal(stubActions(s), '');
+});
+
+test('snapshot: a build with only in-scope edits passes; out-of-scope and story-protected edits fail', () => {
+  const p = newBuildProject(true); const s = makeStub();
+  const snap = snapOf(['--mode', 'build'], { project: p, stub: s });
+  assert.equal(compareOf(['--mode', 'build'], snap, { project: p, stub: s }).out.runner_status, 'unchanged');
+  fs.writeFileSync(path.join(p, 'src', 'fix.txt'), 'new\n');
+  fs.appendFileSync(path.join(p, 'src', 'script.sh'), '# edited\n');
+  fs.writeFileSync(path.join(p, 'tmp', 'cache.txt'), 'ignored build output\n');
+  const ok = compareOf(['--mode', 'build'], snap, { project: p, stub: s });
+  assert.equal(ok.status, 0, JSON.stringify(ok.out));
+  assert.equal(ok.out.runner_status, 'in-scope');
+  assert.deepEqual(ok.out.actual_files_changed, ['src/fix.txt', 'src/script.sh']);
+  assert.deepEqual(ok.out.ignored_files_changed, ['tmp/cache.txt'], 'ignored output is reported, not enforced, as after a real build');
+  fs.writeFileSync(path.join(p, 'README.md'), 'outside touches\n');
+  const out = compareOf(['--mode', 'build'], snap, { project: p, stub: s });
+  assert.equal(out.status, 74);
+  assert.deepEqual(out.out.changes.content, ['README.md']);
+  const q = protectedBuildProject();
+  const snap2 = snapOf(['--mode', 'build'], { project: q, stub: s });
+  fs.writeFileSync(path.join(q, 'src', 'acceptance', 'a.test.mjs'), 'green by edit\n');
+  const pr = compareOf(['--mode', 'build'], snap2, { project: q, stub: s });
+  assert.equal(pr.status, 74);
+  assert.deepEqual(pr.out.changes.story_protected, ['src/acceptance/a.test.mjs']);
+  // The scope comes from the snapshot, so a child that widens the story's touches gains nothing.
+  const story = path.join(q, 'docs', 'stories', 'S1-1-fix.md');
+  fs.writeFileSync(story, fs.readFileSync(story, 'utf8').replace('"touches":["src"]', '"touches":["src","lib"]'));
+  const widened = compareOf(['--mode', 'build'], snap2, { project: q, stub: s });
+  assert.equal(widened.status, 74);
+  assert.ok(widened.out.changes.protected_artifacts.includes('docs/stories/S1-1-fix.md'));
+  // A build snapshot makes the build's refusals first.
+  const pending = runRunner(['--mode', 'build', '--snapshot', '--snapshot-out', path.join(tmpDir('pmsnap-'), 's.json')], { project: newBuildProject(false), stub: s });
+  assert.equal(pending.status, 66);
+});
+
+test('emit-prompt: build makes the pre-launch baseline refusal too', { skip: process.platform === 'win32' && 'a newline in a filename is POSIX-only' }, () => {
+  const p = newBuildProject(true); const s = makeStub();
+  fs.writeFileSync(path.join(p, 'src', 'a\nb.txt'), 'x\n');
+  const r = runRunner(['--mode', 'build', '--emit-prompt'], { project: p, stub: s });
+  assert.equal(r.status, 66, JSON.stringify(r.out));
+  assert.match(r.out.reason, /ambiguous baseline/);
+  const snap = runRunner(['--mode', 'build', '--snapshot', '--snapshot-out', path.join(tmpDir('pmsnap-'), 's.json')], { project: p, stub: s });
+  assert.equal(snap.status, 66);
+});
+
+test('snapshot: assume-unchanged or skip-worktree cannot hide a protected test rewrite from a build compare', () => {
+  for (const flag of ['--assume-unchanged', '--skip-worktree']) {
+    const p = protectedBuildProject(); const s = makeStub();
+    const rel = 'src/acceptance/a.test.mjs';
+    const snap = snapOf(['--mode', 'build'], { project: p, stub: s });
+    gitIn(p, ['update-index', flag, rel]);
+    fs.writeFileSync(path.join(p, rel), 'green by edit\n');
+    // git itself now reports nothing: the diffs the scope check reads are empty.
+    assert.equal(gitIn(p, ['diff', '--name-only', 'HEAD', '--']).trim(), '', flag);
+    assert.equal(gitIn(p, ['status', '--porcelain']).trim(), '', flag);
+    const r = compareOf(['--mode', 'build'], snap, { project: p, stub: s });
+    assert.equal(r.status, 74, `${flag}: ${JSON.stringify(r.out)}`);
+    assert.ok(r.out.changes.git_metadata.includes('index flags'), `${flag}: the index flag change`);
+    assert.deepEqual(r.out.changes.story_protected, [rel], `${flag}: the content change, from the bytes on disk`);
+    // Only the content change, with the flag already set before the snapshot, is still caught.
+    const q = protectedBuildProject();
+    gitIn(q, ['update-index', flag, rel]);
+    const snap2 = snapOf(['--mode', 'build'], { project: q, stub: s });
+    fs.writeFileSync(path.join(q, rel), 'green by edit\n');
+    const t = compareOf(['--mode', 'build'], snap2, { project: q, stub: s });
+    assert.equal(t.status, 74, `${flag}: ${JSON.stringify(t.out)}`);
+    assert.deepEqual(t.out.changes.git_metadata, [], flag);
+    assert.deepEqual(t.out.changes.story_protected, [rel], flag);
+  }
+});
