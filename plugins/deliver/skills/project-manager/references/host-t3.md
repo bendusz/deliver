@@ -59,6 +59,8 @@ none of this file applies.
    output elsewhere is reported in `ignored_files_changed`, not refused. A non-zero exit
    (`safety-violation`, with `changes` naming each kind) stops the story with the tree preserved.
    Report what changed, never grade or relay the run, and never fall back to a wrapper over it.
+   The compare runs the plugin's own files, so it cannot see a child that rewrote the plugin
+   outside the checkout; that is the same residual risk as a build's full-access run.
 6. **Read-only result.** Use the summary as the wrapper's answer. Grade review findings per
    `review-gates.md`, and save the summary as
    `<out>/<stamp>-codex-review-<scope>[-<objective slug>]-t3.md`, `<stamp>` being the review

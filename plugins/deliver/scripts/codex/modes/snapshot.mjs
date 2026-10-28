@@ -24,7 +24,7 @@ const META_PARTS = ['HEAD', 'the checked-out branch', 'the index', 'refs', 'loca
 const rejected = (r) => new RunnerError('rejected', r);
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 const isBuild = (mode) => mode === 'build' || mode === 'fix';
-const NO_REPO = 'no git repository: a host-run child needs a checkout to snapshot, so that path is refused here; use the wrapper agent';
+const NO_REPO = 'no git repository: a host-run child needs a checkout to snapshot; before the child runs, use the wrapper agent; after it, treat the run as a safety violation';
 
 // checkoutRoot(o): the root the snapshot covers. A build's is its worktree; any other mode's is the
 // top level of the checkout holding the cwd, never the cwd itself.
