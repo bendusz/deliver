@@ -4,9 +4,9 @@
 # scan-secrets.sh --pre-push <remote> <url>: the git pre-push hook contract; scans each pushed
 # commit the destination lacks per ls-remote, or every reachable one if ls-remote fails. A copy
 # of this file installed as the pre-push hook runs this way.
-# Each commit is diffed as text against its first parent (a root commit against the empty tree),
-# and only added lines and paths are matched. Exit 0 clean, 1 on a hit, 2 on any usage, git or
-# matcher error, so an error blocks too. Prints commit, file, line and pattern, never a value.
+# Each commit is diffed as text against its first parent (a root commit against the empty tree);
+# only added lines and paths are matched. Exit 0 clean, 1 on a hit, 2 on any error (which blocks
+# too). Prints commit, file, line and pattern, never a value.
 set -euo pipefail
 export LC_ALL=C
 die() { printf 'scan-secrets: %s\n' "$1" >&2; exit 2; }
@@ -22,20 +22,23 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/scan-secrets.XXXXXX") || die "cannot create a t
 trap 'rm -rf "$tmp"' EXIT
 : > "$tmp/lines"; : > "$tmp/hits"
 
-# scan <sha>...: append "<sha12>:<file>:<line><TAB><text>" per added line, and "<sha12>:<path>:path
-# <TAB><path>" per added or changed path (empty files too). Control bytes but tab and newline become
-# spaces, so they still separate. Content git will not show as text blocks.
+# scan <sha>...: append "<sha12>:<file>:<line><TAB><text>" per added line and "<sha12>:<path>:path
+# <TAB><path>" per added or changed path. Control bytes become spaces (separators); a diff with NULs
+# is also read with them dropped, joining UTF-16 text. Content git cannot show as text blocks.
 gd=(git -c diff.relative=false -c core.quotePath=true diff --no-color --no-ext-diff --no-renames)
 scan() {
-  local c p
+  local c p j
   for c in "$@"; do
     p=$(git rev-parse -q --verify "$c^1" 2>/dev/null) || p=$empty
     "${gd[@]}" --name-only -z --diff-filter=d "$p" "$c" -- 2>/dev/null | tr '\001-\037\177' ' ' \
       | tr '\000' '\n' | awk -v c="${c:0:12}" '{print c ":" $0 ":path\t" $0}' >> "$tmp/lines" \
       || die "cannot list the paths of commit $c"
     "${gd[@]}" --no-textconv --text --submodule=short -U0 --inter-hunk-context=0 \
-      --src-prefix=a/ --dst-prefix=b/ "$p" "$c" -- 2>/dev/null \
-      | tr '\000-\010\013-\037\177' ' ' > "$tmp/diff" || die "cannot diff commit $c"
+      --src-prefix=a/ --dst-prefix=b/ "$p" "$c" -- > "$tmp/raw" 2>/dev/null || die "cannot diff commit $c"
+    tr '\000-\010\013-\037\177' ' ' < "$tmp/raw" > "$tmp/diff" || die "cannot read the diff of $c"
+    tr -d '\000' < "$tmp/raw" | tr '\001-\010\013-\037\177' ' ' > "$tmp/joined" \
+      || die "cannot read the diff of $c"
+    j=; cmp -s "$tmp/diff" "$tmp/joined" || j=1  # they differ only where the diff has NULs
     awk -v c="${c:0:12}" '
       /^diff --git /{hdr=1; next}
       hdr && /^(Binary files |GIT binary patch)/{exit 3}
@@ -44,7 +47,7 @@ scan() {
       hdr{next}
       /^\+/{print c ":" f ":" n "\t" substr($0,2); n++; next}
       /^ /{n++}
-    ' "$tmp/diff" >> "$tmp/lines" || die "cannot inspect commit $c as text"
+    ' "$tmp/diff" ${j:+"$tmp/joined"} >> "$tmp/lines" || die "cannot inspect commit $c as text"
   done
 }
 
@@ -71,9 +74,8 @@ else
   die "usage: scan-secrets.sh <base>..<branch> | --pre-push <remote> <url>"
 fi
 
-# The first four formats are distinctive enough to match anywhere. The broader ones must start a
-# line or follow a character outside [A-Za-z0-9_-], or an escape: \n \r \t, %XX (URL) or =XX
-# (quoted-printable). Paths are redacted in what is printed.
+# The first four formats match anywhere. The broader ones must start a line or follow a character
+# outside [A-Za-z0-9_-] or an escape: \n \r \t, %XX or =XX. Printed paths are redacted.
 tab=$(printf '\t'); bnd='(.*([^A-Za-z0-9_-]|\\[nrt]|[%=][0-9A-Fa-f]{2}))?'; red=()
 for p in "${pats[@]}"; do red+=(-e "s/$p/[redacted]/g"); done
 for i in "${!pats[@]}"; do
@@ -84,6 +86,6 @@ for i in "${!pats[@]}"; do
     || die "cannot report hits"
 done
 [ -s "$tmp/hits" ] || exit 0
-sed 's/^/scan-secrets: /' "$tmp/hits" >&2
+awk '!seen[$0]++{print "scan-secrets: " $0}' "$tmp/hits" >&2 || die "cannot report hits"
 printf 'scan-secrets: %s blocked. Remove the secret from history, not just the working tree, and rotate it. Only the user may bypass this, with git push --no-verify.\n' "$mode" >&2
 exit 1
