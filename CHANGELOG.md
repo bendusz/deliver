@@ -2,6 +2,73 @@
 
 All notable changes to this project are documented here.
 
+## 0.30.0 - 2026-11-07
+
+deliver is trimmed back to the PM discipline and becomes T3-first: it now requires T3 Code. Most
+of what is gone existed to restrict agents. This release trusts the agents, relies on T3 for
+dispatch, worktrees, messaging and PR watching, and treats git as the safety net: every change is
+a diff the user can read and revert. The design is `docs/specs/2026-11-07-v1.0-bstack-redesign.md`.
+
+**Removed**
+- **Agents.** All 17 `agents/*.md`. The roles live in `references/roles.md` as souls the PM pastes
+  into each T3 `delegate_task`, since a T3 child sees only its task text.
+- **Hooks.** The whole `hooks/` directory: the sign-off, verified-merge and secrets guards and the
+  session-start hook. Sign-off is now a conversation step recorded in `docs/approval.json`, and
+  the git secret scan below replaces the write-time secrets guard.
+- **Scripts and code.** The Codex runner, `holdout.mjs`, `test-integrity.mjs`, `retro-stats.mjs`,
+  `assurance.mjs`, `agent-evals.mjs`, the builder benchmark scorer, both schemas and every
+  node:test suite. Codex now runs as a T3 child.
+- **Review machinery.** Tiers, calibrated panels, the trust report, test-integrity checks,
+  holdout refs and the `benchmarks/` corpora.
+- **References and commands.** Twenty-four references are merged into seven (`planning`, `loop`,
+  `roles`, `host`, `state`, `retro`, `skeleton`) or dropped. Thirteen commands go: specify,
+  clarify, constitution, analyze, checklist, correct-course, handoff, codex-help, codex-review,
+  benchmark-builders, agent-evals, calibrate and improve.
+- **Templates.** HANDOFF, log, constitution, the four checklists, claude-settings-hardening,
+  verification-report and the three wiki templates.
+- **Repo.** `scripts/validate.sh` and the other maintainer scripts, the CI workflow,
+  `docs/plans/` and `docs/specs/` up to 0.29.4, `docs/codex-cli-reference.md`,
+  `docs/model-tiering.md` and `examples/todo-cli`. Older design history stays in git.
+- **Handoffs, the heartbeat, the actor id and the Node.js requirement.** `/deliver:resume` and T3
+  thread persistence cover what they did.
+
+**What replaces it**
+- **Five roles.** builder, reviewer and verifier, plus optional researcher and spec-architect,
+  each with ground rules, a return shape and a recommended default model the PM may override.
+- **Six commands.** `pm`, `resume`, `doctor`, `retro`, `skeleton`, and `codex`, which merges
+  codex-review (`/deliver:codex review`) and codex-help (`/deliver:codex ask`).
+- **A tracked decision log.** `docs/log.md`, appended only through `scripts/log.sh` (one
+  `YYYY-MM-DD HH:MM  <message>` line, with a message of at most 100 characters) and committed
+  with the PM's next commit. It replaces the gitignored `tmp/log.md`.
+- **A secret scan in git.** Passwords and keys must not leave the machine. `scripts/scan-secrets.sh`
+  blocks a high-confidence token format (AWS access key, private key
+  header, GitHub, Slack, `sk-` API key, Google API key, JWT) in added lines or paths; the broader
+  `sk-`, Slack, Google and JWT formats must start a word, so identifiers such as `task-…` pass.
+  It names the commit, file, line and pattern, never the value, redacting a token in a path.
+  The PM installs it as the project's pre-push hook at scaffold, where it scans every pushed
+  commit the destination remote lacks, and runs it on every commit of a story branch before the
+  merge. Each commit is diffed as text, binary or not; any error blocks too.
+  `/deliver:doctor` reports the hook as current, missing, outdated or bypassed by
+  `core.hooksPath`. It runs in git, so it covers every agent and provider. No agent passes
+  `--no-verify`; only the user may. Credential-assignment patterns are not ported: they caused
+  most false positives. Secrets coming in still go through `request_secret`. `log.sh` and
+  `scan-secrets.sh` are the plugin's only code.
+- **SpecDD is optional** and off by default (`Skeleton: none` in the plan).
+- **Conventions by hand.** With `validate.sh` gone, `AGENTS.md` lists the checks a reviewer makes.
+
+**The calibration result kept.** The 2026-10-25 calibration measured one panel for both targets:
+a single Codex generalist lens met the 10% and 5% miss targets with a miss-rate upper bound of
+4.44% and no false positives, and the Claude specialist lenses added no measured coverage. That is
+why the default is one opposite-family generalist reviewer, with an optional `focus:` line for
+design, security or performance. The measured lens was Codex's own review prompt through the old
+runner; the reviewer soul run as a T3 child is uncalibrated.
+
+**Projects managed with 0.29 or earlier** are not migrated. Old `pm-exec` fields are ignored, and
+handoff files and holdout refs are inert. To clean them up:
+- `git for-each-ref --format='%(refname)' refs/deliver/holdout | xargs -n1 git update-ref -d`
+- `git rm -r docs/handoff`
+- If you want the old log's history, move the content of `tmp/log.md` into `docs/log.md`.
+
 ## 0.29.4 - 2026-10-27
 
 Inside T3 Code, Codex runs through T3 itself. Without T3 nothing changes.

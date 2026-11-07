@@ -1,34 +1,18 @@
 ---
-description: Resume a PM-managed project from git, the approval marker, and the story Execution blocks, then continue.
+description: Resume a PM-managed project from git, the approval record, the story Execution blocks and the decision log, then continue.
 ---
 
-Mode: $ARGUMENTS  (optional; `--heartbeat` when a scheduled T3 heartbeat sent this, see
-`references/host-t3.md`)
+Use the `project-manager` skill to resume work on this project. Probe the host first; without T3
+Code, say so and stop. Then load `references/state.md` and follow `## Resume`: read the approval
+record, the integration branch's first-parent history, every story's `pm-exec`, the worktree list,
+each recorded thread that is not merged, and the last ~20 lines of `docs/log.md`, in that order.
+Git and the `pm-exec` lines win over the log.
 
-With `--heartbeat`, do nothing when any of these holds:
-- a turn or subagent is still running;
-- an escalation is unanswered and no independent build-ready story remains in the current sprint;
-- the work is at any checkpoint the plan's configured checkpoint policy says to wait at
-  (`references/planning-and-signoff.md`), and the user has not yet answered it.
+Summarise where things stand in a few lines: the approval status, the sprint, each claimed story
+with its `status`, `rounds`, thread, branch and worktree, any `Tests:` line, any blocker, and the
+next step. Present a blocked story to the user before anything else, except one with a
+`Replaced by:` line: that is history, not a blocker. Then continue from each story's `status` as
+`## Resume` says.
 
-Then append `heartbeat: idle, <reason>` to `tmp/log.md` only when the reason differs from the
-last heartbeat entry there, so an unchanged state logs once, not every 30 minutes. Otherwise
-resume as below.
-
-Use the `project-manager` skill to resume work on this project. Load
-`references/resume-procedure.md` and follow it, then `references/migrations.md` when it finds a
-pre-0.24 `pm/` directory or an old story format.
-
-Summarise where things stand: the approval status, the checked-out story and its Execution block,
-the other claimed stories with their owners, worktrees, uncommitted paths, and the handoff's
-freshness. Then continue from the Execution block's `status`.
-
-If `AGENTS.md` is absent at the project root, say so in one line and point to the migration in
-`references/instruction-layers.md`. Do not write it during resume.
-
-On a `standard` or larger project with no `docs/wiki/`, offer the backfill in
-`references/knowledge.md`. Do not run it unasked.
-
-If neither `docs/approval.json` nor legacy state exists, place the project by its `docs/`
-artifacts: a spec with no plan continues at specification or planning, and no spec at all means
-discovery.
+If `docs/approval.json` is absent, the project has not been planned: say so and start planning
+(`references/planning.md`).

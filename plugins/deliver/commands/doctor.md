@@ -1,56 +1,46 @@
 ---
-description: Check environment readiness before implementation, covering tooling, versions, and whether the project's gates actually run.
+description: Check readiness before implementation, covering the T3 host, the toolchain, whether the project's gates pass, Codex availability, log.sh and the pre-push secret scan.
 ---
 
-Use the `project-manager` skill to run a pre-implementation environment readiness check. Inspect and
-probe only; the readiness report is the only file you may write.
+Use the `project-manager` skill to run a readiness check. Install or upgrade nothing, and write no
+file of your own. Running a gate may leave the artifacts a normal run produces (build output,
+caches, coverage); leave them as the run left them.
 
 Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo)
 
-Inspect (whichever apply):
-- **Toolchain and versions.** The language runtimes, the package manager, and their versions, and
-  whether `node --version` reports 20 or newer.
-- **Claude version and agent settings.** Run `claude --version` when available and record the
-  configured `model` and `effort` frontmatter for every agent the active story may use. For a story that
-  uses an Opus agent, flag Claude Code older than `v2.1.292` (no per-dispatch effort, so the fix loop
-  cannot escalate), a moving `model: opus` alias, or a host-level
-  `CLAUDE_CODE_SUBAGENT_MODEL` or `CLAUDE_CODE_EFFORT_LEVEL` override. Do not claim a delivered
-  model ID unless the host exposes it.
-- **Dependencies.** Lockfiles present, and whether install has been run (`node_modules`, a venv).
-- **Gates.** The `test`, `lint`, `build`, and `run` commands from `docs/plan.md` and `AGENTS.md`, and
-  whether each actually runs. Use a non-mutating probe (`--version` or help, or the real command only
-  when it is safe and fast). Record `N/A` for the ones the project does not have.
-- **Config.** A missing `.env.example` or required env vars; CI config.
-- **Containers.** A `Dockerfile` or devcontainer that defines the expected environment.
-- **Setup steps.** Any documented bootstrap (README, CONTRIBUTING) needed before the gates pass.
-- **Codex builder readiness.** If any build-ready story selects `codex-builder`, or the active
-  story's `auto` builder may resolve to it, call the bundled runner with
-  `--mode build --preflight --worktree <absolute-root> --story <story>` (omit `--story` for environment-only
-  readiness). Treat `runner_status: ready` as authoritative. It never starts model inference and
-  reports `quota_consumed: false`. A missing or logged-out Codex blocks only an explicit
-  `codex-builder` story; `auto` may resolve to `expert-builder` and should record that fallback.
-- **Instructions layer.** `AGENTS.md` exists at the project root; `CLAUDE.md` exists and its first
-  line is `@AGENTS.md` (report `standalone` when it is not, and `missing` when absent); `AGENTS.md`
-  is under 200 lines and under 32 KiB, the Codex budget, and report both numbers; list any
-  `AGENTS.md` lines that restate skill rules (sign-off before implementation, the PM writes no code,
-  commit as you go, verifier PASS before ship, traceability to FR and AC ids) as trim candidates.
-- **T3 Code host.** Only when the probe in `references/host-t3.md` succeeds:
-  - T3 accepts a custom Claude `homePath`, which can hide this plugin. Confirm the `deliver`
-    agents and `/deliver:*` commands are visible in this session.
-  - `node` and `codex` resolve on the PATH T3 gives the session (`command -v`, or `where` on
-    Windows).
-  - `claude --version` meets the minimum above, `v2.1.292`.
-  - The PM thread runs in the root workspace, not a host worktree. The two lines of
-    `git rev-parse --path-format=absolute --git-dir --git-common-dir` (git 2.31 or newer) are
-    equal from anywhere in the root checkout and differ in a linked worktree. Without
-    `--path-format`, the plain output differs in a subdirectory too.
-- **State health.** When `docs/approval.json` or a legacy `pm/` exists, run the checks in
-  `references/state-health.md` and report `OK` or `DRIFT` for each.
+Check, in order, each with its evidence:
+1. **T3 host.** Load `ToolSearch select:mcp__t3-code__orchestrator_capabilities` and call it once
+   (`references/host.md` `## Probe`). If it is absent or fails, report
+   `MISSING: deliver requires T3 Code` and stop: the other checks mean nothing without it.
+2. **Toolchain**, `OK`, `MISSING` or `UNKNOWN`. The runtimes, package manager and dependencies
+   behind the plan's `## Commands` (or, before a plan exists, what the manifests and lockfiles
+   name): each resolves on `PATH`, with its version from a `--version` probe, and install has been
+   run (`node_modules`, a venv, a lockfile in sync). This shows the tools exist, not that gates pass.
+3. **Gates**, `PASS`, `FAIL`, `UNKNOWN` or `N/A`. Run each of the plan's `test`, `lint` and `build`
+   commands for real, from the repository root, exactly as the plan writes it. A version or help
+   probe is not evidence here.
+   - `PASS`: it exited 0. `FAIL`: it did not; quote the command, the exit code and the first
+     error lines.
+   - `UNKNOWN`: it cannot run safely here, for example it needs a service, credentials or a
+     destructive step. Say what it needs and what stays unverified. Never fake the missing piece.
+   - `N/A`: the plan says `N/A`. Before a plan exists, every gate is `UNKNOWN: no plan yet`.
+   - `run` is not a gate: step 2 covers the program it starts.
+4. **Codex**, `OK` or `MISSING`. `orchestrator_capabilities` lists the `codex` provider with the
+   models the `references/roles.md` defaults name. Without it there is no opposite-family reviewer
+   for a Claude build, so the default workflow cannot run: report `MISSING` as a blocker. Recommend
+   restoring Codex in T3, or an explicit change of workflow the user approves and the log records.
+   Never move a Codex default to a Claude model on your own: same-family review breaks the
+   hard rule that the reviewer is never the builder.
+5. **Decision log**, `OK` or `MISSING`. `"${CLAUDE_PLUGIN_ROOT}/scripts/log.sh"` exists and is
+   executable (`test -x`). Do not call it: a call writes a line.
+6. **Secret scan**, `OK`, `MISSING`, `OUTDATED` or `BYPASSED`. If `git config core.hooksPath`
+   prints a path, `BYPASSED`: git ignores the pre-push hook below; name the path and ask the user
+   how to wire the scan in. Else check `pre-push` in the `hooks` directory of
+   `git rev-parse --git-common-dir`. `OK`: executable and byte-equal (`cmp`) to
+   `"${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh"`. `OUTDATED`: it has the
+   `# deliver secret-scan pre-push` line but differs; offer to refresh it with that copy.
+   `MISSING`: absent, not executable, or another hook without that line (show it; never replace it
+   unasked). Install it as `references/planning.md` `## 5. Scaffold, after sign-off` says.
 
-Do **not** install or upgrade anything. Delegate heavy reading to a read-only subagent if that
-helps.
-
-Write the findings to `tmp/environment-check.md` (runtime-only): each check as `OK`, `MISSING`, or
-`UNKNOWN` with the evidence, then a one-line verdict (ready, or the blockers and what is missing).
-
-Run this before the implementation loop on a fresh or unfamiliar clone.
+End with a one-line verdict: ready only when the host, toolchain, Codex, log and secret scan
+checks are `OK` and every gate is `PASS` or `N/A`. Otherwise name the blockers and what each needs.

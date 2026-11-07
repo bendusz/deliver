@@ -1,7 +1,7 @@
 # Prior art and references
 
-The design of deliver was validated against the work below. See the design spec
-(`docs/specs/2026-06-02-project-manager-skill-design.md`) for how each influenced decisions.
+The design of deliver was validated against the work below. The current design is in
+`docs/specs/2026-11-07-v1.0-bstack-redesign.md`; earlier design history is in git (tag v0.29.4).
 
 ## Foundations (Anthropic)
 - **Building Effective Agents.** The per-story build, review, and fix loop uses its

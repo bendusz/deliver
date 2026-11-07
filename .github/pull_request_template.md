@@ -1,7 +1,5 @@
 ## What & why
 
 ## Checklist
-- [ ] `bash scripts/validate.sh` passes
-- [ ] Nothing under `plugins/deliver/` names a specific third-party plugin
+- [ ] Checked against the Conventions in `AGENTS.md`
 - [ ] `CHANGELOG.md` updated
-- [ ] If the hook changed, its allow / block cases were tested

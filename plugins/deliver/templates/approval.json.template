@@ -1,7 +1,1 @@
-{
-  "status": "pending",
-  "approver": null,
-  "approved_date": null,
-  "plan_digest": null,
-  "updated": "<YYYY-MM-DD HH:MM>"
-}
+{"status":"pending","approved_at":null,"plan_commit":null}

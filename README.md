@@ -1,22 +1,26 @@
-# deliver, a Project/Product Manager skill for Claude Code
+# deliver, a project manager skill for T3 Code
 
-Claude acts as the project manager. It agrees requirements and a plan with you, waits for sign-off,
-then delegates implementation and review to specialist agents. It never writes code.
+Claude acts as the project manager. It agrees a plan with you, waits for your sign-off, then
+delivers the work through T3 child agents: builders write the code, a reviewer from the other model
+family checks it, a verifier signs it off, and the PM runs the gates and merges. It never writes
+implementation code itself.
 
-One repeatable way of working:
+**Requirements.** T3 Code, with Codex available in T3. deliver dispatches every role through T3
+and stops if T3 is not there. The default workflow needs Codex for the opposite-family review and
+for bounded builds. You may name other models for any dispatch.
 
-> **discover → specify → clarify → plan → sign-off → skeleton (optional) → analyze → decompose → claim → build → gate → review → verify → ship → retro**
-
-It works on a bare Claude Code install and can use optional tools when they are present.
+**Secrets stay on the machine.** A secret comes in through T3's `request_secret`, never a file.
+On the way out, the PM installs a git pre-push hook that scans every pushed commit for
+high-confidence token formats (cloud and API keys, tokens, JWTs, private keys), and scans every
+commit of a story before merging it. A hit blocks the push or merge and names the commit and file,
+never the value.
+It lives in git, so it covers every agent and provider. Agents never bypass it; only you may, with
+`git push --no-verify`.
 
 ## Install
 
 Run these two steps separately. Submit the first, wait for it to finish, then run the second. If you
 paste both at once, the second line gets swallowed into the first command's argument.
-
-**Requirements.** Node.js 20 or newer on your PATH. The plugin's hooks and its Codex runner are Node
-scripts, so the same install works on macOS, Linux, and Windows without bash or jq. The OpenAI Codex
-CLI is optional and only needed for the `codex-*` agents and commands.
 
 **1. Add the marketplace**
 
@@ -30,278 +34,61 @@ CLI is optional and only needed for the `codex-*` agents and commands.
 /plugin install deliver@deliver
 ```
 
-Use the full `https://` URL above. The `owner/repo` shorthand resolves to SSH, which fails on
-machines without a GitHub SSH key and host key set up.
-
-If it does not appear right away, restart your Claude Code session.
-
-**3. Optional: install the `poteto` companion**
-
-```
-/plugin install poteto@deliver
-```
-
-Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack) engineering skills
-(`how`, `why`, `architect`, `arena`, `interrogate`, `blast-radius`, `unslop`, a technical-writing
-standard, verification-skill generators, and 21 principles), ported to Claude Code under her MIT
-license. The deliver plugin uses them when present and works without them. See
-[`plugins/poteto/README.md`](plugins/poteto/README.md).
-
-## Upgrade from pm-skill
-
-The plugin was called `pm-skill` through 0.20. Remove the old marketplace, add the new one, and
-install under the new name:
-
-```
-/plugin marketplace remove pm-skill
-/plugin marketplace add https://github.com/bendusz/deliver
-/plugin install deliver@deliver
-```
-
-A project managed before 0.24 carries a `pm/` state directory. `/deliver:resume` migrates it in
-one commit into `docs/approval.json` and per-story Execution blocks, and the sign-off hook honours
-the old file until then. `DELIVER_NO_ENFORCE=1` is the documented kill switch. The pre-0.21 name `PM_SKILL_NO_ENFORCE`
-stopped working in 0.22.
+Use the full `https://` URL; the `owner/repo` shorthand resolves to SSH, which fails without a
+GitHub SSH key. If the plugin does not appear right away, restart the session.
 
 ## Use
 
-- Just describe the work, "act as my PM to build a CLI todo app" for example, and the
-  `project-manager` skill activates.
-- Or run the command explicitly:
+Describe the work ("act as my PM to build a CLI todo app") or run `/deliver:pm <request>`.
 
-```
-/deliver:pm build a CLI todo app
-```
+1. **Plan.** The PM talks it through with you and writes `docs/plan.md`, plus `docs/spec.md` when
+   the work will outlive the plan.
+2. **Sign-off, in conversation.** Nothing is built until you say "approved", recorded in `docs/approval.json`.
+3. **Stories.** Each sprint becomes self-contained files under `docs/stories/`, tracing to the plan's IDs.
+4. **Per-story loop on T3.** Claim, tests first, build in a T3 worktree, gate, review, at most three
+   fix rounds, verify. Up to three independent stories build at once.
+5. **Ship.** A `--no-ff` merge whose body is the story's record, or a PR when you ask. Each sprint
+   ends with a retro that proposes `AGENTS.md` learnings as a diff. A one-story fix skips the spec,
+   sprints and retro.
 
-The PM runs discovery with you, writes a plan, and waits for your explicit sign-off before building
-anything.
+## Roles
 
-## How it works
+Each role is a short "soul" pasted into a T3 `delegate_task`; its default model is a recommendation.
 
-| Phase | What happens |
-|-------|--------------|
-| Discovery | You and the PM agree the problem and the best solution. |
-| Specification | A durable `docs/spec.md`: user stories, requirements, acceptance criteria, success metrics. What and why, not how. |
-| Clarification | Open `[NEEDS CLARIFICATION]` questions resolved one at a time before planning. |
-| Plan and sign-off | A written `docs/plan.md` that derives from the spec, with traceability. You approve it before any code. |
-| Skeleton (optional) | With `Skeleton: specdd` in the plan, `spec-architect` writes the sprint's `.sdd` contracts, the shape of the code, before any code exists. |
-| Analyze | A read-only cross-artifact consistency check for coverage, contradictions, and constitution, run after the plan and before decomposition, optionally before sign-off. |
-| Decomposition | Sprints, then self-contained story files under `docs/stories/`, each a thin end-to-end slice tracing to requirement IDs. |
-| Implementation loop | Per story: claim, build, commit, gate, review, fix, verify, ship, run by subagents. A bug fix lands with a regression test, and a failed attempt is retried at higher effort. At the sprint boundary, a cross-story review and a retrospective that reads fix rounds and retries per builder, turns mechanical mistakes into checks, and feeds the rest into `AGENTS.md`. |
-| Parallel stories | Independent `[P]` stories can build at once in isolated git worktrees, then integrate one at a time. Opt-in, with a safe fallback to sequential. |
-| Review and verification | A read-only review panel that includes a lens from the family opposite the builder's whenever that family is available, the project's real test, lint, and build gates, a test-integrity check, and a final `pm-verifier` PASS, with bounded fix loops. |
-| Tiers and measured assurance | Each story is `T0`, `T1`, or `T2` by what it changes. A tier runs the cheapest panel whose measured escape bound meets its target (10%, 5%, 2% by default), calibrated on a seeded-defect corpus with `/deliver:calibrate`. A tier without a measured bound runs the maximum panel. |
-| Protected oracles | At `T1` and up, `test-engineer` writes the acceptance tests before the build and no builder may change them. At `T2`, extra holdout checks live on a private git ref the builder is never shown. |
-| Ship gate | The `require-verified.mjs` hook blocks merging a story branch without a recorded verifier `PASS` for its tip and, at `T1` and up, a passing integrity verdict. |
-| Trust report | Instead of a diff, every checkpoint at every scale opens with `retro-stats.mjs --trust`: stories per tier, the panel each ran, stories reviewed below panel, its bound, fix rounds, integrity blocks, holdout failures, and observed escapes. An escape bound over target forces the maximum panel. |
-| State | Git carries it. The claim is the story branch, each build and fix round is a commit, and the `--no-ff` merge body is the story record. Only an approval marker, a per-story Execution block, and an optional handoff are written, so concurrent sessions never overwrite each other and any lost session resumes from git. |
-
-Bundled specialist agents do the work:
-
-| Role | Agent |
-|------|-------|
-| Build with broad repo context | `expert-builder` (Opus) |
-| Build one bounded outcome | `codex-builder` (Codex CLI, optional) |
-| Risk-selected read-only review panel | `code-integrity-reviewer`, `architecture-reviewer`, `security-auditor`, `performance-reviewer` |
-| Write tests, nothing else | `test-engineer` |
-| Root cause and a fix plan, read-only | `debugger` |
-| Independent PASS, FAIL, or UNKNOWN before ship | `pm-verifier` |
-| Docs only | `technical-writer` |
-| Map a brownfield codebase | `codebase-analyst` |
-| Maintain the project wiki, its only writer | `librarian` |
-| Write SpecDD `.sdd` contracts before code | `spec-architect` |
-| External research, reports under `docs/research/` | `researcher` (web), `codex-researcher` |
-| Second opinion on code and on decisions | `codex-reviewer`, `codex-advisor` |
-
-With Codex installed, the PM asks `codex-advisor` before a consequential technical decision.
-Review is opposite-family: an `expert-builder` story gets `codex-reviewer`, and a `codex-builder`
-story gets the Claude `code-integrity-reviewer`. When the panel in force needs a Codex lens and
-Codex is unavailable, `T0` and `T1` stories continue without it and the trust report counts them
-as below panel; `T2` stories escalate. A `codex-builder` story's maximum panel is Claude-only, so
-its review runs without a Codex lens. The advisor defaults to `gpt-6-astra` and the reviewer to `gpt-6.1-sol`, both at `high`.
-`codex-reviewer` writes reports under `untracked/` or a gitignored `codex/`, and `codex-advisor`
-relays its answer in chat. Outside T3 Code's `delegate_task` advisory and research path, every Codex
-invocation goes through one of these thin Sonnet wrappers and the bundled Node runner; the PM never runs
-`codex` itself. The PM stays an orchestrator and protects its own context by handing each agent
-only what it needs.
-
-Each story carries a one-line `pm-meta` JSON comment naming its builder (`expert-builder`,
-`codex-builder`, or `auto`) and its machine-readable touch paths. Opus remains the default for broad
-features, architecture, and changes spread across the codebase. Codex is selected for bounded
-implementation, failing tests, and localized fixes with concrete evidence. Both feed the same
-deterministic gates, independent review panel, and final verifier.
-
-Default check-in is sprint-level, so you review at each sprint boundary, and it is configurable to
-story-level or `autonomous`. Choose a scale from `tiny` through `regulated` to right-size the
-workflow. Tiny work stays lightweight, and regulated work makes every gate mandatory.
+| Role | Does | Default |
+|---|---|---|
+| builder | Implements one story, a tests-only brief or a fix, in its own worktree | Codex `gpt-6-astra` for bounded work, `claude-opus-5-5` for broad work |
+| reviewer | Reviews the diff against the story; never the builder | The family that did not build |
+| verifier | Checks each acceptance criterion PASS, FAIL or UNKNOWN before merge | `claude-opus-5-5` |
+| researcher (optional) | Answers one external question, report under `docs/research/` | `claude-opus-5-5`, Codex for a second opinion |
+| spec-architect (optional) | Writes the SpecDD `.sdd` files for a sprint | `claude-opus-5-5` |
 
 ## Commands
 
 | Command | What it does |
-|---------|--------------|
-| `/deliver:pm` | Act as the PM end to end: discover, plan, get sign-off, orchestrate delivery. |
-| `/deliver:specify` | Capture or refine `docs/spec.md`, the product spec of what and why. |
-| `/deliver:clarify` | Resolve open `[NEEDS CLARIFICATION]` in the spec, one question at a time, 5 at most. |
-| `/deliver:constitution` | Create or update `docs/constitution.md`, the project-specific governing rules. |
-| `/deliver:skeleton` | Write or extend the SpecDD `.sdd` skeleton for a sprint, after sign-off and before decomposition. |
-| `/deliver:analyze` | Read-only consistency and quality report across all artifacts. Never edits. |
-| `/deliver:checklist` | Generate or evaluate a spec, plan, story, or verification quality checklist under `docs/checklists/`. |
-| `/deliver:doctor` | Check environment readiness (toolchain, deps, gates run) and state health before building. |
-| `/deliver:benchmark-builders` | Run Opus and Codex on the same story in isolated worktrees, score the measured results, and merge neither. |
-| `/deliver:correct-course` | Handle a mid-flight scope change: re-plan at the right level, re-sign-off if material. |
-| `/deliver:retro` | At a sprint boundary, a bounded cross-story review and a retrospective that proposes `AGENTS.md` learnings as a diff. Each learned line carries its evidence and a review-by sprint, three at most per retro, and is retired when no later retro cites it. |
-| `/deliver:agent-evals` | Maintainers only. Run one agent's prompt over the frozen eval fixtures, three trials per case, and score it. |
-| `/deliver:calibrate` | Maintainers only. Run the review lenses over the frozen assurance corpus, select then certify, and write each tier's calibrated panel to `panels.json`. |
-| `/deliver:improve` | Maintainers only. Propose one small, evidence-backed edit to one agent or reference, test it against the frozen evals, and leave the decision to you. |
-| `/deliver:handoff` | End a session cleanly by writing a token-efficient `docs/handoff/<id>.md` briefing for the next agent. |
-| `/deliver:resume` | Read git, the approval marker, the story Execution blocks, and the handoff, then continue where you left off. |
-| `/deliver:codex-review` | Spawn parallel OpenAI Codex CLI review agents. Scope `recent`, `worktree`, `branch`, or `codebase`, plus `model=` and `effort=` and objective presets or free-form text. Reports land in `untracked/` or a gitignored `codex/`. Requires the `codex` CLI. |
-| `/deliver:codex-help` | Ask Codex for a second opinion on a consequential decision, with `model=` and `effort=`, defaulting to `gpt-6-astra` at `medium` with a one-time fallback to `gpt-6-sol` at `medium`. The answer is relayed in chat. Requires the `codex` CLI. |
+|---|---|
+| `/deliver:pm` | Act as the PM end to end: plan, sign-off, stories, loop, ship. |
+| `/deliver:resume` | Pick up from git, the approval record, the story Execution blocks and the log. |
+| `/deliver:doctor` | Check the T3 host, the toolchain, the project's gates, Codex, `log.sh` and the secret scan. |
+| `/deliver:retro` | Run the sprint boundary's cross-story review and retrospective. |
+| `/deliver:codex` | `review` a commit, worktree, branch or codebase with Codex, or `ask` it a question. |
+| `/deliver:skeleton` | Write or extend the SpecDD skeleton for a sprint. |
 
-## Artifacts
+## State and the decision log
 
-At the project root:
+Git is the record: the claim, each status change and the merge are commits. `docs/log.md` is the
+decision log, one timestamped line per decision with the why, appended only through the bundled
+`scripts/log.sh` and committed with the PM's next commit. SpecDD is optional and off by default:
+opt in during planning and each sprint gets its `.sdd` contracts before any code. Projects started
+on 0.29 or earlier: see the 0.30.0 entry in [CHANGELOG.md](CHANGELOG.md) for cleanup commands.
 
-- `AGENTS.md`, the project's instructions file: commands, layout, conventions, gotchas. Facts only,
-  under 200 lines. Codex, Cursor, and Copilot read it natively.
-- `CLAUDE.md`, a two-line bridge whose first line is `@AGENTS.md`, so Claude Code reads the same
-  file. Existing files are never overwritten; the PM proposes a migration instead.
-- `<root>.sdd`, `.specdd/bootstrap.md`, and `.sdd` files beside the code they describe: the SpecDD
-  skeleton, when the plan's Delivery mode says `Skeleton: specdd`. Optional.
+## poteto
 
-Committed under `docs/`, which is authoritative:
-
-- `docs/approval.json`, the approval marker: status, approver, date, and the plan digest. The
-  sign-off hook and the Codex runner read it.
-- `docs/spec.md`, the product specification: user stories, requirements, acceptance criteria,
-  metrics.
-- `docs/plan.md`, the delivery plan, derived from the spec with traceability.
-- `docs/stories/*.md`, self-contained story files, each tracing to requirement IDs. A claimed
-  story ends with an Execution block: owner, builder, branch, status, loop counters, and dated notes.
-- `docs/handoff/<actor-id>.md`, an end-of-session briefing, current while nothing but that file
-  has changed since its `BASE_COMMIT`. Optional.
-- `docs/constitution.md`, project-specific governing principles. Optional.
-- `docs/checklists/*.md`, spec, plan, story, and verification quality checklists. Optional.
-- `docs/research/*.md`, sourced research reports from `researcher` and `codex-researcher`. Optional.
-- `docs/verification/*.md`, per-story verification reports. Optional, and recommended for
-  non-trivial work.
-- `docs/retros/sprint-<n>.md`, the sprint retrospective records. On at `standard` scale and
-  above, and the next sprint's first claim waits for the current one.
-- `docs/completion-report.md`, the end-of-project summary `technical-writer` produces. Optional.
-- `docs/wiki/`, the project wiki: an index, a schema, and decision, concept, and source pages the
-  `librarian` maintains. On at `standard` scale and above.
-
-In git, the rest of the state. Solo is a team of one.
-
-- The story branch `pm/S<sprint>-<n>-<slug>` is the claim, and its commits are the build and fix
-  rounds. Counters are committed before the dispatch they bound.
-- The `--no-ff` merge commit body (Why, Scope, Tradeoffs, Blast radius, Verification) is the story
-  record, and `git log --first-parent` on the integration branch is the project history.
-- Never write secrets into any tracked file.
-
-Gitignored scratch and reports, disposable and never load-bearing for resume. The first five live
-under `tmp/`; the report directories sit at the repository root:
-
-- `tmp/log.md`, the PM's running narrative: a timestamped entry of three or four sentences at
-  every claim, build, fix round, block, and merge, and for each decision the PM took without
-  asking. Never committed and never a source of state.
-- `tmp/environment-check.md`, `/deliver:doctor`'s readiness report.
-- `tmp/codex-builder/*.md`, focused fix briefs passed to `codex-builder`. Never authoritative and
-  safe to discard after the story.
-- `tmp/codex-runtime/*`, per-run tool temp directories, ignored and removed on exit. Best effort: an
-  antivirus or indexer lock on Windows can leave them.
-- `tmp/builder-benchmark/*`, opt-in two-builder evaluations. Never part of delivery or resume state.
-- `untracked/` or `codex/`, gitignored, holding `/deliver:codex-review` reports named
-  `<stamp>-codex-review-<scope>[-<objective>].md`, plus an index file for multi-objective runs.
-- Worktrees, prompts, raw agent output, and other ephemera.
-
-## Safety
-
-- **No implementation before your sign-off.** A behavioural rule the PM holds, plus the bundled
-  `require-signoff.mjs` hook. The hook runs on `Write`, `Edit`, and `MultiEdit` only, and blocks a
-  write while `docs/approval.json` has any status but `approved`, or while `docs/plan.md` no longer
-  matches the approved `plan_digest`, honouring a pre-0.24 `pm/pm-state.json` until the migration
-  runs. It exempts `docs/`, `pm/`, `tmp/`, `.git/`, `.claude/rules/`, `.specdd/`, every `.sdd` file,
-  `CLAUDE.md`, `AGENTS.md`, `.gitignore`, and `.gitattributes`, fails open on any uncertainty, and
-  does not see writes made through `Bash`.
-- **Audited Codex writes.** Codex builds require an approved, tracked `docs/approval.json` and
-  bounded story touch paths, and every run is audited afterwards against the worktree: an out-of-scope or protected-path
-  change, or touched git metadata, is a safety violation with the changes preserved. There is no OS
-  sandbox: Codex runs with full host access and network on every platform, and the runner cannot see
-  writes outside the worktree or network use. See `docs/codex-cli-reference.md` for the flag
-  matrix, audited state, and exit codes.
-- Repository `AGENTS.md`, `CLAUDE.md`, and `.codex/config.toml`, and your own Codex config, are
-  trusted inputs: MCP servers and web search apply as configured. Only Codex hooks and subagents are
-  pinned off.
-- **No secrets in tracked docs.** A bundled hook blocks secret-shaped content, meaning key tokens,
-  PEM blocks, and credential assignments, from being written under the git-tracked `docs/` or a
-  pre-0.24 `pm/`.
-- **The companion plugin is inert.** The optional `poteto` plugin ships skills only, with no hooks,
-  agents, or commands, so it cannot change any guardrail above.
-- **Repository safety.** The PM never overwrites your files without asking, commits only what it
-  created for the current story, runs `git init` only after asking, and never pushes without an
-  explicit request.
-- **Optional hardening.** For mechanical enforcement of a read-only Bash posture and sign-off, the
-  bundled hardening guide uses Claude Code permissions and hooks. Its verifier Bash allowlist
-  requires `jq`.
-
-Two of the four bundled hooks are fail-open accident tripwires on the Write, Edit, and MultiEdit
-tools. The third, `require-verified.mjs`, gates story merges made through Bash, and the fourth runs
-at session start and only reads. None is a security boundary. Bash
-coverage is the optional hardening allowlist described in
-`plugins/deliver/skills/project-manager/references/hardening.md`.
-
-**Windows.** Hooks and the Codex runner run under `node` directly, with no Git Bash needed. The
-Codex posture is the same as on macOS and Linux.
-
-## Optional tools
-
-The deliver plugin needs none of the optional tools below. If your environment has any of them, the PM may
-prefer them where useful.
-
-- The `poteto` companion plugin from this marketplace. [Install](#install) step 3 lists its skills.
-  The PM's references name them as optional examples, and nothing breaks without them.
-- A dedicated planning or TDD skill suite for richer discovery and planning. With Superpowers
-  installed, deliver's phases replace its brainstorming, writing-plans, and
-  subagent-driven-development while deliver is active; its TDD, systematic-debugging, and
-  verification-before-completion skills still apply.
-- An external code-review tool, an OpenAI Codex-based reviewer or another model's CLI for example,
-  for the optional independent review step.
-- The OpenAI Codex CLI for `codex-builder`, `codex-researcher`, `codex-reviewer`, `codex-advisor`,
-  and the Codex commands. An `auto` story or opportunistic fix falls back to `expert-builder` when
-  Codex is unavailable; a story that explicitly requires `codex-builder` waits for `codex login`
-  rather than switching workers silently.
-- To exercise the real write path after an install or a Codex upgrade, run
-  `PM_CODEX_LIVE=1 node plugins/deliver/scripts/codex/smoke-live.mjs`, or the equivalent
-  `PM_CODEX_LIVE=1 scripts/smoke-codex-builder-live.sh` wrapper. In PowerShell, use
-  `$env:PM_CODEX_LIVE='1'; node plugins/deliver/scripts/codex/smoke-live.mjs`. It runs one
-  low-effort Codex task in a disposable signed-off repository, which is removed afterwards unless you
-  set `PM_CODEX_KEEP=1`, and it is deliberately excluded from default validation.
-- `gh` plus a GitHub remote for real pull requests. Otherwise the PM uses local merges.
-
-The spec, clarify, analyze, and constitution steps add spec-driven rigor, inspired by spec-driven
-development tools, and `pm-verifier` adds an independent final check. All of them are built in and
-self-contained. The deliver plugin does not depend on `spec-kit`, and there is no external verifier process in
-this workflow: `pm-verifier` is an ordinary read-only Claude Code subagent the PM dispatches.
-
-### Running inside T3 Code
-
-T3 Code is optional. Under plain Claude Code the probe finds nothing and deliver runs unchanged;
-a test keeps every T3-only step behind the probe. The PM detects T3 Code at session start and then follows
-[`host-t3.md`](plugins/deliver/skills/project-manager/references/host-t3.md). It still dispatches
-its own agents through `Agent`, so reviewers stay read-only, and uses T3's `delegate_task` only
-for Codex advisory and research opinions. It counts only its own worktrees and
-never prunes T3's. A blocked story no longer stops the sprint while independent stories remain.
-A 30-minute heartbeat runs `/deliver:resume --heartbeat`, and PR CI wakes trigger a local re-gate.
-Start the PM in the root workspace, not a T3 worktree thread. `/deliver:doctor` checks the T3
-setup. Sign-off, gates, verification, and merges are unchanged.
+`/plugin install poteto@deliver` adds Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack)
+skills (`how`, `why`, `architect`, `arena`, `interrogate`, `blast-radius`, `unslop`, verification-skill
+generators and 24 principles), ported to Claude Code under her MIT license. deliver uses them when
+present and works without them. See [`plugins/poteto/README.md`](plugins/poteto/README.md).
 
 ## License
 
-GPL-3.0-or-later; see [LICENSE](LICENSE). Copyright (c) 2026 bendusz.
-
-This project is free software: you can redistribute it and modify it under the terms of the GNU
-General Public License as published by the Free Software Foundation, either version 3 of the License
-or, at your option, any later version. If you distribute copies or modified versions, they must
-remain under the GPL with source made available; private modifications you do not distribute carry no
-such obligation.
+GPL-3.0-or-later; see [LICENSE](LICENSE). Copyright (c) 2026 bendusz. `poteto` stays under MIT.

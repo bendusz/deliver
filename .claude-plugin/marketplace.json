@@ -1,6 +1,6 @@
 {
   "name": "deliver",
-  "description": "A Project/Product Manager skill that orchestrates software delivery through subagents.",
+  "description": "A project manager skill that orchestrates software delivery through T3 Code child roles.",
   "owner": {
     "name": "bendusz",
     "url": "https://github.com/bendusz"
@@ -9,14 +9,13 @@
     {
       "name": "deliver",
       "source": "./plugins/deliver",
-      "description": "Claude acts as a PM: discover, plan, get sign-off, decompose, and orchestrate build/review/ship via agents.",
+      "description": "Claude acts as a PM under T3 Code: plan, get sign-off, decompose into stories, and run build, review, verify and ship through T3 child roles.",
       "category": "workflow",
       "homepage": "https://github.com/bendusz/deliver",
       "tags": [
         "skill",
         "project-management",
         "orchestration",
-        "agents",
         "workflow"
       ]
     },

@@ -1,17 +1,19 @@
 ---
-description: Run the sprint checkpoint's bounded cross-story review and retrospective, and propose AGENTS.md learnings as a diff.
+description: Run the sprint boundary's cross-story review and retrospective, and propose AGENTS.md learnings as a diff.
 ---
 
-Use the `project-manager` skill to run a sprint retrospective. Load `references/retrospective.md`
-and follow it: the sprint's numbers, the sprint review, the three questions, and the record are the
-whole contract.
+Use the `project-manager` skill to run a sprint retrospective. Load `references/retro.md` and
+follow it: the cross-story review, the three questions, the `AGENTS.md` diff and the record are
+the whole contract.
 
-Sprint: $ARGUMENTS  (a sprint number; default is the lowest sprint that
-`node "${CLAUDE_PLUGIN_ROOT}/hooks/lib.mjs" state .` lists under `sprints_without_retro`, or the most
-recently completed sprint when that list is empty)
+Sprint: $ARGUMENTS  (a sprint number; default is the lowest sprint whose stories are all `merged`,
+or `blocked` and escalated, with no `docs/retros/sprint-<n>.md` yet)
 
-Precondition: every story of that sprint has `status: merged` in its Execution block. Otherwise say
-which are open and stop.
+Precondition: every story of that sprint is `merged`, or `blocked` and escalated, in its
+`pm-exec`. Otherwise name the open stories and stop.
 
-End with the numbers table, the review verdict, any proposed check stories, the learned lines due
-for review, the proposed `AGENTS.md` diff or "no changes earned", and the path of the retro record.
+End with the review verdict, any fix or check stories for the next sprint (after the last sprint,
+the corrective story or the user's ruling, as `## 1` says), the proposed
+`AGENTS.md` diff or "no changes earned", and the path of the retro record. Then report to the user
+and wait before decomposing the next sprint, unless the plan's `Between sprints:` is
+`autonomous`.
