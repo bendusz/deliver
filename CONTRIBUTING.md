@@ -1,26 +1,22 @@
 # Contributing to deliver
 
-`deliver` is a generic, self-contained Claude Code plugin. It must keep working on a bare install,
-so the rules below are about what you may not add.
+deliver is prose and templates plus one script, `plugins/deliver/scripts/log.sh`. A contribution is
+almost always a prose change: a reference, a command, a role's soul or a template.
 
 ## Ground rules
-- **Keep it generic.** Nothing under `plugins/deliver/` may depend on a specific third-party plugin
-  or a particular environment. Name external tools only as optional examples in `README.md` and
-  `docs/`.
-- **Keep `SKILL.md` lean**, under 500 lines, and put detail in `references/`, one level deep.
-- **Six agents stay read-only** on `Read, Grep, Glob`: `code-integrity-reviewer`,
-  `architecture-reviewer`, `security-auditor`, `performance-reviewer`, `debugger`, and
-  `codebase-analyst`. `pm-verifier`
-  also has `Bash`, because it must run the gates, and the Codex wrappers have `Bash` to call the
-  bundled runner.
+- **Keep `SKILL.md` lean.** Detail goes in `references/`, one level deep, each loaded only when the
+  moment needs it.
+- **Trust the agents.** Roles are souls with ground rules and a recommended model, not tool
+  restrictions. Review independence is a process rule: the reviewer is never the builder.
+- **No new code.** `log.sh` stays the only code in the plugin. Prefer what T3 Code and git already
+  give over new machinery.
 
 ## Before opening a PR
-- Run `bash scripts/validate.sh`, and `claude plugin validate ./plugins/deliver` if you have the
-  CLI. Node.js 20 or newer is required to run the tests and the validator.
-- `scripts/validate.sh` runs the whole test suite. Run `node --test
-  plugins/deliver/scripts/tests/` directly when you want one suite or a focused test.
-- Update `CHANGELOG.md`.
+- Check the change against the Conventions in [`AGENTS.md`](AGENTS.md): there is no automated
+  validation, so those checks are done by hand.
+- Ask for a review, and expect the reviewer to check the same list.
+- Update `CHANGELOG.md`, with the new entry on top.
 
 ## How it is built
-The plugin was itself developed with a PM-orchestrated spec, plan, build, review flow. See
-`docs/specs/` and `docs/plans/` for the design history.
+The plugin was itself developed with a PM-orchestrated spec, plan, build and review flow. See
+`docs/specs/` and `docs/plans/` for the current design; earlier history is in git.

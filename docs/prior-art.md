@@ -1,7 +1,7 @@
 # Prior art and references
 
 The design of deliver was validated against the work below. See the design spec
-(`docs/specs/2026-06-02-project-manager-skill-design.md`) for how each influenced decisions.
+(`docs/specs/2026-11-07-v1.0-bstack-redesign.md`) for how each influenced decisions.
 
 ## Foundations (Anthropic)
 - **Building Effective Agents.** The per-story build, review, and fix loop uses its

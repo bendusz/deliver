@@ -1,29 +1,38 @@
 # deliver
 
-A Claude Code plugin marketplace: `plugins/deliver` (the Project Manager skill, agents, hooks,
-Codex runner) and `plugins/poteto` (Lauren Tan's pstack skills, MIT).
+A Claude Code plugin marketplace: `plugins/deliver` (the T3-first project manager skill) and
+`plugins/poteto` (Lauren Tan's pstack skills, MIT). The plugin is prose and templates plus one
+script, `log.sh`.
 
 ## Commands
-- Test: `bash scripts/validate.sh` runs the whole suite. `node --test
-  plugins/deliver/scripts/tests/` is for focused test work.
-- Lint: `bash scripts/validate.sh` (needs bash, jq, node 20+, git; shellcheck in CI)
+- Test: `N/A`
+- Lint: `N/A`
 - Build: `N/A`
-- Run: `N/A` (install the marketplace into Claude Code to try it)
+- Run: install the marketplace into Claude Code under T3 Code.
 
 ## Layout
-- `plugins/deliver/skills/project-manager/`: `SKILL.md` plus the phase and on-demand references.
-- `plugins/deliver/agents/`, `commands/`, `templates/`, `schemas/`, `benchmarks/`: the orchestrated fleet and its artifacts.
-- `plugins/deliver/hooks/`: fail-open guardrails. `plugins/deliver/scripts/codex/`: the Codex
-  runner. `plugins/deliver/scripts/tests/`: node:test suites.
-- `docs/specs/`, `docs/plans/`: this repo's own design history, named `YYYY-MM-DD-vX.Y-topic.md`.
+- `plugins/deliver/skills/project-manager/`: `SKILL.md` plus seven `references/` (planning, loop,
+  roles, host, state, retro, skeleton).
+- `plugins/deliver/commands/`: pm, resume, doctor, retro, codex, skeleton.
+- `plugins/deliver/templates/`: the artifacts the PM creates in a project.
+- `plugins/deliver/scripts/log.sh`: appends a timestamped line to a project's `docs/log.md`.
+- `plugins/poteto/`: the ported pstack skills, with their LICENSE and attribution.
+- `docs/specs/`, `docs/plans/`: this repo's design (`YYYY-MM-DD-vX.Y-topic.md`).
+  `docs/research/`: research reports. `docs/prior-art.md`: what the design draws on.
 
 ## Conventions
-- Runtime code is Node ESM only (`plugins/deliver/hooks/*.mjs`, `plugins/deliver/scripts/**/*.mjs`).
-  No bash or jq at runtime; the repo-level `scripts/*.sh` are the maintainer-only exception.
-- Agent frontmatter pins `model` and `effort`; Opus roles use `claude-opus-5-5`, never the moving alias.
-- Every change to a reference or template must keep `bash scripts/validate.sh` green.
+There is no automated validation. A reviewer checks these by hand on every change:
+- `plugin.json` version equals the top CHANGELOG heading.
+- `SKILL.md` stays under 16,000 characters, leaving headroom under Claude Code's
+  20,000-character re-attachment cut after compaction.
+- Every `references/*.md` that `SKILL.md` names, and every template a reference or command
+  names, exists.
+- The model ids in `roles.md` exist in `orchestrator_capabilities`, and the Opus roles use
+  `claude-opus-5-5`, never a moving alias.
+- poteto keeps its MIT LICENSE and attribution.
+- `log.sh` stays the only code in the plugin, and stays executable with LF line endings.
+- New CHANGELOG entries go on top; everything below stays as written.
 
 ## Gotchas
-- `plugin.json` version must equal the top CHANGELOG heading (validate check 11).
-- Never change the actor-id salt in `hooks/lib.mjs`; the comment beside it says why.
-- `.gitattributes` pins LF for `*.mjs` and `*.sh`; Windows checkouts rely on it.
+- `plugin.json` version must equal the top CHANGELOG heading.
+- `.gitattributes` pins `*.sh` to LF for `log.sh`; Windows checkouts rely on it.
