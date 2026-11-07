@@ -61,11 +61,12 @@ else
   die "usage: scan-secrets.sh <base>..<branch> | --pre-push <remote> <url>"
 fi
 
-# A token starts a line or follows a character outside [A-Za-z0-9_-]. Paths are redacted.
-tab=$(printf '\t'); red=()
+# A token starts a line or follows a character outside [A-Za-z0-9_-], or an escape: \n \r \t,
+# %XX (URL) or =XX (quoted-printable). Paths are redacted in what is printed.
+tab=$(printf '\t'); bnd='(.*([^A-Za-z0-9_-]|\\[nrt]|[%=][0-9A-Fa-f]{2}))?'; red=()
 for p in "${pats[@]}"; do red+=(-e "s/$p/[redacted]/g"); done
 for i in "${!pats[@]}"; do
-  st=0; grep -aE -e "^[^$tab]*$tab(.*[^A-Za-z0-9_-])?${pats[$i]}" "$tmp/lines" > "$tmp/m" || st=$?
+  st=0; grep -aE -e "^[^$tab]*$tab$bnd${pats[$i]}" "$tmp/lines" > "$tmp/m" || st=$?
   [ "$st" -le 1 ] || die "matcher failed (grep exit $st)"
   cut -f1 "$tmp/m" | sed -E "${red[@]}" -e "s/\$/ ${names[$i]}/" >> "$tmp/hits" \
     || die "cannot report hits"
