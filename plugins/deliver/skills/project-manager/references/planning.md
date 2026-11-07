@@ -6,8 +6,7 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 
 ## 1. Ground
 - Not a git repository: offer `git init`, and ask first. Git is the record, so planning needs it.
-- Create `docs/approval.json` as `pending` now, per `state.md` `## Approval`, and commit it with
-  the first plan draft.
+- Create `docs/approval.json` as `pending` per `state.md` `## Approval`; commit it with the first draft.
 - Brownfield work: run one native Explore pass for the architecture, the conventions, the real
   test, lint and build commands, and where new code should go. Fold the answers into the plan's
   Architecture and Commands, and keep them for the stories' Context.
@@ -34,13 +33,11 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - Create `docs/plan.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.template`, replacing its comments.
 - Requirements carry stable IDs, `FR-n` and `AC-n`, and are never renumbered: the stories, the
   reviewer and the verifier trace to them.
-- Write acceptance criteria in EARS where they are behavioural:
-  `WHEN <condition or event>, THE SYSTEM SHALL <observable behaviour>`. Otherwise use a plain
-  measurable statement. Sharper criteria make the tests and the verifier more reliable.
+- Acceptance criteria use EARS where behavioural (`WHEN <condition or event>, THE SYSTEM SHALL
+  <observable behaviour>`), else a plain measurable statement. Sharper criteria test better.
 - Commands are the project's real `test`, `lint`, `build` and `run`, discovered now, with `N/A`
   where one does not exist. They are the gates you run yourself.
-- `Integration branch:` is the branch the scaffold commit lands on, `main` by default: every story
-  branch is cut from it and merged back into it.
+- `Integration branch:` is the branch the scaffold commit lands on, `main` by default.
 - `Skeleton:` stays `none` unless the user opts into SpecDD; then `specdd` (`skeleton.md`).
 - The Stories table's `covers` column names the IDs each story satisfies. Traceability maps every
   `FR-` and `AC-` to at least one story and flags any that has none.
@@ -80,8 +77,13 @@ found wrong goes through this path, never drip-fed into a running story:
    altered is material; when unsure, treat it as material. Follow `state.md` `## Approval`: show
    `git diff <plan_commit> -- docs/plan.md`, ask again, and write a new record only on a new
    approval. A story-level tweak needs no re-approval; log it.
-4. **Reset.** An in-flight story whose scope changed restarts from its claim against the revised
-   story file, with `rounds` back to 0. Unaffected stories keep their Execution blocks.
+4. **Replace, never restart.** Edit a story never dispatched in place. A dispatched story keeps
+   its `clientRequestId`s (`host.md` `## Dispatch`), so a rerun would return its old children.
+   Instead set its `pm-exec` `status` to `blocked`, add a `Replaced by: <new id>` line, and keep
+   its history, branch and worktree. Write the revised story under the next free `S<sprint>-<n>`
+   with `Replaces: <old id>` under its header, move its plan row and Traceability there, and
+   claim and run it from scratch; no earlier `verifier` result counts for it. Log both ids and why.
+   Unaffected stories keep their Execution blocks.
 5. **Commit** the `docs/` changes together, saying what changed, at which level, and whether
    re-approval happened.
 
@@ -133,13 +135,11 @@ before its first claim.
 - **Ordering.** Record `Depends on` and order dependencies first. `Parallel-safe: yes` only for a
   story with no dependency on unmerged work; the plan's table tags it `[P]`. When unsure, `no`.
 - **Execution.** Never written at decomposition. The claim adds it (`state.md` `## Execution block`).
-
-Never dispatch a builder on a story that misses any of the above; fix it first.
+- **Ready.** Never dispatch a builder on a story that misses any of the above; fix it first.
 
 ## 7. Self-check, inline
 Before handing over, check and fix:
-- Every `FR-` and `AC-` is covered by at least one story, and Traceability agrees.
-- Every `Covers` ID exists in the plan or spec.
+- Every `FR-` and `AC-` is covered by a story, Traceability agrees, and every `Covers` ID exists.
 - `Depends on` has no cycles, and no story depends on a later sprint.
 - No two `Parallel-safe` stories in a sprint overlap in `touches`: neither path equals, or sits
   under, the other's.
