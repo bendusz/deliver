@@ -10,6 +10,7 @@ set -euo pipefail
 export LC_ALL=C
 die() { printf 'scan-secrets: %s\n' "$1" >&2; exit 2; }
 [ "$(basename "$0")" = pre-push ] && set -- --pre-push "$@"
+# Keep the four distinctive formats first: they match without a token-start boundary (below).
 names=(aws-access-key private-key github-token github-pat slack-token sk-api-key google-api-key jwt)
 pats=('AKIA[0-9A-Z]{16}' '-----BEGIN [A-Z ]*PRIVATE KEY' 'gh[pousr]_[A-Za-z0-9]{30,}'
   'github_pat_[A-Za-z0-9_]{22,}' 'xox[baprs]-[A-Za-z0-9-]{10,}' 'sk-[A-Za-z0-9_-]{20,}'
@@ -61,12 +62,14 @@ else
   die "usage: scan-secrets.sh <base>..<branch> | --pre-push <remote> <url>"
 fi
 
-# A token starts a line or follows a character outside [A-Za-z0-9_-], or an escape: \n \r \t,
-# %XX (URL) or =XX (quoted-printable). Paths are redacted in what is printed.
+# The first four formats are distinctive enough to match anywhere. The broader ones must start a
+# line or follow a character outside [A-Za-z0-9_-], or an escape: \n \r \t, %XX (URL) or =XX
+# (quoted-printable). Paths are redacted in what is printed.
 tab=$(printf '\t'); bnd='(.*([^A-Za-z0-9_-]|\\[nrt]|[%=][0-9A-Fa-f]{2}))?'; red=()
 for p in "${pats[@]}"; do red+=(-e "s/$p/[redacted]/g"); done
 for i in "${!pats[@]}"; do
-  st=0; grep -aE -e "^[^$tab]*$tab$bnd${pats[$i]}" "$tmp/lines" > "$tmp/m" || st=$?
+  pre='.*'; [ "$i" -lt 4 ] || pre=$bnd
+  st=0; grep -aE -e "^[^$tab]*$tab$pre${pats[$i]}" "$tmp/lines" > "$tmp/m" || st=$?
   [ "$st" -le 1 ] || die "matcher failed (grep exit $st)"
   cut -f1 "$tmp/m" | sed -E "${red[@]}" -e "s/\$/ ${names[$i]}/" >> "$tmp/hits" \
     || die "cannot report hits"
