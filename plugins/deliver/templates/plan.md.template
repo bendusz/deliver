@@ -1,28 +1,14 @@
 # <Project> delivery plan
-<!-- Source spec: docs/spec.md (or "none, intent captured inline"). The plan derives from the spec
-     and traces each story back to its FR-/AC- IDs. -->
+<!-- Source spec: docs/spec.md, or "none, intent captured inline". With a spec, the plan derives
+     from it and traces each story to its FR-/AC- IDs. Replace every comment as you fill this in. -->
 
 ## Overview
 <!-- 2 to 3 sentences -->
 <what and why>
 
-## Source spec
-- docs/spec.md  <!-- or: none, intent captured inline -->
-
-## Delivery mode
-- Scale: <tiny | small | standard | large | regulated>  <!-- see references/scale-profiles.md -->
-- Checkpoint policy: <story-level | sprint-level | autonomous>
+## Delivery
 - Integration branch: <main>  <!-- the branch every story branch is cut from and merged back into -->
-- Skeleton: <specdd | none>  <!-- specdd writes .sdd contracts per sprint before decomposition; default none below large -->
-<!-- Assurance targets: escape-bound target per tier; omit for these defaults (references/review-gates.md) -->
-- Assurance targets: T0=0.10, T1=0.05, T2=0.02
-
-<!-- Omit Goals and Target users when docs/spec.md exists; the spec owns them. -->
-## Goals
-- <goal>
-
-## Target users
-- <user>
+- Skeleton: <specdd | none>  <!-- default none; specdd writes .sdd contracts per sprint before decomposition -->
 
 ## Scope
 <!-- be explicit about what you are not doing -->
@@ -32,37 +18,42 @@
 **Out:**
 - <item>
 
+## Requirements
+<!-- Stable IDs, never renumbered. With docs/spec.md, list the IDs this plan delivers and leave
+     their text in the spec. Prefer EARS for behavioural criteria. Non-functional requirements
+     (performance, security, accessibility) are FR- items with a measurable bar. -->
+- FR-001: <testable requirement>
+- AC-001: WHEN <condition or event>, THE SYSTEM SHALL <observable behaviour>.
+
 ## Stories
 | id | title | priority | covers | depends-on | [P] |
 |------|---------|----------|--------|------------|-----|
 | S1-1 | <title> | high | FR-001, AC-001 | none | no |
 
 ## Architecture
-<!-- stack, key decisions, patterns -->
+<!-- stack, key decisions and why, patterns; cite docs/research/ reports behind a decision -->
 <architecture>
 
 ## Traceability
-<!-- Every spec requirement maps to at least one story; flag any that do not. -->
+<!-- Every FR- and AC- maps to at least one story; flag any that does not. -->
 | requirement | covered by | notes |
 |-------------|-----------|-------|
 | FR-001 | S1-1 | |
 
-## Non-functional requirements
-- <performance, security, accessibility, etc.>
-
 ## Commands
-<!-- real commands, discovered now; N/A where none exists -->
+<!-- the project's real commands, discovered now; N/A where none exists -->
 - test: `<cmd or N/A>`
 - lint: `<cmd or N/A>`
 - build: `<cmd or N/A>`
 - run: `<cmd or N/A>`
 
 ## Risks
-<!-- and open questions -->
+<!-- and open questions, carried assumptions, rejected design alternatives -->
 - <risk + mitigation>
 
 ## Clarifications
-<!-- Must be empty before sign-off. List any [NEEDS CLARIFICATION] items here until resolved. -->
+<!-- Must hold no open [NEEDS CLARIFICATION] before sign-off. Record each resolution here. -->
 
 ## Sign-off
-Approved by __________ on ____-__-__
+<!-- Filled after the user says approved, in the commit that becomes plan_commit. -->
+- approved in conversation on <date>; record in docs/approval.json

@@ -1,18 +1,18 @@
 # S<sprint>-<n>: <title>
-<!-- pm-meta: {"builder":"<expert-builder|codex-builder|auto>","touches":["<repo-relative file or directory root; no globs; required and bounded>"]} -->
+<!-- pm-meta: {"builder":"<auto|claude|codex>","touches":["<repo-relative path>"]} -->
 Sprint: <n> · Priority: <high|med|low> · Covers: <FR-…, AC-…> · Depends on: <ids|none> · Parallel-safe: <yes|no>
-Risk: <low|med|high> · Tier: <T0|T1|T2> · Review lenses: <code-integrity-reviewer[, architecture-reviewer][, security-auditor][, performance-reviewer]> · Specs: <.sdd paths|none>
+Review focus: <none|design|security|performance>
 
 ## Goal
 <one paragraph>
 
 ## Context (self-contained)
-<facts a cold builder needs that are absent from AGENTS.md>
-<name the source files, symbols, interfaces, and conventions. When a complete inventory matters,
-name the exact search that finds it.>
+<facts a cold builder needs that are absent from AGENTS.md: the source files, symbols, interfaces
+and conventions to inspect; with a skeleton, the .sdd files this story implements. When a complete
+inventory matters, name the exact search that finds it.>
 
 ## Acceptance criteria (testable)
-- [ ] <criterion>
+- [ ] AC-…: <criterion>
 
 ## Out of scope
 - <item>
@@ -20,11 +20,7 @@ name the exact search that finds it.>
 ## Verification
 - Prove done with: `<command>`
 
-## Verification evidence
-
-## Execution
-<!-- Never written at decomposition; the claim commit adds this section (references/state.md).
-     One JSON comment on its own line, then optional dated notes for events with no commit.
-     Shape: pm-exec: {"owner":"<actor-id>","builder":"<expert-builder|codex-builder>","branch":"pm/S<sprint>-<n>-<slug>","status":"<claimed|building|built|in-review|merged|blocked>","tier":"<T0|T1|T2>","protected":["<acceptance test paths>"],"protected_base":"<sha of the acceptance commit>","integrity":"<pass|fail> <sha>, or n/a at T0","verifier":"<PASS|FAIL|UNKNOWN> <sha>","panel":["<lenses that ran on every review round>"],"rounds":0,"retries":0,"integrity_fails":0,"holdout_fails":0,"deliver":"<plugin version>","updated":"<YYYY-MM-DD HH:MM, UTC>"}
-     `verifier` is absent until the first verification, `panel` until the first review; `pm-meta` may add "integrity_allow":["<kind>"].
-     Then lines such as: - <YYYY-MM-DD HH:MM> external review skipped: codex CLI absent. -->
+<!-- Execution: never written at decomposition. The claim commit appends an "## Execution" heading
+     and one line (references/state.md, ## Execution block). Shape:
+     pm-exec: {"role_model":"<role provider/model effort>","thread":"<childThreadId>","branch":"pm/S<sprint>-<n>-<slug>","worktree":"<absolute path>","status":"<claimed|building|built|reviewing|fixing|verified|merged|blocked>","rounds":0,"verifier":"<PASS|FAIL|UNKNOWN> <sha>"}
+     `verifier` is absent until the first verification. -->
