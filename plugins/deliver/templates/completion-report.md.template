@@ -2,10 +2,10 @@
 # <project> completion report
 
 - **Date:** <YYYY-MM-DD>
-- **Spec:** docs/spec.md
+- **Spec:** docs/spec.md  <!-- omit if none -->
 - **Plan:** docs/plan.md
-- **Constitution:** docs/constitution.md  <!-- omit if none -->
 - **History:** `git log --first-parent <integration branch>`
+- **Decisions:** docs/log.md
 
 ## Overview
 <2 to 4 sentences: what was delivered, and the outcome against the plan's goals.>
@@ -15,7 +15,7 @@ Per sprint and story, what landed and where.
 
 | story | covers | title | status | merge / PR |
 | --- | --- | --- | --- | --- |
-| S1-1 | FR-001, AC-001 | <title> | done | <commit / PR link> |
+| S1-1 | FR-001, AC-001 | <title> | merged | <commit / PR link> |
 
 ## Traceability
 <!-- Spec requirements → the stories that delivered them; flag anything descoped. -->
@@ -28,11 +28,9 @@ How the delivered work meets the spec's acceptance criteria, or the story files'
 with the reason.
 
 ## Gates, review & verification
-- **Deterministic gates:** <test / lint / build results, or N/A.>
-- **Review:** lenses run and the final verdicts; any accepted `minor` findings left open.
-- **Verification:** `pm-verifier` status per story (and links to `docs/verification/*` if written).
-- **Analysis:** last `/deliver:analyze` headline status, if run.
-- **Trust:** the last `retro-stats.mjs --trust` report, unedited.
+- **Gates:** <test / lint / build results, or N/A.>
+- **Review:** reviewers run per story and the final verdicts; any accepted `minor` findings left open.
+- **Verification:** the verifier's status and sha per story, with evidence under `docs/evidence/<story-id>/` where captured.
 
 ## Follow-ups & known issues
 - <Anything deferred, known limitations, or tech debt to revisit.>
