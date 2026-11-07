@@ -11,8 +11,9 @@ for bounded builds. You may name other models for any dispatch.
 
 **Secrets stay on the machine.** A secret comes in through T3's `request_secret`, never a file.
 On the way out, the PM installs a git pre-push hook that scans every pushed commit for
-high-confidence token formats (cloud and API keys, tokens, JWTs, private keys), and scans each
-story's diff before merging it. A hit blocks the push or merge and names the file, never the value.
+high-confidence token formats (cloud and API keys, tokens, JWTs, private keys), and scans every
+commit of a story before merging it. A hit blocks the push or merge and names the commit and file,
+never the value.
 It lives in git, so it covers every agent and provider. Agents never bypass it; only you may, with
 `git push --no-verify`.
 

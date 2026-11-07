@@ -97,9 +97,10 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
    - Bring the branch up to date: `git -C <worktree> merge <integration>`, then re-gate. If that
      merge brought in anything beyond `docs/stories/`, `docs/log.md` and `docs/evidence/`, verify
      again (step 7) so the `verifier` sha is the head.
-   - Scan for secrets: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh" <integration>...<branch>`.
-     Never merge on a hit. Send the builder `thread` the hits as a Fix item: remove the secret
-     from the story branch's history (rewrite that unshared branch only, never the integration
+   - Scan every commit for secrets:
+     `bash "${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh" <integration>..<branch>`. Never merge
+     on a hit. Send the builder `thread` the hits as a Fix item: remove the secret from each
+     story-branch commit the hits name (rewrite that unshared branch only, never the integration
      branch). Tell the user to rotate it, then re-gate, scan again and verify again (step 7).
    - On the integration branch, `git merge --no-ff <branch>`. Title `type(scope): subject`,
      imperative, no trailing period. Body sections in order, dropping empty ones:

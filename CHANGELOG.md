@@ -42,10 +42,11 @@ a diff the user can read and revert. The design is `docs/specs/2026-11-07-v1.0-b
   with the PM's next commit. It replaces the gitignored `tmp/log.md`.
 - **A secret scan in git.** Passwords and keys must not leave the machine. `scripts/scan-secrets.sh`
   blocks added lines that carry a high-confidence token format (AWS access key, private key
-  header, GitHub, Slack, `sk-` API key, Google API key, JWT) and names the file and line or commit
-  and the pattern, never the value. The PM installs it as the project's pre-push hook at scaffold,
-  where it scans every pushed commit, and runs it on each story's diff and commits before the
-  merge. Binary files and files marked binary in `.gitattributes` are scanned as text.
+  header, GitHub, Slack, `sk-` API key, Google API key, JWT), each starting a word, in added lines
+  or paths. It names the commit, file, line and pattern, never the value, redacting a token in a
+  path. The PM installs it as the project's pre-push hook at scaffold, where it scans every pushed
+  commit the destination remote lacks, and runs it on every commit of a story branch before the
+  merge. Each commit is diffed as text, binary or not; any error blocks too.
   `/deliver:doctor` reports the hook as current, missing, outdated or bypassed by
   `core.hooksPath`. It runs in git, so it covers every agent and provider. No agent passes
   `--no-verify`; only the user may. Credential-assignment patterns are not ported: they caused
