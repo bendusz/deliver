@@ -20,6 +20,7 @@ done
 common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
   || die "not inside a git repository"
 log="$(dirname "$common")/docs/log.md"
-mkdir -p "$(dirname "$log")"
-[ -f "$log" ] || printf '# Decision log\n' > "$log"
-printf '%s  %s\n' "$(date '+%Y-%m-%d %H:%M')" "$msg" >> "$log"
+ts=$(date '+%Y-%m-%d %H:%M') && [ -n "$ts" ] || die "could not read the date"
+mkdir -p "$(dirname "$log")" 2>/dev/null || die "cannot create $(dirname "$log")"
+[ -f "$log" ] || { printf '# Decision log\n' > "$log"; } 2>/dev/null || die "cannot create $log"
+{ printf '%s  %s\n' "$ts" "$msg" >> "$log"; } 2>/dev/null || die "cannot write to $log"
