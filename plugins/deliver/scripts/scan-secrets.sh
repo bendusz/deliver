@@ -82,10 +82,10 @@ for i in "${!pats[@]}"; do
   pre='.*'; [ "$i" -lt 4 ] || pre=$bnd
   st=0; grep -aE -e "^[^$tab]*$tab$pre${pats[$i]}" "$tmp/lines" > "$tmp/m" || st=$?
   [ "$st" -le 1 ] || die "matcher failed (grep exit $st)"
-  cut -f1 "$tmp/m" | sed -E "${red[@]}" -e "s/\$/ ${names[$i]}/" >> "$tmp/hits" \
+  cut -f1 "$tmp/m" | awk '!seen[$0]++' | sed -E "${red[@]}" -e "s/\$/ ${names[$i]}/" >> "$tmp/hits" \
     || die "cannot report hits"
 done
 [ -s "$tmp/hits" ] || exit 0
-awk '!seen[$0]++{print "scan-secrets: " $0}' "$tmp/hits" >&2 || die "cannot report hits"
+sed 's/^/scan-secrets: /' "$tmp/hits" >&2 || die "cannot report hits"
 printf 'scan-secrets: %s blocked. Remove the secret from history, not just the working tree, and rotate it. Only the user may bypass this, with git push --no-verify.\n' "$mode" >&2
 exit 1
