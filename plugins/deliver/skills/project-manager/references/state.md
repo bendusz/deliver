@@ -29,8 +29,8 @@ The claim commit, on the integration branch and before any dispatch, appends to 
   are ignored; an old `in-review` status reads as `reviewing`.
 
 ## Log
-- `docs/log.md` in the main checkout is the decision log, tracked. Each line is
-  `YYYY-MM-DD HH:MM  <message>`, at most 100 characters, under a `# Decision log` header.
+- `docs/log.md` in the main checkout is the decision log, tracked, headed `# Decision log`. Each
+  line is `YYYY-MM-DD HH:MM  <message>`, with the message at most 100 characters.
 - Append only with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" "<message>"`, never by editing
   the file. It works from any worktree and writes the main checkout's file.
 - Log sign-off, each claim, build, fix round, block and merge, and every decision you make
@@ -48,8 +48,10 @@ story's `pm-exec`; `git worktree list --porcelain`; `t3_thread_read` of each thr
 block records; the last ~20 lines of `docs/log.md`. Not approved means planning; approved with no
 stories means decomposition. Then re-enter each story from its `status` (steps per `loop.md`):
 - `claimed`: no build yet. Dispatch the tests-first or build step.
-- `building` or `fixing`: if the thread finished, take its result JSON and gate. If it was
-  cancelled, dispatch again with the same `clientRequestId`, or resend the Fix list.
+- `building` or `fixing`: if the thread finished, take its result JSON and gate. If cancelled or
+  interrupted, `t3_thread_send` to `thread`: its branch, worktree, and continue (`host.md`
+  `## Messaging`). No `thread` yet: retry with the same `clientRequestId` in case the response was
+  lost; if no child comes back, dispatch a new builder with the next round in the key.
 - `built`: gate, then review. `reviewing`: re-gate, then a new review of the committed diff.
 - `verified`: re-check that `verifier` names the branch head, then ship.
 - `blocked`: present the blocker to the user before anything else.
