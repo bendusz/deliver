@@ -28,8 +28,10 @@ message so they run in parallel:
 - `task`: the `references/roles.md` `## reviewer` soul, from its first line through **Returns**,
   then the brief: the repository root (`git rev-parse --show-toplevel`), the scope and the exact
   diff command to run (or "review the codebase"), and the objective, as a `focus:` line when it is
-  `design`, `security` or `performance`, else `Objective: <text>`. With no story, add: "No story:
-  skip the per-criterion check and report spec findings as none."
+  `design`, `security` or `performance`, else `Objective: <text>`. When the review targets a
+  story, add its story file (with its acceptance criteria) and its recorded `pm-exec.worktree`,
+  and run the diff there. With no story, add: "No story: skip the per-criterion check and report
+  spec findings as none."
 - `target`: `{"providerInstanceId":"codex","model":"gpt-6.1-sol","options":{"reasoningEffort":"high"}}`.
 - `isolation: "shared"`, so the child sees the checkout as it is, uncommitted changes included.
 - `title`: `codex review <scope> <objective>`.
@@ -53,7 +55,9 @@ step 6 does before anything goes to a builder.
   question, the relevant file paths, the options being weighed with their trade-offs, and the
   constraints. End it with: `Read the referenced files before answering. Give a concrete
   recommendation and your reasoning, in your reply.`
-- Dispatch one `delegate_task`: `task` the brief, `target`
+- `task`: the `references/roles.md` `## researcher` soul, from its first line through
+  **Returns**, then the brief.
+- Dispatch one `delegate_task` on the researcher's second-opinion default, `target`
   `{"providerInstanceId":"codex","model":"gpt-6-astra","options":{"reasoningEffort":"high"}}`
   (another model only when the user names one), `isolation: "shared"`, `title` `codex ask`,
   `clientRequestId` `codex-ask-<YYYYMMDDHHMMSS>`, fresh per call.

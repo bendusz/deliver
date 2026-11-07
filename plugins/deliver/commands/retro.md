@@ -14,4 +14,5 @@ Precondition: every story of that sprint is `merged`, or `blocked` and escalated
 
 End with the review verdict, any fix or check stories for the next sprint, the proposed
 `AGENTS.md` diff or "no changes earned", and the path of the retro record. Then report to the user
-and wait before decomposing the next sprint, unless the plan says to run on across sprints.
+and wait before decomposing the next sprint, unless the plan's `Between sprints:` is
+`autonomous`.

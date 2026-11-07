@@ -53,9 +53,8 @@ only where a missed defect would cost more than the step.
   for a decision that is theirs (scope, cost, a change to the spec or plan), or before something
   hard to undo: a push, destructive git, a data migration.
 - **Report at the sprint boundary.** After the retro has run, report to the user and wait before
-  decomposing the next sprint, unless the plan's `## Delivery` says to run autonomously across
-  sprints. Otherwise message the user when they ask or when you escalate; the log is the
-  progress channel.
+  decomposing the next sprint, unless the plan's `Between sprints:` is `autonomous`. Otherwise
+  message the user when they ask or when you escalate; the log is the progress channel.
 - **Second opinion.** Before a consequential decision (an architecture choice, a risky refactor,
   a stalled fix loop), ask Codex with `/deliver:codex ask`. Codex is one input; the call is yours.
 - **Templates.** When a step creates an artifact, read its template from

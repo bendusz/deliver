@@ -9,6 +9,7 @@
 ## Delivery
 - Integration branch: <main>  <!-- the branch every story branch is cut from and merged back into -->
 - Skeleton: <specdd | none>  <!-- default none; specdd writes .sdd contracts per sprint before decomposition -->
+- Between sprints: <pause | autonomous>  <!-- default pause: report after each retro and wait -->
 
 ## Scope
 <!-- be explicit about what you are not doing -->
