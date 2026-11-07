@@ -5,7 +5,7 @@
 <!-- One row per story, from its pm-exec line. -->
 | story | builder | rounds | verifier | status |
 |-------|---------|--------|----------|--------|
-| S<n>-1 | <provider/model effort> | <n> | <PASS sha, or none> | <merged | blocked> |
+| S<n>-1 | <provider/model effort> | <n> | <PASS sha, or none> | <merged or blocked> |
 
 ## Sprint review
 - Range: `<from>...<to>` · changed lines: <n> · focus: <none | design>
@@ -24,7 +24,7 @@
 <!-- The proposed diff: at most 3 added lines. Record the user's answer per line. -->
 | line | evidence | accepted |
 |------|----------|----------|
-| <the line> | <story ids and fix rounds> | <yes | no> |
+| <the line> | <story ids and fix rounds> | <yes or no> |
 
 Retired this sprint: <lines and why, such as now caught by a check; or "none">
 

@@ -3,13 +3,14 @@
 Run when every story in the sprint is `merged`, or `blocked` and escalated, or on `/deliver:retro`.
 
 ## 1. Cross-story review
-- Range: `git diff <from>...<to>` on the integration branch, from the parent of the sprint's
-  first story merge to its last (`git log --first-parent --merges`).
+- Range: `git diff <from>...<to>`, from the parent of the sprint's first story merge to its last
+  (`git log --first-parent --merges` on the integration branch).
 - Dispatch one reviewer soul (`host.md` `## Dispatch`, `isolation: "shared"` on the main
-  checkout, key `S<n>-retro-reviewer-0`) with that range, the plan's Architecture section and
-  the sprint's story files. Ask only for what no single story review could see: logic duplicated
-  across stories, a convention two stories read differently, an interface one changed and
-  another still assumes. Over about 1,500 changed lines, add `focus: design`.
+  checkout) with that range, the plan's Architecture section and the sprint's story files. Each
+  retro's key is fresh, `S<n>-retro-reviewer-<YYYYMMDDHHMM>`; reuse one only to retry a lost
+  response. Ask only for what no single story review could see: logic duplicated across stories,
+  a convention two stories read differently, an interface one changed and another still assumes.
+  Over about 1,500 changed lines, add `focus: design`.
 - Triage as `loop.md` step 6. A `block` or `major` becomes a fix story at the head of the next
   sprint, never a silent edit on the integration branch.
 
@@ -22,8 +23,7 @@ Read each story's `pm-exec`, merge body and review verdicts, and the sprint's `d
    Its criteria name the commit the check must fail on. Only a judgement call is a candidate
    `AGENTS.md` line: a rule in prose is paid on every dispatch and still gets missed.
 2. Which story's Context lacked something its builder had to discover? Add it to the next sprint's.
-3. Which gate, review or verification step caught nothing and cost time? Say so; the user
-   decides whether to drop it, never you.
+3. Which gate, review or verify step caught nothing and cost time? The user decides on dropping it.
 
 ## 3. AGENTS.md, as a diff
 - Each proposed line names the stories and fix rounds its absence cost. Count only what a gate,

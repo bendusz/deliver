@@ -29,16 +29,23 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
      `claimed`.
    - Its commit on that branch is the tests commit; no copy is needed. Check that it touched only
      test files (`git diff --name-only <integration>...<tests sha>`) and that its result reports the
-     tests red for the stated reason. Otherwise send it back with the problem.
+     tests red for the stated reason.
+   - Otherwise send a correction to its `thread` (`t3_thread_send`). Each correction is a fix
+     round under the step 6 cap: increment `rounds`, commit and log it first; status stays
+     `claimed`. At the cap, or on a `blocked` result, go to step 10.
    - Add one line under the `pm-exec`, `Tests: <tests sha> <test paths>`, commit it and log it.
      Clean the tests worktree per `host.md` `## Worktrees` steps 1 to 4; keep its branch.
    - The build starts from the tests commit, so it has the tests: its brief's first line is
      `git switch -c pm/<id>-<slug> <tests sha>`, and it says not to edit the listed test paths.
 
 3. **Build.** Dispatch the builder soul at `role_model`, `isolation: "worktree"`, key
-   `<id>-builder-0`. The brief names the branch `pm/<id>-<slug>` and, after step 2, the tests
-   sha and paths. Record `childThreadId` as `thread` and mark `building`. When its JSON block
-   returns `done`, record its `branch` and `worktree` and mark `built`. `blocked` goes to step 10.
+   `<id>-builder-<round>`. The brief names the branch `pm/<id>-<slug>` and, after step 2, the
+   tests sha and paths. Mark `building` with `thread` the new `childThreadId`, `branch` set to
+   `pm/<id>-<slug>` and `worktree` empty, so no tests-stage coordinates survive. When its JSON
+   block returns `done`, record its `branch` and `worktree` and mark `built`. `blocked` goes to
+   step 10. If the build is interrupted while `worktree` is still empty, `t3_thread_send` its
+   `thread` asking for `git rev-parse --show-toplevel` and `git branch --show-current`, record
+   both, then tell it to continue (`host.md` `## Messaging`).
 
 4. **Gate.** Run the gates yourself in the recorded worktree (`cd <worktree>`), never on a
    child's word: its `tests` field is a claim, your run is the evidence. Then check scope:
@@ -63,7 +70,7 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
    produce it. "I would have done it differently" and flags on code the story did not touch are
    missing context. Be slower to dismiss security and correctness than style.
    - Triage into **Fix** and **Dismissed**, each dismissal with a one-line reason. Log the
-     dismissals; the user can overrule them.
+     dismissals; the user can overrule them. An empty Fix list uses no round: verify (step 7).
    - **Cap: 3 rounds, then escalate.** If `rounds` is already 3, escalate to the user with the
      open findings and the diff (step 10). Else increment `rounds` and mark `fixing` first.
    - `t3_thread_send` the Fix list to the recorded builder `thread`, never a reviewer's raw output
