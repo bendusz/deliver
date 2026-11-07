@@ -25,8 +25,8 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
 
 2. **Tests first**, when the story has testable acceptance criteria.
    - Dispatch a builder with the `roles.md` tests-only line, `isolation: "worktree"`, branch
-     `pm/<id>-<slug>-tests`. Record its thread, branch and worktree in `pm-exec`; status stays
-     `claimed`.
+     `pm/<id>-<slug>-tests`. Record its thread, branch and worktree in `pm-exec` and commit them,
+     so a resume can find it (`state.md` `## Resume`); status stays `claimed`.
    - Its commit on that branch is the tests commit; no copy is needed. Check that it touched only
      test files (`git diff --name-only <integration>...<tests sha>`) and that its result reports the
      tests red for the stated reason.

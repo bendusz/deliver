@@ -21,6 +21,8 @@ The claim commit, on the integration branch and before any dispatch, appends to 
 ```
 - `role_model` is the builder's choice, such as `builder codex/gpt-6-astra high`. `thread`,
   `branch` and `worktree` come from the builder's dispatch and result (`host.md` `## Dispatch`).
+- Tests first (`loop.md` step 2) records its child in those three fields, still `claimed`. Once
+  its tests are accepted, one line goes under the `pm-exec`: `Tests: <tests sha> <test paths>`.
 - `rounds` counts fix rounds. Increment and commit it before the round's dispatch; the cap is 3.
 - `verifier` is absent until the first verification, then the verifier's `STATUS` and `COMMIT`
   (`roles.md` `## verifier`). `merged` is terminal; the block stays as history.
@@ -32,14 +34,13 @@ The claim commit, on the integration branch and before any dispatch, appends to 
 - `docs/log.md` in the main checkout is the decision log, tracked, headed `# Decision log`. Each
   line is `YYYY-MM-DD HH:MM  <message>`, with the message at most 100 characters.
 - Append only with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" "<message>"`, never by editing
-  the file. It works from any worktree and writes the main checkout's file.
+  the file. It works from any worktree or submodule and writes that repo's main checkout's file.
 - Log sign-off, each claim, build, fix round, block and merge, and every decision you make
   without asking, with the why: `S2-3: chose SQLite over Postgres, single-user CLI, no server`.
   A long thought is two or three lines.
 - Only the PM writes it. Children report back; you decide what is worth a line.
-- Stage `docs/log.md` into your next commit on the integration branch, whatever it is. Make a
-  log-only commit only at session end, if entries are still unstaged. Story branches never touch
-  it, so it cannot conflict.
+- Stage `docs/log.md` into your next integration-branch commit, whatever it is; a log-only commit
+  only at session end, for entries still unstaged. Story branches never touch it: no conflicts.
 - It is a history, never a source of state. When it disagrees with git or a `pm-exec`, they win.
 
 ## Resume
@@ -47,14 +48,18 @@ Read, in order: `docs/approval.json`; `git log --first-parent <integration branc
 story's `pm-exec`; `git worktree list --porcelain`; `t3_thread_read` of each thread a non-merged
 block records; the last ~20 lines of `docs/log.md`. Not approved means planning; approved with no
 stories means decomposition. Then re-enter each story from its `status` (steps per `loop.md`):
-- `claimed`: no build yet. Dispatch the tests-first or build step.
+- `claimed`, no `thread`: dispatch step 2 or 3. Its fixed key returns the child of a lost response.
+- `claimed`, a `thread`, no `Tests:` line: the tests child. Finished: check its last result
+  (step 2). Cancelled or interrupted: `t3_thread_send` it to continue, as step 3 resumes a build.
+- `claimed` with a `Tests:` line: the tests are accepted and their worktree is meant to go. Finish
+  any of its cleanup step 2 left undone, then build (step 3).
 - `building` or `fixing`: if the thread finished, take its result JSON and gate. If cancelled or
   interrupted, `t3_thread_send` to `thread`: its branch, worktree, and continue (`host.md`
   `## Messaging`). No `thread` yet: retry with the same `clientRequestId` in case the response was
   lost; if no child comes back, dispatch a new builder with the next round in the key.
 - `built`: gate, then review. `reviewing`: re-gate, then a new review of the committed diff.
 - `verified`: re-check that `verifier` names the branch head, then ship.
-- `blocked`: present the blocker to the user before anything else.
+- `blocked`: present the blocker to the user first, unless a `Replaced by:` line makes it history.
 - `merged`: finish any cleanup `host.md` `## Worktrees` lists, then take the next story.
-A recorded worktree `git worktree list` no longer shows: if its branch survives, `git worktree add`
-it at a new path, record that path, and name it in any fix round. Otherwise log it, rebuild.
+From `building` to `verified`, a recorded worktree no longer listed: if its branch survives,
+`git worktree add` it at a new path, record it and name it in any fix round; else log it, rebuild.

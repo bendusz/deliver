@@ -19,7 +19,12 @@ done
 
 common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
   || die "not inside a git repository"
-log="$(dirname "$common")/docs/log.md"
+# Main checkout: the work tree the common dir names (a submodule's core.worktree), else its
+# parent. Accept it only if it resolves to the same common dir, which rejects a bare repo.
+top=$(git -C "$common" rev-parse --show-toplevel 2>/dev/null) || top=$(dirname "$common")
+[ "$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" = "$common" ] \
+  || die "cannot find the main checkout of $common"
+log=$top/docs/log.md
 ts=$(date '+%Y-%m-%d %H:%M') && [ -n "$ts" ] || die "could not read the date"
 mkdir -p "$(dirname "$log")" 2>/dev/null || die "cannot create $(dirname "$log")"
 [ -f "$log" ] || { printf '# Decision log\n' > "$log"; } 2>/dev/null || die "cannot create $log"

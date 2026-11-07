@@ -26,8 +26,11 @@ Check, in order, each with its evidence:
    - `N/A`: the plan says `N/A`. Before a plan exists, every gate is `UNKNOWN: no plan yet`.
    - `run` is not a gate: step 2 covers the program it starts.
 4. **Codex**, `OK` or `MISSING`. `orchestrator_capabilities` lists the `codex` provider with the
-   models the `references/roles.md` defaults name. Without it, a Codex builder or reviewer default
-   cannot be dispatched: report which defaults must move to a Claude model.
+   models the `references/roles.md` defaults name. Without it there is no opposite-family reviewer
+   for a Claude build, so the default workflow cannot run: report `MISSING` as a blocker. Recommend
+   restoring Codex in T3, or an explicit change of workflow the user approves and the log records.
+   Never move a Codex default to a Claude model on your own: same-family review breaks the
+   hard rule that the reviewer is never the builder.
 5. **Decision log**, `OK` or `MISSING`. `"${CLAUDE_PLUGIN_ROOT}/scripts/log.sh"` exists and is
    executable (`test -x`). Do not call it: a call writes a line.
 

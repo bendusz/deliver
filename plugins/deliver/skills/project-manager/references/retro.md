@@ -12,7 +12,10 @@ Run when every story in the sprint is `merged`, or `blocked` and escalated, or o
   duplicated across stories, a convention two read differently, an interface one story changed
   while another still assumes the old one. Over about 1,500 changed lines, add `focus: design`.
 - Triage as `loop.md` step 6. A `block` or `major` becomes a fix story at the head of the next
-  sprint, never a silent edit on the integration branch.
+  sprint, never a silent edit on the integration branch. After the last sprint, gather them into
+  one corrective story, a final one-story sprint: add its plan row, decompose it (`planning.md`
+  `## 6. Decompose`) and run it through `loop.md`; its retro skips this review. Or escalate, and
+  log the user's explicit disposition of each finding.
 
 ## 2. Three questions, check before rule
 Read each story's `pm-exec`, merge body and review verdicts, and the sprint's `docs/log.md` lines.
@@ -35,6 +38,7 @@ Read each story's `pm-exec`, merge body and review verdicts, and the sprint's `d
 Write `docs/retros/sprint-<n>.md` from `templates/retro.md.template`. Commit it with any accepted
 `AGENTS.md` change as `chore(retro): sprint <n>`, `docs/log.md` staged, and log the outcome. Show
 the user the record, then decompose the next sprint (`planning.md`). After the last sprint, write
-`docs/completion-report.md` from `templates/completion-report.md.template` instead.
+`docs/completion-report.md` from `templates/completion-report.md.template` instead, never while a
+cross-story `block` or `major` is open: each is merged as a fix or has the user's logged ruling.
 
 <!-- Check before rule is adapted from Matt Pocock's skills (mattpocock/skills, MIT). -->

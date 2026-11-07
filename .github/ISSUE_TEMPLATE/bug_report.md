@@ -12,5 +12,6 @@ labels: bug
 
 **Environment**
 - Claude Code version:
+- T3 Code version:
 - deliver version:
 - OS:

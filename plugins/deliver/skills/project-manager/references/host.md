@@ -77,4 +77,5 @@ verify again. Never push without the user's request. `unwatch_pull_request` once
 - Running-app evidence comes from `preview_*` or `device_*`, used by the verifier or a builder
   asked for evidence. Screenshots go under `docs/evidence/<story-id>/`.
 - Anything only the user can give, a token, login or pairing code, comes through `request_secret`.
-  Never put a secret in a file, a brief or the log.
+  Never put a secret in a file, a brief or the log. Every soul tells its child to stop and ask for
+  one; answer with only what `request_secret` returns (a `secretRef`, or a `delivery: "file"` path).
