@@ -1,8 +1,8 @@
 # deliver
 
 A Claude Code plugin marketplace: `plugins/deliver` (the T3-first project manager skill) and
-`plugins/poteto` (Lauren Tan's pstack skills, MIT). The plugin is prose and templates plus one
-script, `log.sh`.
+`plugins/poteto` (Lauren Tan's pstack skills, MIT). The plugin is prose and templates plus two
+scripts, `log.sh` and `scan-secrets.sh`.
 
 ## Commands
 - Test: `N/A`
@@ -16,6 +16,8 @@ script, `log.sh`.
 - `plugins/deliver/commands/`: pm, resume, doctor, retro, codex, skeleton.
 - `plugins/deliver/templates/`: the artifacts the PM creates in a project.
 - `plugins/deliver/scripts/log.sh`: appends a timestamped line to a project's `docs/log.md`.
+- `plugins/deliver/scripts/scan-secrets.sh`: blocks token formats in added lines; the project's
+  pre-push hook and the PM's merge-time check.
 - `plugins/poteto/`: the ported pstack skills, with their LICENSE and attribution.
 - `docs/specs/`, `docs/plans/`: this repo's design (`YYYY-MM-DD-vX.Y-topic.md`).
   `docs/research/`: research reports. `docs/prior-art.md`: what the design draws on.
@@ -30,9 +32,10 @@ There is no automated validation. A reviewer checks these by hand on every chang
 - The model ids in `roles.md` exist in `orchestrator_capabilities`, and the Opus roles use
   `claude-opus-5-5`, never a moving alias.
 - poteto keeps its MIT LICENSE and attribution.
-- `log.sh` stays the only code in the plugin, and stays executable with LF line endings.
+- `log.sh` and `scan-secrets.sh` are the only code in the plugin, both executable with LF line
+  endings.
 - New CHANGELOG entries go on top; everything below stays as written.
 
 ## Gotchas
 - `plugin.json` version must equal the top CHANGELOG heading.
-- `.gitattributes` pins `*.sh` to LF for `log.sh`; Windows checkouts rely on it.
+- `.gitattributes` pins `*.sh` to LF for `log.sh` and `scan-secrets.sh`; Windows checkouts rely on it.

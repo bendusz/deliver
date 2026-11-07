@@ -65,7 +65,8 @@ Call it again only after a dispatch error or a provider change the user names.
 
 ## PR mode
 Only when the user asks for real PRs, `gh auth status` succeeds and a GitHub remote exists. Push
-the story branch, open the PR with the merge body `loop.md` gives, then `link_pull_request` and
+the story branch through the pre-push scan; a block is escalated to the user, never bypassed with
+`--no-verify`. Open the PR with the merge body `loop.md` gives, then `link_pull_request` and
 `watch_pull_request`. A wake is news, not a merge decision: re-run the gates locally. Merge only
 on passing gates and a recorded `verifier: PASS <sha>` whose sha is the PR head; if the head moved,
 verify again. Never push without the user's request. `unwatch_pull_request` once the PR closes:

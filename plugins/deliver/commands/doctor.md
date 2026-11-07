@@ -1,5 +1,5 @@
 ---
-description: Check readiness before implementation, covering the T3 host, the toolchain, whether the project's gates pass, Codex availability and log.sh.
+description: Check readiness before implementation, covering the T3 host, the toolchain, whether the project's gates pass, Codex availability, log.sh and the pre-push secret scan.
 ---
 
 Use the `project-manager` skill to run a readiness check. Install or upgrade nothing, and write no
@@ -33,6 +33,14 @@ Check, in order, each with its evidence:
    hard rule that the reviewer is never the builder.
 5. **Decision log**, `OK` or `MISSING`. `"${CLAUDE_PLUGIN_ROOT}/scripts/log.sh"` exists and is
    executable (`test -x`). Do not call it: a call writes a line.
+6. **Secret scan**, `OK`, `MISSING`, `OUTDATED` or `BYPASSED`. If `git config core.hooksPath`
+   prints a path, `BYPASSED`: git ignores the pre-push hook below; name the path and ask the user
+   how to wire the scan in. Else check `pre-push` in the `hooks` directory of
+   `git rev-parse --git-common-dir`. `OK`: executable and byte-equal (`cmp`) to
+   `"${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh"`. `OUTDATED`: it has the
+   `# deliver secret-scan pre-push` line but differs; offer to refresh it with that copy.
+   `MISSING`: absent, not executable, or another hook without that line (show it; never replace it
+   unasked). Install it as `references/planning.md` `## 5. Scaffold, after sign-off` says.
 
-End with a one-line verdict: ready only when the host, toolchain, Codex and log checks are `OK` and every gate
-is `PASS` or `N/A`. Otherwise name the blockers and what each needs.
+End with a one-line verdict: ready only when the host, toolchain, Codex, log and secret scan
+checks are `OK` and every gate is `PASS` or `N/A`. Otherwise name the blockers and what each needs.

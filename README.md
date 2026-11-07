@@ -9,6 +9,13 @@ implementation code itself.
 and stops if T3 is not there. The default workflow needs Codex for the opposite-family review and
 for bounded builds. You may name other models for any dispatch.
 
+**Secrets stay on the machine.** A secret comes in through T3's `request_secret`, never a file.
+On the way out, the PM installs a git pre-push hook that scans every pushed commit for
+high-confidence token formats (cloud and API keys, tokens, JWTs, private keys), and scans each
+story's diff before merging it. A hit blocks the push or merge and names the file, never the value.
+It lives in git, so it covers every agent and provider. Agents never bypass it; only you may, with
+`git push --no-verify`.
+
 ## Install
 
 Run these two steps separately. Submit the first, wait for it to finish, then run the second. If you
@@ -61,7 +68,7 @@ Each role is a short "soul" pasted into a T3 `delegate_task`; its default model 
 |---|---|
 | `/deliver:pm` | Act as the PM end to end: plan, sign-off, stories, loop, ship. |
 | `/deliver:resume` | Pick up from git, the approval record, the story Execution blocks and the log. |
-| `/deliver:doctor` | Check the T3 host, the toolchain, the project's gates, Codex and `log.sh`. |
+| `/deliver:doctor` | Check the T3 host, the toolchain, the project's gates, Codex, `log.sh` and the secret scan. |
 | `/deliver:retro` | Run the sprint boundary's cross-story review and retrospective. |
 | `/deliver:codex` | `review` a commit, worktree, branch or codebase with Codex, or `ask` it a question. |
 | `/deliver:skeleton` | Write or extend the SpecDD skeleton for a sprint. |

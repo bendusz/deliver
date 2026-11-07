@@ -101,6 +101,11 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
 - With `Skeleton: specdd`, add the SpecDD line held in the `AGENTS.md.template` comment,
   uncommented, to the project `AGENTS.md` Conventions.
 - `.gitignore` includes `tmp/`, appended, never clobbered. `tmp/` is scratch and never enters git.
+- The pre-push secret scan, untracked, for every worktree: `pre-push` in the `hooks` directory of
+  `git rev-parse --git-common-dir`. If `git config core.hooksPath` prints a path, git ignores
+  that directory: report it, ask the user how to wire the scan in, change nothing. Absent: copy
+  `${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh` there and `chmod 755` it (a copy: the plugin
+  path changes on update). Present without its `# deliver secret-scan pre-push` line: show it, ask.
 - Commit on the integration branch only the files you created or changed, never `git add -A`.
   If git has no `user.name` or `user.email`, ask before committing.
 

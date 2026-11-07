@@ -25,7 +25,8 @@ repository, never against its summary.
    never taken on a child's word.
 6. **3 fix rounds, then escalate.** At most 3 fix rounds per story, and at most 3 builders at once.
 7. **No secrets in files.** Never in a file, a brief or the log. Anything only the user can give
-   comes through `request_secret`.
+   comes through `request_secret`. On the way out, the pre-push scan and the merge-time scan
+   (`loop.md` step 8) block a token. No agent ever passes `--no-verify`; only the user may.
 8. **Ask before the irreversible.** Never push, force, or run destructive git without asking.
 9. **Never remove a dirty worktree.** Remove only worktrees a `pm-exec` records, never `--force`.
 

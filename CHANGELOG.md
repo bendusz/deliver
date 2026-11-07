@@ -14,7 +14,7 @@ a diff the user can read and revert. The design is `docs/specs/2026-11-07-v1.0-b
   into each T3 `delegate_task`, since a T3 child sees only its task text.
 - **Hooks.** The whole `hooks/` directory: the sign-off, verified-merge and secrets guards and the
   session-start hook. Sign-off is now a conversation step recorded in `docs/approval.json`, and
-  no secrets in files stays a hard rule in prose.
+  the git secret scan below replaces the write-time secrets guard.
 - **Scripts and code.** The Codex runner, `holdout.mjs`, `test-integrity.mjs`, `retro-stats.mjs`,
   `assurance.mjs`, `agent-evals.mjs`, the builder benchmark scorer, both schemas and every
   node:test suite. Codex now runs as a T3 child.
@@ -39,8 +39,17 @@ a diff the user can read and revert. The design is `docs/specs/2026-11-07-v1.0-b
   codex-review (`/deliver:codex review`) and codex-help (`/deliver:codex ask`).
 - **A tracked decision log.** `docs/log.md`, appended only through `scripts/log.sh` (one
   `YYYY-MM-DD HH:MM  <message>` line, with a message of at most 100 characters) and committed
-  with the PM's next commit. It replaces the gitignored `tmp/log.md`. `log.sh` is the plugin's
-  only code.
+  with the PM's next commit. It replaces the gitignored `tmp/log.md`.
+- **A secret scan in git.** Passwords and keys must not leave the machine. `scripts/scan-secrets.sh`
+  blocks added lines that carry a high-confidence token format (AWS access key, private key
+  header, GitHub, Slack, `sk-` API key, Google API key, JWT) and names the file and line or commit
+  and the pattern, never the value. The PM installs it as the project's pre-push hook at scaffold,
+  where it scans every pushed commit, and runs it on each story's diff before the merge;
+  `/deliver:doctor` reports the hook as current, missing, outdated or bypassed by
+  `core.hooksPath`. It runs in git, so it covers every agent and provider. No agent passes
+  `--no-verify`; only the user may. Credential-assignment patterns are not ported: they caused
+  most false positives. Secrets coming in still go through `request_secret`. `log.sh` and
+  `scan-secrets.sh` are the plugin's only code.
 - **SpecDD is optional** and off by default (`Skeleton: none` in the plan).
 - **Conventions by hand.** With `validate.sh` gone, `AGENTS.md` lists the checks a reviewer makes.
 
