@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # deliver secret-scan pre-push
-# scan-secrets.sh <rev-range>: scan the lines `git diff <rev-range>` adds for token formats.
+# scan-secrets.sh <rev-range>: scan the lines `git diff <rev-range>` adds for token formats, and
+# for an A..B or A...B range also each commit B has that A lacks, so history is covered too.
 # scan-secrets.sh --pre-push <remote> <url>: the git pre-push hook contract, scanning each pushed
 # commit. A copy of this file installed as the pre-push hook runs in this mode.
 # Exit 0 clean, 1 on a hit, 2 on a usage or git error. Never prints a matched value.
@@ -17,11 +18,12 @@ trap 'rm -rf "$tmp"' EXIT
 : > "$tmp/loc"; : > "$tmp/txt"
 
 # added <label> <diff args>: append each added line to txt, and to loc its file:line, or
-# file:<label> when a label is given.
+# file:<label> when a label is given. --text and dropping NULs keep binary files in the scan.
 added() {
   local label=$1; shift
-  git diff --no-color --no-ext-diff --no-textconv -U0 --src-prefix=a/ --dst-prefix=b/ "$@" -- \
-    > "$tmp/diff" 2>/dev/null || die "bad revision or range: $*"
+  git diff --no-color --no-ext-diff --no-textconv --text --no-renames --submodule=short -U0 \
+    --src-prefix=a/ --dst-prefix=b/ "$@" -- 2>/dev/null | tr -d '\000' > "$tmp/diff" \
+    || die "bad revision or range: $*"
   awk -v label="$label" -v loc="$tmp/loc" -v txt="$tmp/txt" '
     /^diff --git /{hdr=1; next}
     hdr && /^\+\+\+ /{f=substr($0,5); sub(/^"?b\//,"",f); sub(/"$/,"",f); next}
@@ -29,9 +31,16 @@ added() {
     !hdr && /^\+/{print f ":" (label=="" ? n : label) >> loc; print substr($0,2) >> txt; n++}
   ' "$tmp/diff"
 }
+# each <sha>...: scan each commit against its first parent, a root commit against the empty tree.
+each() {
+  local c p; for c in "$@"; do
+    p=$(git rev-parse -q --verify "$c^1" 2>/dev/null) || p=$(git hash-object -t tree /dev/null)
+    added "${c:0:12}" "$p" "$c"
+  done
+}
 
 if [ "${1:-}" = --pre-push ]; then
-  mode=push; empty=$(git hash-object -t tree /dev/null)
+  mode=push
   while read -r _ lsha _ rsha; do
     case $lsha in *[!0]*) ;; *) continue ;; esac  # a delete pushes no content
     case $rsha in *[!0]*) git cat-file -e "$rsha^{commit}" 2>/dev/null || rsha=0 ;; esac
@@ -39,13 +48,11 @@ if [ "${1:-}" = --pre-push ]; then
       *[!0]*) commits=$(git rev-list "$rsha..$lsha") || die "cannot list $rsha..$lsha" ;;
       *) commits=$(git rev-list "$lsha" --not --remotes) || die "cannot list commits of $lsha" ;;
     esac
-    for c in $commits; do
-      p=$(git rev-parse -q --verify "$c^1" 2>/dev/null) || p=$empty
-      added "${c:0:12}" "$p" "$c"
-    done
+    each $commits
   done
 elif [ "$#" -eq 1 ] && [ "${1#-}" = "$1" ]; then
   mode=merge; added "" "$1"
+  case $1 in *..*) commits=$(git rev-list --right-only "$1") || die "bad range: $1"; each $commits ;; esac
 else
   die "usage: scan-secrets.sh <rev-range> | --pre-push <remote> <url>"
 fi

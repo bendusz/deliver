@@ -44,7 +44,8 @@ a diff the user can read and revert. The design is `docs/specs/2026-11-07-v1.0-b
   blocks added lines that carry a high-confidence token format (AWS access key, private key
   header, GitHub, Slack, `sk-` API key, Google API key, JWT) and names the file and line or commit
   and the pattern, never the value. The PM installs it as the project's pre-push hook at scaffold,
-  where it scans every pushed commit, and runs it on each story's diff before the merge;
+  where it scans every pushed commit, and runs it on each story's diff and commits before the
+  merge. Binary files and files marked binary in `.gitattributes` are scanned as text.
   `/deliver:doctor` reports the hook as current, missing, outdated or bypassed by
   `core.hooksPath`. It runs in git, so it covers every agent and provider. No agent passes
   `--no-verify`; only the user may. Credential-assignment patterns are not ported: they caused
