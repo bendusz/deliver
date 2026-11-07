@@ -1,1 +1,0 @@
-// Contact search helpers.

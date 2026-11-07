@@ -1,1 +1,0 @@
-// Course enrollment helpers.

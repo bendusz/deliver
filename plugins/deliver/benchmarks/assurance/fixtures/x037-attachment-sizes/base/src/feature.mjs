@@ -1,1 +1,0 @@
-// Attachment sizes helpers.
