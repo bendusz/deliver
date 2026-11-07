@@ -5,11 +5,11 @@ Run when every story in the sprint is `merged`, or `blocked` and escalated, or o
 ## 1. Cross-story review
 - Range: `git diff <from>...<to>`, from the parent of the sprint's first story merge to its last
   (`git log --first-parent --merges` on the integration branch).
-- Dispatch one reviewer soul (`host.md` `## Dispatch`, `isolation: "shared"` on the main
-  checkout) with that range, the plan's Architecture section and the sprint's story files. Each
-  retro's key is fresh, `S<n>-retro-reviewer-<YYYYMMDDHHMM>`; reuse one only to retry a lost
-  response. Ask only for what no single story review could see: logic duplicated across stories,
-  a convention two stories read differently, an interface one changed and another still assumes.
+- Dispatch one reviewer soul (`host.md` `## Dispatch`, `isolation: "shared"`, main checkout)
+  with that range, the plan's Architecture and the sprint's stories. Key `S<n>-retro-reviewer-<k>`,
+  `k` = 1 + the `S<n> retro review` lines in `docs/log.md`; log that line at dispatch. Reuse a key
+  only to retry a lost response. Ask only for what no single story review could see: logic
+  duplicated across stories, a convention two read differently, an interface one changed.
   Over about 1,500 changed lines, add `focus: design`.
 - Triage as `loop.md` step 6. A `block` or `major` becomes a fix story at the head of the next
   sprint, never a silent edit on the integration branch.
