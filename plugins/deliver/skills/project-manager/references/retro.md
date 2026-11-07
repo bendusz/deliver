@@ -9,8 +9,8 @@ Run when every story in the sprint is `merged`, or `blocked` and escalated, or o
   with that range, the plan's Architecture and the sprint's stories. Key `S<n>-retro-reviewer-<k>`,
   `k` = 1 + the `S<n> retro review` lines in `docs/log.md`; log that line at dispatch. Reuse a key
   only to retry a lost response. Ask only for what no single story review could see: logic
-  duplicated across stories, a convention two read differently, an interface one changed.
-  Over about 1,500 changed lines, add `focus: design`.
+  duplicated across stories, a convention two read differently, an interface one story changed
+  while another still assumes the old one. Over about 1,500 changed lines, add `focus: design`.
 - Triage as `loop.md` step 6. A `block` or `major` becomes a fix story at the head of the next
   sprint, never a silent edit on the integration branch.
 
