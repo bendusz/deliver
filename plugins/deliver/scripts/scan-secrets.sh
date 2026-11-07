@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # deliver secret-scan pre-push
 # scan-secrets.sh <base>..<branch>: scan every commit in the range for token formats.
-# scan-secrets.sh --pre-push <remote> <url>: the git pre-push hook contract; scans every pushed
-# commit not already on <remote>. A copy of this file installed as the pre-push hook runs this way.
+# scan-secrets.sh --pre-push <remote> <url>: the git pre-push hook contract; scans each pushed
+# commit the destination lacks per ls-remote, or every reachable one if ls-remote fails. A copy
+# of this file installed as the pre-push hook runs this way.
 # Each commit is diffed as text against its first parent (a root commit against the empty tree),
 # and only added lines and paths are matched. Exit 0 clean, 1 on a hit, 2 on any usage, git or
 # matcher error, so an error blocks too. Prints commit, file, line and pattern, never a value.
@@ -21,21 +22,24 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/scan-secrets.XXXXXX") || die "cannot create a t
 trap 'rm -rf "$tmp"' EXIT
 : > "$tmp/lines"; : > "$tmp/hits"
 
-# scan <sha>...: for each commit, append "<sha12>:<file>:<line><TAB><added text>" per added line,
-# and "<sha12>:<file>:path<TAB><file>" per changed file. Content git will not show as text blocks.
+# scan <sha>...: append "<sha12>:<file>:<line><TAB><text>" per added line, and "<sha12>:<path>:path
+# <TAB><path>" per added or changed path (empty files too). Control bytes but tab and newline become
+# spaces, so they still separate. Content git will not show as text blocks.
+gd=(git -c diff.relative=false -c core.quotePath=true diff --no-color --no-ext-diff --no-renames)
 scan() {
   local c p
   for c in "$@"; do
     p=$(git rev-parse -q --verify "$c^1" 2>/dev/null) || p=$empty
-    git -c diff.relative=false -c core.quotePath=true diff --no-color --no-ext-diff \
-      --no-textconv --text --no-renames --submodule=short -U0 --inter-hunk-context=0 \
-      --src-prefix=a/ --dst-prefix=b/ "$p" "$c" -- 2>/dev/null | tr -d '\000' > "$tmp/diff" \
-      || die "cannot diff commit $c"
+    "${gd[@]}" --name-only -z --diff-filter=d "$p" "$c" -- 2>/dev/null | tr '\001-\037\177' ' ' \
+      | tr '\000' '\n' | awk -v c="${c:0:12}" '{print c ":" $0 ":path\t" $0}' >> "$tmp/lines" \
+      || die "cannot list the paths of commit $c"
+    "${gd[@]}" --no-textconv --text --submodule=short -U0 --inter-hunk-context=0 \
+      --src-prefix=a/ --dst-prefix=b/ "$p" "$c" -- 2>/dev/null \
+      | tr '\000-\010\013-\037\177' ' ' > "$tmp/diff" || die "cannot diff commit $c"
     awk -v c="${c:0:12}" '
       /^diff --git /{hdr=1; next}
       hdr && /^(Binary files |GIT binary patch)/{exit 3}
-      hdr && /^\+\+\+ "?b\//{f=substr($0,5); sub(/\t$/,"",f); sub(/^"?b\//,"",f); sub(/"$/,"",f)
-        print c ":" f ":path\t" f; next}
+      hdr && /^\+\+\+ "?b\//{f=substr($0,5); sub(/\t$/,"",f); sub(/^"?b\//,"",f); sub(/"$/,"",f); next}
       /^@@ /{hdr=0; split($3,a,","); n=substr(a[1],2)+0; next}
       hdr{next}
       /^\+/{print c ":" f ":" n "\t" substr($0,2); n++; next}
@@ -45,12 +49,17 @@ scan() {
 }
 
 if [ "${1:-}" = --pre-push ] && [ "$#" -ge 2 ]; then
-  mode=push; remote=$2
-  while read -r _ lsha _ rsha; do
+  mode=push; : > "$tmp/excl"
+  # Exclude only what the destination really has: the shas it advertises that exist here. If it
+  # cannot be listed, exclude nothing (fail closed on safety, not on availability).
+  if git ls-remote "${3:-$2}" < /dev/null > "$tmp/remote" 2>/dev/null; then
+    cut -f1 "$tmp/remote" | sort -u | sed 's/$/^{commit}/' \
+      | git cat-file --batch-check='%(objectname)' | awk '/^[0-9a-f]+$/{print "^" $0}' \
+      > "$tmp/excl" || die "cannot check the destination's refs"
+  fi
+  while read -r _ lsha _ _; do
     case $lsha in *[!0]*) ;; *) continue ;; esac  # a delete pushes no content
-    known=; case $rsha in *[!0]*) git cat-file -e "$rsha^{commit}" 2>/dev/null && known=$rsha ;; esac
-    # Exclude only history already on the destination; with none known, scan all of it.
-    commits=$(git rev-list "$lsha" --not ${known:+"$known"} --remotes="$remote" --) \
+    commits=$( { echo "$lsha"; cat "$tmp/excl"; } | git rev-list --stdin) \
       || die "cannot list the commits of $lsha"
     scan $commits
   done
