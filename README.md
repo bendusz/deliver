@@ -5,9 +5,9 @@ delivers the work through T3 child agents: builders write the code, a reviewer f
 family checks it, a verifier signs it off, and the PM runs the gates and merges. It never writes
 implementation code itself.
 
-**Requirements.** deliver requires T3 Code. It dispatches every role through
-T3, and stops if T3 is not there. Codex in T3 is used for the opposite-family review and for
-bounded builds; without it, those defaults move to a Claude model.
+**Requirements.** T3 Code, with Codex available in T3. deliver dispatches every role through T3
+and stops if T3 is not there. The default workflow needs Codex for the opposite-family review and
+for bounded builds. You may name other models for any dispatch.
 
 ## Install
 
@@ -26,30 +26,26 @@ paste both at once, the second line gets swallowed into the first command's argu
 /plugin install deliver@deliver
 ```
 
-Use the full `https://` URL above. The `owner/repo` shorthand resolves to SSH, which fails on
-machines without a GitHub SSH key. If the plugin does not appear right away, restart the session.
+Use the full `https://` URL; the `owner/repo` shorthand resolves to SSH, which fails without a
+GitHub SSH key. If the plugin does not appear right away, restart the session.
 
 ## Use
 
-Describe the work ("act as my PM to build a CLI todo app"), or run `/deliver:pm build a CLI todo app`.
+Describe the work ("act as my PM to build a CLI todo app") or run `/deliver:pm <request>`.
 
-1. **Plan.** The PM talks the need through with you, writes `docs/plan.md` (and `docs/spec.md`
-   when the work will outlive the plan), and iterates until you are happy.
-2. **Sign-off, in conversation.** Nothing is built until you say "approved". The PM records it in
-   `docs/approval.json`.
-3. **Stories.** Each sprint becomes self-contained story files under `docs/stories/`, tracing to
-   the plan's requirement IDs.
-4. **Per-story loop on T3.** Claim, tests first, build in a T3 worktree, gate, review, at most
-   three fix rounds, verify. Up to three independent stories build at once.
-5. **Ship.** A `--no-ff` merge whose body is the story's record, or a real PR when you ask for one.
-   Each sprint ends with a retro that proposes `AGENTS.md` learnings as a diff.
-
-Size follows the work: a one-story fix gets a short plan and the loop, with no spec, sprints or retro.
+1. **Plan.** The PM talks it through with you and writes `docs/plan.md`, plus `docs/spec.md` when
+   the work will outlive the plan.
+2. **Sign-off, in conversation.** Nothing is built until you say "approved", recorded in `docs/approval.json`.
+3. **Stories.** Each sprint becomes self-contained files under `docs/stories/`, tracing to the plan's IDs.
+4. **Per-story loop on T3.** Claim, tests first, build in a T3 worktree, gate, review, at most three
+   fix rounds, verify. Up to three independent stories build at once.
+5. **Ship.** A `--no-ff` merge whose body is the story's record, or a PR when you ask. Each sprint
+   ends with a retro that proposes `AGENTS.md` learnings as a diff. A one-story fix skips the spec,
+   sprints and retro.
 
 ## Roles
 
-Each role is a short "soul" the PM pastes into a T3 `delegate_task`, with a recommended model the PM
-may override per task.
+Each role is a short "soul" pasted into a T3 `delegate_task`; its default model is a recommendation.
 
 | Role | Does | Default |
 |---|---|---|
@@ -73,24 +69,18 @@ may override per task.
 ## State and the decision log
 
 Git is the record: the claim, each status change and the merge are commits. `docs/log.md` is the
-decision log: one timestamped line per decision, with the why, appended only through the bundled
-`scripts/log.sh` and committed with the PM's next commit, so months later you can see what was
-decided and why.
-
-SpecDD is optional and off by default. Say you want it during planning and the plan's
-`Skeleton:` becomes `specdd`, so each sprint gets its `.sdd` contracts before any code.
-
-Projects started on 0.29 or earlier leave some old files behind; see the 0.30.0 entry in
-[CHANGELOG.md](CHANGELOG.md) for the cleanup commands.
+decision log, one timestamped line per decision with the why, appended only through the bundled
+`scripts/log.sh` and committed with the PM's next commit. SpecDD is optional and off by default:
+opt in during planning and each sprint gets its `.sdd` contracts before any code. Projects started
+on 0.29 or earlier: see the 0.30.0 entry in [CHANGELOG.md](CHANGELOG.md) for cleanup commands.
 
 ## poteto
 
 `/plugin install poteto@deliver` adds Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack)
-engineering skills (`how`, `why`, `architect`, `arena`, `interrogate`, `blast-radius`, `unslop`,
-verification-skill generators and 24 principles), ported to Claude Code under her MIT license.
-deliver uses them when present and works without them. See [`plugins/poteto/README.md`](plugins/poteto/README.md).
+skills (`how`, `why`, `architect`, `arena`, `interrogate`, `blast-radius`, `unslop`, verification-skill
+generators and 24 principles), ported to Claude Code under her MIT license. deliver uses them when
+present and works without them. See [`plugins/poteto/README.md`](plugins/poteto/README.md).
 
 ## License
 
-GPL-3.0-or-later; see [LICENSE](LICENSE). Copyright (c) 2026 bendusz. The `poteto` plugin stays
-under its own MIT license.
+GPL-3.0-or-later; see [LICENSE](LICENSE). Copyright (c) 2026 bendusz. `poteto` stays under MIT.

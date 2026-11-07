@@ -38,8 +38,9 @@ a diff the user can read and revert. The design is `docs/specs/2026-11-07-v1.0-b
 - **Six commands.** `pm`, `resume`, `doctor`, `retro`, `skeleton`, and `codex`, which merges
   codex-review (`/deliver:codex review`) and codex-help (`/deliver:codex ask`).
 - **A tracked decision log.** `docs/log.md`, appended only through `scripts/log.sh` (one
-  `YYYY-MM-DD HH:MM  <message>` line, at most 100 characters) and committed with the PM's next
-  commit. It replaces the gitignored `tmp/log.md`. `log.sh` is the plugin's only code.
+  `YYYY-MM-DD HH:MM  <message>` line, with a message of at most 100 characters) and committed
+  with the PM's next commit. It replaces the gitignored `tmp/log.md`. `log.sh` is the plugin's
+  only code.
 - **SpecDD is optional** and off by default (`Skeleton: none` in the plan).
 - **Conventions by hand.** With `validate.sh` gone, `AGENTS.md` lists the checks a reviewer makes.
 
