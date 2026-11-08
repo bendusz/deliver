@@ -1,6 +1,6 @@
 # Prior art and references
 
-The design of deliver was validated against the work below. The current design is in
+The design of bstack (formerly deliver) was validated against the work below. The current design is in
 `docs/specs/2026-11-07-v1.0-bstack-redesign.md`; earlier design history is in git (tag v0.29.4).
 
 ## Foundations (Anthropic)

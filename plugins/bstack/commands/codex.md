@@ -3,13 +3,13 @@ description: Get an independent Codex review of the last commit, the worktree, t
 ---
 
 Use the `project-manager` skill's host rules: probe as `references/host.md` `## Probe` says
-(without T3 Code, say "deliver requires T3 Code" and stop), and dispatch as its `## Dispatch`
+(without T3 Code, say "bstack requires T3 Code" and stop), and dispatch as its `## Dispatch`
 says. Never review the code or answer the question yourself, and never run the `codex` CLI.
 
 Arguments: $ARGUMENTS
 
 ## review
-`/deliver:codex review [last-commit|worktree|branch|codebase] [objective…]`
+`/bstack:codex review [last-commit|worktree|branch|codebase] [objective…]`
 
 - **Scope**, default `worktree`:
   - `last-commit`: `git diff HEAD~1..HEAD`.
@@ -48,7 +48,7 @@ Relay each verdict and the most severe findings across the reports, attributed (
 step 6 does before anything goes to a builder.
 
 ## ask
-`/deliver:codex ask <question>`
+`/bstack:codex ask <question>`
 
 - An empty question: ask the user what they want Codex's opinion on.
 - Codex knows nothing of this conversation, so make the question a self-contained brief: the

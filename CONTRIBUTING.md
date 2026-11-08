@@ -1,6 +1,6 @@
-# Contributing to deliver
+# Contributing to bstack
 
-deliver is prose and templates plus two scripts in `plugins/deliver/scripts/`, `log.sh` and
+bstack is prose and templates plus two scripts in `plugins/bstack/scripts/`, `log.sh` and
 `scan-secrets.sh`. A contribution is almost always a prose change: a reference, a command, a
 role's soul or a template.
 

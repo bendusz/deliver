@@ -1,11 +1,11 @@
-# deliver, a project manager skill for T3 Code
+# bstack, a project manager skill for T3 Code
 
 Claude acts as the project manager. It agrees a plan with you, waits for your sign-off, then
 delivers the work through T3 child agents: builders write the code, a reviewer from the other model
 family checks it, a verifier signs it off, and the PM runs the gates and merges. It never writes
 implementation code itself.
 
-**Requirements.** T3 Code, with Codex available in T3. deliver dispatches every role through T3
+**Requirements.** T3 Code, with Codex available in T3. bstack dispatches every role through T3
 and stops if T3 is not there. The default workflow needs Codex for the opposite-family review and
 for bounded builds. You may name other models for any dispatch.
 
@@ -25,13 +25,13 @@ paste both at once, the second line gets swallowed into the first command's argu
 **1. Add the marketplace**
 
 ```
-/plugin marketplace add https://github.com/bendusz/deliver
+/plugin marketplace add https://github.com/bendusz/bstack
 ```
 
 **2. Install the plugin**
 
 ```
-/plugin install deliver@deliver
+/plugin install bstack@bstack
 ```
 
 Use the full `https://` URL; the `owner/repo` shorthand resolves to SSH, which fails without a
@@ -39,7 +39,7 @@ GitHub SSH key. If the plugin does not appear right away, restart the session.
 
 ## Use
 
-Describe the work ("act as my PM to build a CLI todo app") or run `/deliver:pm <request>`.
+Describe the work ("act as my PM to build a CLI todo app") or run `/bstack:pm <request>`.
 
 1. **Plan.** The PM talks it through with you and writes `docs/plan.md`, plus `docs/spec.md` when
    the work will outlive the plan.
@@ -67,12 +67,12 @@ Each role is a short "soul" pasted into a T3 `delegate_task`; its default model 
 
 | Command | What it does |
 |---|---|
-| `/deliver:pm` | Act as the PM end to end: plan, sign-off, stories, loop, ship. |
-| `/deliver:resume` | Pick up from git, the approval record, the story Execution blocks and the log. |
-| `/deliver:doctor` | Check the T3 host, the toolchain, the project's gates, Codex, `log.sh` and the secret scan. |
-| `/deliver:retro` | Run the sprint boundary's cross-story review and retrospective. |
-| `/deliver:codex` | `review` a commit, worktree, branch or codebase with Codex, or `ask` it a question. |
-| `/deliver:skeleton` | Write or extend the SpecDD skeleton for a sprint. |
+| `/bstack:pm` | Act as the PM end to end: plan, sign-off, stories, loop, ship. |
+| `/bstack:resume` | Pick up from git, the approval record, the story Execution blocks and the log. |
+| `/bstack:doctor` | Check the T3 host, the toolchain, the project's gates, Codex, `log.sh` and the secret scan. |
+| `/bstack:retro` | Run the sprint boundary's cross-story review and retrospective. |
+| `/bstack:codex` | `review` a commit, worktree, branch or codebase with Codex, or `ask` it a question. |
+| `/bstack:skeleton` | Write or extend the SpecDD skeleton for a sprint. |
 
 ## State and the decision log
 
@@ -84,9 +84,9 @@ on 0.29 or earlier: see the 0.30.0 entry in [CHANGELOG.md](CHANGELOG.md) for cle
 
 ## poteto
 
-`/plugin install poteto@deliver` adds Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack)
+`/plugin install poteto@bstack` adds Lauren Tan's [pstack](https://github.com/cursor/plugins/tree/main/pstack)
 skills (`how`, `why`, `architect`, `arena`, `interrogate`, `blast-radius`, `unslop`, verification-skill
-generators and 24 principles), ported to Claude Code under her MIT license. deliver uses them when
+generators and 24 principles), ported to Claude Code under her MIT license. bstack uses them when
 present and works without them. See [`plugins/poteto/README.md`](plugins/poteto/README.md).
 
 ## License

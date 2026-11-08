@@ -3,7 +3,7 @@
 Off by default. It runs only when `docs/plan.md` says `Skeleton: specdd`: once per sprint, after
 sign-off and the scaffold, before that sprint's decomposition (`planning.md` step 6). It writes
 the sprint's `.sdd` contracts, the shape of the code, before any code exists. Sprint 1 also gets
-the root spec and `.specdd/bootstrap.md`; later sprints extend the tree. `/deliver:skeleton` runs
+the root spec and `.specdd/bootstrap.md`; later sprints extend the tree. `/bstack:skeleton` runs
 it on demand.
 
 ## Bootstrap

@@ -19,4 +19,4 @@ Check the real thing, not a proxy:
 
 The strongest proof is a deterministic script that re-runs the same comparison, not a one-time eyeball. Write the script, run it, and keep its output as an artifact a reviewer can re-run instead of trusting your word.
 
-Keep the artifact visible for the human. Commit it only for large or complex work where the trail has to be auditable later, like a big port or migration (pstack's upstream `show-me-your-work` skill, not bundled here; under the deliver plugin the trail is the story's Execution block and the merge commit body).
+Keep the artifact visible for the human. Commit it only for large or complex work where the trail has to be auditable later, like a big port or migration (pstack's upstream `show-me-your-work` skill, not bundled here; under the bstack plugin the trail is the story's Execution block and the merge commit body).

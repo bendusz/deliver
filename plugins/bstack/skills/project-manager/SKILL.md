@@ -3,7 +3,7 @@ name: project-manager
 description: Use for end-to-end software project delivery under T3 Code, covering discovery, planning, sign-off, decomposition into stories, implementation, review, verification, and shipping. Acts as an autonomous technical project manager and delegates all code to T3 child agents.
 ---
 
-If you were dispatched as a child agent (your task begins 'You are a deliver … child'), do not use this skill.
+If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.
 
 # Project manager
 
@@ -31,9 +31,9 @@ repository, never against its summary.
 9. **Never remove a dirty worktree.** Remove only worktrees a `pm-exec` records, never `--force`.
 
 ## Host
-deliver requires T3 Code. At session start, load the tool with
+bstack requires T3 Code. At session start, load the tool with
 `ToolSearch select:mcp__t3-code__orchestrator_capabilities` and probe as the host reference's
-`## Probe` says. If the tool is absent or the call fails, say "deliver requires T3 Code" and stop:
+`## Probe` says. If the tool is absent or the call fails, say "bstack requires T3 Code" and stop:
 plan nothing, dispatch nothing, write nothing. Every role is a `delegate_task` child; the native
 Explore agent is for quick read-only lookups only. Before every child brief, paste the relevant
 soul from the roles reference, from its first line through **Returns**, then the story or brief.
@@ -46,7 +46,7 @@ sprints that each deliver something usable, and a retro at each sprint boundary.
 only where a missed defect would cost more than the step.
 
 ## Operating rules
-- **Superpowers.** While deliver is active, its phases replace Superpowers' brainstorming,
+- **Superpowers.** While bstack is active, its phases replace Superpowers' brainstorming,
   writing-plans and subagent-driven-development. TDD, systematic-debugging and
   verification-before-completion remain compatible.
 - **Decide, then record.** Between checkpoints, make the reasonable call yourself and log it with
@@ -57,7 +57,7 @@ only where a missed defect would cost more than the step.
   decomposing the next sprint, unless the plan's `Between sprints:` is `autonomous`. Otherwise
   message the user when they ask or when you escalate; the log is the progress channel.
 - **Second opinion.** Before a consequential decision (an architecture choice, a risky refactor,
-  a stalled fix loop), ask Codex with `/deliver:codex ask`. Codex is one input; the call is yours.
+  a stalled fix loop), ask Codex with `/bstack:codex ask`. Codex is one input; the call is yours.
 - **Templates.** When a step creates an artifact, read its template from
   `${CLAUDE_PLUGIN_ROOT}/templates/`.
 
@@ -67,13 +67,13 @@ only where a missed defect would cost more than the step.
 2. `references/planning.md`: from the request to a signed-off plan, the scaffold and the first
    sprint's stories; again to decompose each later sprint, and for any change after sign-off.
 3. `references/skeleton.md`: only when the plan says `Skeleton: specdd`, once per sprint after
-   the scaffold and before that sprint's decomposition (`/deliver:skeleton`).
+   the scaffold and before that sprint's decomposition (`/bstack:skeleton`).
 4. `references/roles.md`: before every dispatch, for the soul you paste and its default model.
 5. `references/loop.md`: once a sprint's stories are committed, for each story from claim to ship.
 6. `references/retro.md`: when every story in the sprint is merged, or blocked and escalated
-   (`/deliver:retro`).
+   (`/bstack:retro`).
 7. `references/state.md`: for the approval record, the `pm-exec` Execution block and the log, and
-   to resume. If `docs/approval.json` exists at session start, resume from it (`/deliver:resume`).
+   to resume. If `docs/approval.json` exists at session start, resume from it (`/bstack:resume`).
 
-Commands: `/deliver:pm`, `/deliver:resume`, `/deliver:doctor`, `/deliver:retro`,
-`/deliver:codex`, `/deliver:skeleton`.
+Commands: `/bstack:pm`, `/bstack:resume`, `/bstack:doctor`, `/bstack:retro`,
+`/bstack:codex`, `/bstack:skeleton`.
