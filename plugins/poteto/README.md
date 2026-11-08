@@ -63,8 +63,7 @@ line and still applies on its own, because three other skills here rely on it. `
 Twenty-four principle skills, one rule each, named `principle-<slug>`. New in 0.15.17:
 `explain-the-number`, `attack-the-premise`, and `test-behavior-not-implementation`. You do not invoke them. You
 steer with their names ("use subtract before you add", "apply prove it works"), and `architect`,
-`arena`, `blast-radius`, and `interrogate` cite them. The bstack constitution template offers them
-as a menu a project can adopt.
+`arena`, `blast-radius`, and `interrogate` cite them.
 
 ## What was left out, and why
 
@@ -72,8 +71,8 @@ as a menu a project can adopt.
   on "never block on the human". The bstack entry point is built on "no implementation before
   sign-off". Two entry points with opposite rules in one session would fight.
 - `swarm`, `figure-it-out`, `show-me-your-work`, `recall`, `tdd`. Each duplicates something the
-  bstack plugin already provides (`parallel-execution`, the spec-plan-stories pipeline,
-  the story Execution blocks and merge commit bodies, `/resume`), or the Claude Code harness does, or would need a rewrite for a
+  bstack plugin already provides (parallel stories on T3, the spec-plan-stories pipeline,
+  the story Execution blocks, the decision log and merge commit bodies, `/resume`), or the Claude Code harness does, or would need a rewrite for a
   non-Cursor host.
 - `no-comments` and the Comment Sicko agent. A matter of taste, and it wants an agent file.
 - `automate-me`, `setup-pstack`, and the Benny automations. Cursor-specific mechanisms.
@@ -81,7 +80,7 @@ as a menu a project can adopt.
   for this port.
 
 Read them upstream. Several are worth borrowing ideas from even where they are not worth porting.
-The bstack PR body format and its handoff log audit came from there.
+The bstack PR and merge body format came from there.
 
 ## What changed for Claude Code
 

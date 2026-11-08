@@ -61,11 +61,11 @@ descriptions (the last still loads by `paths:` if the host honours it under that
 | Skill | Reason |
 |---|---|
 | `poteto-mode`, playbooks, `poteto-agent` | Orchestration entry point built on "never block on the human"; conflicts with bstack's sign-off gate. Also depends on `cursor-team-kit`, Graphite, Bugbot, `/goal`, and `mode: true` frontmatter. |
-| `swarm` | Built on Cursor cloud workers (`environment: "cloud"`); bstack's `parallel-execution.md` and the Claude Code harness cover the shape. |
+| `swarm` | Built on Cursor cloud workers (`environment: "cloud"`); bstack's parallel stories on T3 worktree children cover the shape. |
 | `figure-it-out` | bstack's spec, plan, and stories pipeline is the same role; depends on `poteto-mode` and `show-me-your-work`. |
-| `show-me-your-work` | A second decision trail next to bstack's own merge commit bodies; its log-audit idea moved into `/bstack:handoff`. |
-| `recall` | `/bstack:resume` and `/bstack:handoff` cover PM-managed work; needs the transcript-path patch for anything else. |
-| `tdd` | Conflicts in name and default with the superpowers TDD skill; bstack's `test-engineer` covers TDD-red. |
+| `show-me-your-work` | A second decision trail next to bstack's own merge commit bodies; bstack's decision log (`docs/log.md`) covers its log-audit idea. |
+| `recall` | `/bstack:resume` and T3 thread history cover PM-managed work; needs the transcript-path patch for anything else. |
+| `tdd` | Conflicts in name and default with the superpowers TDD skill; bstack's tests-first builder brief covers TDD-red. |
 | `no-comments`, Comment Sicko | Taste; needs an agent file. |
 | `automate-me`, `setup-pstack` | Cursor `create-skill` and `pstack-models.mdc` mechanisms. |
 | `correct`, `make-bot-ui`, `poteto-help` | Added upstream between 0.14.4 and 0.15.17; not evaluated for the port. `poteto-help` routes into `poteto-mode` and `setup-pstack`; `make-bot-ui` is Grok Bot webhook tooling. |
