@@ -93,7 +93,7 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
   layout, non-default conventions, gotchas), aiming at 30 to 40 lines. Replace every template
   comment rather than copying it, since Codex reads a comment as an instruction. Every child
   loads this file, so test each line: would removing it cause mistakes? Never copy procedure or
-  hard rules into it, nor a line saying the project runs on deliver.
+  hard rules into it, nor a line saying the project runs on bstack.
 - `CLAUDE.md` from `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.template`, the `@AGENTS.md` bridge.
   If `CLAUDE.md` exists without `AGENTS.md`, propose moving its content into a new `AGENTS.md`
   and making `CLAUDE.md` the bridge; show the diff and ask. If both exist and `CLAUDE.md` is not
@@ -105,7 +105,8 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
   `git rev-parse --git-common-dir`. If `git config core.hooksPath` prints a path, git ignores
   that directory: report it, ask the user how to wire the scan in, change nothing. Absent: copy
   `${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh` there and `chmod 755` it (a copy: the plugin
-  path changes on update). Present without its `# deliver secret-scan pre-push` line: show it, ask.
+  path changes on update). Present without its `# bstack secret-scan pre-push` line: show it, ask,
+  unless it has the old `# deliver secret-scan pre-push` line: ours, outdated; offer to refresh it.
 - Commit on the integration branch only the files you created or changed, never `git add -A`.
   If git has no `user.name` or `user.email`, ask before committing.
 

@@ -1,5 +1,5 @@
 {
-  "name": "deliver",
+  "name": "bstack",
   "description": "A project manager skill that orchestrates software delivery through T3 Code child roles.",
   "owner": {
     "name": "bendusz",
@@ -7,11 +7,11 @@
   },
   "plugins": [
     {
-      "name": "deliver",
-      "source": "./plugins/deliver",
+      "name": "bstack",
+      "source": "./plugins/bstack",
       "description": "Claude acts as a PM under T3 Code: plan, get sign-off, decompose into stories, and run build, review, verify and ship through T3 child roles.",
       "category": "workflow",
-      "homepage": "https://github.com/bendusz/deliver",
+      "homepage": "https://github.com/bendusz/bstack",
       "tags": [
         "skill",
         "project-management",
@@ -22,7 +22,7 @@
     {
       "name": "poteto",
       "source": "./plugins/poteto",
-      "description": "Lauren Tan's pstack engineering skills ported to Claude Code (MIT). Optional companion to deliver: design exploration, subsystem walkthroughs, multi-model review, blast-radius proofs, verification skills, unslop, 21 principles.",
+      "description": "Lauren Tan's pstack engineering skills ported to Claude Code (MIT). Optional companion to bstack: design exploration, subsystem walkthroughs, multi-model review, blast-radius proofs, verification skills, unslop, 21 principles.",
       "category": "workflow",
       "homepage": "https://github.com/cursor/plugins/tree/main/pstack",
       "tags": [

@@ -2,6 +2,37 @@
 
 All notable changes to this project are documented here.
 
+## 1.0.0 - 2026-11-08
+
+deliver is renamed bstack. The behaviour is the 0.30.0 behaviour; only the name changes.
+
+- **Plugin and marketplace.** Both are named `bstack`; the plugin lives in `plugins/bstack`.
+- **Commands.** `/deliver:*` becomes `/bstack:*`: `/bstack:pm`, `/bstack:resume`,
+  `/bstack:doctor`, `/bstack:retro`, `/bstack:codex` and `/bstack:skeleton`.
+- **Repository.** It moved to `bendusz/bstack`; the old `bendusz/deliver` URL redirects.
+- **Pre-push hook marker.** `scan-secrets.sh` now carries `# bstack secret-scan pre-push`.
+- **Reinstall.** Remove the old marketplace, which also uninstalls the `deliver` plugin (and
+  `poteto`, if you had it):
+
+  ```
+  /plugin marketplace remove deliver
+  ```
+
+  Then run these two steps separately, as the README says:
+
+  ```
+  /plugin marketplace add https://github.com/bendusz/bstack
+  ```
+
+  ```
+  /plugin install bstack@bstack
+  ```
+
+  Reinstall `poteto` with `/plugin install poteto@bstack` if you use it.
+- **Existing projects keep working.** Their files carry no plugin name, except an installed
+  pre-push hook with the old `# deliver secret-scan pre-push` marker. `/bstack:doctor` recognises
+  it as an outdated copy and offers to refresh it.
+
 ## 0.30.0 - 2026-11-07
 
 deliver is trimmed back to the PM discipline and becomes T3-first: it now requires T3 Code. Most

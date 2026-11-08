@@ -13,5 +13,5 @@ labels: bug
 **Environment**
 - Claude Code version:
 - T3 Code version:
-- deliver version:
+- bstack version:
 - OS:

@@ -46,7 +46,7 @@ differs. Keep it current.
 | `interrogate` | `SKILL.md` | 1, 2, 3 | Reviewer table `opus` / `sonnet` on `Explore`; the two slug-fallback paragraphs shortened to one sentence. |
 | `reflect` | `SKILL.md`, `references/synthesizer.md`, `references/judgment-reviewer.md`, `references/tooling-reviewer.md`, `references/divergent-reviewer.md` | 1, 2, 3, 4, 5, 6 | Transcript lookup; reviewer and synthesizer params and models (judgment, divergent, synthesizer `opus`; tooling `sonnet`); `create-skill` routing; skill paths in the three reviewer prompts; `/poteto:reflect`. |
 | `technical-writing` | `SKILL.md` | 6 | Description only. |
-| `principle-prove-it-works` | `SKILL.md` | prose | The `show-me-your-work` mention now says the skill is upstream-only and names the story's Execution block and merge commit body as deliver's trail (the `pm/log.md` it named before 0.24). |
+| `principle-prove-it-works` | `SKILL.md` | prose | The `show-me-your-work` mention now says the skill is upstream-only and names the story's Execution block and merge commit body as bstack's trail (the `pm/log.md` it named before 0.24). |
 | `benchmark-checklist` (new in 0.28) | `SKILL.md` | prose | Names three upstream `poteto-mode` playbooks (Opening a PR, Perf issue, Hillclimb). The first mention and one added sentence under "Other perf material" say they are upstream-only. |
 | `ketchup` (new in 0.28) | `SKILL.md` | 6 | `/poteto:ketchup` in the description and body; the `/bro` link text became `/poteto:bro`. |
 | `unslop` | `SKILL.md` | deviation | Upstream added `disable-model-invocation: true` after 0.14.3. The port drops that one line so `unslop` keeps auto-loading, because `technical-writing`, `teach`, and `blast-radius` tell the model to apply it. Body is upstream's, including new rules 32 and 33. |
@@ -60,12 +60,12 @@ descriptions (the last still loads by `paths:` if the host honours it under that
 
 | Skill | Reason |
 |---|---|
-| `poteto-mode`, playbooks, `poteto-agent` | Orchestration entry point built on "never block on the human"; conflicts with deliver's sign-off gate. Also depends on `cursor-team-kit`, Graphite, Bugbot, `/goal`, and `mode: true` frontmatter. |
-| `swarm` | Built on Cursor cloud workers (`environment: "cloud"`); deliver's `parallel-execution.md` and the Claude Code harness cover the shape. |
-| `figure-it-out` | deliver's spec, plan, and stories pipeline is the same role; depends on `poteto-mode` and `show-me-your-work`. |
-| `show-me-your-work` | A second decision trail next to deliver's own merge commit bodies; its log-audit idea moved into `/deliver:handoff`. |
-| `recall` | `/deliver:resume` and `/deliver:handoff` cover PM-managed work; needs the transcript-path patch for anything else. |
-| `tdd` | Conflicts in name and default with the superpowers TDD skill; deliver's `test-engineer` covers TDD-red. |
+| `poteto-mode`, playbooks, `poteto-agent` | Orchestration entry point built on "never block on the human"; conflicts with bstack's sign-off gate. Also depends on `cursor-team-kit`, Graphite, Bugbot, `/goal`, and `mode: true` frontmatter. |
+| `swarm` | Built on Cursor cloud workers (`environment: "cloud"`); bstack's parallel stories on T3 worktree children cover the shape. |
+| `figure-it-out` | bstack's spec, plan, and stories pipeline is the same role; depends on `poteto-mode` and `show-me-your-work`. |
+| `show-me-your-work` | A second decision trail next to bstack's own merge commit bodies; bstack's decision log (`docs/log.md`) covers its log-audit idea. |
+| `recall` | `/bstack:resume` and T3 thread history cover PM-managed work; needs the transcript-path patch for anything else. |
+| `tdd` | Conflicts in name and default with the superpowers TDD skill; bstack's tests-first builder brief covers TDD-red. |
 | `no-comments`, Comment Sicko | Taste; needs an agent file. |
 | `automate-me`, `setup-pstack` | Cursor `create-skill` and `pstack-models.mdc` mechanisms. |
 | `correct`, `make-bot-ui`, `poteto-help` | Added upstream between 0.14.4 and 0.15.17; not evaluated for the port. `poteto-help` routes into `poteto-mode` and `setup-pstack`; `make-bot-ui` is Grok Bot webhook tooling. |

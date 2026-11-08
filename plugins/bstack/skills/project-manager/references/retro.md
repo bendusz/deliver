@@ -1,6 +1,6 @@
 # Retro: the sprint boundary
 
-Run when every story in the sprint is `merged`, or `blocked` and escalated, or on `/deliver:retro`.
+Run when every story in the sprint is `merged`, or `blocked` and escalated, or on `/bstack:retro`.
 
 ## 1. Cross-story review
 - Range: `git diff <from>...<to>`, from the parent of the sprint's first story merge to its last

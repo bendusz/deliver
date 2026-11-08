@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deliver secret-scan pre-push
+# bstack secret-scan pre-push
 # scan-secrets.sh <base>..<branch>: scan every commit in the range for token formats.
 # scan-secrets.sh --pre-push <remote> <url>: the git pre-push hook contract; scans each pushed
 # commit the destination lacks per ls-remote, or every reachable one if ls-remote fails. A copy

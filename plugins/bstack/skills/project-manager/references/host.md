@@ -1,10 +1,10 @@
 # Host: T3 Code
 
-deliver runs only under T3 Code. Every child is a T3 thread you start, message and clean up.
+bstack runs only under T3 Code. Every child is a T3 thread you start, message and clean up.
 
 ## Probe
 At session start, call `orchestrator_capabilities` once; it lists the providers, models and
-options you may target. If it is missing or fails, say "deliver requires T3 Code" and stop.
+options you may target. If it is missing or fails, say "bstack requires T3 Code" and stop.
 Call it again only after a dispatch error or a provider change the user names.
 
 ## Dispatch

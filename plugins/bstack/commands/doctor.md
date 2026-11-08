@@ -11,7 +11,7 @@ Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo
 Check, in order, each with its evidence:
 1. **T3 host.** Load `ToolSearch select:mcp__t3-code__orchestrator_capabilities` and call it once
    (`references/host.md` `## Probe`). If it is absent or fails, report
-   `MISSING: deliver requires T3 Code` and stop: the other checks mean nothing without it.
+   `MISSING: bstack requires T3 Code` and stop: the other checks mean nothing without it.
 2. **Toolchain**, `OK`, `MISSING` or `UNKNOWN`. The runtimes, package manager and dependencies
    behind the plan's `## Commands` (or, before a plan exists, what the manifests and lockfiles
    name): each resolves on `PATH`, with its version from a `--version` probe, and install has been
@@ -38,8 +38,9 @@ Check, in order, each with its evidence:
    how to wire the scan in. Else check `pre-push` in the `hooks` directory of
    `git rev-parse --git-common-dir`. `OK`: executable and byte-equal (`cmp`) to
    `"${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh"`. `OUTDATED`: it has the
-   `# deliver secret-scan pre-push` line but differs; offer to refresh it with that copy.
-   `MISSING`: absent, not executable, or another hook without that line (show it; never replace it
+   `# bstack secret-scan pre-push` line, or the old `# deliver secret-scan pre-push` one, but
+   differs; offer to refresh it with that copy.
+   `MISSING`: absent, not executable, or another hook without either line (show it; never replace it
    unasked). Install it as `references/planning.md` `## 5. Scaffold, after sign-off` says.
 
 End with a one-line verdict: ready only when the host, toolchain, Codex, log and secret scan
