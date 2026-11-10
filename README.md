@@ -63,9 +63,11 @@ Each role is a short "soul" pasted into a T3 `delegate_task`; its default model 
 | researcher (optional) | Answers one external question, report under `docs/research/` | `claude-opus-5-5`, Codex for a second opinion |
 | spec-architect (optional) | Writes the SpecDD `.sdd` files for a sprint | `claude-opus-5-5` |
 
-## Commands
+## Skills
 
-| Command | What it does |
+Each is a skill: run it as `/bstack:<name>`, or describe the task and Claude picks it up.
+
+| Skill | What it does |
 |---|---|
 | `/bstack:pm` | Act as the PM end to end: plan, sign-off, stories, loop, ship. |
 | `/bstack:resume` | Pick up from git, the approval record, the story Execution blocks and the log. |

@@ -1,10 +1,16 @@
 ---
+name: retro
 description: Run the sprint boundary's cross-story review and retrospective, and propose AGENTS.md learnings as a diff.
+argument-hint: "[sprint-number]"
 ---
 
-Use the `project-manager` skill to run a sprint retrospective. Load `references/retro.md` and
-follow it: the cross-story review, the three questions, the `AGENTS.md` diff and the record are
-the whole contract.
+If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.
+
+`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`.
+
+Run the `bstack:project-manager` skill's procedure (load that skill first) for a sprint
+retrospective. Load `references/retro.md` and follow it: the cross-story review, the three
+questions, the `AGENTS.md` diff and the record are the whole contract.
 
 Sprint: $ARGUMENTS  (a sprint number; default is the lowest sprint whose stories are all `merged`,
 or `blocked` and escalated, with no `docs/retros/sprint-<n>.md` yet)

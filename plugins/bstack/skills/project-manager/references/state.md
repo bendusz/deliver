@@ -4,8 +4,9 @@ Keep on disk only what git cannot derive: whether the plan is approved, where ea
 stands, and why things were decided. Everything else is branches, commits and tracked `docs/`.
 
 ## Approval
-- When planning starts, create `docs/approval.json` from `templates/approval.json.template`
-  (`"status":"pending"`, the other fields `null`).
+- When planning starts, create `docs/approval.json` from
+  `${CLAUDE_PLUGIN_ROOT}/templates/approval.json.template` (`"status":"pending"`, the other
+  fields `null`).
 - Sign-off is conversation style. Show the plan, and only after the user says approved, write
   `{"status":"approved","approved_at":"<YYYY-MM-DD HH:MM>","plan_commit":"<sha>"}`, where
   `plan_commit` is the commit holding the signed-off `docs/plan.md`. Commit it with a log line.

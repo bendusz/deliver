@@ -35,10 +35,11 @@ Read each story's `pm-exec`, merge body and review verdicts, and the sprint's `d
   never write it unasked. Add lines, never rewrite the file.
 
 ## 4. Record
-Write `docs/retros/sprint-<n>.md` from `templates/retro.md.template`. Commit it with any accepted
-`AGENTS.md` change as `chore(retro): sprint <n>`, `docs/log.md` staged, and log the outcome. Show
-the user the record, then decompose the next sprint (`planning.md`). After the last sprint, write
-`docs/completion-report.md` from `templates/completion-report.md.template` instead, never while a
+Write `docs/retros/sprint-<n>.md` from `${CLAUDE_PLUGIN_ROOT}/templates/retro.md.template`.
+Commit it with any accepted `AGENTS.md` change as `chore(retro): sprint <n>`, `docs/log.md`
+staged, and log the outcome. Show the user the record, then decompose the next sprint
+(`planning.md`). After the last sprint, write `docs/completion-report.md` from
+`${CLAUDE_PLUGIN_ROOT}/templates/completion-report.md.template` instead, never while a
 cross-story `block` or `major` is open: each is merged as a fix or has the user's logged ruling.
 
 <!-- Check before rule is adapted from Matt Pocock's skills (mattpocock/skills, MIT). -->

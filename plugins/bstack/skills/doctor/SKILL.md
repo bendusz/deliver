@@ -1,10 +1,16 @@
 ---
+name: doctor
 description: Check readiness before implementation, covering the T3 host, the toolchain, whether the project's gates pass, Codex availability, log.sh and the pre-push secret scan.
+argument-hint: "[sub-path or component]"
 ---
 
-Use the `project-manager` skill to run a readiness check. Install or upgrade nothing, and write no
-file of your own. Running a gate may leave the artifacts a normal run produces (build output,
-caches, coverage); leave them as the run left them.
+If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.
+
+`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`.
+
+Run the `bstack:project-manager` skill's procedure (load that skill first) for a readiness check.
+Install or upgrade nothing, and write no file of your own. Running a gate may leave the artifacts
+a normal run produces (build output, caches, coverage); leave them as the run left them.
 
 Scope: $ARGUMENTS  (optional, a sub-path or component; default is the whole repo)
 

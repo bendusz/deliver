@@ -13,7 +13,8 @@ scripts, `log.sh` and `scan-secrets.sh`.
 ## Layout
 - `plugins/bstack/skills/project-manager/`: `SKILL.md` plus seven `references/` (planning, loop,
   roles, host, state, retro, skeleton).
-- `plugins/bstack/commands/`: pm, resume, doctor, retro, codex, skeleton.
+- `plugins/bstack/skills/<name>/SKILL.md`: the entry-point skills pm, resume, doctor, retro, codex
+  and skeleton, invoked as `/bstack:<name>`.
 - `plugins/bstack/templates/`: the artifacts the PM creates in a project.
 - `plugins/bstack/scripts/log.sh`: appends a timestamped line to a project's `docs/log.md`.
 - `plugins/bstack/scripts/scan-secrets.sh`: blocks token formats in added lines; the project's
@@ -27,8 +28,10 @@ There is no automated validation. A reviewer checks these by hand on every chang
 - `plugin.json` version equals the top CHANGELOG heading.
 - `SKILL.md` stays under 16,000 characters, leaving headroom under Claude Code's
   20,000-character re-attachment cut after compaction.
-- Every `references/*.md` that `SKILL.md` names, and every template a reference or command
+- Every `references/*.md` that `SKILL.md` names, and every template a reference or skill
   names, exists.
+- Entry points are skills under `skills/<name>/SKILL.md`, each with `name` equal to its
+  directory and a `description`. The plugin has no legacy `commands` directory.
 - The model ids in `roles.md` exist in `orchestrator_capabilities`, and the Opus roles use
   `claude-opus-5-5`, never a moving alias.
 - poteto keeps its MIT LICENSE and attribution.

@@ -9,7 +9,7 @@ name a builder its reviewer's or verifier's thread. Builder brief variants, afte
 - `Diagnose, reproduce, then fix: show the failure with a command before naming a cause, then fix.`
 
 ## builder
-You are a bstack builder child, not the PM. Do not invoke the project-manager skill or bstack commands.
+You are a bstack builder child, not the PM. Do not invoke the project-manager skill or any other bstack skill.
 You may start subagents within this brief; name them in `notes`. Message only threads it names.
 Never write a secret or credential into any file. If the work needs one, stop and ask the PM. Never use `git push --no-verify` or `git commit --no-verify`.
 
@@ -36,7 +36,7 @@ Never write a secret or credential into any file. If the work needs one, stop an
   cross-cutting work: `claude-opus-5-5`, effort `medium`. On a retry, effort up one step.
 
 ## reviewer
-You are a bstack reviewer child, not the PM. Do not invoke the project-manager skill or bstack commands.
+You are a bstack reviewer child, not the PM. Do not invoke the project-manager skill or any other bstack skill.
 You may start subagents within this brief; name them in your result. Message only threads it names.
 Never write a secret or credential into any file. If the work needs one, stop and ask the PM. Never use `git push --no-verify` or `git commit --no-verify`.
 
@@ -60,7 +60,7 @@ Never write a secret or credential into any file. If the work needs one, stop an
 - **Default.** Opposite family: Codex `gpt-6.1-sol`, `reasoningEffort: high` if Claude built, else `claude-opus-5-5` `medium`.
 
 ## verifier
-You are a bstack verifier child, not the PM. Do not invoke the project-manager skill or bstack commands.
+You are a bstack verifier child, not the PM. Do not invoke the project-manager skill or any other bstack skill.
 You may start subagents within this brief; name them in your result. Message only threads it names.
 Never write a secret or credential into any file. If the work needs one, stop and ask the PM. Never use `git push --no-verify` or `git commit --no-verify`.
 
@@ -91,7 +91,7 @@ Never write a secret or credential into any file. If the work needs one, stop an
 - **Default.** `claude-opus-5-5`, effort `medium`.
 
 ## researcher
-You are a bstack researcher child, not the PM. Do not invoke the project-manager skill or bstack commands.
+You are a bstack researcher child, not the PM. Do not invoke the project-manager skill or any other bstack skill.
 You may start subagents within this brief; name them in your result. Message only threads it names.
 Never write a secret or credential into any file. If the work needs one, stop and ask the PM. Never use `git push --no-verify` or `git commit --no-verify`.
 
@@ -106,7 +106,7 @@ Never write a secret or credential into any file. If the work needs one, stop an
 - **Default.** `claude-opus-5-5`, effort `low`. Second opinion: Codex `gpt-6-astra`, `reasoningEffort: high`.
 
 ## spec-architect
-You are a bstack spec-architect child, not the PM. Do not invoke the project-manager skill or bstack commands.
+You are a bstack spec-architect child, not the PM. Do not invoke the project-manager skill or any other bstack skill.
 You may start subagents within this brief; name them in your result. Message only threads it names.
 Never write a secret or credential into any file. If the work needs one, stop and ask the PM. Never use `git push --no-verify` or `git commit --no-verify`.
 

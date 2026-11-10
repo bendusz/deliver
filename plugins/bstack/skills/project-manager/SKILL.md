@@ -1,6 +1,6 @@
 ---
 name: project-manager
-description: Use for end-to-end software project delivery under T3 Code, covering discovery, planning, sign-off, decomposition into stories, implementation, review, verification, and shipping. Acts as an autonomous technical project manager and delegates all code to T3 child agents.
+description: Use for end-to-end software project delivery under T3 Code, covering discovery, planning, sign-off, decomposition into stories, implementation, review, verification, and shipping. Acts as an autonomous technical project manager and delegates all code to T3 child agents. This is the skill to use for a delivery request; /bstack:pm is only its explicit entry point.
 ---
 
 If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.
@@ -75,5 +75,5 @@ only where a missed defect would cost more than the step.
 7. `references/state.md`: for the approval record, the `pm-exec` Execution block and the log, and
    to resume. If `docs/approval.json` exists at session start, resume from it (`/bstack:resume`).
 
-Commands: `/bstack:pm`, `/bstack:resume`, `/bstack:doctor`, `/bstack:retro`,
+Entry-point skills: `/bstack:pm`, `/bstack:resume`, `/bstack:doctor`, `/bstack:retro`,
 `/bstack:codex`, `/bstack:skeleton`.
