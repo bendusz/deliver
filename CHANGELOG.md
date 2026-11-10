@@ -20,8 +20,11 @@ Packaging only: the six entry points become skills. No behaviour changes.
 - **Wording.** "Commands" become skills in `SKILL.md`, the five role guards, the README,
   CONTRIBUTING and AGENTS.md, which gains a convention: entry points are skills, no `commands/`.
   The marketplace's poteto entry now says 24 principles, as poteto's own manifest does.
-- **Update.** Run `/plugin marketplace update bstack`, then `/reload-plugins` or restart the
-  session. If the old commands still show, reinstall with `/plugin install bstack@bstack`.
+- **Triggers.** `project-manager` is the skill Claude picks for a delivery request; `pm`'s
+  description now says it is only the explicit `/bstack:pm` entry point, so the two don't compete.
+- **Update.** Run `/plugin marketplace update bstack` to refresh the catalogue, then
+  `claude plugin update bstack@bstack` in a terminal to update the installed plugin, then
+  `/reload-plugins` or restart the session.
 
 ## 1.0.0 - 2026-11-08
 

@@ -1,6 +1,6 @@
 ---
 name: project-manager
-description: Use for end-to-end software project delivery under T3 Code, covering discovery, planning, sign-off, decomposition into stories, implementation, review, verification, and shipping. Acts as an autonomous technical project manager and delegates all code to T3 child agents.
+description: Use for end-to-end software project delivery under T3 Code, covering discovery, planning, sign-off, decomposition into stories, implementation, review, verification, and shipping. Acts as an autonomous technical project manager and delegates all code to T3 child agents. This is the skill to use for a delivery request; /bstack:pm is only its explicit entry point.
 ---
 
 If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.

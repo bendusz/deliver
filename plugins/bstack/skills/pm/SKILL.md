@@ -1,6 +1,6 @@
 ---
 name: pm
-description: Act as the project manager who plans with you, gets sign-off, and delivers through T3 child agents.
+description: Explicit entry point for /bstack:pm. Use only when the user invokes /bstack:pm or asks by name for the bstack PM; it starts the project-manager skill's procedure on their request. For any other software-delivery request, use the project-manager skill instead.
 argument-hint: "[request]"
 ---
 
