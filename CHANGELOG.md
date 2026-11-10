@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## 1.0.2 - 2026-11-10
+
+Restores two things the 0.30.0 trim lost when the agent files were folded into `roles.md`.
+
+- **Credit.** `roles.md` again credits Matt Pocock's skills (`mattpocock/skills`, MIT) for the ideas it
+  carries over: the builder's reproduce-first rule and its list of tests never to write, and the
+  reviewer's split of spec and standards findings and its smells. `planning.md` and `retro.md` kept
+  their credit lines throughout.
+- **Reviewer smells.** The reviewer returns up to five one-line `minor` smells with `file:line`: shapes
+  that will cost the next change, such as a function doing several jobs, a duplicated block, a flag
+  argument, or a test mirroring the code. The old code-integrity reviewer had this; the trim dropped it.
+- **Update.** `/plugin marketplace update bstack`, then `claude plugin update bstack@bstack` in a
+  terminal, then `/reload-plugins` or restart.
+
 ## 1.0.1 - 2026-11-10
 
 Packaging only: the six entry points become skills. No behaviour changes.

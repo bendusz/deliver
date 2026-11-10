@@ -1,7 +1,7 @@
 {
   "name": "bstack",
   "description": "Claude manages software delivery under T3 Code: it plans, gets sign-off, has T3 child roles build, review and verify each story, and ships. It does not write implementation code.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": { "name": "bendusz", "url": "https://github.com/bendusz" },
   "homepage": "https://github.com/bendusz/bstack",
   "repository": "https://github.com/bendusz/bstack",
