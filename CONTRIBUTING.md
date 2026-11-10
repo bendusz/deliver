@@ -1,7 +1,7 @@
 # Contributing to bstack
 
 bstack is prose and templates plus two scripts in `plugins/bstack/scripts/`, `log.sh` and
-`scan-secrets.sh`. A contribution is almost always a prose change: a reference, a command, a
+`scan-secrets.sh`. A contribution is almost always a prose change: a reference, a skill, a
 role's soul or a template.
 
 ## Ground rules

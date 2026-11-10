@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## 1.0.1 - 2026-11-10
+
+Packaging only: the six entry points become skills. No behaviour changes.
+
+- **Why.** Claude Code's plugin reference now marks a plugin's `commands/` directory as legacy
+  ("use `skills/` instead"), and hosts that list only `skills/` did not show the entry points.
+- **Skills.** `commands/<name>.md` moved to `skills/<name>/SKILL.md` for `pm`, `resume`,
+  `doctor`, `retro`, `codex` and `skeleton`. Each has a `name`, its old `description` and, where
+  it takes arguments, an `argument-hint`. The invocation is unchanged: `/bstack:<name>`. Claude
+  can also load them on its own, which `/bstack:codex ask` needs when the PM asks Codex for a
+  second opinion.
+- **Paths.** Each entry-point skill resolves `references/…` from
+  `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/`, carries the project-manager skill's
+  child guard, and says it runs that skill's procedure. The template paths in `state.md` and
+  `retro.md` now start with `${CLAUDE_PLUGIN_ROOT}/templates/`.
+- **Wording.** "Commands" become skills in `SKILL.md`, the five role guards, the README,
+  CONTRIBUTING and AGENTS.md, which gains a convention: entry points are skills, no `commands/`.
+  The marketplace's poteto entry now says 24 principles, as poteto's own manifest does.
+- **Update.** Run `/plugin marketplace update bstack`, then `/reload-plugins` or restart the
+  session. If the old commands still show, reinstall with `/plugin install bstack@bstack`.
+
 ## 1.0.0 - 2026-11-08
 
 deliver is renamed bstack. The behaviour is the 0.30.0 behaviour; only the name changes.

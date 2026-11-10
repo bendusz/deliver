@@ -75,5 +75,5 @@ only where a missed defect would cost more than the step.
 7. `references/state.md`: for the approval record, the `pm-exec` Execution block and the log, and
    to resume. If `docs/approval.json` exists at session start, resume from it (`/bstack:resume`).
 
-Commands: `/bstack:pm`, `/bstack:resume`, `/bstack:doctor`, `/bstack:retro`,
+Entry-point skills: `/bstack:pm`, `/bstack:resume`, `/bstack:doctor`, `/bstack:retro`,
 `/bstack:codex`, `/bstack:skeleton`.

@@ -1,8 +1,14 @@
 ---
+name: codex
 description: Get an independent Codex review of the last commit, the worktree, the branch or the codebase, one reviewer child per objective, or ask Codex a question. Reserve ask for consequential decisions.
+argument-hint: "[review [last-commit|worktree|branch|codebase] [objective…] | ask <question>]"
 ---
 
-Use the `project-manager` skill's host rules: probe as `references/host.md` `## Probe` says
+If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.
+
+`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`.
+
+Use the `bstack:project-manager` skill's host rules: probe as `references/host.md` `## Probe` says
 (without T3 Code, say "bstack requires T3 Code" and stop), and dispatch as its `## Dispatch`
 says. Never review the code or answer the question yourself, and never run the `codex` CLI.
 
