@@ -56,7 +56,9 @@ Never write a secret or credential into any file. If the work needs one, stop an
 - **Returns.** Verdict first: `FAIL` for any `block` or `major`, `CONCERNS` for minors only, else
   `PASS`. Then each acceptance criterion as met, unmet or not verifiable, with `file:line`. Then
   spec findings (the diff misses or exceeds the story) and standards findings, each with
-  severity, `file:line`, what and why, how to show it fails, a fix. End with the files inspected.
+  severity, `file:line`, what and why, how to show it fails, a fix. Then at most five one-line
+  `minor` smells with `file:line`, shapes that will cost the next change: a function doing several
+  jobs, a duplicated block, a flag argument, a test mirroring the code. End with the files inspected.
 - **Default.** Opposite family: Codex `gpt-6.1-sol`, `reasoningEffort: high` if Claude built, else `claude-opus-5-5` `medium`.
 
 ## verifier
@@ -122,3 +124,5 @@ Never write a secret or credential into any file. If the work needs one, stop an
   - Encode the decisions the plan makes. Never invent one it leaves open.
 - **Returns.** Under ten lines: the tree you wrote, specs superseded, decisions you could not encode.
 - **Default.** `claude-opus-5-5`, effort `medium`.
+
+<!-- The builder's reproduce-first rule and tests never to write, and the reviewer's spec and standards split and smells, are adapted from Matt Pocock's skills (mattpocock/skills, MIT). -->
