@@ -42,7 +42,9 @@
 | FR-001 | S1-1 | |
 
 ## Commands
-<!-- the project's real commands, discovered now; N/A where none exists -->
+<!-- the project's real commands, discovered now; N/A where none exists. setup is what a fresh
+     worktree needs before the gates can run, such as installing dependencies. -->
+- setup: `<cmd or N/A>`
 - test: `<cmd or N/A>`
 - lint: `<cmd or N/A>`
 - build: `<cmd or N/A>`

@@ -5,7 +5,7 @@ stands, and why things were decided. Everything else is branches, commits and tr
 
 ## Approval
 - When planning starts, create `docs/approval.json` from
-  `${CLAUDE_PLUGIN_ROOT}/templates/approval.json.template` (`"status":"pending"`, the other
+  `<plugin>/templates/approval.json.template` (`"status":"pending"`, the other
   fields `null`).
 - Sign-off is conversation style. Show the plan, and only after the user says approved, write
   `{"status":"approved","approved_at":"<YYYY-MM-DD HH:MM>","plan_commit":"<sha>"}`, where
@@ -34,7 +34,7 @@ The claim commit, on the integration branch and before any dispatch, appends to 
 ## Log
 - `docs/log.md` in the main checkout is the decision log, tracked, headed `# Decision log`. Each
   line is `YYYY-MM-DD HH:MM  <message>`, with the message at most 100 characters.
-- Append only with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" "<message>"`, never by editing
+- Append only with `bash "<plugin>/scripts/log.sh" "<message>"`, never by editing
   the file. It works from any worktree or submodule and writes that repo's main checkout's file.
 - Log sign-off, each claim, build, fix round, block and merge, and every decision you make
   without asking, with the why: `S2-3: chose SQLite over Postgres, single-user CLI, no server`.
@@ -54,10 +54,15 @@ stories means decomposition. Then re-enter each story from its `status` (steps p
   (step 2). Cancelled or interrupted: `t3_thread_send` it to continue, as step 3 resumes a build.
 - `claimed` with a `Tests:` line: the tests are accepted and their worktree is meant to go. Finish
   any of its cleanup step 2 left undone, then build (step 3).
-- `building` or `fixing`: if the thread finished, take its result JSON and gate. If cancelled or
+- `building`: if the thread finished, take its result JSON and gate. If cancelled or
   interrupted, `t3_thread_send` to `thread`: its branch, worktree, and continue (`host.md`
   `## Messaging`). No `thread` yet: retry with the same `clientRequestId` in case the response was
   lost; if no child comes back, dispatch a new builder with the next round in the key.
+- `fixing`: first make sure round `rounds` was sent. If the thread's last message from you is not
+  that round's Fix list, send it again under the same `<id>-fix-<round>` key: T3 returns the first
+  send if there was one, and the round is not spent twice. Never gate a result that predates the
+  send. Then, as `building`: take the finished result and gate, or tell an interrupted child to
+  continue.
 - `built`: gate, then review. `reviewing`: re-gate, then a new review of the committed diff.
 - `verified`: re-check that `verifier` names the branch head, then ship.
 - `blocked`: present the blocker to the user first, unless a `Replaced by:` line makes it history.

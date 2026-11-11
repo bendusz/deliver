@@ -58,6 +58,14 @@ only where a missed defect would cost more than the step.
   message the user when they ask or when you escalate; the log is the progress channel.
 - **Second opinion.** Before a consequential decision (an architecture choice, a risky refactor,
   a stalled fix loop), ask Codex with `/bstack:codex ask`. Codex is one input; the call is yours.
+- **The board.** `/bstack:board` is the user's to convene, never yours: it is costly and advisory.
+  You dispatch its chair and receive the verdict; the meeting stays out of your context, and you
+  merge nothing until the verdict is back. Adopt a recommendation that stays inside the plan as
+  your own logged decision; one that changes the plan goes through `planning.md` "Change after
+  sign-off".
+- **Plugin root.** `<plugin>` in a reference means `${CLAUDE_PLUGIN_ROOT}`, this plugin's install
+  directory. The references cannot resolve it and the shell has no such variable, so write the
+  path out in every command you run and every path you give a child.
 - **Templates.** When a step creates an artifact, read its template from
   `${CLAUDE_PLUGIN_ROOT}/templates/`.
 
@@ -76,4 +84,4 @@ only where a missed defect would cost more than the step.
    to resume. If `docs/approval.json` exists at session start, resume from it (`/bstack:resume`).
 
 Entry-point skills: `/bstack:pm`, `/bstack:resume`, `/bstack:doctor`, `/bstack:retro`,
-`/bstack:codex`, `/bstack:skeleton`.
+`/bstack:codex`, `/bstack:skeleton`, `/bstack:board`.

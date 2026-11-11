@@ -6,7 +6,9 @@ argument-hint: "[sprint-number]"
 
 If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.
 
-`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`.
+`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`, and
+`<plugin>` in any reference means `${CLAUDE_PLUGIN_ROOT}`. Neither is a shell variable: write the
+path out in every command.
 
 Run the `bstack:project-manager` skill's procedure (load that skill first) to write or extend the
 SpecDD skeleton. Load `references/skeleton.md` and follow it: the bootstrap probe, the

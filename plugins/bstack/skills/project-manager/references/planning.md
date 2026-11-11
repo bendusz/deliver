@@ -30,13 +30,17 @@ plan, no spec and no sprints. Nothing is built before sign-off.
   Architecture, and list the rejected alternatives under Risks.
 
 ## 3. Write the plan
-- Create `docs/plan.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan.md.template`, replacing its comments.
+- Create `docs/plan.md` from `<plugin>/templates/plan.md.template`, replacing its comments.
 - Requirements carry stable IDs, `FR-n` and `AC-n`, and are never renumbered: the stories, the
   reviewer and the verifier trace to them.
 - Acceptance criteria use EARS where behavioural (`WHEN <condition or event>, THE SYSTEM SHALL
   <observable behaviour>`), else a plain measurable statement. Sharper criteria test better.
-- Commands are the project's real `test`, `lint`, `build` and `run`, discovered now, with `N/A`
-  where one does not exist. They are the gates you run yourself.
+- Commands are the project's real `setup`, `test`, `lint`, `build` and `run`, discovered now, with
+  `N/A` where one does not exist. `test`, `lint` and `build` are the gates you run yourself.
+  `setup` is what a fresh checkout needs before they can run (install dependencies, generate
+  code): every builder works in a new worktree that holds only tracked files. If the gates need
+  an untracked file such as `.env`, name it in Risks and agree with the user how a worktree gets
+  it; never commit it or paste its contents into a brief.
 - `Integration branch:` is the branch the scaffold commit lands on, `main` by default.
 - `Skeleton:` stays `none` unless the user opts into SpecDD; then `specdd` (`skeleton.md`).
 - The Stories table's `covers` column names the IDs each story satisfies. Traceability maps every
@@ -47,7 +51,7 @@ plan, no spec and no sprints. Nothing is built before sign-off.
   It is a `verify-<app>` skill under `.claude/skills/` (with poteto installed, ask the user to run
   `/poteto:create-verification-skill` for it) or the project's own end-to-end command. Without
   it, the verifier returns UNKNOWN for every such criterion.
-- Write a separate `docs/spec.md` from `${CLAUDE_PLUGIN_ROOT}/templates/spec.md.template` only
+- Write a separate `docs/spec.md` from `<plugin>/templates/spec.md.template` only
   when the work will outlive this plan. The spec is product intent (user stories, requirements,
   criteria), with no stack and no how; the plan derives from it and traces to its IDs. Update an
   existing spec in place, never blind-overwrite it.
@@ -60,7 +64,7 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - Then fill the plan's Sign-off line with the date and commit the plan: that commit is the
   `plan_commit`. Write and commit the approved record exactly as `state.md` `## Approval` says.
 - Log the sign-off with its scope, and every decision you made without asking, with the why:
-  `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" "<message>"` (`state.md` `## Log`).
+  `bash "<plugin>/scripts/log.sh" "<message>"` (`state.md` `## Log`).
 - No scaffold, no stories and no code before the record says `approved`.
 
 ### Change after sign-off
@@ -89,12 +93,12 @@ found wrong goes through this path, never drip-fed into a running story:
 
 ## 5. Scaffold, after sign-off
 Only add what is absent. Never overwrite a user-authored file without showing a diff and asking.
-- `AGENTS.md` from `${CLAUDE_PLUGIN_ROOT}/templates/AGENTS.md.template`: facts only (commands,
+- `AGENTS.md` from `<plugin>/templates/AGENTS.md.template`: facts only (commands,
   layout, non-default conventions, gotchas), aiming at 30 to 40 lines. Replace every template
   comment rather than copying it, since Codex reads a comment as an instruction. Every child
   loads this file, so test each line: would removing it cause mistakes? Never copy procedure or
   hard rules into it, nor a line saying the project runs on bstack.
-- `CLAUDE.md` from `${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md.template`, the `@AGENTS.md` bridge.
+- `CLAUDE.md` from `<plugin>/templates/CLAUDE.md.template`, the `@AGENTS.md` bridge.
   If `CLAUDE.md` exists without `AGENTS.md`, propose moving its content into a new `AGENTS.md`
   and making `CLAUDE.md` the bridge; show the diff and ask. If both exist and `CLAUDE.md` is not
   a bridge, leave both and tell the user.
@@ -102,11 +106,22 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
   uncommented, to the project `AGENTS.md` Conventions.
 - `.gitignore` includes `tmp/`, appended, never clobbered. `tmp/` is scratch and never enters git.
 - The pre-push secret scan, untracked, for every worktree: `pre-push` in the `hooks` directory of
-  `git rev-parse --git-common-dir`. If `git config core.hooksPath` prints a path, git ignores
-  that directory: report it, ask the user how to wire the scan in, change nothing. Absent: copy
-  `${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh` there and `chmod 755` it (a copy: the plugin
-  path changes on update). Present without its `# bstack secret-scan pre-push` line: show it, ask,
-  unless it has the old `# deliver secret-scan pre-push` line: ours, outdated; offer to refresh it.
+  `git rev-parse --git-common-dir`. Absent: copy `<plugin>/scripts/scan-secrets.sh` there and
+  `chmod 755` it (a copy: the plugin path changes on update). Present without its
+  `# bstack secret-scan pre-push` line: show it, ask, unless it has the old
+  `# deliver secret-scan pre-push` line: ours, outdated; offer to refresh it.
+- If `git config core.hooksPath` prints a path, git ignores that directory and a hook manager owns
+  pre-push. Install the copy all the same, then propose the one call that runs it, as a diff to
+  the manager's tracked file, and ask:
+  - husky, first line of `.husky/pre-push`:
+    `bash "$(git rev-parse --git-common-dir)/hooks/pre-push" "$@"`
+  - lefthook, a `pre-push` command with `use_stdin: true` and
+    `run: bash "$(git rev-parse --git-common-dir)/hooks/pre-push" {0}`
+  - any other manager: the same call from its pre-push, with the hook's arguments and stdin.
+
+  Until the user accepts, pushes go out unscanned: tell them so and log it.
+- Never create `.scan-secrets-allow` at scaffold. It gets a line only when the user approves one
+  for a false positive (`loop.md` step 8).
 - Commit on the integration branch only the files you created or changed, never `git add -A`.
   If git has no `user.name` or `user.email`, ask before committing.
 
@@ -122,7 +137,7 @@ before its first claim.
   each leave the gates green: **expand** adds the new shape beside the old, **migrate** moves the
   callers (in `[P]` batches where `touches` allow), **contract** deletes the old shape.
 - **Story files.** `docs/stories/S<sprint>-<n>-<slug>.md` from
-  `${CLAUDE_PLUGIN_ROOT}/templates/story.md.template`. The child sees only the story, so it must
+  `<plugin>/templates/story.md.template`. The child sees only the story, so it must
   stand alone: the goal, the boundaries, the exact files and symbols to inspect, and the search
   that finds a complete target set when one matters. Do not restate `AGENTS.md`.
 - **pm-meta.** `builder` is `claude`, `codex` or `auto`. `codex` suits one precise outcome with

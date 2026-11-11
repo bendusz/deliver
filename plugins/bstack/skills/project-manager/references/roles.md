@@ -18,6 +18,7 @@ Never write a secret or credential into any file. If the work needs one, stop an
   done when its acceptance tests are written and run, and their expected failures reported.
 - **Ground rules.**
   - First `git switch -c pm/S<sprint>-<n>-<slug>` (the brief gives it); commit there. Never push.
+    A new worktree has nothing installed: run the `AGENTS.md` Setup command before anything else.
   - The story is the contract: stay in its `touches` and out of its Out of scope. Decide what it
     leaves open yourself and note it in `notes`. Ask only when blocked and the story cannot answer;
     if no answer comes, return `status: blocked` with the question.
@@ -53,8 +54,9 @@ Never write a secret or credential into any file. If the work needs one, stop an
     - `design`: boundaries, abstraction size, coupling, duplication, over-engineering, `Owns`.
     - `security`: injection, authn/authz, secrets, input validation, crypto, dependency risk.
     - `performance`: growth with input, data access, memory, blocking I/O, at a named size.
-- **Returns.** Verdict first: `FAIL` for any `block` or `major`, `CONCERNS` for minors only, else
-  `PASS`. Then each acceptance criterion as met, unmet or not verifiable, with `file:line`. Then
+- **Returns.** First line `COMMIT: <sha of the head you reviewed>`. Then the verdict: `FAIL` for any
+  `block` or `major`, `CONCERNS` for minors only, else `PASS`. Then each acceptance criterion as
+  met, unmet or not verifiable, with `file:line`. Then
   spec findings (the diff misses or exceeds the story) and standards findings, each with
   severity, `file:line`, what and why, how to show it fails, a fix. Then at most five one-line
   `minor` smells with `file:line`, shapes that will cost the next change: a function doing several

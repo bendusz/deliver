@@ -6,16 +6,18 @@ story's state lives in its `pm-exec` line (`state.md` `## Execution block`); `<i
 
 **Mark `<status>`** means: set `pm-exec.status`, commit it on the integration branch with
 `docs/log.md` staged, and log one line that says why, not just what:
-`bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" "S1-2: fixing, round 2, null path in parse()"`.
+`bash "<plugin>/scripts/log.sh" "S1-2: fixing, round 2, null path in parse()"`.
 Every status change below is a mark. Log decisions made without asking the same way (`state.md`
 `## Log`).
 
-**Gates** are the plan's `## Commands` test, lint and build, `N/A` where none exists.
+**Gates** are the plan's `## Commands` test, lint and build, `N/A` where none exists. Its `setup`
+is not a gate: it is what makes a fresh worktree able to run them.
 
 **Dispatch** is `host.md` `## Dispatch`: a `roles.md` soul, then the story file and the brief
 lines. Keys are `<id>-<role>-<round>`, with `round` the current `pm-exec.rounds`. A second
 dispatch of a role in the same round adds a letter (`S1-2-reviewer-1b`), because T3 answers a
-reused key with the original child. Tests first uses `<id>-tests-0`.
+reused key with the original child. Tests first uses `<id>-tests-0`. A fix round's send to the
+builder carries `<id>-fix-<round>` (`host.md` `## Messaging`).
 
 1. **Claim.** Append the `## Execution` heading and the `pm-exec` line, `status: claimed`,
    `rounds: 0`, to the story (`state.md` `## Execution block`). Resolve `pm-meta.builder`: `auto`
@@ -48,7 +50,9 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
    both, then tell it to continue (`host.md` `## Messaging`).
 
 4. **Gate.** Run the gates yourself in the recorded worktree (`cd <worktree>`), never on a
-   child's word: its `tests` field is a claim, your run is the evidence. Then check scope:
+   child's word: its `tests` field is a claim, your run is the evidence. If a gate cannot start
+   because the worktree lacks dependencies, run the plan's `setup` there once, then the gates;
+   a gate that still cannot start is red. Then check scope:
    - `git diff --name-only <integration>...<branch>` stays inside `pm-meta.touches`.
    - After step 2, `git -C <worktree> diff <tests sha>..HEAD -- <test paths>` prints nothing.
      The build started on that commit, so any change there is the builder's.
@@ -60,7 +64,9 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
    build's `role_model` (`roles.md` `## reviewer` **Default**). Add a second, `focus:` reviewer
    when the story's `Review focus:` is not `none`, or the diff touches auth, untrusted input, a
    hot path or module structure: `focus: security`, `performance` or `design`. After a fix
-   round, each brief lists the prior round's Fix items so the reviewer can check them.
+   round, each brief lists the prior round's Fix items so the reviewer can check them. A review
+   counts only when its `COMMIT` line is the branch head: otherwise dispatch it again with a
+   letter on the key.
    - `PASS` from every reviewer: verify (step 7).
    - `CONCERNS`: minors only. Fix them in a round if cheap, else note them; then verify.
    - `FAIL`: a `block` or `major` is open. Fix (step 6).
@@ -73,8 +79,8 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
      dismissals; the user can overrule them. An empty Fix list uses no round: verify (step 7).
    - **Cap: 3 rounds, then escalate.** If `rounds` is already 3, escalate to the user with the
      open findings and the diff (step 10). Else increment `rounds` and mark `fixing` first.
-   - `t3_thread_send` the Fix list to the recorded builder `thread`, never a reviewer's raw output
-     (`host.md` `## Messaging`). Name the recorded branch and worktree.
+   - `t3_thread_send` the Fix list to the recorded builder `thread`, never a reviewer's raw output,
+     with key `<id>-fix-<round>` (`host.md` `## Messaging`). Name the recorded branch and worktree.
    - A bug fix, a red gate, or a correctness or security finding names the behaviour to pin and
      the test file inside `touches`. The builder writes that test, sees it fail, then fixes. A
      round whose diff lacks the test is not closed. A name, dead code or comment is exempt.
@@ -98,10 +104,19 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
      merge brought in anything beyond `docs/stories/`, `docs/log.md` and `docs/evidence/`, verify
      again (step 7) so the `verifier` sha is the head.
    - Scan every commit for secrets:
-     `bash "${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh" <integration>..<branch>`. Never merge
-     on a hit. Send the builder `thread` the hits as a Fix item: remove the secret from each
-     story-branch commit the hits name (rewrite that unshared branch only, never the integration
-     branch). Tell the user to rotate it, then re-gate, scan again and verify again (step 7).
+     `bash "<plugin>/scripts/scan-secrets.sh" <integration>..<branch>`. Never merge on a hit.
+     A merge commit counts only what it adds itself, so the merge above does not re-report what
+     the integration branch already holds.
+     - A real secret: send the builder `thread` the hits as a Fix item: remove it from each
+       story-branch commit the hits name (rewrite that unshared branch only, never the
+       integration branch). Tell the user to rotate it, then re-gate, scan again and verify
+       again (step 7).
+     - A false positive, such as a token-shaped test fixture: show the user the hit and the line
+       `<pattern name> <path glob>` that would allow it. Only on their yes, add it to
+       `.scan-secrets-allow` on the integration branch, commit and log it, and scan again. The
+       scan reads that file from `<integration>`, so a line on the story branch allows nothing;
+       a builder that edits the file is out of `touches`. A push honours the line only once it
+       is on the remote's default branch, never from the work tree or the pushed branch.
    - On the integration branch, `git merge --no-ff <branch>`. Title `type(scope): subject`,
      imperative, no trailing period. Body sections in order, dropping empty ones:
      - `## Why`: intent, and why this approach.
@@ -129,14 +144,16 @@ reused key with the original child. Tests first uses `<id>-tests-0`.
       blocked one. Never start a later sprint's story early.
     - When every remaining story in the sprint is blocked or depends on one, stop and wait.
 
-**Why one reviewer by default.** Spec §9 keeps one calibration result, measured on 2026-10-25
-against the frozen review corpus: at both the 10% and the 5% miss targets, the best measured
-choice was a single Codex generalist lens, with a 4.44% upper bound on the miss rate and 0 false
-positives. The Claude specialist lenses (security, performance, architecture) added no measured
-coverage over it. Hence the default: one opposite-family generalist reviewer, plus an optional
-`focus:` reviewer. That lens was Codex's built-in `codex exec review` prompt. A T3 child running
-the reviewer soul is a different, uncalibrated reviewer: weigh its verdict as one reviewer's,
-which your gates and the verifier back up.
+**Why one reviewer by default.** bstack's design keeps one calibration result
+(`docs/specs/2026-11-07-v1.0-bstack-redesign.md` §9 in the bstack repository, not in this
+project), measured on 2026-10-25 against a review corpus since removed: at both the 10% and the
+5% miss targets, the best measured choice was a single Codex generalist lens, with a 4.44% upper
+bound on the miss rate and 0 false positives. The Claude specialist lenses (security,
+performance, architecture) added no measured coverage over it. Hence the default: one
+opposite-family generalist reviewer, plus an optional `focus:` reviewer. That lens was Codex's
+built-in `codex exec review` prompt. A T3 child running the reviewer soul is a different,
+uncalibrated reviewer: weigh its verdict as one reviewer's, which your gates and the verifier
+back up.
 
 **Sprint end.** When every story in the sprint is `merged`, or `blocked` and escalated, load
 `retro.md`.

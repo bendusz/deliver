@@ -6,7 +6,9 @@ argument-hint: "[review [last-commit|worktree|branch|codebase] [objective…] | 
 
 If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.
 
-`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`.
+`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`, and
+`<plugin>` in any reference means `${CLAUDE_PLUGIN_ROOT}`. Neither is a shell variable: write the
+path out in every command.
 
 Use the `bstack:project-manager` skill's host rules: probe as `references/host.md` `## Probe` says
 (without T3 Code, say "bstack requires T3 Code" and stop), and dispatch as its `## Dispatch`

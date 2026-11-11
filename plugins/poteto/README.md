@@ -101,5 +101,5 @@ every occurrence by skill.
 ## Re-syncing with upstream
 
 `PORT.md` records the upstream commit. To update: copy the skill directory from upstream, re-apply
-the patches listed for it in `PORT.md`, run `bash scripts/validate.sh` from the repository root (it
+the patches listed for it in `PORT.md`, run `bash .github/scripts/check.sh` from the repository root (it
 greps for Cursor-only strings), and bump the plugin version to the pstack release you synced to.
