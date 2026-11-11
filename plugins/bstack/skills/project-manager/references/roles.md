@@ -1,8 +1,8 @@
 # Roles: the five souls
 
 A `delegate_task` child sees only its `task` text, whatever the provider, so each soul carries the
-rules its child must keep. Paste one soul, from its first line through **Returns**, then the story
-or brief. **Default** is a recommendation for you: pick another model from
+rules its child must keep. Paste one soul, from its first line to the last line of its
+**Returns** item, which can run to several lines, then the story or brief. **Default** is a recommendation for you: pick another model from
 `orchestrator_capabilities` when the work needs it, and record it in `pm-exec.role_model`. Never
 name a builder its reviewer's or verifier's thread. Builder brief variants, after the story:
 - `Tests only: write the acceptance tests, touch only test files, run them. Red is correct.`

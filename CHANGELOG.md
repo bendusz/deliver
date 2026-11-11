@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here.
 
+## 1.1.1 - 2026-11-11
+
+Fixes what the board found when it first met on its default seats, in this repository on
+2026-11-11: sponsor `claude-opus-5-5` high, engineering `gpt-6-astra` xhigh, customer
+`claude-fable-5-2` medium, chaired by `claude-opus-5-5` medium. It scored 1.1.0 7/10, with all
+three seats behind the first two fixes below. After the fixes, a `quick` meeting on the default
+seats in a small PM-managed project ran the managed path end to end: the gates, the minutes in
+`docs/board/`, an 89-character log line that `log.sh` accepted, and the `docs(board)` commit.
+
+**Fixed**
+- **The log line fits `log.sh`.** The chair's `Log:` line had no length limit, and `log.sh`
+  rejects anything over 100 characters, so a meeting in a managed project could fail at its last
+  step. The chair now keeps the line to 100 characters, and if one is still too long the
+  convening session shortens the recommendation, never the scores.
+- **A soul is pasted whole.** "From its first line through **Returns**" read as stopping at the
+  Returns item's first line, and the chair in that meeting dropped the member soul's round-2
+  `Changed` or `Held` line. The board's member soul now runs to the end of `souls.md`, and the
+  PM's souls to the last line of their Returns item.
+- **One meeting, one id.** The meeting stamp gains seconds, `YYYYMMDD-HHMMSS`, and a stamp whose
+  minutes already exist is replaced, so two meetings cannot share dispatch keys or a minutes file.
+
+**From a review of the board** (Codex `gpt-6.1-sol`; the skill shipped in 1.1.0 unreviewed)
+- **Managed meetings run in the main checkout.** `log.sh` writes to the main checkout's log, so
+  minutes committed from a linked worktree would leave the log line behind. A managed meeting
+  convened from a linked worktree now stops and names the main checkout.
+- **Gates that write are reported.** The chair compares `git status` before and after the gates.
+  It reverts nothing, and lists any file they changed in the brief and the minutes.
+- **No score leaks into round 2.** A member names its number only on its `Score:` line, and the
+  chair strips any other score from the statements it relays.
+
 ## 1.1.0 - 2026-11-11
 
 Adds the board, and fixes what an assessment of 1.0.2 found between the prose and Claude Code,

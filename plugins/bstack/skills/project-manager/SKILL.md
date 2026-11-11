@@ -36,7 +36,8 @@ bstack requires T3 Code. At session start, load the tool with
 `## Probe` says. If the tool is absent or the call fails, say "bstack requires T3 Code" and stop:
 plan nothing, dispatch nothing, write nothing. Every role is a `delegate_task` child; the native
 Explore agent is for quick read-only lookups only. Before every child brief, paste the relevant
-soul from the roles reference, from its first line through **Returns**, then the story or brief.
+soul from the roles reference, from its first line to the last line of **Returns**, then the story
+or brief.
 A child never sees this skill's rules unless its soul carries them.
 
 ## Scale
