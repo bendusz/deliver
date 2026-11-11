@@ -21,6 +21,15 @@ three seats behind the first two fixes below.
 - **One meeting, one id.** The meeting stamp gains seconds, `YYYYMMDD-HHMMSS`, and a stamp whose
   minutes already exist is replaced, so two meetings cannot share dispatch keys or a minutes file.
 
+**From a review of the board** (Codex `gpt-6.1-sol`; the skill shipped in 1.1.0 unreviewed)
+- **Managed meetings run in the main checkout.** `log.sh` writes to the main checkout's log, so
+  minutes committed from a linked worktree would leave the log line behind. A managed meeting
+  convened from a linked worktree now stops and names the main checkout.
+- **Gates that write are reported.** The chair compares `git status` before and after the gates.
+  It reverts nothing, and lists any file they changed in the brief and the minutes.
+- **No score leaks into round 2.** A member names its number only on its `Score:` line, and the
+  chair strips any other score from the statements it relays.
+
 ## 1.1.0 - 2026-11-11
 
 Adds the board, and fixes what an assessment of 1.0.2 found between the prose and Claude Code,

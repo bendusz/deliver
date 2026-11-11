@@ -58,7 +58,9 @@ customer `low`; an effort the user names stands as given.
    `docs/board/` or `tmp/board/`, take a new one. Record the absolute repository root, the
    branch, `git rev-parse HEAD` and whether `git status --porcelain` is empty.
 3. **Goal.** With `docs/approval.json` the project is managed, and the chair takes the goal and
-   the milestone from the plan: pass none. Otherwise check that the README or a manifest says
+   the milestone from the plan: pass none. A managed meeting is held in the main checkout, the
+   one `log.sh` writes to: if `git rev-parse --git-dir` and `git rev-parse --git-common-dir`
+   differ, you are in a linked worktree, so name the main checkout and stop. Otherwise check that the README or a manifest says
    what the project is for. If nothing does, ask the user once, "What does success look like
    here, and what is the next milestone?", and pass the answer verbatim.
 4. **Dispatch the chair,** one `delegate_task` as `references/host.md` `## Dispatch` says:
