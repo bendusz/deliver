@@ -16,16 +16,26 @@ git and GitHub.
 - **The meeting.** Round 1 is blind. In round 2 each member reads the other two statements, with
   scores and model names removed, and holds or changes its own. The board's score is the median,
   shown with all three; a gap of 3 or more is reported as a split, and dissent stays in the
-  minutes. Claude chairs, runs the gates once for everyone, and has no vote.
+  minutes.
+- **A chair of its own.** A fourth child (`claude-opus-5-5`, medium) runs the gates once for
+  everyone, writes the brief, holds both rounds, tallies and writes the minutes, with no vote.
+  The session that convenes the meeting passes a stamp, the baseline and the seats, and receives
+  the verdict in about twenty lines: a PM mid-sprint keeps its context, and neither the brief nor
+  the tally comes from the agent whose work is being judged. The chair reads its soul from
+  `skills/board/souls.md` itself, so the souls never enter the convening session either. Tried
+  once end to end on small models: two rounds, one seat changed its score, and the convening
+  session was woken once, with the verdict.
 - **Advisory, and the user's to convene.** The PM never calls it. A recommendation inside the plan
   is the PM's to adopt and log; one that changes the plan goes through the change path.
 - **Options.** `quick` holds round 1 only at lower effort. `<seat>=<model>[:<effort>]` reseats a
-  member. A missing model stops the meeting before it starts; nothing is substituted unasked.
+  member or the chair. A missing model stops the meeting before it starts; nothing is substituted
+  unasked.
 - **Record.** Minutes go to `docs/board/` with a log line and a commit in a managed project, and to
   `tmp/board/` anywhere else.
 - **Why this shape.** Opus 5.5 and Astra were each asked for a design. Both, and the author,
   arrived at distinct seats, a blind first round, a chair without a vote and the median. The
-  member soul lives in the skill itself, not in `roles.md`, which the PM reads on every dispatch.
+  separate chair was the owner's change to that design. The souls live beside the skill, not in
+  `roles.md`, which the PM reads on every dispatch.
 
 **Fixed**
 - **Plugin paths in references.** Claude Code substitutes `${CLAUDE_PLUGIN_ROOT}` only in a

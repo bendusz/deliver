@@ -30,6 +30,9 @@ update `host.md`, the README's "last checked" line and `check.sh`'s model list:
 - `t3_thread_send` to a finished child starts a new run with its context intact.
 - A reused `clientRequestId` returns the original child, and the original send.
 - A Claude child still sees the bstack skills, so every soul's first line still matters.
+- A child can still dispatch its own children on either provider and message them, and is woken
+  by their results; a parent is not told a child has finished while that child's children are
+  still running. The board's chair depends on both. Keys are scoped to the dispatching thread.
 
 ## How it is built
 The plugin was itself developed with a PM-orchestrated spec, plan, build and review flow. See

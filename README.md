@@ -10,7 +10,8 @@ and stops if T3 is not there. The default workflow needs Codex for the opposite-
 for bounded builds. You may name other models for any dispatch. bstack leans on how T3 behaves
 (where it puts a worktree, what a child's result carries, how a reused request key answers).
 Dispatch, messaging and the model ids were last checked against T3 Code 0.1.9 nightly on
-2026-11-10; the worktree behaviour on 2026-11-07.
+2026-11-10; the worktree behaviour on 2026-11-07; a child dispatching its own children, which the
+board's chair relies on, on 2026-11-11.
 
 **Secrets stay on the machine.** A secret comes in through T3's `request_secret`, never a file.
 On the way out, the PM installs a git pre-push hook that scans every pushed commit, and scans
@@ -100,10 +101,17 @@ question to them instead.
 
 They write their first statements without seeing each other's. In a second round each reads the
 other two, with the scores removed, and holds or changes its own. The board's score is the median,
-shown with all three, and dissent stays on the record. Claude chairs and has no vote. The board is
-advisory and only you convene it: one meeting is six model runs. `quick` holds the first round
-only, and `sponsor=<model>:<effort>` reseats a member. Minutes go to `docs/board/` in a project
-the PM manages, and to `tmp/board/` anywhere else.
+shown with all three, and dissent stays on the record.
+
+A fourth child chairs (`claude-opus-5-5`, medium). It runs the gates once for everyone, writes the
+brief, holds both rounds, tallies and writes the minutes, and it has no vote. The session that
+convenes the meeting hands the chair a stamp, the baseline and the seats, and gets back the verdict
+in about twenty lines. So a PM in the middle of a sprint spends almost none of its context on the
+meeting, and the brief and the tally come from an agent that did not run the project.
+
+The board is advisory and only you convene it: one meeting is six member runs and a chair. `quick`
+holds the first round only, and `sponsor=<model>:<effort>` reseats a member or the chair. Minutes
+go to `docs/board/` in a project the PM manages, and to `tmp/board/` anywhere else.
 
 ## State and the decision log
 

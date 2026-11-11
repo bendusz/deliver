@@ -14,7 +14,7 @@ scripts, `log.sh` and `scan-secrets.sh`.
 - `plugins/bstack/skills/project-manager/`: `SKILL.md` plus seven `references/` (planning, loop,
   roles, host, state, retro, skeleton).
 - `plugins/bstack/skills/<name>/SKILL.md`: the entry-point skills pm, resume, doctor, retro, codex,
-  skeleton and board, invoked as `/bstack:<name>`. `board` carries its own member soul.
+  skeleton and board, invoked as `/bstack:<name>`. `board` keeps its chair and member souls in `skills/board/souls.md`, which the chair child reads.
 - `plugins/bstack/templates/`: the artifacts the PM creates in a project.
 - `plugins/bstack/scripts/log.sh`: appends a timestamped line to a project's `docs/log.md`.
 - `plugins/bstack/scripts/scan-secrets.sh`: blocks token formats in added lines; the project's
@@ -30,7 +30,8 @@ scripts, `log.sh` and `scan-secrets.sh`.
 - `plugin.json` version equals the top CHANGELOG heading.
 - Every bstack `SKILL.md` stays under 16,000 characters, leaving headroom under Claude Code's
   20,000-character re-attachment cut after compaction.
-- Every `references/*.md` and every template a skill or reference names exists.
+- Every `references/*.md` and every template a skill or reference names exists, and so does
+  `skills/board/souls.md` with its two souls.
 - Entry points are skills under `skills/<name>/SKILL.md`, each with `name` equal to its
   directory and a `description`. The plugin has no legacy `commands` directory.
 - `${CLAUDE_PLUGIN_ROOT}` appears only in a `SKILL.md` body, the one place Claude Code

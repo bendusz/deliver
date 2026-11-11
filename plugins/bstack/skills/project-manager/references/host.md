@@ -16,7 +16,8 @@ Call it again only after a dispatch error or a provider change the user names.
   - Codex: `{"providerInstanceId":"codex","model":"<id>","options":{"reasoningEffort":"<level>"}}`
   - Always set Codex `reasoningEffort`: T3's per-model default can be `low`.
 - `role` is `implementation` for a builder, `test` for a tests-only builder and the verifier,
-  `review` for a reviewer, `research` for a researcher, `design` for the spec-architect.
+  `review` for a reviewer or a board member, `research` for a researcher, `design` for the
+  spec-architect, `general` for the board's chair.
 - `clientRequestId` is `<story-id>-<role>-<round>`, for example `S1-2-builder-0` or
   `S1-2-reviewer-1`. Reuse a key only to retry a dispatch whose response was lost: T3 returns
   the original child. It never restarts one; continue a cancelled child as `## Messaging` says.
