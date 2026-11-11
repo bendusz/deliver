@@ -53,8 +53,10 @@ customer `low`; an effort the user names stands as given.
    provider that lists the model (`effort` for Claude, `reasoningEffort` for Codex). If one is
    not, name it and stop before dispatching anyone: the user names a replacement or agrees to a
    two-seat meeting. Never substitute a model yourself.
-2. **Baseline.** Take one stamp, `YYYYMMDD-HHMM`. Record the absolute repository root, the branch,
-   `git rev-parse HEAD` and whether `git status --porcelain` is empty.
+2. **Baseline.** Take one stamp, `YYYYMMDD-HHMMSS`: it is the meeting's id in every key and
+   path, reused only to retry this meeting. If a minutes file with that stamp exists in
+   `docs/board/` or `tmp/board/`, take a new one. Record the absolute repository root, the
+   branch, `git rev-parse HEAD` and whether `git status --porcelain` is empty.
 3. **Goal.** With `docs/approval.json` the project is managed, and the chair takes the goal and
    the milestone from the plan: pass none. Otherwise check that the README or a manifest says
    what the project is for. If nothing does, ask the user once, "What does success look like
@@ -94,7 +96,8 @@ The chair's last message begins `Board:`. Anything else is not a verdict; see be
   of your context is why the chair exists.
 - Managed project: log the chair's `Log:` line as written with
   `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" "<line>"`, and commit the minutes and `docs/log.md`
-  only, as `docs(board): <mode> <stamp>`.
+  only, as `docs(board): <mode> <stamp>`. If `log.sh` rejects the line as too long, shorten only
+  the recommendation after the colon until it fits, keep the mode and the scores, and log that.
 - Anywhere else: no log line and no commit. If `.gitignore` does not ignore `tmp/`, show the
   one-line addition and ask before appending it.
 - Tell the user the verdict as the chair returned it, the minutes path and the chair's thread.

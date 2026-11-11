@@ -33,7 +33,7 @@ Arguments: $ARGUMENTS
 
 Take one stamp now, `YYYYMMDDHHMMSS`. Dispatch one `delegate_task` per objective, all in one
 message so they run in parallel:
-- `task`: the `references/roles.md` `## reviewer` soul, from its first line through **Returns**,
+- `task`: the `references/roles.md` `## reviewer` soul, from its first line to the last line of **Returns**,
   then the brief: the repository root (`git rev-parse --show-toplevel`), the scope and the exact
   diff command to run (or "review the codebase"), and the objective, as a `focus:` line when it is
   `design`, `security` or `performance`, else `Objective: <text>`. When the review targets a
