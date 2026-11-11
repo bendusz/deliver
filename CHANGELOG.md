@@ -7,7 +7,9 @@ All notable changes to this project are documented here.
 Fixes what the board found when it first met on its default seats, in this repository on
 2026-11-11: sponsor `claude-opus-5-5` high, engineering `gpt-6-astra` xhigh, customer
 `claude-fable-5-2` medium, chaired by `claude-opus-5-5` medium. It scored 1.1.0 7/10, with all
-three seats behind the first two fixes below.
+three seats behind the first two fixes below. After the fixes, a `quick` meeting on the default
+seats in a small PM-managed project ran the managed path end to end: the gates, the minutes in
+`docs/board/`, an 89-character log line that `log.sh` accepted, and the `docs(board)` commit.
 
 **Fixed**
 - **The log line fits `log.sh`.** The chair's `Log:` line had no length limit, and `log.sh`
