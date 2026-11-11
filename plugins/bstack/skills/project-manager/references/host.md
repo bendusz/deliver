@@ -15,6 +15,8 @@ Call it again only after a dispatch error or a provider change the user names.
   - Claude: `{"providerInstanceId":"claudeAgent","model":"<id>","options":{"effort":"<level>"}}`
   - Codex: `{"providerInstanceId":"codex","model":"<id>","options":{"reasoningEffort":"<level>"}}`
   - Always set Codex `reasoningEffort`: T3's per-model default can be `low`.
+- `role` is `implementation` for a builder, `test` for a tests-only builder and the verifier,
+  `review` for a reviewer, `research` for a researcher, `design` for the spec-architect.
 - `clientRequestId` is `<story-id>-<role>-<round>`, for example `S1-2-builder-0` or
   `S1-2-reviewer-1`. Reuse a key only to retry a dispatch whose response was lost: T3 returns
   the original child. It never restarts one; continue a cancelled child as `## Messaging` says.
@@ -25,6 +27,9 @@ Call it again only after a dispatch error or a provider change the user names.
   Only the builder reports them, in the JSON block its soul's **Returns** defines. Record
   `childThreadId` as `thread`, and its `branch` and `worktree`, in the story's `pm-exec`
   (`state.md`). At most 3 builders run at once.
+- A new worktree holds only what git tracks: no installed dependencies, no `.env`. The builder
+  runs the plan's `setup` first (its soul says so), and you run it before your first gate there if
+  the gates still cannot start (`loop.md` step 4).
 - The native Explore agent is for quick read-only lookups only, never for a role. Children may
   start their own subagents inside their brief and report them; do not manage those.
 - Wait without polling: the default `async` mode wakes you when a child completes. No `task_status`
@@ -34,8 +39,10 @@ Call it again only after a dispatch error or a provider change the user names.
 ## Messaging
 - A fix round goes to the same builder: `t3_thread_send` to the recorded `thread`, so it keeps its
   context; a send to a finished thread starts a new run. Send the triaged Fix list, never a
-  reviewer's raw output. To continue a cancelled or interrupted child, send to its `thread` too,
-  naming its recorded branch and worktree and telling it to continue the story or Fix list.
+  reviewer's raw output, with `clientRequestId` `<story-id>-fix-<round>`. T3 answers a reused send
+  key with the first send and starts no second run, so resending after a lost response is safe.
+  To continue a cancelled or interrupted child, send to its `thread` too, naming its recorded
+  branch and worktree and telling it to continue the story or Fix list.
 - Children may message only thread ids their brief names, such as a researcher's thread. A builder
   never messages its reviewer or verifier, so never name those to it; findings flow through you.
 - Read a child's question with `t3_pending_request`; answer it there (`action: "respond"`) when
@@ -64,15 +71,31 @@ Call it again only after a dispatch error or a provider change the user names.
     `branch refs/heads/<integration branch>`, the `Integration branch:` in `docs/plan.md`.
 
 ## PR mode
-Only when the user asks for real PRs, `gh auth status` succeeds and a GitHub remote exists. Push
-the story branch through the pre-push scan; a block is escalated to the user, never bypassed with
-`--no-verify`. Open the PR with the merge body `loop.md` gives, then `link_pull_request` and
-`watch_pull_request`. A wake is news, not a merge decision: re-run the gates locally. Merge only
-on passing gates and a recorded `verifier: PASS <sha>` whose sha is the PR head; if the head moved,
-verify again. Never push without the user's request. `unwatch_pull_request` once the PR closes:
-- Merged: `git switch <integration branch>`, `git pull --ff-only`, then clean up as in
-  `## Worktrees` (`git branch -d` refuses until the local integration branch has the merge).
-- Closed unmerged: no cleanup. Keep the worktree and branches, set the story `blocked`, escalate.
+Only when the user asks for real PRs, `gh auth status` succeeds and a GitHub remote exists. PR mode
+needs merge commits: if `gh repo view --json mergeCommitAllowed` says `false`, say so and stay on
+local merges, because your commits could never fast-forward onto a squashed or rebased history.
+- **State rides in the PR.** Your claim, status and log commits live on the local integration
+  branch and are never pushed on their own. `loop.md` step 8 merges that branch into the story
+  branch, so each PR carries them, and a protected branch needs nothing more.
+- **Open.** Push the story branch through the pre-push scan; a block is escalated to the user,
+  never bypassed with `--no-verify`. Open the PR with the merge body `loop.md` gives, then
+  `link_pull_request` and `watch_pull_request`. A wake is news, not a merge decision.
+- **Merge.** Re-run the gates locally. Merge with `gh pr merge --merge`, only on passing gates and
+  a recorded `verifier: PASS <sha>` that covers the PR head: the sha is the head, or
+  `git diff --name-only <sha>..<head>` lists nothing outside `docs/stories/`, `docs/log.md` and
+  `docs/evidence/`. Otherwise verify again. A user who merges it themselves must use a merge commit.
+- **After.** `unwatch_pull_request` once the PR closes.
+  - Merged: `git switch <integration branch>`, `git fetch`, then
+    `git merge --ff-only origin/<integration branch>`. If you committed since the PR opened, that
+    refuses: use a plain `git merge origin/<integration branch>`, never a rebase. Mark `merged`,
+    then clean up as in `## Worktrees`.
+  - Squashed or rebased instead (`git merge-base --is-ancestor <branch head>
+    origin/<integration branch>` fails): stop. The histories have diverged and `git branch -d`
+    will refuse. Show the user both and ask how to reconcile; never force.
+  - Closed unmerged: no cleanup. Keep the worktree and branches, set the story `blocked`, escalate.
+- **Sprint end.** The last `merged` marks, the retro and the completion report are still local.
+  Ask the user: push the integration branch, or open one `pm/state-sprint-<n>` PR for them.
+- Never push without the user's request.
 
 ## Evidence and secrets
 - Running-app evidence comes from `preview_*` or `device_*`, used by the verifier or a builder

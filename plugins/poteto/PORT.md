@@ -8,8 +8,8 @@ directory was re-copied from `978ca6e` and re-patched, so the whole bundle refle
 
 Skills bundled: 40
 
-`scripts/validate.sh` (repository root) reads the line above and fails if the directory count
-differs. Keep it current.
+`.github/scripts/check.sh` reads the line above and fails if the directory count differs. Keep it
+current.
 
 ## Patch classes
 
@@ -78,4 +78,4 @@ descriptions (the last still loads by `paths:` if the host honours it under that
 2. Copy each bundled skill directory over `plugins/poteto/skills/<name>/`, deleting files upstream removed.
 3. Re-apply the patches in the table above. `grep -rnE '\.cursor|grok-4|sol-max|thinking-max|generalPurpose|pstack-models|agent-transcripts|create-skill' plugins/poteto/skills` lists what regressed.
 4. Update the SHA and pstack version at the top of this file and in `.claude-plugin/plugin.json`.
-5. Run `bash scripts/validate.sh` from the repository root.
+5. Run `bash .github/scripts/check.sh` from the repository root.

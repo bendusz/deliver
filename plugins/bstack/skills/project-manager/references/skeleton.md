@@ -20,8 +20,9 @@ where you commit them. `clientRequestId` is `S<sprint>-spec-architect-<round>`. 
 - `Plan sections`: Architecture, Scope, and the Stories rows for that sprint.
 - `Spec IDs`: the `FR-` and `AC-` IDs the sprint covers.
 - `Bootstrap`: the path of `.specdd/bootstrap.md`, or `template`.
-- `Templates`: `${CLAUDE_PLUGIN_ROOT}/templates/sdd-root.template`, `sdd-module.template` and
-  `specdd-bootstrap.md.template`.
+- `Templates`: the absolute paths of `<plugin>/templates/sdd-root.template`,
+  `sdd-module.template` and `specdd-bootstrap.md.template`, with `<plugin>` written out: the
+  child cannot resolve it.
 - Optional: the brownfield Explore summary and the design sketch from planning.
 
 ## Checkpoint and commit

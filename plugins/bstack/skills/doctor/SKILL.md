@@ -6,7 +6,9 @@ argument-hint: "[sub-path or component]"
 
 If you were dispatched as a child agent (your task begins 'You are a bstack … child'), do not use this skill.
 
-`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`.
+`references/…` below means `${CLAUDE_PLUGIN_ROOT}/skills/project-manager/references/…`, and
+`<plugin>` in any reference means `${CLAUDE_PLUGIN_ROOT}`. Neither is a shell variable: write the
+path out in every command.
 
 Run the `bstack:project-manager` skill's procedure (load that skill first) for a readiness check.
 Install or upgrade nothing, and write no file of your own. Running a gate may leave the artifacts
@@ -22,6 +24,8 @@ Check, in order, each with its evidence:
    behind the plan's `## Commands` (or, before a plan exists, what the manifests and lockfiles
    name): each resolves on `PATH`, with its version from a `--version` probe, and install has been
    run (`node_modules`, a venv, a lockfile in sync). This shows the tools exist, not that gates pass.
+   `UNKNOWN` too when the gates need installed dependencies and the plan's `setup` is missing or
+   `N/A`: every builder starts in a fresh worktree that could not run them.
 3. **Gates**, `PASS`, `FAIL`, `UNKNOWN` or `N/A`. Run each of the plan's `test`, `lint` and `build`
    commands for real, from the repository root, exactly as the plan writes it. A version or help
    probe is not evidence here.
@@ -39,10 +43,11 @@ Check, in order, each with its evidence:
    hard rule that the reviewer is never the builder.
 5. **Decision log**, `OK` or `MISSING`. `"${CLAUDE_PLUGIN_ROOT}/scripts/log.sh"` exists and is
    executable (`test -x`). Do not call it: a call writes a line.
-6. **Secret scan**, `OK`, `MISSING`, `OUTDATED` or `BYPASSED`. If `git config core.hooksPath`
-   prints a path, `BYPASSED`: git ignores the pre-push hook below; name the path and ask the user
-   how to wire the scan in. Else check `pre-push` in the `hooks` directory of
-   `git rev-parse --git-common-dir`. `OK`: executable and byte-equal (`cmp`) to
+6. **Secret scan**, `OK`, `MISSING`, `OUTDATED` or `BYPASSED`. Check `pre-push` in the `hooks`
+   directory of `git rev-parse --git-common-dir`. If `git config core.hooksPath` prints a path,
+   git ignores that hook: `BYPASSED` unless the `pre-push` under that path calls it; name the path
+   and offer the one-line call `references/planning.md` `## 5. Scaffold, after sign-off` gives.
+   `OK`: executable and byte-equal (`cmp`) to
    `"${CLAUDE_PLUGIN_ROOT}/scripts/scan-secrets.sh"`. `OUTDATED`: it has the
    `# bstack secret-scan pre-push` line, or the old `# deliver secret-scan pre-push` one, but
    differs; offer to refresh it with that copy.

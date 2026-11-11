@@ -1,5 +1,6 @@
 ## What & why
 
 ## Checklist
-- [ ] Checked against the Conventions in `AGENTS.md`
+- [ ] `bash .github/scripts/check.sh` passes
+- [ ] Checked the by-hand Conventions in `AGENTS.md`
 - [ ] `CHANGELOG.md` updated

@@ -2,6 +2,80 @@
 
 All notable changes to this project are documented here.
 
+## 1.1.0 - 2026-11-11
+
+Adds the board, and fixes what an assessment of 1.0.2 found between the prose and Claude Code,
+git and GitHub.
+
+**The board**
+- **`/bstack:board`.** Three stakeholders meet about the project, each a T3 child on its own
+  model: a sponsor (`claude-opus-5-5`, high), an engineering lead (Codex `gpt-6-astra`, xhigh) and
+  a customer (`claude-fable-5-2`, medium). With no arguments they score how well placed the
+  project is to reach its next milestone, 0 to 10, and recommend what to do.
+  `/bstack:board ask <question>` puts a question to them instead.
+- **The meeting.** Round 1 is blind. In round 2 each member reads the other two statements, with
+  scores and model names removed, and holds or changes its own. The board's score is the median,
+  shown with all three; a gap of 3 or more is reported as a split, and dissent stays in the
+  minutes. Claude chairs, runs the gates once for everyone, and has no vote.
+- **Advisory, and the user's to convene.** The PM never calls it. A recommendation inside the plan
+  is the PM's to adopt and log; one that changes the plan goes through the change path.
+- **Options.** `quick` holds round 1 only at lower effort. `<seat>=<model>[:<effort>]` reseats a
+  member. A missing model stops the meeting before it starts; nothing is substituted unasked.
+- **Record.** Minutes go to `docs/board/` with a log line and a commit in a managed project, and to
+  `tmp/board/` anywhere else.
+- **Why this shape.** Opus 5.5 and Astra were each asked for a design. Both, and the author,
+  arrived at distinct seats, a blind first round, a chair without a vote and the median. The
+  member soul lives in the skill itself, not in `roles.md`, which the PM reads on every dispatch.
+
+**Fixed**
+- **Plugin paths in references.** Claude Code substitutes `${CLAUDE_PLUGIN_ROOT}` only in a
+  `SKILL.md` body and never sets it in the shell, so the 14 uses in `references/*.md` reached the
+  PM as literal text and `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh"` failed as written. The
+  references now write `<plugin>`, and every skill defines it from its own resolved path.
+- **A false positive could block a story for good.** The merge-time scan had no allowlist and no
+  bypass. `.scan-secrets-allow` now takes `<pattern name> <path glob>` lines. A range scan reads
+  it from the base ref, so a story branch cannot allow its own hit; the PM adds a line only on
+  the user's yes.
+- **A hit on the integration branch blocked unrelated stories.** A merge commit used to count
+  everything it brought in. It now counts only what differs from every parent.
+- **PR mode did not close.** It now requires merge commits and checks for them, carries the PM's
+  state commits to the remote inside each PR, accepts a verifier sha when only `docs/` state
+  changed after it, replaces `git pull --ff-only` with a fetch and a merge that works when the PM
+  committed in the meantime, detects a squash or rebase merge and stops, and says how the last
+  state commits of a sprint reach the remote.
+- **A crash could spend a fix round on nothing.** A fix round's send now carries the key
+  `<id>-fix-<round>`. T3 answers a reused send key with the first send, so resume re-sends
+  safely and never gates a result older than the round.
+- **A review could be stale.** The reviewer's result starts with `COMMIT: <sha>`; a review counts
+  only when that is the branch head.
+- **Fresh worktrees could not run the gates.** The plan and `AGENTS.md` gain a `setup` command.
+  The builder runs it first, the PM runs it before gating when it has to, and `/bstack:doctor`
+  reports `UNKNOWN` when gates need dependencies and no `setup` is recorded.
+- **Dead pointers.** poteto's `PORT.md` and README named the removed `scripts/validate.sh`.
+  `loop.md` cited "Spec §9" without saying the spec lives in the bstack repository.
+
+**Changed**
+- **The scan covers more.** New formats: Stripe live keys, GitLab, npm, PyPI and SendGrid tokens.
+  Commit messages are scanned. The README now says what the scan does not catch.
+- **Hook managers.** With `core.hooksPath` set, the PM used to ask the user what to do. It now
+  installs the copy and proposes the one-line call for husky, lefthook or another manager;
+  `/bstack:doctor` reports `OK` once that call is there.
+- **`role` on every dispatch.** `host.md` maps each soul to a `delegate_task` role.
+- **Automated checks are back, small.** `.github/scripts/check.sh` enforces the `AGENTS.md`
+  conventions, runs shellcheck and runs `test-scripts.sh`, 39 cases for the two plugin scripts.
+  A workflow runs it on Linux and macOS. This reverses 1.0's "no `validate.sh`, no CI" at the
+  owner's request: the stale `validate.sh` pointers above are the drift it would have caught. The
+  plugin's own code is still only `log.sh` and `scan-secrets.sh`.
+- **T3 contract.** The README records the T3 Code version last checked, and CONTRIBUTING lists
+  what to check again when T3 changes.
+- **Ownership.** The README states that what bstack writes into a project belongs to the project.
+
+**Existing projects**
+- Run `/bstack:doctor`: it reports the installed pre-push hook as `OUTDATED` and offers the new copy.
+- Add a `setup:` line to `docs/plan.md` `## Commands` and a `Setup:` line to `AGENTS.md`.
+- **Update.** `/plugin marketplace update bstack`, then `claude plugin update bstack@bstack` in a
+  terminal, then `/reload-plugins` or restart.
+
 ## 1.0.2 - 2026-11-10
 
 Restores two things the 0.30.0 trim lost when the agent files were folded into `roles.md`.
