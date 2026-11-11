@@ -34,8 +34,9 @@ git and GitHub.
   references now write `<plugin>`, and every skill defines it from its own resolved path.
 - **A false positive could block a story for good.** The merge-time scan had no allowlist and no
   bypass. `.scan-secrets-allow` now takes `<pattern name> <path glob>` lines. A range scan reads
-  it from the base ref, so a story branch cannot allow its own hit; the PM adds a line only on
-  the user's yes.
+  it from the base ref and a push from the destination's default branch, never from the work
+  tree or the branch being checked, so no branch can allow its own hit; the PM adds a line only
+  on the user's yes.
 - **A hit on the integration branch blocked unrelated stories.** A merge commit used to count
   everything it brought in. It now counts only what differs from every parent.
 - **PR mode did not close.** It now requires merge commits and checks for them, carries the PM's
@@ -62,7 +63,7 @@ git and GitHub.
   `/bstack:doctor` reports `OK` once that call is there.
 - **`role` on every dispatch.** `host.md` maps each soul to a `delegate_task` role.
 - **Automated checks are back, small.** `.github/scripts/check.sh` enforces the `AGENTS.md`
-  conventions, runs shellcheck and runs `test-scripts.sh`, 39 cases for the two plugin scripts.
+  conventions, runs shellcheck and runs `test-scripts.sh`, 43 cases for the two plugin scripts.
   A workflow runs it on Linux and macOS. This reverses 1.0's "no `validate.sh`, no CI" at the
   owner's request: the stale `validate.sh` pointers above are the drift it would have caught. The
   plugin's own code is still only `log.sh` and `scan-secrets.sh`.

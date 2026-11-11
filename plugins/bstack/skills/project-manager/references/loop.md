@@ -115,7 +115,8 @@ builder carries `<id>-fix-<round>` (`host.md` `## Messaging`).
        `<pattern name> <path glob>` that would allow it. Only on their yes, add it to
        `.scan-secrets-allow` on the integration branch, commit and log it, and scan again. The
        scan reads that file from `<integration>`, so a line on the story branch allows nothing;
-       a builder that edits the file is out of `touches`.
+       a builder that edits the file is out of `touches`. A push honours the line only once it
+       is on the remote's default branch, never from the work tree or the pushed branch.
    - On the integration branch, `git merge --no-ff <branch>`. Title `type(scope): subject`,
      imperative, no trailing period. Body sections in order, dropping empty ones:
      - `## Why`: intent, and why this approach.

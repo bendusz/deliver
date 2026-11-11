@@ -8,8 +8,9 @@
 # commit counts only what differs from every parent: what it brings in belongs to the commits that
 # made it. Added lines, added or changed paths and the commit message are matched.
 # Allowlist: .scan-secrets-allow, one "<pattern name> <path glob>" per line (* also spans /, # is
-# a comment). A range scan reads it from <base>, so a story branch cannot allow its own hit; a
-# push reads the work tree's. Only the user adds a line.
+# a comment). It is never read from the work tree or from what is being scanned: a range scan
+# reads it from <base>, a push from the destination's default branch as ls-remote reports it, so
+# no branch can allow its own hit. With no such source the list is empty. Only the user adds a line.
 # Exit 0 clean, 1 on a hit, 2 on any error (which blocks too). Prints commit, file, line and
 # pattern, never a value.
 set -euo pipefail
@@ -86,16 +87,15 @@ scan() {
 
 if [ "${1:-}" = --pre-push ] && [ "$#" -ge 2 ]; then
   mode=push; : > "$tmp/excl"
-  top=$(git rev-parse --show-toplevel 2>/dev/null) || top=
-  if [ -n "$top" ] && [ -f "$top/$allowfile" ]; then
-    cat "$top/$allowfile" > "$tmp/allow" || die "cannot read $allowfile"
-  fi
   # Exclude only what the destination really has: the shas it advertises that exist here. If it
   # cannot be listed, exclude nothing (fail closed on safety, not on availability).
   if git ls-remote "${3:-$2}" < /dev/null > "$tmp/remote" 2>/dev/null; then
     cut -f1 "$tmp/remote" | sort -u | sed 's/$/^{commit}/' \
       | git cat-file --batch-check='%(objectname)' | awk '/^[0-9a-f]+$/{print "^" $0}' \
       > "$tmp/excl" || die "cannot check the destination's refs"
+    # Honour only the allowlist the destination's default branch already holds.
+    rhead=$(awk -F'\t' '$2 == "HEAD" {print $1; exit}' "$tmp/remote") || rhead=
+    [ -z "$rhead" ] || git show "$rhead:$allowfile" > "$tmp/allow" 2>/dev/null || : > "$tmp/allow"
   fi
   while read -r _ lsha _ _; do
     case $lsha in *[!0]*) ;; *) continue ;; esac  # a delete pushes no content
@@ -147,5 +147,5 @@ done
 [ "$skipped" -eq 0 ] || printf 'scan-secrets: %s hit(s) allowed by %s\n' "$skipped" "$allowfile" >&2
 [ -s "$tmp/hits" ] || exit 0
 sed 's/^/scan-secrets: /' "$tmp/hits" >&2 || die "cannot report hits"
-printf 'scan-secrets: %s blocked. Remove the secret from history, not just the working tree, and rotate it. A false positive needs the user'"'"'s line in %s: "<pattern name> <path glob>". Only the user may bypass a push, with git push --no-verify.\n' "$mode" "$allowfile" >&2
+printf 'scan-secrets: %s blocked. Remove the secret from history, not just the working tree, and rotate it. A false positive needs the user'"'"'s line in %s on the base or the remote default branch: "<pattern name> <path glob>". Only the user may bypass a push, with git push --no-verify.\n' "$mode" "$allowfile" >&2
 exit 1

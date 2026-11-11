@@ -93,15 +93,21 @@ expect "a single ref is an error" 2 "usage" bash "$scan" main
 expect "a bad range is an error" 2 "bad range" bash "$scan" nosuch..main
 
 # --- pre-push hook ---
-git init -q --bare ../remote.git && git remote add origin ../remote.git
+git init -q --bare -b main ../remote.git && git remote add origin ../remote.git
 cp "$scan" .git/hooks/pre-push && chmod 755 .git/hooks/pre-push
+expect "push: the first commit goes out as the default branch" 0 "" git push -q origin "$base:refs/heads/main"
 expect "push: a clean branch goes out" 0 "" git push -q origin clean
 expect "push: a key in history blocks" 1 "push blocked" git push -q origin removed
 git switch -q main
-expect "push: a hit on main blocks" 1 "legacy.txt:1 aws-access-key" git push -q origin main
+expect "push: a hit blocks" 1 "legacy.txt:1 aws-access-key" git push -q origin main:refs/heads/legacy
 printf 'aws-access-key legacy.txt\n' >> .scan-secrets-allow
-expect "push: the work tree's allowlist is honoured" 0 "allowed" git push -q origin main
-git checkout -q -- .scan-secrets-allow
+expect "push: a work tree allowlist line is ignored" 1 "legacy.txt:1 aws-access-key" git push -q origin main:refs/heads/legacy
+commit "allow legacy on the pushed branch"
+expect "push: a branch cannot allow its own hit" 1 "legacy.txt:1 aws-access-key" git push -q origin main:refs/heads/legacy
+branch allowonly "$base"; printf 'aws-access-key legacy.txt\n' > .scan-secrets-allow; commit "allow legacy"
+expect "push: the allowlist itself reaches the default branch" 0 "" git push -q origin allowonly:refs/heads/main
+git switch -q main
+expect "push: the default branch's allowlist is honoured" 0 "allowed" git push -q origin main:refs/heads/legacy
 git worktree add -q ../wt -b wtb "$base"
 ( cd ../wt && echo "k=$aws" > w.env && git add w.env && git commit -q -m w )
 expect "push: the hook runs from a linked worktree" 1 "w.env:1 aws-access-key" git -C ../wt push -q origin wtb

@@ -24,7 +24,9 @@ it; only you may, with `git push --no-verify`.
   database URL. It is a net for the common leak, not a guarantee.
 - **False positives.** A token-shaped test fixture blocks too. You allow it with a line in
   `.scan-secrets-allow`, `<pattern name> <path glob>`; the PM proposes the line and adds it only
-  on your yes.
+  on your yes. The scan reads that file from the base branch for a merge and from the remote's
+  default branch for a push, never from the branch being checked, so no branch can allow its
+  own hit.
 - **Hook managers.** If husky, lefthook or anything else sets `core.hooksPath`, git skips the
   hook. The PM then proposes the one-line call that runs the scan from your manager's pre-push.
 

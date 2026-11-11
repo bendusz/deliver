@@ -78,7 +78,9 @@ local merges, because your commits could never fast-forward onto a squashed or r
   branch and are never pushed on their own. `loop.md` step 8 merges that branch into the story
   branch, so each PR carries them, and a protected branch needs nothing more.
 - **Open.** Push the story branch through the pre-push scan; a block is escalated to the user,
-  never bypassed with `--no-verify`. Open the PR with the merge body `loop.md` gives, then
+  never bypassed with `--no-verify`. An approved `.scan-secrets-allow` line counts for a push
+  only once the remote's default branch holds it: ask the user to push that one commit, or to
+  merge a PR that holds only that file, before the story branch goes up. Open the PR with the merge body `loop.md` gives, then
   `link_pull_request` and `watch_pull_request`. A wake is news, not a merge decision.
 - **Merge.** Re-run the gates locally. Merge with `gh pr merge --merge`, only on passing gates and
   a recorded `verifier: PASS <sha>` that covers the PR head: the sha is the head, or
