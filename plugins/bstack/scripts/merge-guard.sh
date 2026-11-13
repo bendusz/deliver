@@ -69,8 +69,9 @@ tokenize() {
   [ "$have" = 1 ] && words+=("$cur")
   words+=("$SEP")
 }
-resolve() { # resolve <dir> <path>; "?" when either cannot be read
-  case $1$2 in *'$'*|*'`'*|"?"*) printf '?'; return ;; esac
+resolve() { # resolve <dir> <path>; "?" when either cannot be read (expansions, globs, ~name)
+  case $1 in "?"*) printf '?'; return ;; esac
+  case $2 in *[\$\`*?[\{]*|"~"[!/]*) printf '?'; return ;; esac
   case $2 in /*) printf '%s' "$2" ;; "~"*) printf '%s' "$HOME${2#\~}" ;; *) printf '%s' "$1/$2" ;; esac
 }
 bstack() { [ "$1" = "?" ] || git -C "$1" cat-file -e HEAD:docs/approval.json 2>/dev/null; }
@@ -123,14 +124,11 @@ scan() {
 }
 tokenize "$cmd"
 indirect='(^|[^A-Za-z0-9_])(eval|xargs|pull|(sh|bash|zsh|dash|ksh)[[:space:]]+-[A-Za-z]*c)([^A-Za-z0-9_]|$)|alias\.'
-if [[ $cmd =~ pm/S[0-9]+-[0-9]+ ]] && [[ $cmd =~ $indirect ]]; then
-  hit=0; bstack "$cwd" && hit=1
-  prev=
-  for w in "${words[@]}"; do   # and every directory a cd or -C in the call names
-    case $prev in cd|-C) bstack "$(resolve "$cwd" "$w")" && hit=1 ;; esac
-    prev=$w
-  done
-  [ "$hit" = 0 ] || block "a story branch named through eval, sh -c, git pull or an alias; merge it with a plain git merge"
+# Allowed only when the cwd is not a bstack project and nothing in the text, quoted payloads
+# included, could point git elsewhere.
+elsewhere='(^|[^A-Za-z0-9_-])(cd|pushd|-C|--git-dir|--work-tree|GIT_DIR|GIT_WORK_TREE)([^A-Za-z0-9_-]|$)'
+if [[ $cmd =~ pm/S[0-9]+-[0-9]+ ]] && [[ $cmd =~ $indirect ]] && { bstack "$cwd" || [[ $cmd =~ $elsewhere ]]; }; then
+  block "a story branch named through eval, sh -c, git pull or an alias; merge it with a plain git merge"
 fi
 targets=$(scan)
 [ -n "$targets" ] || exit 0
@@ -156,6 +154,7 @@ covers() { # covers <label> <sha>: a full commit id on the head, and nothing aft
 check() { # check <repo dir> <story branch> <1 if an earlier command in the call moves HEAD>
   g=$1 br=$2
   [ "$g" != "?" ] || block "cannot tell which repository the merge of $br runs in; write the cd or -C path out"
+  git -C "$g" rev-parse --git-dir >/dev/null 2>&1 || block "$g is not a git repository; check the cd or -C path"
   bstack "$g" || return 0   # not a bstack project
   [ "$3" = 1 ] && block "a story merge after a command that moves HEAD; switch, then merge in a separate call"
   local cur story file meta tags exec gates ver extra
