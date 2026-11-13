@@ -9,7 +9,7 @@
 #   - docs/gate.txt, the integration gate, is not FAIL, unless pm-meta's tags hold fixes-gate.
 # Refused outright, so the check cannot be misread: a merge whose operand it cannot read (a
 # variable, a substitution), a story merge after a command that moves HEAD in the same call, and,
-# in a bstack project, a story name passed through eval, `sh -c`, `git pull` or a git alias.
+# a story name passed through eval, xargs, a shell's -c, `git pull` or a git alias.
 # It guards against mistakes, not an adversary with a shell.
 # Exit 0 allows, exit 2 blocks with the reason on stderr. Bash 3.2 compatible.
 # Only the user switches it off, by starting Claude Code with BSTACK_NO_ENFORCE=1.
@@ -41,8 +41,8 @@ case $cmd in *merge*|*pm/S*) ;; *) exit 0 ;; esac   # cheap exit, on the decoded
 case $cmd in *BSTACK_NO_ENFORCE*) block "BSTACK_NO_ENFORCE is the user's switch; never set it in a command" ;; esac
 [ "${BSTACK_NO_ENFORCE:-}" = 1 ] && exit 0
 cwd=$(field cwd); [ -n "$cwd" ] || cwd=$PWD
-if [[ $cmd =~ pm/S[0-9]+-[0-9]+ ]] && git -C "$cwd" cat-file -e HEAD:docs/approval.json 2>/dev/null \
-   && [[ $cmd =~ (^|[^A-Za-z0-9_])(eval|sh[[:space:]]+-c|bash[[:space:]]+-c|zsh[[:space:]]+-c|pull)([^A-Za-z0-9_]|$)|alias\. ]]; then
+indirect='(^|[^A-Za-z0-9_])(eval|xargs|pull|(sh|bash|zsh|dash|ksh)[[:space:]]+-[A-Za-z]*c)([^A-Za-z0-9_]|$)|alias\.'
+if [[ $cmd =~ pm/S[0-9]+-[0-9]+ ]] && [[ $cmd =~ $indirect ]]; then
   block "a story branch named through eval, sh -c, git pull or an alias; merge it with a plain git merge"
 fi
 
@@ -80,9 +80,9 @@ scan() {
   for w in "${words[@]}"; do
     if [ "$w" != "$SEP" ]; then c+=("$w"); continue; fi
     k=0
-    while [ "$k" -lt "${#c[@]}" ]; do   # prefixes: assignments, command, exec, env, time, nohup
+    while [ "$k" -lt "${#c[@]}" ]; do   # prefixes: keywords, assignments, command, env and the like
       case ${c[k]} in
-        command|exec|time|nohup|env|-*) k=$((k + 1)) ;;
+        if|then|else|elif|do|while|until|'!'|'{'|command|exec|time|nohup|env|-*) k=$((k + 1)) ;;
         *=*) if [[ ${c[k]} =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then k=$((k + 1)); else break; fi ;;
         *) break ;;
       esac
@@ -121,6 +121,11 @@ scan() {
 tokenize "$cmd"
 targets=$(scan)
 [ -n "$targets" ] || exit 0
+for w in "${words[@]}"; do   # a HEAD-moving word anywhere in the call, whatever its position
+  case $w in switch|checkout|reset|rebase|worktree|stash|bisect|update-ref|symbolic-ref)
+    targets=$(printf '%s\n' "$targets" | awk 'BEGIN { FS = OFS = "\t" } { $3 = 1; print }') ;;
+  esac
+done
 
 covers() { # covers <label> <sha>: a full commit id on the head, and nothing after it but state
   local sha=$2 extra

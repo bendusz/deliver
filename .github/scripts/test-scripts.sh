@@ -214,6 +214,8 @@ done
 git switch -q pm/S1-1-a
 expect "guard: switching and merging in one call blocks" 2 "moves HEAD" hook "$mg" "git switch main && $M"
 expect "guard: a story name through sh -c blocks" 2 "plain git merge" hook "$mg" "sh -c 'git merge pm/S1-1-a'"
+expect "guard: a shell flag group with c blocks" 2 "plain git merge" hook "$work" "cd $mg && bash -lc 'git merge pm/S1-1-a'"
+expect "guard: a HEAD move in any position blocks" 2 "moves HEAD" hook "$mg" "if git checkout main; then git merge pm/S1-1-a; fi"
 expect "guard: a story name through git pull blocks" 2 "plain git merge" hook "$mg" "git pull . pm/S1-1-a"
 expect "guard: updating the story branch is not a story merge" 0 "" hook "$mg" "git merge main -m \"bring pm/S1-1-a up to date\""
 git switch -q main
