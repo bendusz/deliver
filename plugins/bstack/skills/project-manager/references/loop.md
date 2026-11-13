@@ -65,8 +65,10 @@ lacks STATUS, the head COMMIT or a CRITERIA line goes back first (`roles.md` `##
    is not `none`, or the diff touches auth, untrusted input, a hot path or module structure.
    After a fix round, PRIOR lists the round's Fix items. A review counts only when its COMMIT is
    the branch head; otherwise dispatch it again with a letter on the key.
-   - `PASS` from every reviewer: verify (step 7).
-   - `CONCERNS`: minors only. Fix them in a round if cheap, else note them; then verify.
+   - `PASS` from every reviewer: record `review: PASS <head sha>` and verify (step 7).
+   - `CONCERNS`: minors only. Fix them in a round if cheap, else note them; record the review
+     at the head it covered, then verify. A later code commit needs a new review at the new head;
+     only state commits and a clean merge of `<integration>` (step 8) keep it.
    - `FAIL`: a `block` or `major` is open. Fix (step 6).
 
 6. **Fix.** You are the lead reviewer, not an aggregator. Check every finding against the code,
@@ -121,7 +123,7 @@ lacks STATUS, the head COMMIT or a CRITERIA line goes back first (`roles.md` `##
      `## Trade-offs`, `## Blast radius`, `## Verification` (every command and result, the gates
      and verifier shas).
    - Mark `merged` in its own commit, `chore(<id>): merged`, with the ledger row staged:
-     `bash "<plugin>/scripts/ledger.sh" <id> <blocked+partial replies> <reruns> "<role>=<model>:<min>m …" <parity|n/a>`.
+     `bash "<plugin>/scripts/ledger.sh" <id> merged <review-driven rounds> <blocked+partial replies> <reruns> "<role>=<model>:<min>m …" <parity|n/a>`.
      Minutes come from each child's run in `t3_thread_read`.
    - Run the full gates on the new integration head and write `docs/gate.txt`:
      `PASS|FAIL <sha> <YYYY-MM-DD HH:MM> <failing tests, if any>`. Commit it. `FAIL` holds every
@@ -141,6 +143,7 @@ lacks STATUS, the head COMMIT or a CRITERIA line goes back first (`roles.md` `##
 10. **Blocked.** Mark `blocked` with the reason in the log line. Escalate to the user, with a push
     notification if the host offers one, in at most 6 lines:
     `DECISION NEEDED | options with cost | what each skips | default if no answer by <time> | evidence path`
+    - Once it was reviewed, append its ledger row with status `blocked` (step 8's call).
     - Keep its worktree and branches; a blocked or dirty worktree is never removed.
     - Take the next unblocked, build-ready story in the same sprint that does not depend on the
       blocked one. Never start a later sprint's story early.

@@ -25,5 +25,5 @@ inventory matters, name the exact search that finds it.>
 
 <!-- Execution: never written at decomposition. The claim commit appends an "## Execution" heading
      and one line (references/state.md, ## Execution block). Shape:
-     pm-exec: {"role_model":"<role provider/model effort>","thread":"<childThreadId>","branch":"pm/S<sprint>-<n>-<slug>","worktree":"<absolute path>","status":"<claimed|building|built|reviewing|fixing|verified|merged|blocked>","rounds":0,"gates":"PASS <sha>","verifier":"<PASS|FAIL|UNKNOWN> <sha>|WAIVED"}
-     `gates` and `verifier` are absent until first recorded. -->
+     pm-exec: {"role_model":"<role provider/model effort>","thread":"<childThreadId>","branch":"pm/S<sprint>-<n>-<slug>","worktree":"<absolute path>","status":"<claimed|building|built|reviewing|fixing|verified|merged|blocked>","rounds":0,"gates":"PASS <sha>","review":"PASS <sha>","verifier":"<PASS|FAIL|UNKNOWN> <sha>|WAIVED"}
+     `gates`, `review` and `verifier` are absent until first recorded. -->

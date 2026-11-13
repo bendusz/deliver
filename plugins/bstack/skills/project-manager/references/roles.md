@@ -21,7 +21,7 @@ a dispatch fails on it twice), use its fallback and log it. Record the model use
 this header, then the story's `## Context`. Fixed keys, nothing around them; leave out a line
 that would say `n/a`:
 ```
-BRIEF <story-id> <role> r<round> model=<id> effort=<level>
+BRIEF <story-id> <role>
 BASE: <branch>@<full sha>  BRANCH: <name>  WORKTREE: <path|new>
 GOAL: <one outcome; two goals = two briefs>
 DONE WHEN:
@@ -31,8 +31,9 @@ OUT OF SCOPE: <items>
 PRIOR: <numbered findings to check, fix and re-review rounds only>
 HEAVY: <the plan's heavy wrapper>
 ```
-- A review brief is neutral: `r-` for the round, and no word on who built it, how many rounds ran
-  or what you expect. GOAL says what to review and any `focus:`, never what to find.
+- A review brief is neutral: no word on who built it, how many rounds ran or what you expect;
+  PRIOR is a plain numbered list of findings, with no builder notes and no "confirm". GOAL says
+  what to review and any `focus:`, never what to find.
 - GOAL variants: `Tests only: write the DONE WHEN tests, touch only test files, run them; red is
   correct.` `Diagnose: show the failure with a command before naming a cause, then fix.`
 - A reply counts only with STATUS, a COMMIT that is the branch head, and one CRITERIA line per DONE

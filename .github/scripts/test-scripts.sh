@@ -142,9 +142,9 @@ hook() {
 hookraw() { # hookraw <cwd> <JSON-encoded command, escapes as given>
   printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}}' "$1" "$2" | bash "$guard"
 }
-exec_line() { # exec_line <gates> <verifier>: rewrite S1-1's pm-exec and commit it on main
+exec_line() { # exec_line <gates> <verifier> [review, default the gates value]: rewrite S1-1's pm-exec, commit on main
   git switch -q main
-  sed -i.bak "s|<!-- pm-exec:.*|<!-- pm-exec: {\"status\":\"verified\",\"rounds\":0,\"gates\":\"$1\",\"verifier\":\"$2\"} -->|" docs/stories/S1-1-a.md
+  sed -i.bak "s|<!-- pm-exec:.*|<!-- pm-exec: {\"status\":\"verified\",\"rounds\":0,\"gates\":\"$1\",\"review\":\"${3:-$1}\",\"verifier\":\"$2\"} -->|" docs/stories/S1-1-a.md
   rm -f docs/stories/S1-1-a.md.bak; commit "state: $1 / $2"
 }
 cd "$work" && git init -q -b main mg && cd mg || exit 2
@@ -171,7 +171,10 @@ git switch -q pm/S1-1-a; echo "- J1 label wording" > docs/acceptance-differences
 expect "guard: recording an accepted difference keeps the shas valid" 0 "" hook "$mg" "$M"
 expect "guard: a message naming another story is not an operand" 0 "" hook "$mg" "git merge -m \"pm/S1-2-b\" pm/S1-1-a"
 git branch -q pm/S1-2-b main
-expect "guard: every story operand is checked" 2 "no docs/stories/S1-2" hook "$mg" "git merge pm/S1-1-a pm/S1-2-b"
+expect "guard: two stories in one merge block" 2 "one story per merge" hook "$mg" "git merge pm/S1-1-a pm/S1-2-b"
+expect "guard: two story merges in one call block" 2 "one story per merge" hook "$mg" "git merge pm/S1-1-a && git merge pm/S1-2-b"
+exec_line "PASS $head1" "PASS $head1" "none"
+expect "guard: no review record blocks" 2 "no 'review: PASS" hook "$mg" "$M"
 exec_line "PASS pm/S1-1-a" "PASS pm/S1-1-a"
 expect "guard: a ref name is not a recorded sha" 2 "not a full commit id" hook "$mg" "$M"
 exec_line "PASS $head1" "PASS $head1"
@@ -187,6 +190,21 @@ expect "guard: a later merge that brings only state files passes" 0 "" hook "$mg
 echo other > src/b.txt; commit "unrelated code on main"
 expect "guard: main code the branch has not merged blocks" 2 "since pm/S1-1-a last merged it" hook "$mg" "$M"
 git switch -q pm/S1-1-a; git merge -q --no-edit main; head3=$(git rev-parse HEAD); git switch -q main
+exec_line "PASS $head3" "PASS $head3"
+# Review at head3; then main moves on and the branch takes it in with a clean merge.
+echo more-main > src/c.txt; commit "more code on main"
+git switch -q pm/S1-1-a; git merge -q --no-edit main; head4=$(git rev-parse HEAD); git switch -q main
+exec_line "PASS $head4" "PASS $head4" "PASS $head3"
+expect "guard: a clean merge of the base after the review passes" 0 "" hook "$mg" "$M"
+git switch -q pm/S1-1-a; echo fix > src/d.txt; commit "builder fix after review"; head5=$(git rev-parse HEAD); git switch -q main
+exec_line "PASS $head5" "PASS $head5" "PASS $head3"
+expect "guard: a code commit after the reviewed sha blocks" 2 "review the head" hook "$mg" "$M"
+git switch -q pm/S1-1-a; git reset -q --hard "$head4"; echo evil > src/e.txt
+git merge -q --no-ff --no-commit main 2>/dev/null; git add src/e.txt; git commit -q --no-edit -m "merge with a change of its own"
+head6=$(git rev-parse HEAD); git switch -q main
+exec_line "PASS $head6" "PASS $head6" "PASS $head3"
+expect "guard: a merge with a change of its own after the review blocks" 2 "changes src/e.txt" hook "$mg" "$M"
+git switch -q pm/S1-1-a; git reset -q --hard "$head4"; git switch -q main; head3=$head4
 exec_line "PASS $head3" "PASS $head3"
 printf 'FAIL %s 2026-01-01 00:00 3 failed\n' "$head3" > docs/gate.txt; commit "gate red"
 git switch -q pm/S1-1-a; git merge -q --no-edit main; git switch -q main
@@ -274,13 +292,23 @@ expect "heavy: a command is required" 2 "usage" bash "$heavy" 2
 # --- ledger.sh (in the merge-guard repository, where S1-1 has a pm-exec) ---
 cd "$mg" || exit 2
 W="builder=claude-opus-5-5:14m reviewer=gpt-6-astra:6m"
-expect "ledger: appends a row" 0 "" bash "$ledger" S1-1 0 1 "$W" "12->30"
-expect "ledger: rounds and first-pass come from pm-exec" 0 "| S1-1 | 0 | y | 0 | 1 | $W | 12->30 |" cat docs/ledger.md
-expect "ledger: a sixth argument is a usage error" 1 "usage" bash "$ledger" S1-1 0 0 "$W" n/a n/a
-expect "ledger: wall time needs role=model:minutes" 1 "<role>=<model>:<minutes>m" bash "$ledger" S1-1 0 0 "builder 14m" n/a
-expect "ledger: empty wall time is refused" 1 "is not <role>" bash "$ledger" S1-1 0 0 "   " n/a
-expect "ledger: a pipe cannot break the table" 1 "parity" bash "$ledger" S1-1 0 0 "$W" "a|b->c"
-expect "ledger: an unknown story is refused" 1 "no docs/stories/S7-7" bash "$ledger" S7-7 0 0 "$W" n/a
+printf '# S1-3: a again\nReplaces: S1-1\n<!-- pm-exec: {"status":"merged","rounds":2} -->\n' > docs/stories/S1-3-a.md
+printf '# S1-4: a, third try\nReplaces: S1-3\n<!-- pm-exec: {"status":"merged","rounds":1} -->\n' > docs/stories/S1-4-a.md
+expect "ledger: appends a row" 0 "" bash "$ledger" S1-1 merged 0 0 1 "$W" "12->30"
+expect "ledger: first-pass for a merged story with no review round" 0 "| S1-1 | merged | S1-1 | 0 | 0 | y | 0 | 1 | $W | 12->30 |" cat docs/ledger.md
+expect "ledger: rows for a replaced story too" 0 "" bash "$ledger" S1-3 replaced 1 0 0 "$W" n/a
+expect "ledger: tests-stage rounds do not spoil first-pass; lineage follows Replaces" 0 "| S1-4 | merged | S1-1 | 1 | 0 | y |" \
+  sh -c 'bash "$1" S1-4 merged 0 0 0 "$2" n/a && cat docs/ledger.md' sh "$ledger" "$W"
+expect "ledger: a blocked story is never first-pass" 0 "| S1-3 | blocked | S1-1 | 2 | 0 | n |" \
+  sh -c 'bash "$1" S1-3 blocked 0 0 0 "$2" n/a && cat docs/ledger.md' sh "$ledger" "$W"
+expect "ledger: review rounds cannot exceed all rounds" 1 "more than the story's" bash "$ledger" S1-4 merged 2 0 0 "$W" n/a
+expect "ledger: an unknown status is refused" 1 "is not merged, blocked" bash "$ledger" S1-1 held 0 0 0 "$W" n/a
+expect "ledger: the old five-argument form is a usage error" 1 "usage" bash "$ledger" S1-1 0 0 "$W" n/a n/a
+expect "ledger: wall time needs role=model:minutes" 1 "<role>=<model>:<minutes>m" bash "$ledger" S1-1 merged 0 0 0 "builder 14m" n/a
+expect "ledger: empty wall time is refused" 1 "is not <role>" bash "$ledger" S1-1 merged 0 0 0 "   " n/a
+expect "ledger: a pipe cannot break the table" 1 "parity" bash "$ledger" S1-1 merged 0 0 0 "$W" "a|b->c"
+expect "ledger: an unknown story is refused" 1 "no docs/stories/S7-7" bash "$ledger" S7-7 merged 0 0 0 "$W" n/a
+rm -f docs/stories/S1-3-a.md docs/stories/S1-4-a.md
 
 # --- hygiene.sh ---
 cd "$work" && git init -q -b main hy && cd hy || exit 2

@@ -97,6 +97,7 @@ found wrong goes through this path, never drip-fed into a running story:
    its history, branch and worktree. Write the revised story under the next free `S<sprint>-<n>`
    with `Replaces: <old id>` under its header, move its plan row and Traceability there, and
    claim and run it from scratch; no earlier `verifier` result counts for it. Log both ids and why.
+   A reviewed story it replaces gets a ledger row with status `replaced` (`loop.md` step 8).
    Unaffected stories keep their Execution blocks.
 5. **Commit** the `docs/` changes together, saying what changed, at which level, and whether
    re-approval happened.

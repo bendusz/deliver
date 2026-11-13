@@ -43,12 +43,14 @@ every sprint.
 
 Where a machine can check a rule, a script does:
 - **Merge guard.** A Claude Code hook refuses `git merge … pm/<story>` unless the story records
-  passing gates and a verifier PASS at the branch head and the integration gate is not red. Only
-  you can switch it off, by starting Claude Code with `BSTACK_NO_ENFORCE=1`.
+  passing gates, review and verifier at the branch head, the integration gate is not red, and it
+  merges one story at a time. Only you can switch it off, by starting Claude Code with
+  `BSTACK_NO_ENFORCE=1`.
 - **`heavy.sh`.** Tests and builds wait for one of N slots shared by every worktree, and report
   the load; the PM runs two builders, not three, while the machine is overloaded.
-- **`ledger.sh`.** One row per merged story: rounds, first-pass, reruns, wall time and model per
-  role. It counts no tokens: tracking them would pull the PM's attention off the work.
+- **`ledger.sh`.** One row per reviewed story's outcome, merged or not: its lineage, rounds,
+  first-pass, reruns, wall time and model per role. It counts no tokens: tracking them would pull
+  the PM's attention off the work.
 - **`hygiene.sh`**, run by `/bstack:doctor`: an oversized `AGENTS.md`, an integration branch far
   ahead of main, a tag missing from main, leftovers of merged stories, and loose PM scripts.
 

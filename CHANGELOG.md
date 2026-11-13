@@ -26,8 +26,9 @@ smaller than in 1.1.1, and so is every child's dispatch.
 - **Merge guard** (`hooks/hooks.json`, `scripts/merge-guard.sh`), a PreToolUse hook on Bash. It
   refuses `git merge … pm/<story>` in a bstack project unless the story's `pm-exec` records
   `gates: PASS <sha>` and `verifier: PASS <sha>` (or `WAIVED` with a Waivers row) that cover the
-  branch head, the target branch holds nothing the story has not merged, and `docs/gate.txt` is
-  not `FAIL`. Only the user may set `BSTACK_NO_ENFORCE=1`. It reads its input with jq, python3 or
+  branch head, and `review: PASS <sha>` followed only by state commits or clean merges of the
+  base; the target branch holds nothing the story has not merged; `docs/gate.txt` is not `FAIL`;
+  and the call merges one story only, never a bundle. Only the user may set `BSTACK_NO_ENFORCE=1`. It reads its input with jq, python3 or
   node, and splits the command as the shell quotes it. It also refuses a story merge that follows
   a branch switch in the same call, and, in a bstack project, a story named through `eval`,
   `sh -c`, `git pull` or an alias, and a story merge in a repository it cannot name
@@ -38,9 +39,11 @@ smaller than in 1.1.1, and so is every child's dispatch.
 - **`heavy.sh`**: an N-slot semaphore for tests and builds across every worktree (`flock`, or
   pid symlinks where `flock` is missing, as on macOS), reporting the load before and after. The
   PM drops to two builders while the load stays over the core count.
-- **`ledger.sh`**: one row per merged story in `docs/ledger.md`, with wall time and model per role
-  from each child's run in `t3_thread_read`. It records no tokens: T3 does not report them, and
-  having the PM track them would take its attention off the work.
+- **`ledger.sh`**: one row per reviewed story's outcome in `docs/ledger.md`: merged, blocked,
+  replaced or abandoned, with its lineage (the root of its `Replaces:` chain), all fix rounds, the
+  review-driven ones, first-pass (merged with no review-driven round), and wall time and model per
+  role from each child's run in `t3_thread_read`. It records no tokens: T3 does not report them,
+  and having the PM track them would take its attention off the work.
 - **`hygiene.sh`**, run by `/bstack:doctor`: an `AGENTS.md` over 32 KiB, an integration branch
   over 200 commits or 14 days ahead of main, tags missing from main, branches and worktrees of
   merged stories, untracked or ignored scripts outside a tracked `ops/pm/`, and a stale copy of
@@ -68,9 +71,10 @@ smaller than in 1.1.1, and so is every child's dispatch.
 
 **Messages**
 - **One brief** for every role: `## Common` (once, not four lines in every soul), the role's
-  soul, then a fixed-key header (`BRIEF`, `BASE`, `GOAL`, `DONE WHEN`, `TOUCHES`/`PROTECTED`,
-  `OUT OF SCOPE`, `PRIOR`, `HEAVY`). A review brief is neutral: no round, no builder, no expected
-  verdict.
+  soul, then a fixed-key header (`BRIEF <story> <role>`, `BASE`, `GOAL`, `DONE WHEN`,
+  `TOUCHES`/`PROTECTED`, `OUT OF SCOPE`, `PRIOR`, `HEAVY`). Round, model and effort stay in the
+  dispatch target, key and `pm-exec`, out of the child's text. A review brief is neutral: no
+  builder, no expected verdict, and PRIOR a plain numbered list.
 - **One reply format** for every role, replacing the builder's JSON and the separate reviewer and
   verifier formats: `STATUS`, `COMMIT`, `CRITERIA`, `CHECKS` (with reruns and the failed run's
   error text), role lines, `OPEN`. A reply without STATUS, the head COMMIT or a CRITERIA line per

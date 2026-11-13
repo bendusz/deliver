@@ -5,6 +5,9 @@
 #   - its pm-exec records `gates: PASS <sha>` and `verifier: PASS <sha>` (or exactly `WAIVED`
 #     with a verifier row in the plan's ## Waivers), each a full commit id on the branch, and no
 #     commit after it (merges compared with their first parent) touches anything but state files;
+#   - it records `review: PASS <sha>` on the branch, and every commit after it touches only state
+#     files or is a clean merge (no change of its own) of a commit already on the target branch;
+#   - it is the only story in the call: stories integrate one at a time, each gated on the tip;
 #   - the target branch holds nothing outside state files that the story branch has not merged;
 #   - docs/gate.txt, the integration gate, is not FAIL, unless pm-meta's tags hold fixes-gate.
 # Refused outright, so the check cannot be misread: a story merge whose operand or repository it
@@ -138,6 +141,22 @@ for w in "${words[@]}"; do   # a HEAD-moving word anywhere in the call, whatever
   esac
 done
 
+review_covers() { # review_covers <sha>: as covers, but a clean merge of the base is allowed
+  local sha=$1 c p1 p2 t extra
+  [[ $sha =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] && [ "$(git -C "$g" cat-file -t "$sha" 2>/dev/null)" = commit ] \
+    || block "$id: the review record '$sha' is not a commit id in this repository"
+  git -C "$g" merge-base --is-ancestor "$sha" "$head" 2>/dev/null \
+    || block "$id: the reviewed sha $sha is not on $br; review the head $head"
+  for c in $(git -C "$g" rev-list --first-parent "$sha..$head"); do
+    read -r _ p1 p2 _ <<< "$(git -C "$g" rev-list --parents -n 1 "$c")"
+    if [ -n "${p2:-}" ] && git -C "$g" merge-base --is-ancestor "$p2" HEAD \
+       && t=$(git -C "$g" merge-tree --write-tree "$p1" "$p2" 2>/dev/null | head -1) \
+       && [ "$t" = "$(git -C "$g" rev-parse "$c^{tree}")" ]; then continue; fi
+    extra=$(git -C "$g" diff-tree --no-commit-id --name-only -r "${p1:-$c}" "$c" | grep -vE "$STATE_RE" | head -3 | oneline)
+    [ -z "$extra" ] || block "$id: reviewed at $sha, but a later commit on $br changes $extra; review the head $head"
+  done
+}
+
 covers() { # covers <label> <sha>: a full commit id on the head, and nothing after it but state
   local sha=$2 extra
   [[ $sha =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] \
@@ -157,7 +176,7 @@ check() { # check <repo dir> <story branch> <1 if an earlier command in the call
   git -C "$g" rev-parse --git-dir >/dev/null 2>&1 || block "$g is not a git repository; check the cd or -C path"
   bstack "$g" || return 0   # not a bstack project
   [ "$3" = 1 ] && block "a story merge after a command that moves HEAD; switch, then merge in a separate call"
-  local cur story file meta tags exec gates ver extra
+  local cur story file meta tags exec gates ver rev extra
   cur=$(git -C "$g" symbolic-ref --short -q HEAD)
   case $cur in pm/*) return 0 ;; esac   # bringing a story branch up to date is not a story merge
   case $br in "?"*) block "cannot read the merge operand '${br#?}'; write the branch name out" ;; esac
@@ -173,6 +192,7 @@ check() { # check <repo dir> <story branch> <1 if an earlier command in the call
   [ -n "$exec" ] || block "$story has no pm-exec line committed on $cur"
   gates=$(printf '%s' "$exec" | sed -nE 's/.*"gates": *"([^"]*)".*/\1/p')
   ver=$(printf '%s' "$exec" | sed -nE 's/.*"verifier": *"([^"]*)".*/\1/p')
+  rev=$(printf '%s' "$exec" | sed -nE 's/.*"review": *"([^"]*)".*/\1/p')
 
   case $gates in
     "PASS "*) covers gates "${gates#PASS }" ;;
@@ -185,6 +205,10 @@ check() { # check <repo dir> <story branch> <1 if an earlier command in the call
         || block "$id: verifier WAIVED, but docs/plan.md ## Waivers has no verifier row for $id" ;;
     *) block "$id: pm-exec has no 'verifier: PASS <sha>' (has '${ver:-nothing}')" ;;
   esac
+  case $rev in
+    "PASS "*) review_covers "${rev#PASS }" ;;
+    *) block "$id: pm-exec has no 'review: PASS <sha>' (has '${rev:-nothing}'); record the reviewed head" ;;
+  esac
   extra=$(git -C "$g" diff --name-only "$head...HEAD" | grep -vE "$STATE_RE" | head -3 | oneline)
   [ -z "$extra" ] || block "$cur changed $extra since $br last merged it; merge $cur into $br, gate again"
   if [ "$(git -C "$g" show HEAD:docs/gate.txt 2>/dev/null | awk 'NR==1{print $1}')" = FAIL ] \
@@ -193,5 +217,12 @@ check() { # check <repo dir> <story branch> <1 if an earlier command in the call
   fi
 }
 
+if [ "$(printf '%s\n' "$targets" | cut -f2 | grep -v '^?' | sort -u | wc -l)" -gt 1 ]; then
+  while IFS=$'\t' read -r gd _; do
+    if [ "$gd" = "?" ] || bstack "$gd"; then
+      block "one story per merge: integrate them one at a time, each gated on the new tip"
+    fi
+  done <<< "$targets"
+fi
 while IFS=$'\t' read -r gd b mv; do check "$gd" "$b" "$mv"; done <<< "$targets"
 exit 0
