@@ -11,7 +11,7 @@ path out in every command.
 
 Run the `bstack:project-manager` skill's procedure (load that skill first) to resume this project.
 Probe the host first; without T3 Code, say so and stop. Then load `references/state.md` and follow
-`## Resume`: read the approval record, the integration branch's first-parent history, every
+`## Resume`: read `docs/handoff.md` if present, then the approval record, the integration branch's first-parent history, every
 story's `pm-exec`, the worktree list, each recorded thread that is not merged, and the last ~20
 lines of `docs/log.md`, in that order.
 Git and the `pm-exec` lines win over the log.

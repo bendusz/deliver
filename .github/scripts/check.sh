@@ -46,7 +46,31 @@ for h in '## Chair soul' '## Member soul'; do
 done
 [ "$miss" -ne 0 ] || ok "every named reference, template and soul exists"
 
-# 4. ${CLAUDE_PLUGIN_ROOT} is substituted only in a SKILL.md body: references say <plugin>.
+# 3b. Token budgets. project-manager/SKILL.md loads every session; the phase references load only
+#     at their phase; a child's dispatch (## Common + its soul + the header skeleton) stays under
+#     its 1.1.1 soul. Raise a number only on purpose, with a CHANGELOG line saying why.
+pmsk=$(wc -c < "$b/skills/project-manager/SKILL.md" | tr -d ' ')
+if [ "$pmsk" -le 6257 ]; then ok "project-manager/SKILL.md is $pmsk bytes (budget 6257)"
+else bad "project-manager/SKILL.md is $pmsk bytes, over its 6257 budget"; fi
+for r in acceptance release; do
+  c=$(wc -c < "$refs/$r.md" 2>/dev/null | tr -d ' ')
+  if [ -n "$c" ] && [ "$c" -le 4096 ]; then ok "$r.md is $c bytes (budget 4096)"
+  else bad "$r.md is '${c:-missing}' bytes, budget 4096"; fi
+done
+section() { awk -v h="## $1" '$0==h{f=1;next} /^## |^<!--/{f=0} f' "$refs/roles.md"; }
+hdr=$(awk '/^BRIEF /{f=1} f{print} /^HEAVY:/{exit}' "$refs/roles.md")
+common=$(section Common | wc -c | tr -d ' ')
+for pair in builder:2005:PRIOR reviewer:2035:PRIOR verifier:1744:PRIOR \
+            researcher:1055:'BASE|TOUCHES|PRIOR|HEAVY' spec-architect:1354:'PRIOR|HEAVY'; do
+  role=${pair%%:*}; rest=${pair#*:}; max=${rest%%:*}; drop=${rest#*:}
+  soul=$(section "$role" | wc -c | tr -d ' ')
+  h=$(printf '%s\n' "$hdr" | grep -vE "^($drop)" | wc -c | tr -d ' ')
+  t=$((common + soul + h))
+  if [ "$soul" -gt 1 ] && [ "$t" -lt "$max" ]; then ok "$role dispatch is $t bytes (under $max)"
+  else bad "$role dispatch is $t bytes, not under its 1.1.1 soul's $max"; fi
+done
+
+# 4. ${CLAUDE_PLUGIN_ROOT} is substituted only in a SKILL.md body and hooks.json: references say <plugin>.
 if grep -rn 'CLAUDE_PLUGIN_ROOT' "$refs" "$b/templates" "$b/skills/board/souls.md"; then
   bad "a reference or template uses \${CLAUDE_PLUGIN_ROOT}; write <plugin> there"
 else ok "no \${CLAUDE_PLUGIN_ROOT} outside a SKILL.md body"; fi
@@ -61,12 +85,19 @@ for m in $(grep -rhoE '(claude-(opus|sonnet|haiku|fable)|gpt)-[0-9][0-9a-z.-]*[0
 done
 [ "$unknown" -ne 0 ] || ok "every model id is pinned"
 
-# 6. The only code in the plugin is the two scripts, executable, with LF endings.
+# 6. The only code in the plugin is its scripts, executable, with LF endings, and the hook that
+#    runs one of them.
+scripts="heavy.sh hygiene.sh ledger.sh log.sh merge-guard.sh scan-secrets.sh"
 code=$(git ls-files "$b" | grep -vE '\.(md|json|template)$' | sort | tr '\n' ' ')
-want="$b/scripts/log.sh $b/scripts/scan-secrets.sh "
-if [ "$code" = "$want" ]; then ok "log.sh and scan-secrets.sh are the plugin's only code"
+want=$(for s in $scripts; do printf '%s/scripts/%s ' "$b" "$s"; done)
+if [ "$code" = "$want" ]; then ok "the plugin's only code is its six scripts"
 else bad "unexpected non-prose files in the plugin: $code"; fi
-for s in log.sh scan-secrets.sh; do
+if grep -q '"PreToolUse"' "$b/hooks/hooks.json" 2>/dev/null \
+   && grep -q 'CLAUDE_PLUGIN_ROOT}/scripts/merge-guard.sh' "$b/hooks/hooks.json" \
+   && python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$b/hooks/hooks.json" 2>/dev/null; then
+  ok "hooks/hooks.json runs merge-guard.sh on PreToolUse"
+else bad "hooks/hooks.json is missing, invalid, or does not run scripts/merge-guard.sh"; fi
+for s in $scripts; do
   mode=$(git ls-files -s "$b/scripts/$s" | cut -d' ' -f1)
   [ "$mode" = 100755 ] || bad "$s is mode '$mode' in git, wanted 100755"
   if grep -q "$(printf '\r')" "$b/scripts/$s"; then bad "$s has CRLF line endings"; fi

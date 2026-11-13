@@ -2,6 +2,16 @@
 
 Run when every story in the sprint is `merged`, or `blocked` and escalated, or on `/bstack:retro`.
 
+## 0. Journey gate
+The sprint does not close until the plan's `## Acceptance` journeys that exist so far pass. Story
+tests prove stories; only a journey run from fresh state, with no test helper, proves the product.
+- One verifier dispatch (`roles.md`), `isolation: "shared"`, main checkout at the integration
+  head, key `S<n>-journeys-<k>`. GOAL: run each journey by its recipe; DONE WHEN: one line per
+  journey with its pass condition; evidence under `docs/evidence/S<n>-journeys/`. With a parity
+  check in the plan, its run is a criterion too, before -> after.
+- A failing journey becomes a story at the head of this sprint (`planning.md` `## 6`), run
+  through `loop.md`; then the gate runs again. Its result goes in the record's `## Demo`.
+
 ## 1. Cross-story review
 - Range: `git diff <from>...<to>`, from the parent of the sprint's first story merge to its last
   (`git log --first-parent --merges` on the integration branch).
@@ -34,11 +44,17 @@ Read each story's `pm-exec`, merge body and review verdicts, and the sprint's `d
 - Propose at most 3 added lines, plus retirements of lines a check now catches, as one diff. Ask;
   never write it unasked. Add lines, never rewrite the file.
 
-## 4. Record
-Write `docs/retros/sprint-<n>.md` from `<plugin>/templates/retro.md.template`.
+## 4. Waivers and pending rules
+Show the user every row of the plan's `## Waivers`, with its cost seen so far, and every
+`pending rule:` log line since the last retro. Each pending rule is the user's yes or no; a yes
+changes the plan or `AGENTS.md` now, logged. Unanswered rules stay pending.
+
+## 5. Record
+Write `docs/retros/sprint-<n>.md` from `<plugin>/templates/retro.md.template`; its numbers come
+from `docs/ledger.md`.
 Commit it with any accepted `AGENTS.md` change as `chore(retro): sprint <n>`, `docs/log.md`
-staged, and log the outcome. Show the user the record, then decompose the next sprint
-(`planning.md`). After the last sprint, write `docs/completion-report.md` from
+staged, and log the outcome. Show the user the record, led by `## Demo`, then write the handoff
+(`state.md` `## Handoff`) and decompose the next sprint (`planning.md`). After the last sprint, write `docs/completion-report.md` from
 `<plugin>/templates/completion-report.md.template` instead, never while a
 cross-story `block` or `major` is open: each is merged as a fix or has the user's logged ruling.
 

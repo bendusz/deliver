@@ -7,6 +7,9 @@
 <what and why>
 
 ## Delivery
+- Active goal: <exactly one outcome the current sprints serve>
+- PM model: <the model and effort the user chose for the PM, as named>
+- Release: <none | production>  <!-- production loads references/release.md before go/no-go -->
 - Integration branch: <main>  <!-- the branch every story branch is cut from and merged back into -->
 - Skeleton: <specdd | none>  <!-- default none; specdd writes .sdd contracts per sprint before decomposition -->
 - Between sprints: <pause | autonomous>  <!-- default pause: report after each retro and wait -->
@@ -49,6 +52,24 @@
 - lint: `<cmd or N/A>`
 - build: `<cmd or N/A>`
 - run: `<cmd or N/A>`
+- heavy: `bash "$(git rev-parse --git-common-dir)/bstack/heavy.sh" <slots>`  <!-- every test and build runs through it; slots = how many at once this machine takes -->
+
+## Acceptance
+<!-- REQUIRED. At most 5 journeys a user takes, each run from fresh state through the product's
+     own interface with no test helper: the sprint journey gate and the release candidate use them. -->
+| journey | fresh-state recipe | passes when |
+|---------|--------------------|-------------|
+| J1 <name> | <how to get a clean state: new account, empty database, first run> | <what the user sees> |
+
+- No visible change: <for a replacement or migration: what "users notice nothing" means, measured how; else N/A>
+- Parity check: <the command or tool that measures it, and its pass bar; else N/A>
+- Accepted differences: <docs/acceptance-differences.md, or where else they are listed by name>
+
+## Waivers
+<!-- The only way to waive a requirement the references set (verifier, tests first, a second
+     reviewer, the full suite). Never a Floor. The retro shows every row to the user each sprint. -->
+| what | why | date | who | cost seen so far |
+|------|-----|------|-----|------------------|
 
 ## Risks
 <!-- and open questions, carried assumptions, rejected design alternatives -->

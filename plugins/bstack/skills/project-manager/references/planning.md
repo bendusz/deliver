@@ -11,8 +11,8 @@ plan, no spec and no sprints. Nothing is built before sign-off.
   test, lint and build commands, and where new code should go. Fold the answers into the plan's
   Architecture and Commands, and keep them for the stories' Context.
 - Dispatch a researcher (`roles.md` `## researcher`, via `host.md` `## Dispatch`) only when an
-  external unknown decides the plan: a library choice, an unfamiliar SDK. Add the Codex second
-  opinion its **Default** names for a consequential or contested call. Cite the
+  external unknown decides the plan: a library choice, an unfamiliar SDK. Add `/bstack:codex ask`
+  for a consequential or contested call. Cite the
   `docs/research/` report in the plan's decision.
 
 ## 2. Converge
@@ -42,6 +42,15 @@ plan, no spec and no sprints. Nothing is built before sign-off.
   an untracked file such as `.env`, name it in Risks and agree with the user how a worktree gets
   it; never commit it or paste its contents into a brief.
 - `Integration branch:` is the branch the scaffold commit lands on, `main` by default.
+  `Active goal:` is one outcome; `PM model:` is what the user chose for you, as they named it.
+  `Release:` is `production` when this plan ships to users, which brings in `release.md`.
+- `heavy:` wraps every test and build: `bash "$(git rev-parse --git-common-dir)/bstack/heavy.sh" <slots>`, slots what this machine
+  runs at once without slowing down (start at cores / 8, at least 1).
+- `## Acceptance` is REQUIRED. Name up to 5 journeys a user takes, each with a fresh-state recipe
+  and what the user sees when it passes. For a replacement or migration, define now what "no
+  visible change" means, the parity check that measures it and its bar, and where accepted
+  differences are listed. Not after the first failure: then it is a negotiation.
+- `## Waivers` starts empty. A row is the only way to waive what the references require.
 - `Skeleton:` stays `none` unless the user opts into SpecDD; then `specdd` (`skeleton.md`).
 - The Stories table's `covers` column names the IDs each story satisfies. Traceability maps every
   `FR-` and `AC-` to at least one story and flags any that has none.
@@ -68,7 +77,8 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - No scaffold, no stories and no code before the record says `approved`.
 
 ### Change after sign-off
-Scope is frozen once a story starts. A new requirement, a direction change or an assumption
+Scope is frozen once a story starts. A date or scope change first gets Floor 6: the open go/no-go
+items and what the change skips, in the `loop.md` step 10 format; the user decides from it. A new requirement, a direction change or an assumption
 found wrong goes through this path, never drip-fed into a running story:
 1. **Stop.** Dispatch nothing new. Let running children finish, or `t3_thread_send` a builder to
    stop and commit what it has on its branch. Log the trigger and why.
@@ -105,6 +115,9 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
 - With `Skeleton: specdd`, add the SpecDD line held in the `AGENTS.md.template` comment,
   uncommented, to the project `AGENTS.md` Conventions.
 - `.gitignore` includes `tmp/`, appended, never clobbered. `tmp/` is scratch and never enters git.
+- `heavy.sh`, untracked, for every worktree: copy `<plugin>/scripts/heavy.sh` to `bstack/` in
+  `git rev-parse --git-common-dir`, as with the pre-push hook. Any script you write to run the
+  project lives tracked in `ops/pm/`, never in `tmp/` or untracked.
 - The pre-push secret scan, untracked, for every worktree: `pre-push` in the `hooks` directory of
   `git rev-parse --git-common-dir`. Absent: copy `<plugin>/scripts/scan-secrets.sh` there and
   `chmod 755` it (a copy: the plugin path changes on update). Present without its
@@ -140,19 +153,17 @@ before its first claim.
   `<plugin>/templates/story.md.template`. The child sees only the story, so it must
   stand alone: the goal, the boundaries, the exact files and symbols to inspect, and the search
   that finds a complete target set when one matters. Do not restate `AGENTS.md`.
-- **pm-meta.** `builder` is `claude`, `codex` or `auto`. `codex` suits one precise outcome with
-  bounded `touches`, concrete evidence and an exact verification command, resting on no open
-  design decision. `claude` suits broad, cross-cutting or architecture work, or work that needs
-  wide repo context. `auto` means you pick at claim per `roles.md` `## builder` **Default**
-  (bounded → Codex, broad → Claude) and record it in `pm-exec.role_model`.
 - **touches.** The files and directory roots the story will change, implementation and tests:
   unique repo-relative paths with no globs, placeholders, `.` or `..`. Required and bounded; a
   story whose scope you cannot name yet is not build-ready.
 - **Review focus.** `none` by default. `design` for structural change or a new abstraction,
   `security` for auth, secrets, crypto, untrusted input or dependency changes, `performance` for
   a hot path or large data. It becomes the reviewer's `focus:` line (`roles.md` `## reviewer`).
-- **Criteria and verification.** Every criterion is testable and cites the `AC-` it covers; the
-  header's `Covers` lists them. The verification command proves the story done.
+- **Criteria and verification.** Every criterion is testable, cites the `AC-` it covers and ends
+  `| proof: <command> -> <expected>`; the header's `Covers` lists them. `User-visible: yes` adds
+  the parity check or a journey from `## Acceptance` as a criterion.
+- **Design review** is `yes` for a change to storage, a data model, a migration or a versioned
+  interface (`loop.md` step 1). **tags** holds `fixes-gate` only for a story that fixes a red gate.
 - **Ordering.** Record `Depends on` and order dependencies first. `Parallel-safe: yes` only for a
   story with no dependency on unmerged work; the plan's table tags it `[P]`. When unsure, `no`.
 - **Execution.** Never written at decomposition. The claim adds it (`state.md` `## Execution block`).
