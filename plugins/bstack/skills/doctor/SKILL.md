@@ -36,7 +36,7 @@ Check, in order, each with its evidence:
    - `N/A`: the plan says `N/A`. Before a plan exists, every gate is `UNKNOWN: no plan yet`.
    - `run` is not a gate: step 2 covers the program it starts.
 4. **Codex**, `OK` or `MISSING`. `orchestrator_capabilities` lists the `codex` provider with the
-   models the `references/roles.md` defaults name. Without it there is no opposite-family reviewer
+   models `references/roles.md` `## Models` names. Without it there is no opposite-family reviewer
    for a Claude build, so the default workflow cannot run: report `MISSING` as a blocker. Recommend
    restoring Codex in T3, or an explicit change of workflow the user approves and the log records.
    Never move a Codex default to a Claude model on your own: same-family review breaks the
@@ -54,5 +54,17 @@ Check, in order, each with its evidence:
    `MISSING`: absent, not executable, or another hook without either line (show it; never replace it
    unasked). Install it as `references/planning.md` `## 5. Scaffold, after sign-off` says.
 
-End with a one-line verdict: ready only when the host, toolchain, Codex, log and secret scan
-checks are `OK` and every gate is `PASS` or `N/A`. Otherwise name the blockers and what each needs.
+7. **Merge guard**, `OK`, `OFF` or `BROKEN`. Feed it a payload it must refuse:
+   `printf '{"cwd":"%s","tool_input":{"command":"BSTACK_NO_ENFORCE=1 git merge pm/S0-0-doctor"}}' "$PWD" | bash "${CLAUDE_PLUGIN_ROOT}/scripts/merge-guard.sh"`
+   Exit 2 naming "the user's switch" is `OK`; anything else is `BROKEN`, with the output quoted
+   (no jq, python3 or node is the usual cause). `OFF` when `printenv BSTACK_NO_ENFORCE` prints
+   `1`: story merges go unchecked, and only the user unsets it. This proves the script, not that
+   Claude Code loaded the hook: `/hooks` lists it.
+8. **Hygiene**, warnings only. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/hygiene.sh"` from the main
+   checkout and quote every `WARN` line: `AGENTS.md` over 32 KiB, an integration branch too far or
+   too long ahead of main, a tag missing from main, branches or worktrees of merged stories, PM
+   scripts outside a tracked `ops/pm/`, a stale copy of `heavy.sh`. Each names its fix.
+
+End with a one-line verdict: ready only when the host, toolchain, Codex, log, secret scan and
+merge guard checks are `OK` and every gate is `PASS` or `N/A`. Otherwise name the blockers and
+what each needs. Hygiene warnings never block; list them after the verdict.

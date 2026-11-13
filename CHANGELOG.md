@@ -2,6 +2,110 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.0 - 2026-11-13
+
+Adds the guardrails, phases and message formats that a long production run under bstack's
+predecessor showed were missing. Each change is a template field, a script or a hook before it is
+prose. Each was kept only if a pressure scenario showed the PM getting it wrong without it, and
+right with it. The results are in `docs/evals/2026-11-13-v1.2.md`. `project-manager/SKILL.md` is
+smaller than in 1.1.1, and so is every child's dispatch.
+
+**Floors and waivers**
+- **`## Floors`** replaces the hard rules at the top of `SKILL.md`. No `AGENTS.md` line, plan,
+  project rule or deadline lifts them: no merge on a red integration gate (except a story tagged
+  `fixes-gate`), no merge with an open `block` or `major`, gates run by the PM on the merged tree
+  and recorded with the sha, an opposite-family reviewer, no secrets in files and no push without
+  asking, and the open go/no-go items and what a date or scope change skips, shown before the PM
+  agrees to it.
+- **`## Waivers`** in the plan is the only way to waive anything else the references require (the
+  verifier, tests first, a second reviewer, the full suite). The retro shows every row each sprint.
+- **Rule changes** the PM proposes wait as `pending rule:` log lines until the retro; one the user
+  asks for applies at once.
+
+**Scripts and the hook**
+- **Merge guard** (`hooks/hooks.json`, `scripts/merge-guard.sh`), a PreToolUse hook on Bash. It
+  refuses `git merge … pm/<story>` in a bstack project unless the story's `pm-exec` records
+  `gates: PASS <sha>` and `verifier: PASS <sha>` (or `WAIVED` with a Waivers row) that cover the
+  branch head, and `review: PASS <sha>` followed only by state commits or clean merges of the
+  base; the target branch holds nothing the story has not merged; `docs/gate.txt` is not `FAIL`;
+  and the call merges one story only, never a bundle. Only the user may set `BSTACK_NO_ENFORCE=1`. It reads its input with jq, python3 or
+  node, and splits the command as the shell quotes it. It also refuses a story merge that follows
+  a branch switch in the same call, and, in a bstack project, a story named through `eval`,
+  `sh -c`, `git pull` or an alias, and a story merge in a repository it cannot name
+  (`-C "$repo"`). It exits on the raw input before decoding, so a machine without jq, python3 or
+  node still runs every other command. It catches mistakes, not an agent set on getting past it.
+  For `gh pr merge`, the PM puts the same merge to the guard first (`host.md`), and
+  `/bstack:doctor` checks that the guard refuses a sample merge.
+- **`heavy.sh`**: an N-slot semaphore for tests and builds across every worktree (`flock`, or
+  pid symlinks where `flock` is missing, as on macOS), reporting the load before and after. The
+  PM drops to two builders while the load stays over the core count.
+- **`ledger.sh`**: one row per reviewed story's outcome in `docs/ledger.md`: merged, blocked,
+  replaced or abandoned, with its lineage (the root of its `Replaces:` chain), all fix rounds, the
+  review-driven ones, first-pass (merged with no review-driven round), and wall time and model per
+  role from each child's run in `t3_thread_read`. It records no tokens: T3 does not report them,
+  and having the PM track them would take its attention off the work.
+- **`hygiene.sh`**, run by `/bstack:doctor`: an `AGENTS.md` over 32 KiB, an integration branch
+  over 200 commits or 14 days ahead of main, tags missing from main, branches and worktrees of
+  merged stories, untracked or ignored scripts outside a tracked `ops/pm/`, and a stale copy of
+  `heavy.sh`.
+- `check.sh` now enforces the token budgets: `SKILL.md` at most its 1.1.1 size, `acceptance.md`
+  and `release.md` at most 4 KB, and each role's dispatch under its 1.1.1 soul.
+- A scan-secrets test that could never fail ("the hit output omits the value") now can: under
+  `pipefail` the scan's own exit code decided it.
+
+**Phases**
+- **Acceptance** (`references/acceptance.md`, loaded at a release candidate). The plan's REQUIRED
+  `## Acceptance` names up to 5 journeys with fresh-state recipes, and for a replacement or
+  migration defines "no visible change" and its parity check before any story. Each sprint closes
+  only after the journeys pass from fresh state with no test helper (`retro.md` `## 0`). A release
+  candidate freezes a sha; the user walks it and accepts each difference by name, recorded in
+  `docs/acceptance.json` as the plan is in `docs/approval.json`. Accepted differences are listed
+  in `docs/acceptance-differences.md`, a state file, so recording one keeps the release candidate.
+- **Release** (`references/release.md`, loaded only with `Release: production`). Go/no-go is
+  binding (`docs/go-no-go.md`): a waived item moves the date. The release ships with the new
+  behaviour switched off. Rehearsal runs on the production service units, and the rollback is
+  rehearsed. A clock-timed step runs on a system timer or by a named person, never on the PM's
+  wake-up. Tags must be on main and the integration branch.
+- **Sprint demo**: the sprint report leads with what the user can try, where, and the acceptance
+  status. The PM then writes `docs/handoff.md` and the user continues in a fresh thread.
+
+**Messages**
+- **One brief** for every role: `## Common` (once, not four lines in every soul), the role's
+  soul, then a fixed-key header (`BRIEF <story> <role>`, `BASE`, `GOAL`, `DONE WHEN`,
+  `TOUCHES`/`PROTECTED`, `OUT OF SCOPE`, `PRIOR`, `HEAVY`). Round, model and effort stay in the
+  dispatch target, key and `pm-exec`, out of the child's text. A review brief is neutral: no
+  builder, no expected verdict, and PRIOR a plain numbered list.
+- **One reply format** for every role, replacing the builder's JSON and the separate reviewer and
+  verifier formats: `STATUS`, `COMMIT`, `CRITERIA`, `CHECKS` (with reruns and the failed run's
+  error text), role lines, `OPEN`. A reply without STATUS, the head COMMIT or a CRITERIA line per
+  item goes back and spends no round.
+- Fixed formats for the Fix list, the escalation (at most 6 lines, with options, their cost, what
+  each skips and a default) and the handoff. Story criteria carry `| proof: <command> ->
+  <expected>`; stories gain `User-visible:`, `Design review:` and `tags`. The plan gains
+  `Active goal:`, `PM model:`, `Release:` and `heavy:`.
+
+**Models**
+- **One table** in `roles.md` replaces the scattered defaults. The builder is `claude-opus-5-5`
+  high for every build, fix and tests-only brief (fallback `gpt-6-astra` high). The design review,
+  new before a storage, data-model, migration or versioning build, is `gpt-6-astra` high. The
+  reviewer is the other family at high, the verifier and spec-architect `claude-opus-5-5` high,
+  the researcher `gpt-6.1-sol` high. Every dispatch sets model and effort, and effort never rises
+  on a retry. A builder on its fallback flips the reviewer, so the families stay opposite.
+  `/bstack:codex` follows the table.
+- `pm-meta.builder` (`auto`, `claude`, `codex`) is gone; old stories that carry it still work.
+
+**Moved**
+- The "why one reviewer" calibration note moved from `loop.md` to `docs/review-calibration.md`.
+
+**Upgrading**
+- From 1.1: `pm-exec` gains `gates`, which the PM writes at each ship, so the merge guard refuses
+  a story until it is gated and recorded. An existing plan takes the new fields (`Active goal:`,
+  `PM model:`, `Release:`, `heavy:`, `## Acceptance`, `## Waivers`) through "Change after
+  sign-off"; until `heavy:` is set, briefs leave out `HEAVY:` and commands run unwrapped. Run
+  `/bstack:doctor` to see the hygiene warnings.
+- From `deliver`: the rename in 1.0.0 means a `deliver` install never updates to bstack by itself.
+  Remove it with `/plugin marketplace remove deliver`, then install as the README says (see 1.0.0).
+
 ## 1.1.1 - 2026-11-11
 
 Fixes what the board found when it first met on its default seats, in this repository on

@@ -9,9 +9,9 @@ Call it again only after a dispatch error or a provider change the user names.
 
 ## Dispatch
 - Every role goes through `delegate_task`: model and effort are explicit, and each child has a
-  thread you can message. `task` is one `roles.md` soul (`## builder`, `## reviewer`, `## verifier`,
-  `## researcher`, `## spec-architect`), then the story or brief; `title` is `<story-id> <role>`.
-- `target` shapes, with the model and level from the soul's **Default** or your recorded choice:
+  thread you can message. `task` is built as `roles.md` `## The brief` says; `title` is
+  `<story-id> <role>`.
+- `target` shapes, with the model and level from `roles.md` `## Models`, never left to inherit:
   - Claude: `{"providerInstanceId":"claudeAgent","model":"<id>","options":{"effort":"<level>"}}`
   - Codex: `{"providerInstanceId":"codex","model":"<id>","options":{"reasoningEffort":"<level>"}}`
   - Always set Codex `reasoningEffort`: T3's per-model default can be `low`.
@@ -25,9 +25,8 @@ Call it again only after a dispatch error or a provider change the user names.
   the claim first. Reviewers and verifiers use `isolation: "shared"`; their brief names the
   recorded `pm-exec.worktree` path, and they run git and the gates there (`git -C <worktree>`).
 - The `delegate_task` and `task_status` results carry neither the worktree path nor the branch.
-  Only the builder reports them, in the JSON block its soul's **Returns** defines. Record
-  `childThreadId` as `thread`, and its `branch` and `worktree`, in the story's `pm-exec`
-  (`state.md`). At most 3 builders run at once.
+  Only the builder reports them, in its BRANCH/WORKTREE line. Record `childThreadId` as `thread`,
+  and its `branch` and `worktree`, in the story's `pm-exec` (`state.md`).
 - A new worktree holds only what git tracks: no installed dependencies, no `.env`. The builder
   runs the plan's `setup` first (its soul says so), and you run it before your first gate there if
   the gates still cannot start (`loop.md` step 4).
@@ -83,10 +82,11 @@ local merges, because your commits could never fast-forward onto a squashed or r
   only once the remote's default branch holds it: ask the user to push that one commit, or to
   merge a PR that holds only that file, before the story branch goes up. Open the PR with the merge body `loop.md` gives, then
   `link_pull_request` and `watch_pull_request`. A wake is news, not a merge decision.
-- **Merge.** Re-run the gates locally. Merge with `gh pr merge --merge`, only on passing gates and
-  a recorded `verifier: PASS <sha>` that covers the PR head: the sha is the head, or
-  `git diff --name-only <sha>..<head>` lists nothing outside `docs/stories/`, `docs/log.md` and
-  `docs/evidence/`. Otherwise verify again. A user who merges it themselves must use a merge commit.
+- **Merge.** The merge guard does not see `gh pr merge`, so put the same merge to it first, from
+  the integration branch with the story branch at the PR head:
+  `printf '{"cwd":"%s","tool_input":{"command":"git merge --no-ff %s"}}' "$PWD" <branch> | bash "<plugin>/scripts/merge-guard.sh"`
+  Exit 0 lets `gh pr merge --merge` go; exit 2 names what to fix. A user who merges it
+  themselves must use a merge commit.
 - **After.** `unwatch_pull_request` once the PR closes.
   - Merged: `git switch <integration branch>`, `git fetch`, then
     `git merge --ff-only origin/<integration branch>`. If you committed since the PR opened, that

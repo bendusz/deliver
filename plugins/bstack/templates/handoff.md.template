@@ -1,0 +1,8 @@
+<!-- docs/handoff.md: written at each sprint boundary, read first by /bstack:resume. One line per key. -->
+BASE_COMMIT: <full sha of the integration head>
+GOAL: <the plan's Active goal>
+STORIES: merged <ids>; blocked <ids, why>; next <ids>
+WAIVERS: <open rows of the plan's ## Waivers, or none>
+NEXT: 1. <action> 2. <action> 3. <action>
+READ FIRST: <paths, most useful first>
+SKIP: <what a fresh PM need not read, such as merged stories' files>

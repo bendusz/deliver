@@ -1,11 +1,16 @@
 <!-- docs/retros/sprint-<n>.md -->
 # Sprint <n> retrospective, <YYYY-MM-DD>
 
+## Demo
+- Try: <what the user can do now that they could not before>
+- Where: <URL, command or build, and any login>
+- Acceptance: <J1 pass | fail, …; parity before -> after, or N/A>; evidence `docs/evidence/S<n>-journeys/`
+
 ## Numbers
-<!-- One row per story, from its pm-exec line. -->
-| story | builder | rounds | verifier | status |
-|-------|---------|--------|----------|--------|
-| S<n>-1 | <provider/model effort> | <n> | <PASS sha, or none> | <merged or blocked> |
+<!-- One row per story, from docs/ledger.md and its pm-exec line. -->
+| story | builder model | rounds | first-pass | reruns | verifier | status |
+|-------|---------------|--------|------------|--------|----------|--------|
+| S<n>-1 | <model effort> | <n> | <y or n> | <n> | <PASS sha, WAIVED or none> | <merged or blocked> |
 
 ## Sprint review
 - Range: `<from>...<to>` · changed lines: <n> · focus: <none | design>
@@ -19,6 +24,10 @@
 
 ## What earned nothing
 - <gate, review or step> · cost: <rounds or minutes> · decision: <keep | drop> (the user's)
+
+## Waivers and pending rules
+| item | kind (waiver or pending rule) | cost seen so far | user's answer |
+|------|-------------------------------|------------------|---------------|
 
 ## AGENTS.md
 <!-- The proposed diff: at most 3 added lines. Record the user's answer per line. -->

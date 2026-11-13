@@ -1,0 +1,19 @@
+<!-- docs/go-no-go.md, from references/release.md. Binding: a waived item moves the date. -->
+# Go/no-go: <release> on <YYYY-MM-DD HH:MM>
+
+Decision: <GO | NO-GO | moved to <date>, because <waived items>>
+
+| item | state (open, done, waived) | evidence | who |
+|------|----------------------------|----------|-----|
+| Acceptance: docs/acceptance.json accepted at the release candidate sha | | | |
+| Release ships with the new behaviour switched off; switch-on is its own step | | | |
+| Rehearsal on the production service units, with production-like data | | | |
+| Rollback rehearsed, with its time measured | | | |
+| Every clock-timed step has a system timer or a named person | | | |
+| Release tag is on the integration branch and on main (hygiene.sh) | | | |
+| <project item> | | | |
+
+## Timed steps
+| when | step | runs by (timer unit or person) | check after |
+|------|------|--------------------------------|-------------|
+| <YYYY-MM-DD HH:MM> | <command> | <unit name or person> | <command -> expected> |

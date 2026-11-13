@@ -6,8 +6,8 @@ family checks it, a verifier signs it off, and the PM runs the gates and merges.
 implementation code itself.
 
 **Requirements.** T3 Code, with Codex available in T3. bstack dispatches every role through T3
-and stops if T3 is not there. The default workflow needs Codex for the opposite-family review and
-for bounded builds. You may name other models for any dispatch. bstack leans on how T3 behaves
+and stops if T3 is not there. The default workflow needs Codex for the opposite-family review,
+the design review and research. You may name other models for any dispatch. bstack leans on how T3 behaves
 (where it puts a worktree, what a child's result carries, how a reused request key answers).
 Dispatch, messaging and the model ids were last checked against T3 Code 0.1.9 nightly on
 2026-11-10; the worktree behaviour on 2026-11-07; a child dispatching its own children, which the
@@ -31,6 +31,35 @@ it; only you may, with `git push --no-verify`.
 - **Hook managers.** If husky, lefthook or anything else sets `core.hooksPath`, git skips the
   hook. The PM then proposes the one-line call that runs the scan from your manager's pre-push.
 
+## Guardrails
+
+A few rules hold whatever a project's `AGENTS.md`, plan or deadline says. The PM merges no story
+while the integration gate is red (except the story that fixes it), merges nothing with an open
+`block` or `major` finding, runs the gates itself on the merged tree and records the commit, keeps
+the reviewer in the other model family, and shows you the open go/no-go items and what a date or
+scope change skips before it agrees to one. Anything else (the verifier, tests first, the full
+suite) can be waived only by a row in the plan's `## Waivers` table, which the retro shows you
+every sprint.
+
+Where a machine can check a rule, a script does:
+- **Merge guard.** A Claude Code hook refuses `git merge … pm/<story>` unless the story records
+  passing gates, review and verifier at the branch head, the integration gate is not red, and it
+  merges one story at a time. Only you can switch it off, by starting Claude Code with
+  `BSTACK_NO_ENFORCE=1`.
+- **`heavy.sh`.** Tests and builds wait for one of N slots shared by every worktree, and report
+  the load; the PM runs two builders, not three, while the machine is overloaded.
+- **`ledger.sh`.** One row per reviewed story's outcome, merged or not: its lineage, rounds,
+  first-pass, reruns, wall time and model per role. It counts no tokens: tracking them would pull
+  the PM's attention off the work.
+- **`hygiene.sh`**, run by `/bstack:doctor`: an oversized `AGENTS.md`, an integration branch far
+  ahead of main, a tag missing from main, leftovers of merged stories, and loose PM scripts.
+
+Each sprint ends with the plan's user journeys run from a fresh state, then a demo: what you can
+try and where. Before a release, you walk the release candidate yourself and accept its
+differences by name; with a production release, go/no-go is binding, the new behaviour ships
+switched off, and a step due at a set time runs on a system timer or by a person, never on the
+PM's own wake-up.
+
 ## Install
 
 Run these two steps separately. Submit the first, wait for it to finish, then run the second. If you
@@ -51,6 +80,11 @@ paste both at once, the second line gets swallowed into the first command's argu
 Use the full `https://` URL; the `owner/repo` shorthand resolves to SSH, which fails without a
 GitHub SSH key. If the plugin does not appear right away, restart the session.
 
+**Coming from `deliver`?** The rename means a `deliver` install never updates to bstack on its
+own. Remove it with `/plugin marketplace remove deliver` (that also uninstalls the `deliver`
+plugin), then run the two steps above. Projects keep working; see the 1.0.0 and 1.2.0 entries in
+[CHANGELOG.md](CHANGELOG.md) for what changes in a project.
+
 ## Use
 
 Describe the work ("act as my PM to build a CLI todo app") or run `/bstack:pm <request>`.
@@ -59,23 +93,32 @@ Describe the work ("act as my PM to build a CLI todo app") or run `/bstack:pm <r
    the work will outlive the plan.
 2. **Sign-off, in conversation.** Nothing is built until you say "approved", recorded in `docs/approval.json`.
 3. **Stories.** Each sprint becomes self-contained files under `docs/stories/`, tracing to the plan's IDs.
-4. **Per-story loop on T3.** Claim, tests first, build in a T3 worktree, gate, review, at most three
-   fix rounds, verify. Up to three independent stories build at once.
+4. **Per-story loop on T3.** Claim, a design review when storage or data changes, tests first,
+   build in a T3 worktree, gate, review, at most three fix rounds, verify. Up to three independent
+   stories build at once.
 5. **Ship.** A `--no-ff` merge whose body is the story's record, or a PR when you ask. Each sprint
-   ends with a retro that proposes `AGENTS.md` learnings as a diff. A one-story fix skips the spec,
-   sprints and retro.
+   ends with the journey gate, a retro that proposes `AGENTS.md` learnings as a diff, and a demo.
+   A one-story fix skips the spec, sprints and retro.
+6. **Accept and release.** You walk the release candidate and record your acceptance; a
+   production release adds a binding go/no-go.
 
 ## Roles
 
-Each role is a short "soul" pasted into a T3 `delegate_task`; its default model is a recommendation.
+Each role is a T3 `delegate_task` child. Its brief is a shared block, a short "soul" for the
+role, and a fixed-key header; every child replies in the same line format. Every dispatch names
+its model and effort, so a child never inherits the PM's. If a default is unavailable, the PM uses
+the fallback and logs it.
 
-| Role | Does | Default |
+| Role | Does | Default (fallback) |
 |---|---|---|
-| builder | Implements one story, a tests-only brief or a fix, in its own worktree | Codex `gpt-6-astra` for bounded work, `claude-opus-5-5` for broad work |
-| reviewer | Reviews the diff against the story; never the builder | The family that did not build |
-| verifier | Checks each acceptance criterion PASS, FAIL or UNKNOWN before merge | `claude-opus-5-5` |
-| researcher (optional) | Answers one external question, report under `docs/research/` | `claude-opus-5-5`, Codex for a second opinion |
-| spec-architect (optional) | Writes the SpecDD `.sdd` files for a sprint | `claude-opus-5-5` |
+| builder | Implements one story, a tests-only brief or a fix, in its own worktree | `claude-opus-5-5` high (Codex `gpt-6-astra` high) |
+| design review | Reviews the plan of a storage, data-model, migration or versioning story before it is built | Codex `gpt-6-astra` high (`claude-opus-5-5` high) |
+| reviewer | Reviews the diff against the story; never the builder | The family that did not build: `gpt-6-astra` high or `claude-opus-5-5` high |
+| verifier | Checks each acceptance criterion, the sprint's journeys and the release candidate | `claude-opus-5-5` high (`gpt-6-astra` high) |
+| researcher (optional) | Answers one external question, report under `docs/research/` | Codex `gpt-6.1-sol` high (`claude-opus-5-5` high) |
+| spec-architect (optional) | Writes the SpecDD `.sdd` files for a sprint | `claude-opus-5-5` high (`gpt-6-astra` high) |
+
+The PM runs on whatever model you choose; the plan records it as `PM model:`.
 
 ## Skills
 
@@ -85,7 +128,7 @@ Each is a skill: run it as `/bstack:<name>`, or describe the task and Claude pic
 |---|---|
 | `/bstack:pm` | Act as the PM end to end: plan, sign-off, stories, loop, ship. |
 | `/bstack:resume` | Pick up from git, the approval record, the story Execution blocks and the log. |
-| `/bstack:doctor` | Check the T3 host, the toolchain, the project's gates, Codex, `log.sh` and the secret scan. |
+| `/bstack:doctor` | Check the T3 host, the toolchain, the project's gates, Codex, `log.sh`, the secret scan, the merge guard and project hygiene. |
 | `/bstack:retro` | Run the sprint boundary's cross-story review and retrospective. |
 | `/bstack:codex` | `review` a commit, worktree, branch or codebase with Codex, or `ask` it a question. |
 | `/bstack:skeleton` | Write or extend the SpecDD skeleton for a sprint. |
@@ -135,4 +178,4 @@ GPL-3.0-or-later; see [LICENSE](LICENSE). Copyright (c) 2026 bendusz. `poteto` s
 What bstack writes into your project is yours. The plan, spec, stories, `AGENTS.md`, retros,
 board minutes and `.sdd` files it creates from its templates are your work, under whatever licence
 your project uses. The pre-push hook is an untracked local copy of `scan-secrets.sh`; it is not
-part of your repository.
+part of your repository, and neither is the untracked copy of `heavy.sh` beside it.

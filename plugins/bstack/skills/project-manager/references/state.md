@@ -18,18 +18,32 @@ stands, and why things were decided. Everything else is branches, commits and tr
 The claim commit, on the integration branch and before any dispatch, appends to the story:
 ```
 ## Execution
-<!-- pm-exec: {"role_model":"<role provider/model effort>","thread":"<childThreadId>","branch":"pm/S<sprint>-<n>-<slug>","worktree":"<absolute path>","status":"<claimed|building|built|reviewing|fixing|verified|merged|blocked>","rounds":0,"verifier":"<PASS|FAIL|UNKNOWN> <sha>"} -->
+<!-- pm-exec: {"role_model":"<role provider/model effort>","thread":"<childThreadId>","branch":"pm/S<sprint>-<n>-<slug>","worktree":"<absolute path>","status":"<claimed|building|built|reviewing|fixing|verified|merged|blocked>","rounds":0,"gates":"PASS <sha>","review":"PASS <sha>","verifier":"<PASS|FAIL|UNKNOWN> <sha>|WAIVED"} -->
 ```
-- `role_model` is the builder's choice, such as `builder codex/gpt-6-astra high`. `thread`,
-  `branch` and `worktree` come from the builder's dispatch and result (`host.md` `## Dispatch`).
+- `role_model` is the builder's model as dispatched, such as `builder claudeAgent/claude-opus-5-5
+  high`; a fallback rewrites it. `thread`, `branch` and `worktree` come from the builder's
+  dispatch and its BRANCH/WORKTREE line (`host.md` `## Dispatch`).
+- `gates` is absent until `loop.md` step 8 gates the up-to-date branch: `PASS <sha>` of that head.
+  `review` is the head every reviewer passed (`loop.md` step 5).
 - Tests first (`loop.md` step 2) records its child in those three fields, still `claimed`. Once
   its tests are accepted, one line goes under the `pm-exec`: `Tests: <tests sha> <test paths>`.
 - `rounds` counts fix rounds. Increment and commit it before the round's dispatch; the cap is 3.
 - `verifier` is absent until the first verification, then the verifier's `STATUS` and `COMMIT`
   (`roles.md` `## verifier`). `merged` is terminal; the block stays as history.
 - Only you edit the block, in your commits on the integration branch. Story branches never do.
-- Fields older deliver versions wrote (`owner`, `builder`, `tier`, `panel`, counters and the like)
-  are ignored; an old `in-review` status reads as `reviewing`.
+- Fields older versions wrote (`builder` in `pm-meta`, `owner`, `tier`, `panel`, counters) are
+  ignored; an old `in-review` status reads as `reviewing`.
+
+## State files
+The PM's records, never a story's code: `docs/stories/`, `docs/evidence/`, `docs/retros/`,
+`docs/log.md`, `docs/ledger.md`, `docs/plan.md`, `docs/handoff.md`, `docs/go-no-go.md`,
+`docs/acceptance-differences.md`,
+`docs/approval.json`, `docs/acceptance.json` and `docs/gate.txt`. A commit that touches only these
+leaves a gates or verifier sha valid; the merge guard holds the same list.
+- `docs/gate.txt`, one line: `PASS|FAIL <sha> <YYYY-MM-DD HH:MM> <failing tests>`, the full gates on
+  the integration head after each merge (`loop.md` step 8). Absent means not yet run.
+- `docs/ledger.md`: one row per reviewed story's outcome (merged, blocked, replaced or abandoned),
+  appended only by `<plugin>/scripts/ledger.sh`; its lineage column follows `Replaces:` lines.
 
 ## Log
 - `docs/log.md` in the main checkout is the decision log, tracked, headed `# Decision log`. Each
@@ -44,8 +58,13 @@ The claim commit, on the integration branch and before any dispatch, appends to 
   only at session end, for entries still unstaged. Story branches never touch it: no conflicts.
 - It is a history, never a source of state. When it disagrees with git or a `pm-exec`, they win.
 
+## Handoff
+At each sprint boundary, after the demo, rotate the PM thread: write `docs/handoff.md` from
+`<plugin>/templates/handoff.md.template`, commit it, and tell the user to continue in a new
+thread with `/bstack:resume`. Long threads lose rules to compaction; a fresh one reads them again.
+
 ## Resume
-Read, in order: `docs/approval.json`; `git log --first-parent <integration branch>`; every
+Read, in order: `docs/handoff.md` if present, then skip what its SKIP line lists; `docs/approval.json`; `git log --first-parent <integration branch>`; every
 story's `pm-exec`; `git worktree list --porcelain`; `t3_thread_read` of each thread a non-merged
 block records; the last ~20 lines of `docs/log.md`. Not approved means planning; approved with no
 stories means decomposition. Then re-enter each story from its `status` (steps per `loop.md`):
@@ -54,7 +73,7 @@ stories means decomposition. Then re-enter each story from its `status` (steps p
   (step 2). Cancelled or interrupted: `t3_thread_send` it to continue, as step 3 resumes a build.
 - `claimed` with a `Tests:` line: the tests are accepted and their worktree is meant to go. Finish
   any of its cleanup step 2 left undone, then build (step 3).
-- `building`: if the thread finished, take its result JSON and gate. If cancelled or
+- `building`: if the thread finished, take its reply and gate. If cancelled or
   interrupted, `t3_thread_send` to `thread`: its branch, worktree, and continue (`host.md`
   `## Messaging`). No `thread` yet: retry with the same `clientRequestId` in case the response was
   lost; if no child comes back, dispatch a new builder with the next round in the key.
