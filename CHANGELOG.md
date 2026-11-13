@@ -28,7 +28,10 @@ smaller than in 1.1.1, and so is every child's dispatch.
   `gates: PASS <sha>` and `verifier: PASS <sha>` (or `WAIVED` with a Waivers row) that cover the
   branch head, the target branch holds nothing the story has not merged, and `docs/gate.txt` is
   not `FAIL`. Only the user may set `BSTACK_NO_ENFORCE=1`. It reads its input with jq, python3 or
-  node. The PR path (`gh pr merge`) is checked by the PM, as `host.md` says.
+  node, and splits the command as the shell quotes it. It also refuses a story merge that follows
+  a branch switch in the same call, and, in a bstack project, a story named through `eval`,
+  `sh -c`, `git pull` or an alias. It catches mistakes, not an agent set on getting past it. The
+  PR path (`gh pr merge`) is checked by the PM, as `host.md` says.
 - **`heavy.sh`**: an N-slot semaphore for tests and builds across every worktree (`flock`, or
   pid symlinks where `flock` is missing, as on macOS), reporting the load before and after. The
   PM drops to two builders while the load stays over the core count.

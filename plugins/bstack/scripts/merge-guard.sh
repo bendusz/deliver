@@ -7,7 +7,10 @@
 #     commit after it (merges compared with their first parent) touches anything but state files;
 #   - the target branch holds nothing outside state files that the story branch has not merged;
 #   - docs/gate.txt, the integration gate, is not FAIL, unless pm-meta's tags hold fixes-gate.
-# A merge whose operand it cannot read (a variable, a substitution) is refused: write it out.
+# Refused outright, so the check cannot be misread: a merge whose operand it cannot read (a
+# variable, a substitution), a story merge after a command that moves HEAD in the same call, and,
+# in a bstack project, a story name passed through eval, `sh -c`, `git pull` or a git alias.
+# It guards against mistakes, not an adversary with a shell.
 # Exit 0 allows, exit 2 blocks with the reason on stderr. Bash 3.2 compatible.
 # Only the user switches it off, by starting Claude Code with BSTACK_NO_ENFORCE=1.
 set -uo pipefail
@@ -34,10 +37,14 @@ process.stdout.write(typeof d==="string"?d:"")})' "$@"
   else return 9; fi
 }
 cmd=$(field tool_input command) || block "cannot read the hook input: install jq, python3 or node"
-case $cmd in *merge*) ;; *) exit 0 ;; esac   # cheap exit, on the decoded command
+case $cmd in *merge*|*pm/S*) ;; *) exit 0 ;; esac   # cheap exit, on the decoded command
 case $cmd in *BSTACK_NO_ENFORCE*) block "BSTACK_NO_ENFORCE is the user's switch; never set it in a command" ;; esac
 [ "${BSTACK_NO_ENFORCE:-}" = 1 ] && exit 0
 cwd=$(field cwd); [ -n "$cwd" ] || cwd=$PWD
+if [[ $cmd =~ pm/S[0-9]+-[0-9]+ ]] && git -C "$cwd" cat-file -e HEAD:docs/approval.json 2>/dev/null \
+   && [[ $cmd =~ (^|[^A-Za-z0-9_])(eval|sh[[:space:]]+-c|bash[[:space:]]+-c|zsh[[:space:]]+-c|pull)([^A-Za-z0-9_]|$)|alias\. ]]; then
+  block "a story branch named through eval, sh -c, git pull or an alias; merge it with a plain git merge"
+fi
 
 # Split the command into words as the shell would quote them, with SEP between simple commands.
 words=()
@@ -68,7 +75,7 @@ resolve() { case $2 in /*) printf '%s' "$2" ;; "~"*) printf '%s' "$HOME${2#\~}" 
 # For each `git … merge …`: print "<repo dir>\t<operand>" for every operand that names a story
 # branch, or "?<operand>" for one it cannot read.
 scan() {
-  local dir=$cwd w k g sub op
+  local dir=$cwd w k g sub op moved=0
   local c=()
   for w in "${words[@]}"; do
     if [ "$w" != "$SEP" ]; then c+=("$w"); continue; fi
@@ -91,6 +98,7 @@ scan() {
         esac
       done
       sub=${c[k]:-}; k=$((k + 1)); op=0
+      case $sub in switch|checkout|reset|rebase|worktree|stash|bisect|update-ref|symbolic-ref) moved=1 ;; esac
       while [ "$sub" = merge ] && [ "$k" -lt "${#c[@]}" ]; do
         w=${c[k]}; k=$((k + 1))
         if [ "$op" = 0 ]; then
@@ -102,8 +110,8 @@ scan() {
           esac
         fi
         case $w in
-          *'$'*|*'`'*) printf '%s\t?%s\n' "$g" "$w" ;;
-          pm/*|refs/heads/pm/*) printf '%s\t%s\n' "$g" "${w#refs/heads/}" ;;
+          *'$'*|*'`'*) printf '%s\t?%s\t%s\n' "$g" "$w" "$moved" ;;
+          pm/*|refs/heads/pm/*) printf '%s\t%s\t%s\n' "$g" "${w#refs/heads/}" "$moved" ;;
         esac
       done
     fi
@@ -127,9 +135,10 @@ covers() { # covers <label> <sha>: a full commit id on the head, and nothing aft
   [ -z "$extra" ] || block "$id: $1 ran at $sha, but later commits on $br change $extra; run it again on $head"
 }
 
-check() { # check <repo dir> <story branch>
+check() { # check <repo dir> <story branch> <1 if an earlier command in the call moves HEAD>
   g=$1 br=$2
   git -C "$g" cat-file -e HEAD:docs/approval.json 2>/dev/null || return 0   # not a bstack project
+  [ "$3" = 1 ] && block "a story merge after a command that moves HEAD; switch, then merge in a separate call"
   local cur story file meta tags exec gates ver extra
   cur=$(git -C "$g" symbolic-ref --short -q HEAD)
   case $cur in pm/*) return 0 ;; esac   # bringing a story branch up to date is not a story merge
@@ -166,5 +175,5 @@ check() { # check <repo dir> <story branch>
   fi
 }
 
-while IFS=$'\t' read -r gd b; do check "$gd" "$b"; done <<< "$targets"
+while IFS=$'\t' read -r gd b mv; do check "$gd" "$b" "$mv"; done <<< "$targets"
 exit 0

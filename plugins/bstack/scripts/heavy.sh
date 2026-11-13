@@ -14,8 +14,11 @@ case $slots in ''|*[!0-9]*|0) die "slots must be a positive integer, got '$slots
 
 if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
   dir=$common/bstack-heavy
-else
-  dir=${TMPDIR:-/tmp}/bstack-heavy-$(id -u)
+else   # outside git: a per-user directory only this user can write
+  dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/bstack-heavy-$(id -u)
+  [ -d "$dir" ] || mkdir -m 700 "$dir" 2>/dev/null
+  [ -d "$dir" ] && [ ! -L "$dir" ] && [ -O "$dir" ] || die "$dir is not a directory owned by you"
+  chmod 700 "$dir" || die "cannot restrict $dir"
 fi
 mkdir -p "$dir" || die "cannot create $dir"
 
@@ -57,7 +60,8 @@ while :; do
   i=1
   while [ "$i" -le "$slots" ]; do
     if command -v flock >/dev/null 2>&1 && [ -z "${BSTACK_HEAVY_NO_FLOCK:-}" ]; then
-      exec 9>"$dir/slot$i"
+      [ ! -L "$dir/slot$i" ] || die "$dir/slot$i is a symlink; remove it"
+      exec 9>>"$dir/slot$i"
       if flock -n 9; then run "$@"; exit $?; fi
       exec 9>&-
     else

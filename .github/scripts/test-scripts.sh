@@ -212,6 +212,9 @@ for via in python3 node; do   # without jq, the guard reads its input through py
   expect "guard: reads its input via $via" 2 "not on pm/S1-1-a" hook "$mg" "$M" PATH="$work/bin-$via"
 done
 git switch -q pm/S1-1-a
+expect "guard: switching and merging in one call blocks" 2 "moves HEAD" hook "$mg" "git switch main && $M"
+expect "guard: a story name through sh -c blocks" 2 "plain git merge" hook "$mg" "sh -c 'git merge pm/S1-1-a'"
+expect "guard: a story name through git pull blocks" 2 "plain git merge" hook "$mg" "git pull . pm/S1-1-a"
 expect "guard: updating the story branch is not a story merge" 0 "" hook "$mg" "git merge main -m \"bring pm/S1-1-a up to date\""
 git switch -q main
 git init -q ../plain && git -C ../plain commit -q --allow-empty -m x
@@ -245,6 +248,11 @@ sleep 2; n=$((n + 1))
 if [ -e "$work/live" ]; then fails=$((fails + 1)); echo "FAIL heavy: a live holder's slot is not taken"
 else echo "ok   heavy: a live holder's slot is not taken"; fi
 kill "$waiter" "$live" 2>/dev/null; wait "$waiter" "$live" 2>/dev/null; rm -f "$hd/slot1.lnk"
+mkdir -p "$work/tmpx"
+expect "heavy: outside git, a private directory" 0 "" sh -c 'cd "$1" && shift && exec "$@"' sh "$work" \
+  env TMPDIR="$work/tmpx" XDG_RUNTIME_DIR= bash "$heavy" 1 true
+n=$((n + 1)); if [ -n "$(find "$work/tmpx/bstack-heavy-$(id -u)" -maxdepth 0 -perm 0700)" ]; then echo "ok   heavy: that directory is mode 700"
+else fails=$((fails + 1)); echo "FAIL heavy: that directory is mode 700"; fi
 expect "heavy: slots must be a number" 2 "positive integer" bash "$heavy" x true
 expect "heavy: a command is required" 2 "usage" bash "$heavy" 2
 
