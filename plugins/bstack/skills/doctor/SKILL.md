@@ -54,8 +54,12 @@ Check, in order, each with its evidence:
    `MISSING`: absent, not executable, or another hook without either line (show it; never replace it
    unasked). Install it as `references/planning.md` `## 5. Scaffold, after sign-off` says.
 
-7. **Merge guard**, `OK` or `OFF`. `OFF` when `BSTACK_NO_ENFORCE` is `1` in this session's
-   environment (`printenv BSTACK_NO_ENFORCE`): story merges go unchecked. Only the user unsets it.
+7. **Merge guard**, `OK`, `OFF` or `BROKEN`. Feed it a payload it must refuse:
+   `printf '{"cwd":"%s","tool_input":{"command":"BSTACK_NO_ENFORCE=1 git merge pm/S0-0-doctor"}}' "$PWD" | bash "${CLAUDE_PLUGIN_ROOT}/scripts/merge-guard.sh"`
+   Exit 2 naming "the user's switch" is `OK`; anything else is `BROKEN`, with the output quoted
+   (no jq, python3 or node is the usual cause). `OFF` when `printenv BSTACK_NO_ENFORCE` prints
+   `1`: story merges go unchecked, and only the user unsets it. This proves the script, not that
+   Claude Code loaded the hook: `/hooks` lists it.
 8. **Hygiene**, warnings only. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/hygiene.sh"` from the main
    checkout and quote every `WARN` line: `AGENTS.md` over 32 KiB, an integration branch too far or
    too long ahead of main, a tag missing from main, branches or worktrees of merged stories, PM

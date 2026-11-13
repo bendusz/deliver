@@ -7,20 +7,23 @@
 #     commit after it (merges compared with their first parent) touches anything but state files;
 #   - the target branch holds nothing outside state files that the story branch has not merged;
 #   - docs/gate.txt, the integration gate, is not FAIL, unless pm-meta's tags hold fixes-gate.
-# Refused outright, so the check cannot be misread: a merge whose operand it cannot read (a
-# variable, a substitution), a story merge after a command that moves HEAD in the same call, and,
-# a story name passed through eval, xargs, a shell's -c, `git pull` or a git alias.
+# Refused outright, so the check cannot be misread: a story merge whose operand or repository it
+# cannot read (a variable, a substitution in the branch, `cd` or `-C`), a story merge after a
+# command that moves HEAD in the same call, and, where a bstack project may be involved, a story
+# name passed through eval, xargs, a shell's -c, `git pull` or a git alias.
 # It guards against mistakes, not an adversary with a shell.
 # Exit 0 allows, exit 2 blocks with the reason on stderr. Bash 3.2 compatible.
 # Only the user switches it off, by starting Claude Code with BSTACK_NO_ENFORCE=1.
 set -uo pipefail
 # State files, as references/state.md lists them: the PM's records, never a story's code.
-STATE_RE='^docs/(stories/|evidence/|retros/|(log|ledger|plan|handoff|go-no-go)\.md$|(approval|acceptance)\.json$|gate\.txt$)'
+STATE_RE='^docs/(stories/|evidence/|retros/|(log|ledger|plan|handoff|go-no-go|acceptance-differences)\.md$|(approval|acceptance)\.json$|gate\.txt$)'
 SEP=$'\x1f'
 
 block() { printf 'bstack merge guard: %s\n' "$1" >&2; exit 2; }
 oneline() { tr '\n' ' ' | sed 's/ $//'; }
 input=$(cat)
+# Cheap exit on the raw input: nothing that could decode to a merge or a story name goes past it.
+case $input in *merge*|*pm/S*|*'pm\/S'*|*'\u'*) ;; *) exit 0 ;; esac
 
 field() { # field <key>...: a string at that path in the hook input, else empty
   if command -v jq >/dev/null 2>&1; then
@@ -41,10 +44,6 @@ case $cmd in *merge*|*pm/S*) ;; *) exit 0 ;; esac   # cheap exit, on the decoded
 case $cmd in *BSTACK_NO_ENFORCE*) block "BSTACK_NO_ENFORCE is the user's switch; never set it in a command" ;; esac
 [ "${BSTACK_NO_ENFORCE:-}" = 1 ] && exit 0
 cwd=$(field cwd); [ -n "$cwd" ] || cwd=$PWD
-indirect='(^|[^A-Za-z0-9_])(eval|xargs|pull|(sh|bash|zsh|dash|ksh)[[:space:]]+-[A-Za-z]*c)([^A-Za-z0-9_]|$)|alias\.'
-if [[ $cmd =~ pm/S[0-9]+-[0-9]+ ]] && [[ $cmd =~ $indirect ]]; then
-  block "a story branch named through eval, sh -c, git pull or an alias; merge it with a plain git merge"
-fi
 
 # Split the command into words as the shell would quote them, with SEP between simple commands.
 words=()
@@ -70,7 +69,11 @@ tokenize() {
   [ "$have" = 1 ] && words+=("$cur")
   words+=("$SEP")
 }
-resolve() { case $2 in /*) printf '%s' "$2" ;; "~"*) printf '%s' "$HOME${2#\~}" ;; *) printf '%s' "$1/$2" ;; esac; }
+resolve() { # resolve <dir> <path>; "?" when either cannot be read
+  case $1$2 in *'$'*|*'`'*|"?"*) printf '?'; return ;; esac
+  case $2 in /*) printf '%s' "$2" ;; "~"*) printf '%s' "$HOME${2#\~}" ;; *) printf '%s' "$1/$2" ;; esac
+}
+bstack() { [ "$1" = "?" ] || git -C "$1" cat-file -e HEAD:docs/approval.json 2>/dev/null; }
 
 # For each `git … merge …`: print "<repo dir>\t<operand>" for every operand that names a story
 # branch, or "?<operand>" for one it cannot read.
@@ -119,6 +122,16 @@ scan() {
   done
 }
 tokenize "$cmd"
+indirect='(^|[^A-Za-z0-9_])(eval|xargs|pull|(sh|bash|zsh|dash|ksh)[[:space:]]+-[A-Za-z]*c)([^A-Za-z0-9_]|$)|alias\.'
+if [[ $cmd =~ pm/S[0-9]+-[0-9]+ ]] && [[ $cmd =~ $indirect ]]; then
+  hit=0; bstack "$cwd" && hit=1
+  prev=
+  for w in "${words[@]}"; do   # and every directory a cd or -C in the call names
+    case $prev in cd|-C) bstack "$(resolve "$cwd" "$w")" && hit=1 ;; esac
+    prev=$w
+  done
+  [ "$hit" = 0 ] || block "a story branch named through eval, sh -c, git pull or an alias; merge it with a plain git merge"
+fi
 targets=$(scan)
 [ -n "$targets" ] || exit 0
 for w in "${words[@]}"; do   # a HEAD-moving word anywhere in the call, whatever its position
@@ -142,7 +155,8 @@ covers() { # covers <label> <sha>: a full commit id on the head, and nothing aft
 
 check() { # check <repo dir> <story branch> <1 if an earlier command in the call moves HEAD>
   g=$1 br=$2
-  git -C "$g" cat-file -e HEAD:docs/approval.json 2>/dev/null || return 0   # not a bstack project
+  [ "$g" != "?" ] || block "cannot tell which repository the merge of $br runs in; write the cd or -C path out"
+  bstack "$g" || return 0   # not a bstack project
   [ "$3" = 1 ] && block "a story merge after a command that moves HEAD; switch, then merge in a separate call"
   local cur story file meta tags exec gates ver extra
   cur=$(git -C "$g" symbolic-ref --short -q HEAD)

@@ -30,8 +30,11 @@ smaller than in 1.1.1, and so is every child's dispatch.
   not `FAIL`. Only the user may set `BSTACK_NO_ENFORCE=1`. It reads its input with jq, python3 or
   node, and splits the command as the shell quotes it. It also refuses a story merge that follows
   a branch switch in the same call, and, in a bstack project, a story named through `eval`,
-  `sh -c`, `git pull` or an alias. It catches mistakes, not an agent set on getting past it. The
-  PR path (`gh pr merge`) is checked by the PM, as `host.md` says.
+  `sh -c`, `git pull` or an alias, and a story merge in a repository it cannot name
+  (`-C "$repo"`). It exits on the raw input before decoding, so a machine without jq, python3 or
+  node still runs every other command. It catches mistakes, not an agent set on getting past it.
+  For `gh pr merge`, the PM puts the same merge to the guard first (`host.md`), and
+  `/bstack:doctor` checks that the guard refuses a sample merge.
 - **`heavy.sh`**: an N-slot semaphore for tests and builds across every worktree (`flock`, or
   pid symlinks where `flock` is missing, as on macOS), reporting the load before and after. The
   PM drops to two builders while the load stays over the core count.
@@ -53,7 +56,8 @@ smaller than in 1.1.1, and so is every child's dispatch.
   migration defines "no visible change" and its parity check before any story. Each sprint closes
   only after the journeys pass from fresh state with no test helper (`retro.md` `## 0`). A release
   candidate freezes a sha; the user walks it and accepts each difference by name, recorded in
-  `docs/acceptance.json` as the plan is in `docs/approval.json`.
+  `docs/acceptance.json` as the plan is in `docs/approval.json`. Accepted differences are listed
+  in `docs/acceptance-differences.md`, a state file, so recording one keeps the release candidate.
 - **Release** (`references/release.md`, loaded only with `Release: production`). Go/no-go is
   binding (`docs/go-no-go.md`): a waived item moves the date. The release ships with the new
   behaviour switched off. Rehearsal runs on the production service units, and the rollback is

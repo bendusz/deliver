@@ -167,6 +167,8 @@ expect "guard: an operand it cannot read blocks" 2 "write the branch name out" h
 exec_line "PASS $head1" "PASS $head1"
 expect "guard: gates and verifier at the head pass" 0 "" hook "$mg" "$M"
 expect "guard: a quoted message naming pm/ still finds the branch" 0 "" hook "$mg" "$M -m \"feat: merge pm/S1-1-a\""
+git switch -q pm/S1-1-a; echo "- J1 label wording" > docs/acceptance-differences.md; commit "accept a difference"; git switch -q main
+expect "guard: recording an accepted difference keeps the shas valid" 0 "" hook "$mg" "$M"
 expect "guard: a message naming another story is not an operand" 0 "" hook "$mg" "git merge -m \"pm/S1-2-b\" pm/S1-1-a"
 git branch -q pm/S1-2-b main
 expect "guard: every story operand is checked" 2 "no docs/stories/S1-2" hook "$mg" "git merge pm/S1-1-a pm/S1-2-b"
@@ -211,6 +213,12 @@ for via in python3 node; do   # without jq, the guard reads its input through py
   for t in bash cat env git sed awk grep head tr "$via"; do ln -sf "$(command -v "$t")" "$work/bin-$via/$t"; done
   expect "guard: reads its input via $via" 2 "not on pm/S1-1-a" hook "$mg" "$M" PATH="$work/bin-$via"
 done
+mkdir -p "$work/bin-none"
+for t in bash cat env git sed awk grep head tr; do ln -sf "$(command -v "$t")" "$work/bin-none/$t"; done
+expect "guard: without a JSON reader, other commands still run" 0 "" hook "$mg" "ls -la" PATH="$work/bin-none"
+expect "guard: without a JSON reader, a story merge blocks" 2 "install jq, python3 or node" hook "$mg" "$M" PATH="$work/bin-none"
+expect "guard: an unreadable -C path blocks" 2 "cannot tell which repository" hook "$work" "git -C \"\$REPO\" merge pm/S1-1-a"
+expect "guard: an unreadable cd blocks" 2 "cannot tell which repository" hook "$work" "cd \"\$REPO\" && git merge pm/S1-1-a"
 git switch -q pm/S1-1-a
 expect "guard: switching and merging in one call blocks" 2 "moves HEAD" hook "$mg" "git switch main && $M"
 expect "guard: a story name through sh -c blocks" 2 "plain git merge" hook "$mg" "sh -c 'git merge pm/S1-1-a'"
@@ -221,6 +229,8 @@ expect "guard: updating the story branch is not a story merge" 0 "" hook "$mg" "
 git switch -q main
 git init -q ../plain && git -C ../plain commit -q --allow-empty -m x
 expect "guard: a repository without bstack passes" 0 "" hook "$work/plain" "git merge pm/S9-9-x"
+expect "guard: sh -c outside a bstack project passes" 0 "" hook "$work/plain" "sh -c 'git merge pm/S9-9-x'"
+expect "guard: the doctor's probe is refused anywhere" 2 "the user's switch" hook "$work" "BSTACK_NO_ENFORCE=1 git merge pm/S0-0-doctor"
 cd "$work/repo" || exit 2
 
 # --- heavy.sh ---

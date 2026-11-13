@@ -22,8 +22,8 @@ asked for, and the user's walk-through is the proof. Nothing ships without it.
 ## 3. Walk-through, the user's
 Send the user, in at most 15 lines: where to try it (URL, build or command, and any login), each
 journey with its recipe, the parity result, the verifier's evidence path, and the differences.
-- The user walks it themselves. Each difference is either accepted by name, and listed where the
-  plan's `Accepted differences:` says, or becomes a fix story and a new RC.
+- The user walks it themselves. Each difference is either accepted by name, and listed in
+  `docs/acceptance-differences.md`, or becomes a fix story and a new RC.
 - Only on the user's explicit "accepted", write:
   `{"status":"accepted","rc_sha":"<sha>","walked_at":"<YYYY-MM-DD HH:MM>","journeys":["J1",…],"accepted_differences":["<name>",…]}`
   Commit it with the differences list, and log it.

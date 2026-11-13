@@ -82,10 +82,11 @@ local merges, because your commits could never fast-forward onto a squashed or r
   only once the remote's default branch holds it: ask the user to push that one commit, or to
   merge a PR that holds only that file, before the story branch goes up. Open the PR with the merge body `loop.md` gives, then
   `link_pull_request` and `watch_pull_request`. A wake is news, not a merge decision.
-- **Merge.** The merge guard does not see `gh pr merge`, so check what it checks yourself
-  (`loop.md` step 8): `docs/gate.txt` not `FAIL`, and `gates` and `verifier` shas that cover the
-  PR head, where `git diff --name-only <sha>..<head>` lists only state files (`state.md`).
-  Then `gh pr merge --merge`. A user who merges it themselves must use a merge commit.
+- **Merge.** The merge guard does not see `gh pr merge`, so put the same merge to it first, from
+  the integration branch with the story branch at the PR head:
+  `printf '{"cwd":"%s","tool_input":{"command":"git merge --no-ff %s"}}' "$PWD" <branch> | bash "<plugin>/scripts/merge-guard.sh"`
+  Exit 0 lets `gh pr merge --merge` go; exit 2 names what to fix. A user who merges it
+  themselves must use a merge commit.
 - **After.** `unwatch_pull_request` once the PR closes.
   - Merged: `git switch <integration branch>`, `git fetch`, then
     `git merge --ff-only origin/<integration branch>`. If you committed since the PR opened, that

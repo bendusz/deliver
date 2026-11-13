@@ -36,6 +36,7 @@ The claim commit, on the integration branch and before any dispatch, appends to 
 ## State files
 The PM's records, never a story's code: `docs/stories/`, `docs/evidence/`, `docs/retros/`,
 `docs/log.md`, `docs/ledger.md`, `docs/plan.md`, `docs/handoff.md`, `docs/go-no-go.md`,
+`docs/acceptance-differences.md`,
 `docs/approval.json`, `docs/acceptance.json` and `docs/gate.txt`. A commit that touches only these
 leaves a gates or verifier sha valid; the merge guard holds the same list.
 - `docs/gate.txt`, one line: `PASS|FAIL <sha> <YYYY-MM-DD HH:MM> <failing tests>`, the full gates on
