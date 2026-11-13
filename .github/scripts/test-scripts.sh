@@ -261,14 +261,13 @@ expect "heavy: a command is required" 2 "usage" bash "$heavy" 2
 # --- ledger.sh (in the merge-guard repository, where S1-1 has a pm-exec) ---
 cd "$mg" || exit 2
 W="builder=claude-opus-5-5:14m reviewer=gpt-6-astra:6m"
-expect "ledger: appends a row" 0 "" bash "$ledger" S1-1 0 1 "$W" n/a "12->30"
-expect "ledger: rounds and first-pass come from pm-exec" 0 "| S1-1 | 0 | y | 0 | 1 | $W | n/a | 12->30 |" cat docs/ledger.md
-expect "ledger: an estimated token count is refused" 1 "write n/a" bash "$ledger" S1-1 0 0 "$W" "builder=~40k" n/a
-expect "ledger: wall time needs role=model:minutes" 1 "<role>=<model>:<minutes>m" bash "$ledger" S1-1 0 0 "builder 14m" n/a n/a
-expect "ledger: empty wall time is refused" 1 "is not <role>" bash "$ledger" S1-1 0 0 "   " n/a n/a
-expect "ledger: empty tokens are refused" 1 "write n/a" bash "$ledger" S1-1 0 0 "$W" "" n/a
-expect "ledger: a pipe cannot break the table" 1 "parity" bash "$ledger" S1-1 0 0 "$W" n/a "a|b->c"
-expect "ledger: an unknown story is refused" 1 "no docs/stories/S7-7" bash "$ledger" S7-7 0 0 "$W" n/a n/a
+expect "ledger: appends a row" 0 "" bash "$ledger" S1-1 0 1 "$W" "12->30"
+expect "ledger: rounds and first-pass come from pm-exec" 0 "| S1-1 | 0 | y | 0 | 1 | $W | 12->30 |" cat docs/ledger.md
+expect "ledger: a sixth argument is a usage error" 1 "usage" bash "$ledger" S1-1 0 0 "$W" n/a n/a
+expect "ledger: wall time needs role=model:minutes" 1 "<role>=<model>:<minutes>m" bash "$ledger" S1-1 0 0 "builder 14m" n/a
+expect "ledger: empty wall time is refused" 1 "is not <role>" bash "$ledger" S1-1 0 0 "   " n/a
+expect "ledger: a pipe cannot break the table" 1 "parity" bash "$ledger" S1-1 0 0 "$W" "a|b->c"
+expect "ledger: an unknown story is refused" 1 "no docs/stories/S7-7" bash "$ledger" S7-7 0 0 "$W" n/a
 
 # --- hygiene.sh ---
 cd "$work" && git init -q -b main hy && cd hy || exit 2

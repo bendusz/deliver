@@ -121,8 +121,8 @@ lacks STATUS, the head COMMIT or a CRITERIA line goes back first (`roles.md` `##
      `## Trade-offs`, `## Blast radius`, `## Verification` (every command and result, the gates
      and verifier shas).
    - Mark `merged` in its own commit, `chore(<id>): merged`, with the ledger row staged:
-     `bash "<plugin>/scripts/ledger.sh" <id> <blocked+partial replies> <reruns> "<role>=<model>:<min>m …" n/a <parity|n/a>`.
-     Minutes come from each child's run in `t3_thread_read`; T3 reports no tokens, so `n/a`.
+     `bash "<plugin>/scripts/ledger.sh" <id> <blocked+partial replies> <reruns> "<role>=<model>:<min>m …" <parity|n/a>`.
+     Minutes come from each child's run in `t3_thread_read`.
    - Run the full gates on the new integration head and write `docs/gate.txt`:
      `PASS|FAIL <sha> <YYYY-MM-DD HH:MM> <failing tests, if any>`. Commit it. `FAIL` holds every
      merge but a `fixes-gate` story's.

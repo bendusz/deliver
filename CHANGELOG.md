@@ -35,8 +35,9 @@ smaller than in 1.1.1, and so is every child's dispatch.
 - **`heavy.sh`**: an N-slot semaphore for tests and builds across every worktree (`flock`, or
   pid symlinks where `flock` is missing, as on macOS), reporting the load before and after. The
   PM drops to two builders while the load stays over the core count.
-- **`ledger.sh`**: one row per merged story in `docs/ledger.md`. T3's `t3_thread_read` gives each
-  run's start and end but no token counts, so tokens are `n/a`; the script refuses an estimate.
+- **`ledger.sh`**: one row per merged story in `docs/ledger.md`, with wall time and model per role
+  from each child's run in `t3_thread_read`. It records no tokens: T3 does not report them, and
+  having the PM track them would take its attention off the work.
 - **`hygiene.sh`**, run by `/bstack:doctor`: an `AGENTS.md` over 32 KiB, an integration branch
   over 200 commits or 14 days ahead of main, tags missing from main, branches and worktrees of
   merged stories, untracked or ignored scripts outside a tracked `ops/pm/`, and a stale copy of

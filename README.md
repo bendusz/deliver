@@ -48,7 +48,7 @@ Where a machine can check a rule, a script does:
 - **`heavy.sh`.** Tests and builds wait for one of N slots shared by every worktree, and report
   the load; the PM runs two builders, not three, while the machine is overloaded.
 - **`ledger.sh`.** One row per merged story: rounds, first-pass, reruns, wall time and model per
-  role. T3 reports no token counts, so tokens read `n/a` rather than an estimate.
+  role. It counts no tokens: tracking them would pull the PM's attention off the work.
 - **`hygiene.sh`**, run by `/bstack:doctor`: an oversized `AGENTS.md`, an integration branch far
   ahead of main, a tag missing from main, leftovers of merged stories, and loose PM scripts.
 
