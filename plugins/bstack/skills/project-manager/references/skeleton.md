@@ -17,7 +17,7 @@ Dispatch the `roles.md` `## spec-architect` soul per `host.md` `## Dispatch`, wi
 `isolation: "shared"` in the main checkout: the soul does not commit, so its files must land
 where you commit them. `clientRequestId` is `S<sprint>-spec-architect-<round>`. The brief gives:
 - `Sprint`: the number.
-- `Plan sections`: Architecture, Scope, and the Stories rows for that sprint.
+- `Plan sections`: Design, Scope, and the Stories rows for that sprint.
 - `Spec IDs`: the `FR-` and `AC-` IDs the sprint covers.
 - `Bootstrap`: the path of `.specdd/bootstrap.md`, or `template`.
 - `Templates`: the absolute paths of `<plugin>/templates/sdd-root.template`,

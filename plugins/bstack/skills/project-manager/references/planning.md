@@ -9,7 +9,7 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - Create `docs/approval.json` as `pending` per `state.md` `## Approval`; commit it with the first draft.
 - Brownfield work: run one native Explore pass for the architecture, the conventions, the real
   test, lint and build commands, and where new code should go. Fold the answers into the plan's
-  Architecture and Commands, and keep them for the stories' Context.
+  Design and Commands, and keep them for the stories' Context.
 - Dispatch a researcher (`roles.md` `## researcher`, via `host.md` `## Dispatch`) only when an
   external unknown decides the plan: a library choice, an unfamiliar SDK. Add `/bstack:codex ask`
   for a consequential or contested call. Cite the
@@ -25,12 +25,15 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - Resolve the markers one question at a time, at most 5 in a session, spent on what most changes
   the build: the question, 2 or 3 options, a recommendation, one line on why it matters. After
   each answer, record the decision where it belongs and in Clarifications, and delete the marker.
-- When Architecture has more than one viable shape and poteto is installed, ask the user to run
-  `/poteto:architect with checkpoint` (it is user-invoked). Fold the sketch and its rationale into
-  Architecture, and list the rejected alternatives under Risks.
+- When the design has more than one viable shape and poteto is installed, ask the user to run
+  `/poteto:architect with checkpoint` (it is user-invoked). Fold the sketch into Design, with
+  each rejected alternative beside the decision it lost to.
 
 ## 3. Write the plan
 - Create `docs/plan.md` from `<plugin>/templates/plan.md.template`, replacing its comments.
+- `## Design` is the low-level design: decisions with the option each rejected, contracts,
+  state and invariants, and flows that end in the main failure and its recovery. It is what
+  remains as the platform's documentation, so keep it true as the build goes.
 - Requirements carry stable IDs, `FR-n` and `AC-n`, and are never renumbered: the stories, the
   reviewer and the verifier trace to them.
 - Acceptance criteria use EARS where behavioural (`WHEN <condition or event>, THE SYSTEM SHALL
@@ -82,15 +85,15 @@ found wrong goes through this path, never drip-fed into a running story:
    stop and commit what it has on its branch. Log the trigger and why.
 2. **Classify,** and apply the change at the highest level it touches, then let it flow down:
    - Spec-level, product intent changed: update `docs/spec.md`, then re-derive the plan and stories.
-   - Plan-level, scope, architecture, stories or priorities: update the plan's Scope, Stories
+   - Plan-level, scope, design, stories or priorities: update the plan's Scope, Stories
      table and Traceability, and every affected story file.
    - Story-level, a criteria tweak inside the agreed scope: update just the story file.
 
    Rewrite or delete in place. A dropped requirement goes, with its rows and any story never
    dispatched (`git rm`). The log line and the commit message say what changed and why; the
    files do not.
-3. **Re-approve if material.** Scope added or removed, architecture changed or requirements
-   altered is material; when unsure, treat it as material. Follow `state.md` `## Approval`: show
+3. **Re-approve if material.** Scope added or removed, a decision, contract or invariant
+   changed, or requirements altered is material; when unsure, treat it as material. Follow `state.md` `## Approval`: show
    `git diff <plan_commit> -- docs/plan.md`, ask again, and write a new record only on a new
    approval. A story-level tweak needs no re-approval; log it.
 4. **Replace, never restart.** Edit or delete a story never dispatched. A dispatched story keeps

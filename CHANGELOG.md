@@ -29,6 +29,15 @@ scenarios and results are in `docs/evals.md`.
 - The files the PM writes to run a project are called PM records, where 1.2.0 said "state
   files". State is what git and a story's `pm-exec` line say. Nothing behaves differently.
 
+**The plan's design**
+- `## Design` replaces the plan's free-text `## Architecture`: decisions with the option each
+  rejected, contracts, state and invariants, and flows that end in the main failure and its
+  recovery. It is sized to the risk, and links a schema, a `.sdd` file or the spec instead of
+  copying it.
+- After the completion report, the PM cuts `docs/plan.md` down to the platform's documentation:
+  Overview, Scope, Requirements, Design, Acceptance and the Risks that still hold. The delivery
+  sections go; the completion report and git keep them. A later project reopens the same file.
+
 **Sprint boundary**
 - A sprint in which one story merged skips the cross-story review: that story's own review saw
   the same diff.
@@ -45,6 +54,8 @@ scenarios and results are in `docs/evals.md`.
 **Upgrading**
 - From 1.2.0: delete the `heavy:` line from the plan's `## Delivery`; nothing reads it. The copy
   of `heavy.sh` under `.git/bstack/` can go too.
+- An existing plan: rename `## Architecture` to `## Design`, and give it the four parts when
+  the design next changes.
 - Run `/bstack:doctor` to see the new warning. The PM cleans a file only when a task touches it.
 
 ## 1.2.0 - 2026-11-13

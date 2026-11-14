@@ -34,9 +34,32 @@
 |------|---------|----------|--------|------------|-----|
 | S1-1 | <title> | high | FR-001, AC-001 | none | no |
 
-## Architecture
-<!-- stack, key decisions and why, patterns; cite docs/research/ reports behind a decision -->
-<architecture>
+## Design
+<!-- The build's low-level design and, once delivery ends, the platform's documentation. Write
+     behaviour a cold builder can implement and a verifier can test: "retry three times inside
+     the caller's deadline, never a validation failure", not "use retries". Link a schema, a
+     .sdd file or the spec instead of copying it. Size it to the risk: a small change may need
+     one contract and one flow. Add Security, Capacity, Migration and rollback or Operations
+     only for a risk you can name. -->
+<the stack and the shape, in a few lines>
+
+### Decisions
+| decision | why | rejected, and why |
+|----------|-----|-------------------|
+| <choice> | <the requirement or evidence behind it; cite a docs/research/ report> | <option and its drawback> |
+
+### Contracts
+<!-- One per interface that another part or a user relies on: function, CLI, endpoint, event, file. -->
+- <interface>: in <types and bounds> · out <what callers may rely on> · errors <which, and which are retryable> · duplicates and retries <rule> · timing <deadline and who owns the timeout>
+
+### State and invariants
+- <what is always true, where the truth lives, and the atomic step that keeps it so>
+
+### Flows
+1. <trigger and validation>
+2. <state change>
+3. <what the user or caller sees on completion>
+- Main failure: <what fails, how it shows, what it leaves behind, how it recovers>
 
 ## Traceability
 <!-- Every FR- and AC- maps to at least one story; flag any that does not. -->
@@ -71,7 +94,7 @@
 |------|-----|------|-----|------------------|
 
 ## Risks
-<!-- and open questions, carried assumptions, rejected design alternatives -->
+<!-- and open questions and carried assumptions -->
 - <risk + mitigation>
 
 ## Clarifications

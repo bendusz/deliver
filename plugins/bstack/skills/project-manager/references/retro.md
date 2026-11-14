@@ -18,7 +18,7 @@ Skip it when one story merged in the sprint: that story's review saw the same di
 - Range: `git diff <from>...<to>`, from the parent of the sprint's first story merge to its last
   (`git log --first-parent --merges` on the integration branch).
 - Dispatch one reviewer soul (`host.md` `## Dispatch`, `isolation: "shared"`, main checkout)
-  with that range, the plan's Architecture and the sprint's stories. Key `S<n>-retro-reviewer-<k>`,
+  with that range, the plan's Design and the sprint's stories. Key `S<n>-retro-reviewer-<k>`,
   `k` = 1 + the `S<n> retro review` lines in `docs/log.md`; log that line at dispatch. Reuse a key
   only to retry a lost response. Ask only for what no single story review could see: logic
   duplicated across stories, a convention two read differently, an interface one story changed
@@ -59,5 +59,9 @@ staged, and log the outcome. Show the user the record, led by `## Demo`, then wr
 (`state.md` `## Handoff`) and decompose the next sprint (`planning.md`). After the last sprint, write `docs/completion-report.md` from
 `<plugin>/templates/completion-report.md.template` instead, never while a
 cross-story `block` or `major` is open: each is merged as a fix or has the user's logged ruling.
+Then cut `docs/plan.md` down to the platform's documentation, in its own commit: keep Overview,
+Scope, Requirements, Design, Acceptance and the Risks that still hold, each true of what
+shipped. Delete Delivery, Stories, Traceability, Commands (`AGENTS.md` holds them), Waivers,
+Clarifications and Sign-off; the completion report and git keep them.
 
 <!-- Check before rule is adapted from Matt Pocock's skills (mattpocock/skills, MIT). -->

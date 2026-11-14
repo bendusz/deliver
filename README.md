@@ -89,8 +89,10 @@ plugin), then run the two steps above. Projects keep working; see the 1.0.0 and 
 
 Describe the work ("act as my PM to build a CLI todo app") or run `/bstack:pm <request>`.
 
-1. **Plan.** The PM talks it through with you and writes `docs/plan.md`, plus `docs/spec.md` when
-   the work will outlive the plan.
+1. **Plan.** The PM talks it through with you and writes `docs/plan.md`: scope, requirements and
+   the low-level design (decisions, contracts, invariants, failure flows). When the project ends,
+   the PM cuts the plan down to that design and it stays as the platform's documentation. A
+   `docs/spec.md` holds the product intent when it needs its own file.
 2. **Sign-off, in conversation.** Nothing is built until you say "approved", recorded in `docs/approval.json`.
 3. **Stories.** Each sprint becomes self-contained files under `docs/stories/`, tracing to the plan's IDs.
 4. **Per-story loop on T3.** Claim, a design review when storage or data changes, tests first,
