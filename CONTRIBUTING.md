@@ -1,16 +1,15 @@
 # Contributing to bstack
 
-bstack is prose and templates plus two scripts in `plugins/bstack/scripts/`, `log.sh` and
-`scan-secrets.sh`. A contribution is almost always a prose change: a reference, a skill, a
-role's soul or a template.
+bstack is prose and templates, five scripts in `plugins/bstack/scripts/` and one hook. A
+contribution is almost always a prose change: a reference, a skill, a role's soul or a template.
 
 ## Ground rules
 - **Keep `SKILL.md` lean.** Detail goes in `references/`, one level deep, each loaded only when the
   moment needs it.
 - **Trust the agents.** Roles are souls with ground rules and a recommended model, not tool
   restrictions. Review independence is a process rule: the reviewer is never the builder.
-- **No new code.** `log.sh` and `scan-secrets.sh` stay the only code in the plugin. Prefer what
-  T3 Code and git already give over new machinery.
+- **Little code.** Prefer what T3 Code and git already give over new machinery. A script comes
+  with tests, and a rule with a pressure scenario it fails without; both are in the Conventions.
 
 ## Before opening a PR
 - Run `bash .github/scripts/check.sh`. It enforces the Conventions in [`AGENTS.md`](AGENTS.md),
@@ -33,7 +32,3 @@ update `host.md`, the README's "last checked" line and `check.sh`'s model list:
 - A child can still dispatch its own children on either provider and message them, and is woken
   by their results; a parent is not told a child has finished while that child's children are
   still running. The board's chair depends on both. Keys are scoped to the dispatching thread.
-
-## How it is built
-The plugin was itself developed with a PM-orchestrated spec, plan, build and review flow. See
-`docs/specs/` and `docs/plans/` for the current design; earlier history is in git.

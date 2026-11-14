@@ -1,7 +1,6 @@
 # Prior art and references
 
-The design of bstack (formerly deliver) was validated against the work below. The current design is in
-`docs/specs/2026-11-07-v1.0-bstack-redesign.md`; earlier design history is in git (tag v0.29.4).
+The design of bstack was validated against the work below.
 
 ## Foundations (Anthropic)
 - **Building Effective Agents.** The per-story build, review, and fix loop uses its
@@ -32,8 +31,3 @@ The design of bstack (formerly deliver) was validated against the work below. Th
   https://github.com/cursor/plugins/tree/main/pstack
 - **deanpeters/Product-Manager-Skills.** PM discovery interview flows and INVEST stories.
   https://github.com/deanpeters/Product-Manager-Skills
-
-## Independent review
-- The design spec was hardened by an independent **Codex (gpt-5.5)** audit, which corrected
-  skill-loading semantics, namespaced invocation, repository-safety rules, `gh` gating,
-  project-specific gate discovery, per-agent handoff contracts, and exact loop caps.
