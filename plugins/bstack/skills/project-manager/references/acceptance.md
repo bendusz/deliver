@@ -43,3 +43,8 @@ Agents give these reasons for skipping the walk-through. None of them holds:
   record: cut a new RC.
 - `Release: production` in the plan: load `release.md`. Otherwise ship the way the user asks
   (`host.md`); never push unasked.
+- Last, once it has shipped (after `release.md` when that applies), cut `docs/plan.md` down to
+  the platform's documentation, in its own commit: keep Overview, Scope, Requirements, Design,
+  Acceptance and the Risks that still hold, each true of what shipped. Delete Delivery, Stories,
+  Traceability, Commands (`AGENTS.md` holds them), Waivers, Clarifications and Sign-off; the
+  completion report and git keep them.

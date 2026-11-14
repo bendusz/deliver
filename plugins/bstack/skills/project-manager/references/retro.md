@@ -59,9 +59,5 @@ staged, and log the outcome. Show the user the record, led by `## Demo`, then wr
 (`state.md` `## Handoff`) and decompose the next sprint (`planning.md`). After the last sprint, write `docs/completion-report.md` from
 `<plugin>/templates/completion-report.md.template` instead, never while a
 cross-story `block` or `major` is open: each is merged as a fix or has the user's logged ruling.
-Then cut `docs/plan.md` down to the platform's documentation, in its own commit: keep Overview,
-Scope, Requirements, Design, Acceptance and the Risks that still hold, each true of what
-shipped. Delete Delivery, Stories, Traceability, Commands (`AGENTS.md` holds them), Waivers,
-Clarifications and Sign-off; the completion report and git keep them.
 
 <!-- Check before rule is adapted from Matt Pocock's skills (mattpocock/skills, MIT). -->
