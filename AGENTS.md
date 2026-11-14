@@ -26,6 +26,8 @@ scripts and one hook.
 - `plugins/poteto/`: the ported pstack skills, with their LICENSE and attribution.
 - `.github/scripts/check.sh`: the convention checks below; it runs `test-scripts.sh`, the
   regression tests for the plugin's scripts. CI runs it on Linux and macOS.
+- `GLOSSARY.md`: the words this repo uses with one meaning. Use them as defined; a term that
+  turns out to mean two things is settled there.
 - `docs/evals.md`: the pressure scenario behind each rule, with its result without and with the
   rule. `docs/prior-art.md`: what the design draws on. `docs/review-calibration.md`: why one
   reviewer is the default.

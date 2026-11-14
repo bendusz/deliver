@@ -50,7 +50,8 @@ Where a machine can check a rule, a script does:
   first-pass, reruns, wall time and model per role. It counts no tokens: tracking them would pull
   the PM's attention off the work.
 - **`hygiene.sh`**, run by `/bstack:doctor`: an oversized `AGENTS.md`, an integration branch far
-  ahead of main, a tag missing from main, leftovers of merged stories, and loose PM scripts.
+  ahead of main, a tag missing from main, leftovers of merged stories, loose PM scripts, and
+  struck-through or superseded text left in the plan, spec or `AGENTS.md`.
 
 Each sprint ends with the plan's user journeys run from a fresh state, then a demo: what you can
 try and where. Before a release, you walk the release candidate yourself and accept its

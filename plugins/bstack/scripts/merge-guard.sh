@@ -4,11 +4,11 @@
 # for every story operand:
 #   - its pm-exec records `gates: PASS <sha>` and `verifier: PASS <sha>` (or exactly `WAIVED`
 #     with a verifier row in the plan's ## Waivers), each a full commit id on the branch, and no
-#     commit after it (merges compared with their first parent) touches anything but state files;
-#   - it records `review: PASS <sha>` on the branch, and every commit after it touches only state
-#     files or is a clean merge (no change of its own) of a commit already on the target branch;
+#     commit after it (merges compared with their first parent) touches anything but PM records;
+#   - it records `review: PASS <sha>` on the branch, and every commit after it touches only PM
+#     records or is a clean merge (no change of its own) of a commit already on the target branch;
 #   - it is the only story in the call: stories integrate one at a time, each gated on the tip;
-#   - the target branch holds nothing outside state files that the story branch has not merged;
+#   - the target branch holds nothing outside PM records that the story branch has not merged;
 #   - docs/gate.txt, the integration gate, is not FAIL, unless pm-meta's tags hold fixes-gate.
 # Refused outright, so the check cannot be misread: a story merge whose operand or repository it
 # cannot read (a variable, a substitution in the branch, `cd` or `-C`), a story merge after a
@@ -18,8 +18,8 @@
 # Exit 0 allows, exit 2 blocks with the reason on stderr. Bash 3.2 compatible.
 # Only the user switches it off, by starting Claude Code with BSTACK_NO_ENFORCE=1.
 set -uo pipefail
-# State files, as references/state.md lists them: the PM's records, never a story's code.
-STATE_RE='^docs/(stories/|evidence/|retros/|(log|ledger|plan|handoff|go-no-go|acceptance-differences)\.md$|(approval|acceptance)\.json$|gate\.txt$)'
+# PM records, as references/state.md lists them: never a story's code.
+RECORD_RE='^docs/(stories/|evidence/|retros/|(log|ledger|plan|handoff|go-no-go|acceptance-differences)\.md$|(approval|acceptance)\.json$|gate\.txt$)'
 SEP=$'\x1f'
 
 block() { printf 'bstack merge guard: %s\n' "$1" >&2; exit 2; }
@@ -152,12 +152,12 @@ review_covers() { # review_covers <sha>: as covers, but a clean merge of the bas
     if [ -n "${p2:-}" ] && git -C "$g" merge-base --is-ancestor "$p2" HEAD \
        && t=$(git -C "$g" merge-tree --write-tree "$p1" "$p2" 2>/dev/null | head -1) \
        && [ "$t" = "$(git -C "$g" rev-parse "$c^{tree}")" ]; then continue; fi
-    extra=$(git -C "$g" diff-tree --no-commit-id --name-only -r "${p1:-$c}" "$c" | grep -vE "$STATE_RE" | head -3 | oneline)
+    extra=$(git -C "$g" diff-tree --no-commit-id --name-only -r "${p1:-$c}" "$c" | grep -vE "$RECORD_RE" | head -3 | oneline)
     [ -z "$extra" ] || block "$id: reviewed at $sha, but a later commit on $br changes $extra; review the head $head"
   done
 }
 
-covers() { # covers <label> <sha>: a full commit id on the head, and nothing after it but state
+covers() { # covers <label> <sha>: a full commit id on the head, and nothing after it but PM records
   local sha=$2 extra
   [[ $sha =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] \
     || block "$id: the $1 record '$sha' is not a full commit id; record the sha it ran at"
@@ -166,7 +166,7 @@ covers() { # covers <label> <sha>: a full commit id on the head, and nothing aft
   git -C "$g" merge-base --is-ancestor "$sha" "$head" 2>/dev/null \
     || block "$id: the $1 sha $sha is not on $br; run it again on the head $head"
   extra=$(git -C "$g" log --format= --name-only --first-parent --diff-merges=first-parent "$sha..$head" \
-    | grep -v '^$' | grep -vE "$STATE_RE" | sort -u | head -3 | oneline)
+    | grep -v '^$' | grep -vE "$RECORD_RE" | sort -u | head -3 | oneline)
   [ -z "$extra" ] || block "$id: $1 ran at $sha, but later commits on $br change $extra; run it again on $head"
 }
 
@@ -209,7 +209,7 @@ check() { # check <repo dir> <story branch> <1 if an earlier command in the call
     "PASS "*) review_covers "${rev#PASS }" ;;
     *) block "$id: pm-exec has no 'review: PASS <sha>' (has '${rev:-nothing}'); record the reviewed head" ;;
   esac
-  extra=$(git -C "$g" diff --name-only "$head...HEAD" | grep -vE "$STATE_RE" | head -3 | oneline)
+  extra=$(git -C "$g" diff --name-only "$head...HEAD" | grep -vE "$RECORD_RE" | head -3 | oneline)
   [ -z "$extra" ] || block "$cur changed $extra since $br last merged it; merge $cur into $br, gate again"
   if [ "$(git -C "$g" show HEAD:docs/gate.txt 2>/dev/null | awk 'NR==1{print $1}')" = FAIL ] \
      && ! printf '%s' "$tags" | grep -q '"fixes-gate"'; then

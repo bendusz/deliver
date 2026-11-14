@@ -68,7 +68,7 @@ lacks STATUS, the head COMMIT or a CRITERIA line goes back first (`roles.md` `##
    - `PASS` from every reviewer: record `review: PASS <head sha>` and verify (step 7).
    - `CONCERNS`: minors only. Fix them in a round if cheap, else note them; record the review
      at the head it covered, then verify. A later code commit needs a new review at the new head;
-     only state commits and a clean merge of `<integration>` (step 8) keep it.
+     only commits to PM records and a clean merge of `<integration>` (step 8) keep it.
    - `FAIL`: a `block` or `major` is open. Fix (step 6).
 
 6. **Fix.** You are the lead reviewer, not an aggregator. Check every finding against the code,
@@ -104,7 +104,7 @@ lacks STATUS, the head COMMIT or a CRITERIA line goes back first (`roles.md` `##
      (Floor 1). Take a story that fixes the gate, or escalate.
    - Bring the branch up to date: `git -C <worktree> merge <integration>`. That tree is what the
      merge will produce: gate it and record `gates: PASS <head sha>`. If that merge brought in
-     anything beyond the state files (`state.md` `## State files`), verify again (step 7).
+     anything beyond the PM records (`state.md` `## PM records`), verify again (step 7).
    - Scan every commit for secrets:
      `bash "<plugin>/scripts/scan-secrets.sh" <integration>..<branch>`. Never merge on a hit.
      A merge commit counts only what it adds itself, so the merge above does not re-report what

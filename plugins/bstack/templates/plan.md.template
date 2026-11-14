@@ -62,7 +62,7 @@
 
 - No visible change: <for a replacement or migration: what "users notice nothing" means, measured how; else N/A>
 - Parity check: <the command or tool that measures it, and its pass bar; else N/A>
-- Accepted differences: listed by name in docs/acceptance-differences.md (a state file: recording one never voids the release candidate)
+- Accepted differences: listed by name in docs/acceptance-differences.md (a PM record: recording one never voids the release candidate)
 
 ## Waivers
 <!-- The only way to waive a requirement the references set (verifier, tests first, a second

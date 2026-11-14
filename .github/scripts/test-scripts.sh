@@ -185,7 +185,7 @@ expect "guard: git -C from elsewhere is followed" 2 "later commits" hook "$work"
 expect "guard: cd && merge is followed" 2 "later commits" hook "$work" "cd $mg && $M"
 head2=$(git rev-parse pm/S1-1-a); exec_line "PASS $head2" "PASS $head2"
 git switch -q pm/S1-1-a; git merge -q --no-edit main; git switch -q main
-expect "guard: a later merge that brings only state files passes" 0 "" hook "$mg" "$M"
+expect "guard: a later merge that brings only PM records passes" 0 "" hook "$mg" "$M"
 echo other > src/b.txt; commit "unrelated code on main"
 expect "guard: main code the branch has not merged blocks" 2 "since pm/S1-1-a last merged it" hook "$mg" "$M"
 git switch -q pm/S1-1-a; git merge -q --no-edit main; head3=$(git rev-parse HEAD); git switch -q main
@@ -298,6 +298,15 @@ n=$((n + 1))
 hout=$(bash "$hygiene")
 if printf '%s' "$hout" | grep -q node_modules; then fails=$((fails + 1)); echo "FAIL hygiene: dependencies are not scripts"
 else echo "ok   hygiene: dependencies are not scripts"; fi
+rm -rf tmp node_modules docs/stories/S1-1-x.md
+expect "hygiene: current files carry no legacy" 0 "ok   legacy: none" bash "$hygiene"
+printf -- '- FR-006: withdrawn, not reused\n' >> docs/plan.md
+printf 'line one\n- ~~old rule~~ new rule\n' > AGENTS.md
+expect "hygiene: a withdrawn line in the plan warns" 1 "WARN legacy: old text at docs/plan.md:2" bash "$hygiene"
+expect "hygiene: struck-through text in AGENTS.md warns" 1 "AGENTS.md:2;" bash "$hygiene"
+printf 'The API formerly returned XML.\n' > README.md
+git checkout -q docs/plan.md AGENTS.md
+expect "hygiene: a README is the reviewer's, not this check's" 0 "ok   legacy: none" bash "$hygiene"
 cd "$work/repo" || exit 2
 
 # --- log.sh ---

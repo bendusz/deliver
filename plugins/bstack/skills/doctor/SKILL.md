@@ -63,7 +63,8 @@ Check, in order, each with its evidence:
 8. **Hygiene**, warnings only. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/hygiene.sh"` from the main
    checkout and quote every `WARN` line: `AGENTS.md` over 32 KiB, an integration branch too far or
    too long ahead of main, a tag missing from main, branches or worktrees of merged stories, PM
-   scripts outside a tracked `ops/pm/`. Each names its fix.
+   scripts outside a tracked `ops/pm/`, struck-through or superseded text left in the plan, spec
+   or `AGENTS.md`. Each names its fix.
 
 End with a one-line verdict: ready only when the host, toolchain, Codex, log, secret scan and
 merge guard checks are `OK` and every gate is `PASS` or `N/A`. Otherwise name the blockers and

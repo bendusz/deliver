@@ -39,7 +39,7 @@ Agents give these reasons for skipping the walk-through. None of them holds:
 | "The user is busy; I will list the differences after release." | A difference found after release becomes a rollback. |
 
 ## 4. After
-- A commit after `rc_sha` that touches anything beyond the state files (`state.md`) voids the
+- A commit after `rc_sha` that touches anything beyond the PM records (`state.md`) voids the
   record: cut a new RC.
 - `Release: production` in the plan: load `release.md`. Otherwise ship the way the user asks
   (`host.md`); never push unasked.

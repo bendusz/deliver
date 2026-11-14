@@ -27,8 +27,8 @@ smaller than in 1.1.1, and so is every child's dispatch.
 - **Merge guard** (`hooks/hooks.json`, `scripts/merge-guard.sh`), a PreToolUse hook on Bash. It
   refuses `git merge … pm/<story>` in a bstack project unless the story's `pm-exec` records
   `gates: PASS <sha>` and `verifier: PASS <sha>` (or `WAIVED` with a Waivers row) that cover the
-  branch head, and `review: PASS <sha>` followed only by state commits or clean merges of the
-  base; the target branch holds nothing the story has not merged; `docs/gate.txt` is not `FAIL`;
+  branch head, and `review: PASS <sha>` followed only by commits to PM records or clean merges
+  of the base; the target branch holds nothing the story has not merged; `docs/gate.txt` is not `FAIL`;
   and the call merges one story only, never a bundle. Only the user may set `BSTACK_NO_ENFORCE=1`. It reads its input with jq, python3 or
   node, and splits the command as the shell quotes it. It also refuses a story merge that follows
   a branch switch in the same call, and, in a bstack project, a story named through `eval`,
@@ -54,7 +54,8 @@ smaller than in 1.1.1, and so is every child's dispatch.
   and having the PM track them would take its attention off the work.
 - **`hygiene.sh`**, run by `/bstack:doctor`: an `AGENTS.md` over 32 KiB, an integration branch
   over 200 commits or 14 days ahead of main, tags missing from main, branches and worktrees of
-  merged stories, and untracked or ignored scripts outside a tracked `ops/pm/`.
+  merged stories, untracked or ignored scripts outside a tracked `ops/pm/`, and struck-through
+  text or "superseded", "withdrawn", "formerly" or "no longer" in the plan, spec or `AGENTS.md`.
 - `check.sh` now enforces the token budgets: `SKILL.md` at most its 1.1.1 size, `acceptance.md`
   and `release.md` at most 4 KB, and each role's dispatch under its 1.1.1 soul.
 - A scan-secrets test that could never fail ("the hit output omits the value") now can: under
@@ -67,7 +68,7 @@ smaller than in 1.1.1, and so is every child's dispatch.
   only after the journeys pass from fresh state with no test helper (`retro.md` `## 0`). A release
   candidate freezes a sha; the user walks it and accepts each difference by name, recorded in
   `docs/acceptance.json` as the plan is in `docs/approval.json`. Accepted differences are listed
-  in `docs/acceptance-differences.md`, a state file, so recording one keeps the release candidate.
+  in `docs/acceptance-differences.md`, a PM record, so recording one keeps the release candidate.
 - **Release** (`references/release.md`, loaded only with `Release: production`). Go/no-go is
   binding (`docs/go-no-go.md`): a waived item moves the date. The release ships with the new
   behaviour switched off. Rehearsal runs on the production service units, and the rollback is
