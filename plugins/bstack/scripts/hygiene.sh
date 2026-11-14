@@ -7,7 +7,6 @@
 #   tags      every tag is on main and on the integration branch.
 #   leftovers no branch or worktree of a merged story survives.
 #   scripts   no untracked or ignored script lies about: PM scripts live tracked in ops/pm/.
-#   heavy     the project's copy of heavy.sh, if present, equals the plugin's.
 set -uo pipefail
 max=200 main=
 usage() { printf 'usage: hygiene.sh [--max-ahead <n>] [--main <branch>]\n' >&2; exit 2; }
@@ -88,12 +87,5 @@ outside() { # every untracked file, and every file in an ignored directory that 
 loose=$(outside | grep -E "$ext" | sort -u | head -5 | tr '\n' ' ')
 if [ -n "$loose" ]; then warn scripts "untracked or ignored scripts: ${loose% }; keep PM scripts tracked in ops/pm/"
 else ok "scripts: none outside git"; fi
-
-# heavy
-hv=$(git rev-parse --path-format=absolute --git-common-dir)/bstack/heavy.sh
-if [ -f "$hv" ]; then
-  if cmp -s "$hv" "$(dirname "$0")/heavy.sh"; then ok "heavy: $hv is current"
-  else warn heavy "$hv differs from the plugin's heavy.sh; copy it again"; fi
-fi
 
 [ "$warns" -eq 0 ]

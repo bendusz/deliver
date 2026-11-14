@@ -1,7 +1,7 @@
 # bstack
 
 A Claude Code plugin marketplace: `plugins/bstack` (the T3-first project manager skill) and
-`plugins/poteto` (Lauren Tan's pstack skills, MIT). The plugin is prose and templates, six
+`plugins/poteto` (Lauren Tan's pstack skills, MIT). The plugin is prose and templates, five
 scripts and one hook.
 
 ## Commands
@@ -21,8 +21,8 @@ scripts and one hook.
   pre-push hook and the PM's merge-time check.
 - `plugins/bstack/scripts/merge-guard.sh`, run by `hooks/hooks.json` on every Bash call: refuses
   a story merge without recorded gates and verifier, or on a red integration gate.
-- `plugins/bstack/scripts/heavy.sh` (slots for tests and builds), `ledger.sh` (a row per merged
-  story) and `hygiene.sh` (`/bstack:doctor`'s machine checks).
+- `plugins/bstack/scripts/ledger.sh` (a row per reviewed story) and `hygiene.sh`
+  (`/bstack:doctor`'s machine checks).
 - `plugins/poteto/`: the ported pstack skills, with their LICENSE and attribution.
 - `.github/scripts/check.sh`: the convention checks below; it runs `test-scripts.sh`, the
   regression tests for the plugin's scripts. CI runs it on Linux and macOS.
@@ -45,7 +45,7 @@ scripts and one hook.
   Code substitutes it. References and templates write `<plugin>`, which every skill defines.
 - Every model id in the plugin and the README is in `check.sh`'s pinned list: full ids such as
   `claude-opus-5-5`, never a moving alias.
-- The six scripts in `plugins/bstack/scripts/` are the only code in the plugin, each executable
+- The five scripts in `plugins/bstack/scripts/` are the only code in the plugin, each executable
   with LF line endings, and `hooks/hooks.json` runs `merge-guard.sh`. Maintainer scripts live
   under `.github/scripts/`.
 - poteto keeps its MIT LICENSE and attribution, and `PORT.md` states its skill count.

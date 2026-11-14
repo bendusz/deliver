@@ -44,8 +44,6 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - `Integration branch:` is the branch the scaffold commit lands on, `main` by default.
   `Active goal:` is one outcome; `PM model:` is what the user chose for you, as they named it.
   `Release:` is `production` when this plan ships to users, which brings in `release.md`.
-- `heavy:` wraps every test and build: `bash "$(git rev-parse --git-common-dir)/bstack/heavy.sh" <slots>`, slots what this machine
-  runs at once without slowing down (start at cores / 8, at least 1).
 - `## Acceptance` is REQUIRED. Name up to 5 journeys a user takes, each with a fresh-state recipe
   and what the user sees when it passes. For a replacement or migration, define now what "no
   visible change" means, the parity check that measures it and its bar, and where accepted
@@ -116,9 +114,8 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
 - With `Skeleton: specdd`, add the SpecDD line held in the `AGENTS.md.template` comment,
   uncommented, to the project `AGENTS.md` Conventions.
 - `.gitignore` includes `tmp/`, appended, never clobbered. `tmp/` is scratch and never enters git.
-- `heavy.sh`, untracked, for every worktree: copy `<plugin>/scripts/heavy.sh` to `bstack/` in
-  `git rev-parse --git-common-dir`, as with the pre-push hook. Any script you write to run the
-  project lives tracked in `ops/pm/`, never in `tmp/` or untracked.
+- Any script you write to run the project lives tracked in `ops/pm/`, never in `tmp/` or
+  untracked.
 - The pre-push secret scan, untracked, for every worktree: `pre-push` in the `hooks` directory of
   `git rev-parse --git-common-dir`. Absent: copy `<plugin>/scripts/scan-secrets.sh` there and
   `chmod 755` it (a copy: the plugin path changes on update). Present without its

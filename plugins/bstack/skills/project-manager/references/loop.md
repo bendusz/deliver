@@ -9,9 +9,8 @@ story's state lives in its `pm-exec` line (`state.md` `## Execution block`); `<i
 `bash "<plugin>/scripts/log.sh" "S1-2: fixing, round 2, null path in parse()"`.
 Every status change below is a mark. Log decisions made without asking the same way.
 
-**Gates** are the plan's `## Commands` test, lint and build, `N/A` where none exists, each run as
-`<heavy> <command>` with the plan's `heavy:` wrapper. `setup` is not a gate: it is what makes a
-fresh worktree able to run them.
+**Gates** are the plan's `## Commands` test, lint and build, `N/A` where none exists. `setup`
+is not a gate: it is what makes a fresh worktree able to run them.
 
 **Dispatch** is `host.md` `## Dispatch` with the `roles.md` model and brief. Keys are
 `<id>-<role>-<round>`, `round` the current `pm-exec.rounds`. A second dispatch of a role in the
@@ -52,8 +51,9 @@ lacks STATUS, the head COMMIT or a CRITERIA line goes back first (`roles.md` `##
 4. **Gate.** Run the gates yourself in the recorded worktree (`cd <worktree>`), never on a
    child's word: its CHECKS are a claim, your run is the evidence. If a gate cannot start
    because the worktree lacks dependencies, run the plan's `setup` there once, then the gates;
-   a gate that still cannot start is red. When `heavy` reports load over the core count, run at
-   most 2 builders until it does not. Then check scope:
+   a gate that still cannot start is red. A check that fails, then passes on a rerun, is still a
+   Fix item, with the failed run's text; if it timed out while other builders ran, also cut to one
+   builder at a time (Rules, Caps). Then check scope:
    - `git diff --name-only <integration>...<branch>` stays inside `pm-meta.touches`.
    - After step 2, `git -C <worktree> diff <tests sha>..HEAD -- <test paths>` prints nothing.
    A red gate, a path outside `touches` or an edited acceptance test is a Fix item (step 6).

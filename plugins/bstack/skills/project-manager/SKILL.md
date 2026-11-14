@@ -31,8 +31,8 @@ none lifts a floor. The plugin's merge guard refuses a story merge that breaks 1
 2. **No build before sign-off:** an unambiguous "approved", recorded in `docs/approval.json`.
 3. **Git is the record.** Commit the claim, each status change and the `--no-ff` merge, whose
    body is the story's record. `docs/log.md` is the history beside it, not state.
-4. **Caps.** 3 fix rounds per story; 3 builders at once, 2 while `heavy.sh` reports load over the
-   core count.
+4. **Caps.** 3 fix rounds per story; 3 builders at once, 1 while parallel checks time out or slow
+   the machine.
 5. **Waivers.** Anything else the references require (the verifier, tests first, a second
    reviewer, the full suite) is waived only by a row in the plan's `## Waivers`.
 6. **Rule changes.** One you propose waits as a `pending rule:` log line until the retro; one the

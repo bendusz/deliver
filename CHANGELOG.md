@@ -36,9 +36,10 @@ smaller than in 1.1.1, and so is every child's dispatch.
   node still runs every other command. It catches mistakes, not an agent set on getting past it.
   For `gh pr merge`, the PM puts the same merge to the guard first (`host.md`), and
   `/bstack:doctor` checks that the guard refuses a sample merge.
-- **`heavy.sh`**: an N-slot semaphore for tests and builds across every worktree (`flock`, or
-  pid symlinks where `flock` is missing, as on macOS), reporting the load before and after. The
-  PM drops to two builders while the load stays over the core count.
+- **Reruns and overload**: a check that fails and then passes on a rerun is still a Fix item,
+  with the failed run's text. If it timed out while other builders ran, the PM also cuts to one
+  builder at a time. This is a rule, not a script, so the plugin's scripts stay free of
+  OS-specific code.
 - **`ledger.sh`**: one row per reviewed story's outcome in `docs/ledger.md`: merged, blocked,
   replaced or abandoned, with its lineage (the root of its `Replaces:` chain), all fix rounds, the
   review-driven ones, first-pass (merged with no review-driven round), and wall time and model per
@@ -46,8 +47,7 @@ smaller than in 1.1.1, and so is every child's dispatch.
   and having the PM track them would take its attention off the work.
 - **`hygiene.sh`**, run by `/bstack:doctor`: an `AGENTS.md` over 32 KiB, an integration branch
   over 200 commits or 14 days ahead of main, tags missing from main, branches and worktrees of
-  merged stories, untracked or ignored scripts outside a tracked `ops/pm/`, and a stale copy of
-  `heavy.sh`.
+  merged stories, and untracked or ignored scripts outside a tracked `ops/pm/`.
 - `check.sh` now enforces the token budgets: `SKILL.md` at most its 1.1.1 size, `acceptance.md`
   and `release.md` at most 4 KB, and each role's dispatch under its 1.1.1 soul.
 - A scan-secrets test that could never fail ("the hit output omits the value") now can: under
@@ -72,7 +72,7 @@ smaller than in 1.1.1, and so is every child's dispatch.
 **Messages**
 - **One brief** for every role: `## Common` (once, not four lines in every soul), the role's
   soul, then a fixed-key header (`BRIEF <story> <role>`, `BASE`, `GOAL`, `DONE WHEN`,
-  `TOUCHES`/`PROTECTED`, `OUT OF SCOPE`, `PRIOR`, `HEAVY`). Round, model and effort stay in the
+  `TOUCHES`/`PROTECTED`, `OUT OF SCOPE`, `PRIOR`). Round, model and effort stay in the
   dispatch target, key and `pm-exec`, out of the child's text. A review brief is neutral: no
   builder, no expected verdict, and PRIOR a plain numbered list.
 - **One reply format** for every role, replacing the builder's JSON and the separate reviewer and
@@ -82,7 +82,7 @@ smaller than in 1.1.1, and so is every child's dispatch.
 - Fixed formats for the Fix list, the escalation (at most 6 lines, with options, their cost, what
   each skips and a default) and the handoff. Story criteria carry `| proof: <command> ->
   <expected>`; stories gain `User-visible:`, `Design review:` and `tags`. The plan gains
-  `Active goal:`, `PM model:`, `Release:` and `heavy:`.
+  `Active goal:`, `PM model:` and `Release:`.
 
 **Models**
 - **One table** in `roles.md` replaces the scattered defaults. The builder is `claude-opus-5-5`
@@ -100,8 +100,8 @@ smaller than in 1.1.1, and so is every child's dispatch.
 **Upgrading**
 - From 1.1: `pm-exec` gains `gates`, which the PM writes at each ship, so the merge guard refuses
   a story until it is gated and recorded. An existing plan takes the new fields (`Active goal:`,
-  `PM model:`, `Release:`, `heavy:`, `## Acceptance`, `## Waivers`) through "Change after
-  sign-off"; until `heavy:` is set, briefs leave out `HEAVY:` and commands run unwrapped. Run
+  `PM model:`, `Release:`, `## Acceptance`, `## Waivers`) through "Change after
+  sign-off". Run
   `/bstack:doctor` to see the hygiene warnings.
 - From `deliver`: the rename in 1.0.0 means a `deliver` install never updates to bstack by itself.
   Remove it with `/plugin marketplace remove deliver`, then install as the README says (see 1.0.0).

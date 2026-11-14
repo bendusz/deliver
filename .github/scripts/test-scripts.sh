@@ -8,7 +8,6 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 scan=$root/plugins/bstack/scripts/scan-secrets.sh
 logsh=$root/plugins/bstack/scripts/log.sh
 guard=$root/plugins/bstack/scripts/merge-guard.sh
-heavy=$root/plugins/bstack/scripts/heavy.sh
 ledger=$root/plugins/bstack/scripts/ledger.sh
 hygiene=$root/plugins/bstack/scripts/hygiene.sh
 fails=0; n=0
@@ -254,41 +253,6 @@ expect "guard: sh -c outside a bstack project passes" 0 "" hook "$work/plain" "s
 expect "guard: the doctor's probe is refused anywhere" 2 "the user's switch" hook "$work" "BSTACK_NO_ENFORCE=1 git merge pm/S0-0-doctor"
 cd "$work/repo" || exit 2
 
-# --- heavy.sh ---
-# Two jobs on one slot run one after the other; on two slots, side by side. Each job appends
-# start and end to a file, so the order shows whether they overlapped.
-modes="symlink"; command -v flock >/dev/null 2>&1 && modes="symlink flock"
-for mode in $modes; do
-  nf=; [ "$mode" = symlink ] && nf=1
-  for k in 1 2; do
-    rm -f "$work/order"
-    job='echo start >> "$1"; sleep 1; echo end >> "$1"'
-    BSTACK_HEAVY_NO_FLOCK=$nf bash "$heavy" "$k" sh -c "$job" sh "$work/order" 2>/dev/null &
-    BSTACK_HEAVY_NO_FLOCK=$nf bash "$heavy" "$k" sh -c "$job" sh "$work/order" 2>/dev/null &
-    wait
-    want="start end start end"; [ "$k" = 2 ] && want="start start end end"
-    expect "heavy ($mode): $k slot(s) give $want" 0 "$want" sh -c 'tr "\n" " " < "$1"' sh "$work/order"
-  done
-done
-expect "heavy: the command's exit status is kept" 3 "" bash "$heavy" 1 sh -c 'exit 3'
-expect "heavy: the load is reported" 0 "heavy: load" bash "$heavy" 1 true
-hd=$(git rev-parse --git-common-dir)/bstack-heavy; mkdir -p "$hd"
-ln -s 999999 "$hd/slot1.lnk"; ln -s 999998 "$hd/reaper.lnk"
-expect "heavy: a dead holder's slot and a dead reaper are taken over" 0 "" env BSTACK_HEAVY_NO_FLOCK=1 bash "$heavy" 1 true
-sleep 30 & live=$!; ln -s "$live" "$hd/slot1.lnk"
-BSTACK_HEAVY_NO_FLOCK=1 bash "$heavy" 1 sh -c 'echo ran > "$1"' sh "$work/live" 2>/dev/null & waiter=$!
-sleep 2; n=$((n + 1))
-if [ -e "$work/live" ]; then fails=$((fails + 1)); echo "FAIL heavy: a live holder's slot is not taken"
-else echo "ok   heavy: a live holder's slot is not taken"; fi
-kill "$waiter" "$live" 2>/dev/null; wait "$waiter" "$live" 2>/dev/null; rm -f "$hd/slot1.lnk"
-mkdir -p "$work/tmpx"
-expect "heavy: outside git, a private directory" 0 "" sh -c 'cd "$1" && shift && exec "$@"' sh "$work" \
-  env TMPDIR="$work/tmpx" XDG_RUNTIME_DIR= bash "$heavy" 1 true
-n=$((n + 1)); if [ -n "$(find "$work/tmpx/bstack-heavy-$(id -u)" -maxdepth 0 -perm 0700)" ]; then echo "ok   heavy: that directory is mode 700"
-else fails=$((fails + 1)); echo "FAIL heavy: that directory is mode 700"; fi
-expect "heavy: slots must be a number" 2 "positive integer" bash "$heavy" x true
-expect "heavy: a command is required" 2 "usage" bash "$heavy" 2
-
 # --- ledger.sh (in the merge-guard repository, where S1-1 has a pm-exec) ---
 cd "$mg" || exit 2
 W="builder=claude-opus-5-5:14m reviewer=gpt-6-astra:6m"
@@ -334,13 +298,6 @@ n=$((n + 1))
 hout=$(bash "$hygiene")
 if printf '%s' "$hout" | grep -q node_modules; then fails=$((fails + 1)); echo "FAIL hygiene: dependencies are not scripts"
 else echo "ok   hygiene: dependencies are not scripts"; fi
-mkdir -p .git/bstack && echo old > .git/bstack/heavy.sh
-expect "hygiene: a stale copy of heavy.sh warns" 1 "WARN heavy" bash "$hygiene"
-cp "$heavy" .git/bstack/heavy.sh
-n=$((n + 1))
-hout=$(bash "$hygiene")
-if printf '%s' "$hout" | grep -q 'ok   heavy'; then echo "ok   hygiene: a current copy of heavy.sh passes"
-else fails=$((fails + 1)); echo "FAIL hygiene: a current copy of heavy.sh passes"; fi
 cd "$work/repo" || exit 2
 
 # --- log.sh ---

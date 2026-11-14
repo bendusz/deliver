@@ -52,7 +52,6 @@
 - lint: `<cmd or N/A>`
 - build: `<cmd or N/A>`
 - run: `<cmd or N/A>`
-- heavy: `bash "$(git rev-parse --git-common-dir)/bstack/heavy.sh" <slots>`  <!-- every test and build runs through it; slots = how many at once this machine takes -->
 
 ## Acceptance
 <!-- REQUIRED. At most 5 journeys a user takes, each run from fresh state through the product's

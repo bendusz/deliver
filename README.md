@@ -46,8 +46,6 @@ Where a machine can check a rule, a script does:
   passing gates, review and verifier at the branch head, the integration gate is not red, and it
   merges one story at a time. Only you can switch it off, by starting Claude Code with
   `BSTACK_NO_ENFORCE=1`.
-- **`heavy.sh`.** Tests and builds wait for one of N slots shared by every worktree, and report
-  the load; the PM runs two builders, not three, while the machine is overloaded.
 - **`ledger.sh`.** One row per reviewed story's outcome, merged or not: its lineage, rounds,
   first-pass, reruns, wall time and model per role. It counts no tokens: tracking them would pull
   the PM's attention off the work.
@@ -178,4 +176,4 @@ GPL-3.0-or-later; see [LICENSE](LICENSE). Copyright (c) 2026 bendusz. `poteto` s
 What bstack writes into your project is yours. The plan, spec, stories, `AGENTS.md`, retros,
 board minutes and `.sdd` files it creates from its templates are your work, under whatever licence
 your project uses. The pre-push hook is an untracked local copy of `scan-secrets.sh`; it is not
-part of your repository, and neither is the untracked copy of `heavy.sh` beside it.
+part of your repository.

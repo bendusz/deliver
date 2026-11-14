@@ -58,10 +58,10 @@ for r in acceptance release; do
   else bad "$r.md is '${c:-missing}' bytes, budget 4096"; fi
 done
 section() { awk -v h="## $1" '$0==h{f=1;next} /^## |^<!--/{f=0} f' "$refs/roles.md"; }
-hdr=$(awk '/^BRIEF /{f=1} f{print} /^HEAVY:/{exit}' "$refs/roles.md")
+hdr=$(awk '/^BRIEF /{f=1} f{print} /^PRIOR:/{exit}' "$refs/roles.md")
 common=$(section Common | wc -c | tr -d ' ')
 for pair in builder:2005:PRIOR reviewer:2035:PRIOR verifier:1744:PRIOR \
-            researcher:1055:'BASE|TOUCHES|PRIOR|HEAVY' spec-architect:1354:'PRIOR|HEAVY'; do
+            researcher:1055:'BASE|TOUCHES|PRIOR' spec-architect:1354:'PRIOR'; do
   role=${pair%%:*}; rest=${pair#*:}; max=${rest%%:*}; drop=${rest#*:}
   soul=$(section "$role" | wc -c | tr -d ' ')
   h=$(printf '%s\n' "$hdr" | grep -vE "^($drop)" | wc -c | tr -d ' ')
@@ -87,10 +87,10 @@ done
 
 # 6. The only code in the plugin is its scripts, executable, with LF endings, and the hook that
 #    runs one of them.
-scripts="heavy.sh hygiene.sh ledger.sh log.sh merge-guard.sh scan-secrets.sh"
+scripts="hygiene.sh ledger.sh log.sh merge-guard.sh scan-secrets.sh"
 code=$(git ls-files "$b" | grep -vE '\.(md|json|template)$' | sort | tr '\n' ' ')
 want=$(for s in $scripts; do printf '%s/scripts/%s ' "$b" "$s"; done)
-if [ "$code" = "$want" ]; then ok "the plugin's only code is its six scripts"
+if [ "$code" = "$want" ]; then ok "the plugin's only code is its five scripts"
 else bad "unexpected non-prose files in the plugin: $code"; fi
 if grep -q '"PreToolUse"' "$b/hooks/hooks.json" 2>/dev/null \
    && grep -q 'CLAUDE_PLUGIN_ROOT}/scripts/merge-guard.sh' "$b/hooks/hooks.json" \
