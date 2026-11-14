@@ -6,7 +6,8 @@ family checks it, a verifier signs it off, and the PM runs the gates and merges.
 implementation code itself.
 
 **Requirements.** T3 Code, with Codex available in T3. bstack dispatches every role through T3
-and stops if T3 is not there. The default workflow needs Codex for the opposite-family review,
+and stops if T3 is not there. The merge guard needs `jq`, `python3` or `node` to read its input,
+and refuses every story merge without one. The default workflow needs Codex for the opposite-family review,
 the design review and research. You may name other models for any dispatch. bstack leans on how T3 behaves
 (where it puts a worktree, what a child's result carries, how a reused request key answers).
 Dispatch, messaging and the model ids were last checked against T3 Code 0.1.9 nightly on

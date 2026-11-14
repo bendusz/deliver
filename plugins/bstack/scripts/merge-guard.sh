@@ -99,7 +99,7 @@ scan() {
       g=$dir; k=$((k + 1))
       while [[ ${c[k]:-} == -* ]]; do
         case ${c[k]} in
-          -C) g=$(resolve "$dir" "${c[k+1]:-}"); k=$((k + 2)) ;;
+          -C) g=$(resolve "$g" "${c[k+1]:-}"); k=$((k + 2)) ;;
           -c|--git-dir|--work-tree|--namespace) k=$((k + 2)) ;;
           *) k=$((k + 1)) ;;
         esac
@@ -135,6 +135,11 @@ if [[ $cmd =~ pm/S[0-9]+-[0-9]+ ]] && [[ $cmd =~ $indirect ]] && { bstack "$cwd"
 fi
 targets=$(scan)
 [ -n "$targets" ] || exit 0
+# git's own repository options and environment are not followed: refuse them on a story merge.
+redirect='(^|[^A-Za-z0-9_-])(--git-dir|--work-tree|GIT_DIR|GIT_WORK_TREE)([^A-Za-z0-9_-]|$)'
+if [[ $cmd =~ $redirect ]]; then
+  block "a story merge with --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE; use cd or -C to name the repository"
+fi
 for w in "${words[@]}"; do   # a HEAD-moving word anywhere in the call, whatever its position
   case $w in switch|checkout|reset|rebase|worktree|stash|bisect|update-ref|symbolic-ref)
     targets=$(printf '%s\n' "$targets" | awk 'BEGIN { FS = OFS = "\t" } { $3 = 1; print }') ;;

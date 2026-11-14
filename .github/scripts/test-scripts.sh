@@ -183,6 +183,12 @@ git switch -q pm/S1-1-a; echo more >> src/a.txt; commit "late change"; git switc
 expect "guard: a code commit after the gated sha blocks" 2 "later commits on pm/S1-1-a change src/a.txt" hook "$mg" "$M"
 expect "guard: git -C from elsewhere is followed" 2 "later commits" hook "$work" "git -C $mg merge --no-ff pm/S1-1-a"
 expect "guard: cd && merge is followed" 2 "later commits" hook "$work" "cd $mg && $M"
+expect "guard: --git-dir from elsewhere blocks" 2 "use cd or -C" hook "$work" "git --git-dir=$mg/.git --work-tree=$mg merge --no-ff pm/S1-1-a"
+expect "guard: --git-dir as its own word blocks" 2 "use cd or -C" hook "$work" "git --git-dir $mg/.git merge pm/S1-1-a"
+expect "guard: GIT_DIR on the command blocks" 2 "use cd or -C" hook "$work" "GIT_DIR=$mg/.git git merge pm/S1-1-a"
+expect "guard: an exported GIT_WORK_TREE blocks" 2 "use cd or -C" hook "$work" "export GIT_WORK_TREE=$mg; git merge pm/S1-1-a"
+expect "guard: a chained -C is followed" 2 "later commits" hook "/" "git -C $work -C mg merge --no-ff pm/S1-1-a"
+expect "guard: --git-dir without a story merge passes" 0 "" hook "$work" "git --git-dir=$mg/.git log -1"
 head2=$(git rev-parse pm/S1-1-a); exec_line "PASS $head2" "PASS $head2"
 git switch -q pm/S1-1-a; git merge -q --no-edit main; git switch -q main
 expect "guard: a later merge that brings only PM records passes" 0 "" hook "$mg" "$M"
