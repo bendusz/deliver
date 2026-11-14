@@ -28,3 +28,23 @@ _Avoid_: state file
 Where a project stands, as git and each story's execution line say it. A PM record can be wrong
 about state; git cannot.
 _Avoid_: status, progress
+
+**Plan**:
+What a project builds and how it behaves. Until the project ships it is the agreed target;
+after that, what shipped. What is built so far is state, which the plan does not hold.
+_Avoid_: source of truth, design doc
+
+**Design**:
+The part of the plan that fixes behaviour: decisions with the option each rejected, contracts,
+invariants and flows.
+_Avoid_: architecture
+
+**Sprint boundary**:
+Everything between a sprint's last merge and the next sprint's first story: the journey gate, the
+cross-story review, the retro, the record and the demo.
+_Avoid_: sprint close, sprint end
+
+**Retro**:
+The part of the sprint boundary that asks what the sprint taught: its three questions and the
+proposed `AGENTS.md` diff.
+_Avoid_: retro for the whole sprint boundary
