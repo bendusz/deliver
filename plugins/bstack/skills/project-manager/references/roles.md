@@ -29,7 +29,6 @@ DONE WHEN:
 TOUCHES: <paths>  PROTECTED: <paths|none>
 OUT OF SCOPE: <items>
 PRIOR: <numbered findings to check, fix and re-review rounds only>
-HEAVY: <the plan's heavy wrapper>
 ```
 - A review brief is neutral: no word on who built it, how many rounds ran or what you expect;
   PRIOR is a plain numbered list of findings, with no builder notes and no "confirm". GOAL says
@@ -41,7 +40,7 @@ HEAVY: <the plan's heavy wrapper>
   dispatch with a letter on the key for any other role. It spends no round and moves no status.
 
 ## Common
-You are a bstack <role> child, not the PM: use no bstack skill. Message only threads the brief names; name your subagents in OPEN. Never write a secret into a file (ask the PM), pass `--no-verify` or set `BSTACK_NO_ENFORCE`. Run tests and builds as `<HEAVY> <command>`.
+You are a bstack <role> child, not the PM: use no bstack skill. Message only threads the brief names; name your subagents in OPEN. Never write a secret into a file (ask the PM), pass `--no-verify` or set `BSTACK_NO_ENFORCE`.
 End with these lines, `n/a` where one does not apply:
 ```
 STATUS: done|blocked|partial

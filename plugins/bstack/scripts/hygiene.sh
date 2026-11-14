@@ -7,7 +7,8 @@
 #   tags      every tag is on main and on the integration branch.
 #   leftovers no branch or worktree of a merged story survives.
 #   scripts   no untracked or ignored script lies about: PM scripts live tracked in ops/pm/.
-#   heavy     the project's copy of heavy.sh, if present, equals the plugin's.
+#   legacy    docs/plan.md, docs/spec.md and AGENTS.md hold no struck-through text and no
+#             "superseded", "withdrawn", "formerly" or "no longer": git keeps what was.
 set -uo pipefail
 max=200 main=
 usage() { printf 'usage: hygiene.sh [--max-ahead <n>] [--main <branch>]\n' >&2; exit 2; }
@@ -89,11 +90,14 @@ loose=$(outside | grep -E "$ext" | sort -u | head -5 | tr '\n' ' ')
 if [ -n "$loose" ]; then warn scripts "untracked or ignored scripts: ${loose% }; keep PM scripts tracked in ops/pm/"
 else ok "scripts: none outside git"; fi
 
-# heavy
-hv=$(git rev-parse --path-format=absolute --git-common-dir)/bstack/heavy.sh
-if [ -f "$hv" ]; then
-  if cmp -s "$hv" "$(dirname "$0")/heavy.sh"; then ok "heavy: $hv is current"
-  else warn heavy "$hv differs from the plugin's heavy.sh; copy it again"; fi
-fi
+# legacy
+old=
+for f in docs/plan.md docs/spec.md AGENTS.md; do
+  [ -f "$f" ] || continue
+  hits=$(grep -nEi '~~[^~]+~~|superseded|withdrawn|formerly|no longer' "$f" | head -3 | cut -d: -f1 | tr '\n' ',')
+  [ -z "$hits" ] || old="$old $f:${hits%,}"
+done
+if [ -n "$old" ]; then warn legacy "old text at${old}; rewrite or delete it, git keeps what was"
+else ok "legacy: none in the plan, spec or AGENTS.md"; fi
 
 [ "$warns" -eq 0 ]

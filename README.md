@@ -6,7 +6,8 @@ family checks it, a verifier signs it off, and the PM runs the gates and merges.
 implementation code itself.
 
 **Requirements.** T3 Code, with Codex available in T3. bstack dispatches every role through T3
-and stops if T3 is not there. The default workflow needs Codex for the opposite-family review,
+and stops if T3 is not there. The merge guard needs `jq`, `python3` or `node` to read its input,
+and refuses every story merge without one. The default workflow needs Codex for the opposite-family review,
 the design review and research. You may name other models for any dispatch. bstack leans on how T3 behaves
 (where it puts a worktree, what a child's result carries, how a reused request key answers).
 Dispatch, messaging and the model ids were last checked against T3 Code 0.1.9 nightly on
@@ -46,13 +47,12 @@ Where a machine can check a rule, a script does:
   passing gates, review and verifier at the branch head, the integration gate is not red, and it
   merges one story at a time. Only you can switch it off, by starting Claude Code with
   `BSTACK_NO_ENFORCE=1`.
-- **`heavy.sh`.** Tests and builds wait for one of N slots shared by every worktree, and report
-  the load; the PM runs two builders, not three, while the machine is overloaded.
 - **`ledger.sh`.** One row per reviewed story's outcome, merged or not: its lineage, rounds,
   first-pass, reruns, wall time and model per role. It counts no tokens: tracking them would pull
   the PM's attention off the work.
 - **`hygiene.sh`**, run by `/bstack:doctor`: an oversized `AGENTS.md`, an integration branch far
-  ahead of main, a tag missing from main, leftovers of merged stories, and loose PM scripts.
+  ahead of main, a tag missing from main, leftovers of merged stories, loose PM scripts, and
+  struck-through or superseded text left in the plan, spec or `AGENTS.md`.
 
 Each sprint ends with the plan's user journeys run from a fresh state, then a demo: what you can
 try and where. Before a release, you walk the release candidate yourself and accept its
@@ -89,8 +89,10 @@ plugin), then run the two steps above. Projects keep working; see the 1.0.0 and 
 
 Describe the work ("act as my PM to build a CLI todo app") or run `/bstack:pm <request>`.
 
-1. **Plan.** The PM talks it through with you and writes `docs/plan.md`, plus `docs/spec.md` when
-   the work will outlive the plan.
+1. **Plan.** The PM talks it through with you and writes `docs/plan.md`: scope, requirements and
+   the low-level design (decisions, contracts, invariants, failure flows). When the project ends,
+   the PM cuts the plan down to that design and it stays as the platform's documentation. A
+   `docs/spec.md` holds the product intent when it needs its own file.
 2. **Sign-off, in conversation.** Nothing is built until you say "approved", recorded in `docs/approval.json`.
 3. **Stories.** Each sprint becomes self-contained files under `docs/stories/`, tracing to the plan's IDs.
 4. **Per-story loop on T3.** Claim, a design review when storage or data changes, tests first,
@@ -158,7 +160,9 @@ go to `docs/board/` in a project the PM manages, and to `tmp/board/` anywhere el
 
 ## State and the decision log
 
-Git is the record: the claim, each status change and the merge are commits. `docs/log.md` is the
+Git is the record: the claim, each status change and the merge are commits. So files hold only
+what is true now: when something changes, the PM and its children rewrite or delete the old text
+instead of adding a note beside it, and the project's `AGENTS.md` says so. `docs/log.md` is the
 decision log, one timestamped line per decision with the why, appended only through the bundled
 `scripts/log.sh` and committed with the PM's next commit. SpecDD is optional and off by default:
 opt in during planning and each sprint gets its `.sdd` contracts before any code. Projects started
@@ -178,4 +182,4 @@ GPL-3.0-or-later; see [LICENSE](LICENSE). Copyright (c) 2026 bendusz. `poteto` s
 What bstack writes into your project is yours. The plan, spec, stories, `AGENTS.md`, retros,
 board minutes and `.sdd` files it creates from its templates are your work, under whatever licence
 your project uses. The pre-push hook is an untracked local copy of `scan-secrets.sh`; it is not
-part of your repository, and neither is the untracked copy of `heavy.sh` beside it.
+part of your repository.

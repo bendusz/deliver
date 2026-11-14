@@ -34,7 +34,7 @@ The claim commit, on the integration branch and before any dispatch, appends to 
 - Fields older versions wrote (`builder` in `pm-meta`, `owner`, `tier`, `panel`, counters) are
   ignored; an old `in-review` status reads as `reviewing`.
 
-## State files
+## PM records
 The PM's records, never a story's code: `docs/stories/`, `docs/evidence/`, `docs/retros/`,
 `docs/log.md`, `docs/ledger.md`, `docs/plan.md`, `docs/handoff.md`, `docs/go-no-go.md`,
 `docs/acceptance-differences.md`,

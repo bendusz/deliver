@@ -8,7 +8,6 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 scan=$root/plugins/bstack/scripts/scan-secrets.sh
 logsh=$root/plugins/bstack/scripts/log.sh
 guard=$root/plugins/bstack/scripts/merge-guard.sh
-heavy=$root/plugins/bstack/scripts/heavy.sh
 ledger=$root/plugins/bstack/scripts/ledger.sh
 hygiene=$root/plugins/bstack/scripts/hygiene.sh
 fails=0; n=0
@@ -184,9 +183,15 @@ git switch -q pm/S1-1-a; echo more >> src/a.txt; commit "late change"; git switc
 expect "guard: a code commit after the gated sha blocks" 2 "later commits on pm/S1-1-a change src/a.txt" hook "$mg" "$M"
 expect "guard: git -C from elsewhere is followed" 2 "later commits" hook "$work" "git -C $mg merge --no-ff pm/S1-1-a"
 expect "guard: cd && merge is followed" 2 "later commits" hook "$work" "cd $mg && $M"
+expect "guard: --git-dir from elsewhere blocks" 2 "use cd or -C" hook "$work" "git --git-dir=$mg/.git --work-tree=$mg merge --no-ff pm/S1-1-a"
+expect "guard: --git-dir as its own word blocks" 2 "use cd or -C" hook "$work" "git --git-dir $mg/.git merge pm/S1-1-a"
+expect "guard: GIT_DIR on the command blocks" 2 "use cd or -C" hook "$work" "GIT_DIR=$mg/.git git merge pm/S1-1-a"
+expect "guard: an exported GIT_WORK_TREE blocks" 2 "use cd or -C" hook "$work" "export GIT_WORK_TREE=$mg; git merge pm/S1-1-a"
+expect "guard: a chained -C is followed" 2 "later commits" hook "/" "git -C $work -C mg merge --no-ff pm/S1-1-a"
+expect "guard: --git-dir without a story merge passes" 0 "" hook "$work" "git --git-dir=$mg/.git log -1"
 head2=$(git rev-parse pm/S1-1-a); exec_line "PASS $head2" "PASS $head2"
 git switch -q pm/S1-1-a; git merge -q --no-edit main; git switch -q main
-expect "guard: a later merge that brings only state files passes" 0 "" hook "$mg" "$M"
+expect "guard: a later merge that brings only PM records passes" 0 "" hook "$mg" "$M"
 echo other > src/b.txt; commit "unrelated code on main"
 expect "guard: main code the branch has not merged blocks" 2 "since pm/S1-1-a last merged it" hook "$mg" "$M"
 git switch -q pm/S1-1-a; git merge -q --no-edit main; head3=$(git rev-parse HEAD); git switch -q main
@@ -254,41 +259,6 @@ expect "guard: sh -c outside a bstack project passes" 0 "" hook "$work/plain" "s
 expect "guard: the doctor's probe is refused anywhere" 2 "the user's switch" hook "$work" "BSTACK_NO_ENFORCE=1 git merge pm/S0-0-doctor"
 cd "$work/repo" || exit 2
 
-# --- heavy.sh ---
-# Two jobs on one slot run one after the other; on two slots, side by side. Each job appends
-# start and end to a file, so the order shows whether they overlapped.
-modes="symlink"; command -v flock >/dev/null 2>&1 && modes="symlink flock"
-for mode in $modes; do
-  nf=; [ "$mode" = symlink ] && nf=1
-  for k in 1 2; do
-    rm -f "$work/order"
-    job='echo start >> "$1"; sleep 1; echo end >> "$1"'
-    BSTACK_HEAVY_NO_FLOCK=$nf bash "$heavy" "$k" sh -c "$job" sh "$work/order" 2>/dev/null &
-    BSTACK_HEAVY_NO_FLOCK=$nf bash "$heavy" "$k" sh -c "$job" sh "$work/order" 2>/dev/null &
-    wait
-    want="start end start end"; [ "$k" = 2 ] && want="start start end end"
-    expect "heavy ($mode): $k slot(s) give $want" 0 "$want" sh -c 'tr "\n" " " < "$1"' sh "$work/order"
-  done
-done
-expect "heavy: the command's exit status is kept" 3 "" bash "$heavy" 1 sh -c 'exit 3'
-expect "heavy: the load is reported" 0 "heavy: load" bash "$heavy" 1 true
-hd=$(git rev-parse --git-common-dir)/bstack-heavy; mkdir -p "$hd"
-ln -s 999999 "$hd/slot1.lnk"; ln -s 999998 "$hd/reaper.lnk"
-expect "heavy: a dead holder's slot and a dead reaper are taken over" 0 "" env BSTACK_HEAVY_NO_FLOCK=1 bash "$heavy" 1 true
-sleep 30 & live=$!; ln -s "$live" "$hd/slot1.lnk"
-BSTACK_HEAVY_NO_FLOCK=1 bash "$heavy" 1 sh -c 'echo ran > "$1"' sh "$work/live" 2>/dev/null & waiter=$!
-sleep 2; n=$((n + 1))
-if [ -e "$work/live" ]; then fails=$((fails + 1)); echo "FAIL heavy: a live holder's slot is not taken"
-else echo "ok   heavy: a live holder's slot is not taken"; fi
-kill "$waiter" "$live" 2>/dev/null; wait "$waiter" "$live" 2>/dev/null; rm -f "$hd/slot1.lnk"
-mkdir -p "$work/tmpx"
-expect "heavy: outside git, a private directory" 0 "" sh -c 'cd "$1" && shift && exec "$@"' sh "$work" \
-  env TMPDIR="$work/tmpx" XDG_RUNTIME_DIR= bash "$heavy" 1 true
-n=$((n + 1)); if [ -n "$(find "$work/tmpx/bstack-heavy-$(id -u)" -maxdepth 0 -perm 0700)" ]; then echo "ok   heavy: that directory is mode 700"
-else fails=$((fails + 1)); echo "FAIL heavy: that directory is mode 700"; fi
-expect "heavy: slots must be a number" 2 "positive integer" bash "$heavy" x true
-expect "heavy: a command is required" 2 "usage" bash "$heavy" 2
-
 # --- ledger.sh (in the merge-guard repository, where S1-1 has a pm-exec) ---
 cd "$mg" || exit 2
 W="builder=claude-opus-5-5:14m reviewer=gpt-6-astra:6m"
@@ -334,13 +304,15 @@ n=$((n + 1))
 hout=$(bash "$hygiene")
 if printf '%s' "$hout" | grep -q node_modules; then fails=$((fails + 1)); echo "FAIL hygiene: dependencies are not scripts"
 else echo "ok   hygiene: dependencies are not scripts"; fi
-mkdir -p .git/bstack && echo old > .git/bstack/heavy.sh
-expect "hygiene: a stale copy of heavy.sh warns" 1 "WARN heavy" bash "$hygiene"
-cp "$heavy" .git/bstack/heavy.sh
-n=$((n + 1))
-hout=$(bash "$hygiene")
-if printf '%s' "$hout" | grep -q 'ok   heavy'; then echo "ok   hygiene: a current copy of heavy.sh passes"
-else fails=$((fails + 1)); echo "FAIL hygiene: a current copy of heavy.sh passes"; fi
+rm -rf tmp node_modules docs/stories/S1-1-x.md
+expect "hygiene: current files carry no legacy" 0 "ok   legacy: none" bash "$hygiene"
+printf -- '- FR-006: withdrawn, not reused\n' >> docs/plan.md
+printf 'line one\n- ~~old rule~~ new rule\n' > AGENTS.md
+expect "hygiene: a withdrawn line in the plan warns" 1 "WARN legacy: old text at docs/plan.md:2" bash "$hygiene"
+expect "hygiene: struck-through text in AGENTS.md warns" 1 "AGENTS.md:2;" bash "$hygiene"
+printf 'The API formerly returned XML.\n' > README.md
+git checkout -q docs/plan.md AGENTS.md
+expect "hygiene: a README is the reviewer's, not this check's" 0 "ok   legacy: none" bash "$hygiene"
 cd "$work/repo" || exit 2
 
 # --- log.sh ---

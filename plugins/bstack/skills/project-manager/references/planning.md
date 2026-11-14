@@ -9,7 +9,7 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - Create `docs/approval.json` as `pending` per `state.md` `## Approval`; commit it with the first draft.
 - Brownfield work: run one native Explore pass for the architecture, the conventions, the real
   test, lint and build commands, and where new code should go. Fold the answers into the plan's
-  Architecture and Commands, and keep them for the stories' Context.
+  Design and Commands, and keep them for the stories' Context.
 - Dispatch a researcher (`roles.md` `## researcher`, via `host.md` `## Dispatch`) only when an
   external unknown decides the plan: a library choice, an unfamiliar SDK. Add `/bstack:codex ask`
   for a consequential or contested call. Cite the
@@ -25,12 +25,15 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - Resolve the markers one question at a time, at most 5 in a session, spent on what most changes
   the build: the question, 2 or 3 options, a recommendation, one line on why it matters. After
   each answer, record the decision where it belongs and in Clarifications, and delete the marker.
-- When Architecture has more than one viable shape and poteto is installed, ask the user to run
-  `/poteto:architect with checkpoint` (it is user-invoked). Fold the sketch and its rationale into
-  Architecture, and list the rejected alternatives under Risks.
+- When the design has more than one viable shape and poteto is installed, ask the user to run
+  `/poteto:architect with checkpoint` (it is user-invoked). Fold the sketch into Design, with
+  each rejected alternative beside the decision it lost to.
 
 ## 3. Write the plan
 - Create `docs/plan.md` from `<plugin>/templates/plan.md.template`, replacing its comments.
+- `## Design` is the low-level design: decisions with the option each rejected, contracts,
+  state and invariants, and flows that end in the main failure and its recovery. It is what
+  remains as the platform's documentation, so keep it true as the build goes.
 - Requirements carry stable IDs, `FR-n` and `AC-n`, and are never renumbered: the stories, the
   reviewer and the verifier trace to them.
 - Acceptance criteria use EARS where behavioural (`WHEN <condition or event>, THE SYSTEM SHALL
@@ -44,8 +47,6 @@ plan, no spec and no sprints. Nothing is built before sign-off.
 - `Integration branch:` is the branch the scaffold commit lands on, `main` by default.
   `Active goal:` is one outcome; `PM model:` is what the user chose for you, as they named it.
   `Release:` is `production` when this plan ships to users, which brings in `release.md`.
-- `heavy:` wraps every test and build: `bash "$(git rev-parse --git-common-dir)/bstack/heavy.sh" <slots>`, slots what this machine
-  runs at once without slowing down (start at cores / 8, at least 1).
 - `## Acceptance` is REQUIRED. Name up to 5 journeys a user takes, each with a fresh-state recipe
   and what the user sees when it passes. For a replacement or migration, define now what "no
   visible change" means, the parity check that measures it and its bar, and where accepted
@@ -84,14 +85,18 @@ found wrong goes through this path, never drip-fed into a running story:
    stop and commit what it has on its branch. Log the trigger and why.
 2. **Classify,** and apply the change at the highest level it touches, then let it flow down:
    - Spec-level, product intent changed: update `docs/spec.md`, then re-derive the plan and stories.
-   - Plan-level, scope, architecture, stories or priorities: update the plan's Scope, Stories
+   - Plan-level, scope, design, stories or priorities: update the plan's Scope, Stories
      table and Traceability, and every affected story file.
    - Story-level, a criteria tweak inside the agreed scope: update just the story file.
-3. **Re-approve if material.** Scope added or removed, architecture changed or requirements
-   altered is material; when unsure, treat it as material. Follow `state.md` `## Approval`: show
+
+   Rewrite or delete in place. A dropped requirement goes, with its rows and any story never
+   dispatched (`git rm`). The log line and the commit message say what changed and why; the
+   files do not.
+3. **Re-approve if material.** Scope added or removed, a decision, contract or invariant
+   changed, or requirements altered is material; when unsure, treat it as material. Follow `state.md` `## Approval`: show
    `git diff <plan_commit> -- docs/plan.md`, ask again, and write a new record only on a new
    approval. A story-level tweak needs no re-approval; log it.
-4. **Replace, never restart.** Edit a story never dispatched in place. A dispatched story keeps
+4. **Replace, never restart.** Edit or delete a story never dispatched. A dispatched story keeps
    its `clientRequestId`s (`host.md` `## Dispatch`), so a rerun would return its old children.
    Instead set its `pm-exec` `status` to `blocked`, add a `Replaced by: <new id>` line, and keep
    its history, branch and worktree. Write the revised story under the next free `S<sprint>-<n>`
@@ -108,7 +113,8 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
   layout, non-default conventions, gotchas), aiming at 30 to 40 lines. Replace every template
   comment rather than copying it, since Codex reads a comment as an instruction. Every child
   loads this file, so test each line: would removing it cause mistakes? Never copy procedure or
-  hard rules into it, nor a line saying the project runs on bstack.
+  hard rules into it, nor a line saying the project runs on bstack. Keep the template's first
+  Conventions line as written; propose it as a diff to an `AGENTS.md` that lacks it.
 - `CLAUDE.md` from `<plugin>/templates/CLAUDE.md.template`, the `@AGENTS.md` bridge.
   If `CLAUDE.md` exists without `AGENTS.md`, propose moving its content into a new `AGENTS.md`
   and making `CLAUDE.md` the bridge; show the diff and ask. If both exist and `CLAUDE.md` is not
@@ -116,9 +122,8 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
 - With `Skeleton: specdd`, add the SpecDD line held in the `AGENTS.md.template` comment,
   uncommented, to the project `AGENTS.md` Conventions.
 - `.gitignore` includes `tmp/`, appended, never clobbered. `tmp/` is scratch and never enters git.
-- `heavy.sh`, untracked, for every worktree: copy `<plugin>/scripts/heavy.sh` to `bstack/` in
-  `git rev-parse --git-common-dir`, as with the pre-push hook. Any script you write to run the
-  project lives tracked in `ops/pm/`, never in `tmp/` or untracked.
+- Any script you write to run the project lives tracked in `ops/pm/`, never in `tmp/` or
+  untracked.
 - The pre-push secret scan, untracked, for every worktree: `pre-push` in the `hooks` directory of
   `git rev-parse --git-common-dir`. Absent: copy `<plugin>/scripts/scan-secrets.sh` there and
   `chmod 755` it (a copy: the plugin path changes on update). Present without its

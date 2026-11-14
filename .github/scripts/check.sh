@@ -22,7 +22,7 @@ if [ -n "$ver" ] && [ "$ver" = "$top" ]; then ok "version $ver matches the top C
 else bad "plugin.json version '$ver' differs from the top CHANGELOG heading '$top'"; fi
 
 # 2. Every bstack SKILL.md stays under 16,000 characters, with a name equal to its directory
-#    and a description. No legacy commands directory.
+#    and a description. No commands directory.
 for f in "$b"/skills/*/SKILL.md; do
   d=$(basename "$(dirname "$f")")
   c=$(wc -m < "$f" | tr -d ' ')
@@ -30,7 +30,7 @@ for f in "$b"/skills/*/SKILL.md; do
   grep -qx "name: $d" "$f" || bad "$d/SKILL.md lacks 'name: $d'"
   grep -q '^description: .' "$f" || bad "$d/SKILL.md lacks a description"
 done
-if [ -e "$b/commands" ]; then bad "$b/commands exists; entry points are skills"; else ok "no legacy commands directory"; fi
+if [ -e "$b/commands" ]; then bad "$b/commands exists; entry points are skills"; else ok "no commands directory"; fi
 
 # 3. Every reference and template a skill or reference names exists.
 miss=0
@@ -48,7 +48,7 @@ done
 
 # 3b. Token budgets. project-manager/SKILL.md loads every session; the phase references load only
 #     at their phase; a child's dispatch (## Common + its soul + the header skeleton) stays under
-#     its 1.1.1 soul. Raise a number only on purpose, with a CHANGELOG line saying why.
+#     its limit below. Raise a number only on purpose, with a CHANGELOG line saying why.
 pmsk=$(wc -c < "$b/skills/project-manager/SKILL.md" | tr -d ' ')
 if [ "$pmsk" -le 6257 ]; then ok "project-manager/SKILL.md is $pmsk bytes (budget 6257)"
 else bad "project-manager/SKILL.md is $pmsk bytes, over its 6257 budget"; fi
@@ -58,16 +58,16 @@ for r in acceptance release; do
   else bad "$r.md is '${c:-missing}' bytes, budget 4096"; fi
 done
 section() { awk -v h="## $1" '$0==h{f=1;next} /^## |^<!--/{f=0} f' "$refs/roles.md"; }
-hdr=$(awk '/^BRIEF /{f=1} f{print} /^HEAVY:/{exit}' "$refs/roles.md")
+hdr=$(awk '/^BRIEF /{f=1} f{print} /^PRIOR:/{exit}' "$refs/roles.md")
 common=$(section Common | wc -c | tr -d ' ')
 for pair in builder:2005:PRIOR reviewer:2035:PRIOR verifier:1744:PRIOR \
-            researcher:1055:'BASE|TOUCHES|PRIOR|HEAVY' spec-architect:1354:'PRIOR|HEAVY'; do
+            researcher:1055:'BASE|TOUCHES|PRIOR' spec-architect:1354:'PRIOR'; do
   role=${pair%%:*}; rest=${pair#*:}; max=${rest%%:*}; drop=${rest#*:}
   soul=$(section "$role" | wc -c | tr -d ' ')
   h=$(printf '%s\n' "$hdr" | grep -vE "^($drop)" | wc -c | tr -d ' ')
   t=$((common + soul + h))
   if [ "$soul" -gt 1 ] && [ "$t" -lt "$max" ]; then ok "$role dispatch is $t bytes (under $max)"
-  else bad "$role dispatch is $t bytes, not under its 1.1.1 soul's $max"; fi
+  else bad "$role dispatch is $t bytes, not under its $max limit"; fi
 done
 
 # 4. ${CLAUDE_PLUGIN_ROOT} is substituted only in a SKILL.md body and hooks.json: references say <plugin>.
@@ -87,10 +87,10 @@ done
 
 # 6. The only code in the plugin is its scripts, executable, with LF endings, and the hook that
 #    runs one of them.
-scripts="heavy.sh hygiene.sh ledger.sh log.sh merge-guard.sh scan-secrets.sh"
+scripts="hygiene.sh ledger.sh log.sh merge-guard.sh scan-secrets.sh"
 code=$(git ls-files "$b" | grep -vE '\.(md|json|template)$' | sort | tr '\n' ' ')
 want=$(for s in $scripts; do printf '%s/scripts/%s ' "$b" "$s"; done)
-if [ "$code" = "$want" ]; then ok "the plugin's only code is its six scripts"
+if [ "$code" = "$want" ]; then ok "the plugin's only code is its five scripts"
 else bad "unexpected non-prose files in the plugin: $code"; fi
 if grep -q '"PreToolUse"' "$b/hooks/hooks.json" 2>/dev/null \
    && grep -q 'CLAUDE_PLUGIN_ROOT}/scripts/merge-guard.sh' "$b/hooks/hooks.json" \

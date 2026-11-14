@@ -1,7 +1,7 @@
 # <Project> feature specification
 
 <!--
-Focus on WHAT users need and WHY, never HOW. No stack, no architecture; that belongs in docs/plan.md.
+Focus on WHAT users need and WHY, never HOW. No stack, no design; that belongs in docs/plan.md.
 Use stable IDs (US-001, FR-001, AC-001, and SM-001 when metrics are kept). Stories and the plan trace
 to FR-/AC-; US- is narrative context. Never renumber an existing ID.
 Every requirement must be testable.

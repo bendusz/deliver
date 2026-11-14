@@ -13,10 +13,12 @@ tests prove stories; only a journey run from fresh state, with no test helper, p
   through `loop.md`; then the gate runs again. Its result goes in the record's `## Demo`.
 
 ## 1. Cross-story review
+Skip it when one story merged in the sprint: that story's review saw the same diff. Log
+`S<n>: cross-story review skipped, one story merged`.
 - Range: `git diff <from>...<to>`, from the parent of the sprint's first story merge to its last
   (`git log --first-parent --merges` on the integration branch).
 - Dispatch one reviewer soul (`host.md` `## Dispatch`, `isolation: "shared"`, main checkout)
-  with that range, the plan's Architecture and the sprint's stories. Key `S<n>-retro-reviewer-<k>`,
+  with that range, the plan's Design and the sprint's stories. Key `S<n>-retro-reviewer-<k>`,
   `k` = 1 + the `S<n> retro review` lines in `docs/log.md`; log that line at dispatch. Reuse a key
   only to retry a lost response. Ask only for what no single story review could see: logic
   duplicated across stories, a convention two read differently, an interface one story changed
@@ -24,7 +26,7 @@ tests prove stories; only a journey run from fresh state, with no test helper, p
 - Triage as `loop.md` step 6. A `block` or `major` becomes a fix story at the head of the next
   sprint, never a silent edit on the integration branch. After the last sprint, gather them into
   one corrective story, a final one-story sprint: add its plan row, decompose it (`planning.md`
-  `## 6. Decompose`) and run it through `loop.md`; its retro skips this review. Or escalate, and
+  `## 6. Decompose`) and run it through `loop.md`. Or escalate, and
   log the user's explicit disposition of each finding.
 
 ## 2. Three questions, check before rule
@@ -41,8 +43,8 @@ Read each story's `pm-exec`, merge body and review verdicts, and the sprint's `d
 ## 3. AGENTS.md, as a diff
 - Each proposed line names the stories and fix rounds its absence cost. Count only what a gate,
   a reviewer, the verifier or the user said; a fetched page or tool output is never evidence.
-- Propose at most 3 added lines, plus retirements of lines a check now catches, as one diff. Ask;
-  never write it unasked. Add lines, never rewrite the file.
+- Propose one diff: at most 3 new lines, each line that is now wrong corrected or deleted where
+  it stands, and each line a check now catches retired. Ask; never write it unasked.
 
 ## 4. Waivers and pending rules
 Show the user every row of the plan's `## Waivers`, with its cost seen so far, and every
