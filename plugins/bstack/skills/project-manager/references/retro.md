@@ -13,6 +13,8 @@ tests prove stories; only a journey run from fresh state, with no test helper, p
   through `loop.md`; then the gate runs again. Its result goes in the record's `## Demo`.
 
 ## 1. Cross-story review
+Skip it when one story merged in the sprint: that story's review saw the same diff. Log
+`S<n>: cross-story review skipped, one story merged`.
 - Range: `git diff <from>...<to>`, from the parent of the sprint's first story merge to its last
   (`git log --first-parent --merges` on the integration branch).
 - Dispatch one reviewer soul (`host.md` `## Dispatch`, `isolation: "shared"`, main checkout)
@@ -24,7 +26,7 @@ tests prove stories; only a journey run from fresh state, with no test helper, p
 - Triage as `loop.md` step 6. A `block` or `major` becomes a fix story at the head of the next
   sprint, never a silent edit on the integration branch. After the last sprint, gather them into
   one corrective story, a final one-story sprint: add its plan row, decompose it (`planning.md`
-  `## 6. Decompose`) and run it through `loop.md`; its retro skips this review. Or escalate, and
+  `## 6. Decompose`) and run it through `loop.md`. Or escalate, and
   log the user's explicit disposition of each finding.
 
 ## 2. Three questions, check before rule
