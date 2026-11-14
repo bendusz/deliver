@@ -85,11 +85,15 @@ found wrong goes through this path, never drip-fed into a running story:
    - Plan-level, scope, architecture, stories or priorities: update the plan's Scope, Stories
      table and Traceability, and every affected story file.
    - Story-level, a criteria tweak inside the agreed scope: update just the story file.
+
+   Rewrite or delete in place. A dropped requirement goes, with its rows and any story never
+   dispatched (`git rm`). The log line and the commit message say what changed and why; the
+   files do not.
 3. **Re-approve if material.** Scope added or removed, architecture changed or requirements
    altered is material; when unsure, treat it as material. Follow `state.md` `## Approval`: show
    `git diff <plan_commit> -- docs/plan.md`, ask again, and write a new record only on a new
    approval. A story-level tweak needs no re-approval; log it.
-4. **Replace, never restart.** Edit a story never dispatched in place. A dispatched story keeps
+4. **Replace, never restart.** Edit or delete a story never dispatched. A dispatched story keeps
    its `clientRequestId`s (`host.md` `## Dispatch`), so a rerun would return its old children.
    Instead set its `pm-exec` `status` to `blocked`, add a `Replaced by: <new id>` line, and keep
    its history, branch and worktree. Write the revised story under the next free `S<sprint>-<n>`
@@ -106,7 +110,8 @@ Only add what is absent. Never overwrite a user-authored file without showing a 
   layout, non-default conventions, gotchas), aiming at 30 to 40 lines. Replace every template
   comment rather than copying it, since Codex reads a comment as an instruction. Every child
   loads this file, so test each line: would removing it cause mistakes? Never copy procedure or
-  hard rules into it, nor a line saying the project runs on bstack.
+  hard rules into it, nor a line saying the project runs on bstack. Keep the template's first
+  Conventions line as written; propose it as a diff to an `AGENTS.md` that lacks it.
 - `CLAUDE.md` from `<plugin>/templates/CLAUDE.md.template`, the `@AGENTS.md` bridge.
   If `CLAUDE.md` exists without `AGENTS.md`, propose moving its content into a new `AGENTS.md`
   and making `CLAUDE.md` the bridge; show the diff and ask. If both exist and `CLAUDE.md` is not

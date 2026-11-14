@@ -13,6 +13,11 @@
 <three to eight lines: top-level directories and what lives where>
 
 ## Conventions
+- Files say what is true now; git keeps what was. When a change makes text false, outdated or
+  duplicated, rewrite or delete it in the same commit and fix what points to it. Never add a
+  correction, a dated note or a replacement section beside old text. One home per fact; link to
+  it. Clean up only what your task touches. Only `docs/log.md` is chronological. `tmp/` is
+  untracked scratch: read it only when the task names it.
 <only rules that differ from the language or framework default>
 <!-- with Skeleton: specdd, add: Before working here, read .specdd/bootstrap.md and treat .sdd files as source-adjacent contracts. -->
 

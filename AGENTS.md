@@ -26,9 +26,9 @@ scripts and one hook.
 - `plugins/poteto/`: the ported pstack skills, with their LICENSE and attribution.
 - `.github/scripts/check.sh`: the convention checks below; it runs `test-scripts.sh`, the
   regression tests for the plugin's scripts. CI runs it on Linux and macOS.
-- `docs/specs/`, `docs/plans/`: this repo's design (`YYYY-MM-DD-vX.Y-topic.md`).
-  `docs/research/`: research reports. `docs/prior-art.md`: what the design draws on.
-  `docs/evals/`: pressure-scenario runs, without and with each change.
+- `docs/evals.md`: the pressure scenario behind each rule, with its result without and with the
+  rule. `docs/prior-art.md`: what the design draws on. `docs/review-calibration.md`: why one
+  reviewer is the default.
 
 ## Conventions
 `check.sh` enforces these; run it before every commit:
@@ -36,11 +36,12 @@ scripts and one hook.
 - Every bstack `SKILL.md` stays under 16,000 characters, leaving headroom under Claude Code's
   20,000-character re-attachment cut after compaction.
 - Token budgets: `project-manager/SKILL.md` at most 6,257 bytes, `acceptance.md` and `release.md`
-  at most 4,096, and each role's dispatch (`## Common` + soul + header) under its 1.1.1 soul.
+  at most 4,096, and each role's dispatch (`## Common` + soul + header) under the limit `check.sh`
+  holds for it.
 - Every `references/*.md` and every template a skill or reference names exists, and so does
   `skills/board/souls.md` with its two souls.
 - Entry points are skills under `skills/<name>/SKILL.md`, each with `name` equal to its
-  directory and a `description`. The plugin has no legacy `commands` directory.
+  directory and a `description`. The plugin has no `commands` directory.
 - `${CLAUDE_PLUGIN_ROOT}` appears only in a `SKILL.md` body and `hooks/hooks.json`, where Claude
   Code substitutes it. References and templates write `<plugin>`, which every skill defines.
 - Every model id in the plugin and the README is in `check.sh`'s pinned list: full ids such as
@@ -52,9 +53,16 @@ scripts and one hook.
 
 A reviewer still checks these by hand:
 - A model id added to the pinned list exists in `orchestrator_capabilities`.
-- New CHANGELOG entries go on top; everything below stays as written.
-- A change to any plugin script comes with a case in `test-scripts.sh`.
-- A skill change comes with a pressure scenario run without and with it (`docs/evals/`).
+- Files say what is true now; git keeps what was. When a change makes text false, outdated or
+  duplicated, rewrite or delete it in the same commit and fix what points to it. Never add a
+  correction, a dated note or a replacement section beside old text. One home per fact; link to
+  it. The commit message says what changed and why.
+- `CHANGELOG.md` is the one chronological file: a new entry goes on top, and an unreleased entry
+  is edited in place as the release changes.
+- A change to any plugin script comes with a case in `test-scripts.sh`. No plugin script branches
+  by OS or leaves anything behind outside the repository it runs in.
+- A skill change comes with a pressure scenario run without and with it, and its row in
+  `docs/evals.md`. A rule whose scenario passes without it is not added.
 
 ## Gotchas
 - `plugin.json` version must equal the top CHANGELOG heading.

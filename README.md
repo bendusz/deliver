@@ -156,7 +156,9 @@ go to `docs/board/` in a project the PM manages, and to `tmp/board/` anywhere el
 
 ## State and the decision log
 
-Git is the record: the claim, each status change and the merge are commits. `docs/log.md` is the
+Git is the record: the claim, each status change and the merge are commits. So files hold only
+what is true now: when something changes, the PM and its children rewrite or delete the old text
+instead of adding a note beside it, and the project's `AGENTS.md` says so. `docs/log.md` is the
 decision log, one timestamped line per decision with the why, appended only through the bundled
 `scripts/log.sh` and committed with the PM's next commit. SpecDD is optional and off by default:
 opt in during planning and each sprint gets its `.sdd` contracts before any code. Projects started

@@ -7,7 +7,7 @@ All notable changes to this project are documented here.
 Adds the guardrails, phases and message formats that a long production run under bstack's
 predecessor showed were missing. Each change is a template field, a script or a hook before it is
 prose. Each was kept only if a pressure scenario showed the PM getting it wrong without it, and
-right with it. The results are in `docs/evals/2026-11-13-v1.2.md`. `project-manager/SKILL.md` is
+right with it. The results are in `docs/evals.md`. `project-manager/SKILL.md` is
 smaller than in 1.1.1, and so is every child's dispatch.
 
 **Floors and waivers**
@@ -40,6 +40,12 @@ smaller than in 1.1.1, and so is every child's dispatch.
   with the failed run's text. If it timed out while other builders ran, the PM also cuts to one
   builder at a time. This is a rule, not a script, so the plugin's scripts stay free of
   OS-specific code.
+- **Current files**: files say only what is true now, and git keeps what was. When a change
+  makes text false, the PM rewrites or deletes it in place: a dropped requirement goes with its
+  rows and any story never dispatched, with no dated note or `withdrawn` line left behind. The
+  retro corrects a wrong `AGENTS.md` line where it stands instead of adding one beside it. A new
+  project's `AGENTS.md` carries the same convention for every child; the PM proposes it as a
+  diff to an existing one.
 - **`ledger.sh`**: one row per reviewed story's outcome in `docs/ledger.md`: merged, blocked,
   replaced or abandoned, with its lineage (the root of its `Replaces:` chain), all fix rounds, the
   review-driven ones, first-pass (merged with no review-driven round), and wall time and model per
